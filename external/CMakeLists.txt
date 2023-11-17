@@ -1,3 +1,4 @@
+find_package(Vulkan REQUIRED)
 set(GLM_INCLUDE_DIR "./glm")
 set(GLFW_INCLUDE_DIR "./glfw/include")
 set(INCLUDE_DIRS 
