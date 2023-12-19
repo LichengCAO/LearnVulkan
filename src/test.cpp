@@ -7,7 +7,7 @@
 #include "trig_app.h"
 #include <cstdlib>
 #include <stdexcept>
-#include <vulkan/vulkan.h>
+//#include <vulkan/vulkan.h>
 int main() {
     HelloTriangleApplication app;
     try {
