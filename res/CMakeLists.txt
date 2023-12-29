@@ -25,16 +25,19 @@ endforeach()
 
 # add to the folder ~ in IDE explorer
 source_group("ShaderSources" FILES ${SHADER_SOURCES})
-
+#message("Shaders: ${SHADER_SOURCES}")
+#message("Images: ${IMAGES}")
+message(${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders)
 foreach(SHADER ${SHADER_SOURCES})
     set(SHADER_DIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders)
     get_filename_component(fname ${SHADER} NAME)
     add_custom_target(${fname}.spv  
         COMMAND ${CMAKE_COMMAND} -E make_directory ${SHADER_DIR} &&
         $ENV{VK_SDK_PATH}/Bin/glslangValidator.exe -V ${SHADER} -o ${SHADER_DIR}/${fname}.spv -g
-        SOURCES${SHADER}
+        SOURCES ${SHADER}
     )
+    message(${SHADER_DIR}/${fname}.spv)
     # add to the folder CompliedSPV in IDE explorer
-    funcAddToFolder("CompliedSPV" ${fname}.spv)
+    funcAddToFolder(${fname}.spv "CompliedSPV")
     add_dependencies(${CMAKE_PROJECT_NAME} ${fname}.spv)
 endforeach()

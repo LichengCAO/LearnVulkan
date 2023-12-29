@@ -22,8 +22,6 @@ endforeach()
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 #add_subdirectory(src)
-add_subdirectory(external)
-add_subdirectory(res)
 
 file(GLOB SOURCES
      "src/*.cpp"
@@ -35,5 +33,10 @@ file(GLOB HEADERS
 source_group("Sources" FILES ${SOURCES})
 source_group("Headers" FILES ${HEADERS})
 add_executable(${CMAKE_PROJECT_NAME} ${SOURCES} ${HEADERS})
+
+add_subdirectory(external)
+add_subdirectory(res)
+
 target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC ExternalLibs)
 target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC Vulkan_INCLUDE_DIR)
+
