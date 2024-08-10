@@ -12,6 +12,7 @@ class HelloTriangleApplication {
 public:
 	void run();
 private:
+	uint32_t m_curFrame = 0;
 	GLFWwindow* m_window;
 	VkInstance m_vkInstance;
 	VkPhysicalDevice m_vkPhysicDevice = VK_NULL_HANDLE;
@@ -30,10 +31,11 @@ private:
 	VkPipeline m_vkGraphicsPipeline;
 	std::vector<VkFramebuffer> m_vkFramebuffers;
 	VkCommandPool m_vkCommandPool;
-	VkCommandBuffer m_vkCommandBuffer;
-	VkSemaphore imageAvailableSemaphore;
-	VkSemaphore renderFinishedSemaphore;
-	VkFence inFlightFence;
+	std::vector<VkCommandBuffer> m_vkCommandBuffers;
+	std::vector<VkSemaphore> m_vkImageAvailableSemaphores;
+	std::vector<VkSemaphore> m_vkRenderFinishedSemaphores;
+	std::vector<VkFence> m_vkInFlightFences;
+	bool m_bufferResized = false;
 
 	void printAvailableExtensions()const;
 	VkDebugUtilsMessengerCreateInfoEXT getDefaultDebugMessengerCreateInfo()const;
@@ -74,8 +76,10 @@ private:
 	void createGraphicsPipeline();
 	void createFramebuffers();
 	void createCommandPool();
-	void createCommandBuffer();
+	void createCommandBuffers();
 	void createSyncObjects();
+	void recreateSwapChain();
+	void cleanUpSwapChain();
 
 	bool isDeviceSuitable(const VkPhysicalDevice& device)const;
 	
@@ -83,4 +87,6 @@ private:
 	
 	void mainLoop();
 	void cleanUp();
+public:
+	void setFrameResized(bool val) { m_bufferResized = val; };
 };
