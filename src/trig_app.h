@@ -29,6 +29,8 @@ private:
 	VkRenderPass m_vkRenderPass;
 	VkPipelineLayout m_vkPipelineLayout;
 	VkPipeline m_vkGraphicsPipeline;
+	VkBuffer m_vkVertexBuffer;
+	VkDeviceMemory m_vkVertexBufferMemory;
 	std::vector<VkFramebuffer> m_vkFramebuffers;
 	VkCommandPool m_vkCommandPool;
 	std::vector<VkCommandBuffer> m_vkCommandBuffers;
@@ -80,8 +82,11 @@ private:
 	void createSyncObjects();
 	void recreateSwapChain();
 	void cleanUpSwapChain();
+	void createVertexBuffer();
 
 	bool isDeviceSuitable(const VkPhysicalDevice& device)const;
+
+	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
 	
 	QueueFamilyIndices findQueueFamilies(const VkPhysicalDevice& device)const;
 	

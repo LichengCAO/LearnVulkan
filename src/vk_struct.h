@@ -3,6 +3,7 @@
 #define GLFW_INCLUDE_VULKAN //->auto load <vulkan/vulkan.h>
 #include <GLFW/glfw3.h>
 #include <vector>
+#include <glm/glm.hpp>
 
 struct QueueFamilyIndices {
 	std::optional<uint32_t> graphicsFamily;
