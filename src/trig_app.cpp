@@ -10,6 +10,22 @@
 #include <fstream>
 #include "drawable.h"
 
+#define VK_CHECK(vkcommand) \
+do{\
+if((vkcommand)!=VK_SUCCESS){\
+   throw std::runtime_error(\
+"something went wrong!");\
+}\
+}while(0)
+
+#define VK_CHECK(vkcommand, message) \
+do{\
+if((vkcommand)!=VK_SUCCESS){\
+   throw std::runtime_error(\
+#message);\
+}\
+}while(0)
+
 const std::vector<const char*> validationLayers = {
 	"VK_LAYER_KHRONOS_validation"
 };
@@ -919,39 +935,105 @@ void HelloTriangleApplication::cleanUpSwapChain()
 
 void HelloTriangleApplication::createVertexBuffer()
 {
-	VkBufferCreateInfo bufferCreateInfo = {
+	VkDeviceSize bufferSize = sizeof(Vertex) * vertices.size();
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+	createBuffer(bufferSize, 
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		stagingBuffer,
+		stagingBufferMemory
+		);
+
+	void* data;
+	vkMapMemory(m_vkDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
+	memcpy(data, vertices.data(), (size_t)bufferSize);
+	vkUnmapMemory(m_vkDevice, stagingBufferMemory);
+
+	createBuffer(bufferSize,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		m_vkVertexBuffer,
+		m_vkVertexBufferMemory
+	);
+
+	copyBuffer(stagingBuffer, m_vkVertexBuffer, bufferSize);
+
+	vkDestroyBuffer(m_vkDevice, stagingBuffer, nullptr);
+	vkFreeMemory(m_vkDevice, stagingBufferMemory, nullptr);
+}
+
+void HelloTriangleApplication::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory)
+{
+	VkBufferCreateInfo bufferInfo = {
 		.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-		.flags = 0, //use for sparse buffer memory
-		.size = sizeof(Vertex) * vertices.size(),
-		.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT,
+		.size = size,
+		.usage = usage,
 		.sharingMode = VK_SHARING_MODE_EXCLUSIVE,
 	};
 
-	if (vkCreateBuffer(m_vkDevice, &bufferCreateInfo, nullptr, &m_vkVertexBuffer) != VK_SUCCESS) {
-		throw std::runtime_error("failed to create vertex buffer!");
+	if (vkCreateBuffer(m_vkDevice, &bufferInfo, nullptr, &buffer) != VK_SUCCESS) {
+		throw std::runtime_error("failed to create buffer!");
 	}
 
 	VkMemoryRequirements memRequirements;
-	vkGetBufferMemoryRequirements(m_vkDevice, m_vkVertexBuffer, &memRequirements);
+	vkGetBufferMemoryRequirements(m_vkDevice, buffer, &memRequirements);
 
-	VkMemoryPropertyFlags memPropertyFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 	VkMemoryAllocateInfo allocInfo = {
 		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-		.allocationSize = memRequirements.size, // this could be different from bufferCreateInfo.size!!!
-		.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, memPropertyFlags)
+		.allocationSize = memRequirements.size, //could be different from size on Host!
+		.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits , properties),
 	};
 
-	if (vkAllocateMemory(m_vkDevice, &allocInfo, nullptr, &m_vkVertexBufferMemory) != VK_SUCCESS) {
-		throw std::runtime_error("failed to alloc vertex buffer memory!");
+	if (vkAllocateMemory(m_vkDevice, &allocInfo, nullptr, &bufferMemory) != VK_SUCCESS) {
+		throw std::runtime_error("failed to allocate buffer memory!");
 	}
 
 	VkDeviceSize offset = 0; // should be divisible by memRequirements.alignment
-	vkBindBufferMemory(m_vkDevice, m_vkVertexBuffer, m_vkVertexBufferMemory, offset);
+	vkBindBufferMemory(m_vkDevice, buffer, bufferMemory, offset);
+}
 
-	void* data;
-	vkMapMemory(m_vkDevice, m_vkVertexBufferMemory, 0, bufferCreateInfo.size, 0, &data);
-	memcpy(data, vertices.data(), (size_t)bufferCreateInfo.size);
-	vkUnmapMemory(m_vkDevice, m_vkVertexBufferMemory);
+void HelloTriangleApplication::copyBuffer(VkBuffer& src, VkBuffer& dst, VkDeviceSize size)
+{
+	VkCommandBufferAllocateInfo allocInfo = {
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+		.commandPool = m_vkCommandPool,
+		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+		.commandBufferCount = 1,
+	};
+
+	VkCommandBuffer cpyCommandBuffer;
+	if (vkAllocateCommandBuffers(m_vkDevice, &allocInfo, &cpyCommandBuffer) != VK_SUCCESS) {
+		throw std::runtime_error("create copy command buffer failed!");
+	}
+
+	VkCommandBufferBeginInfo beginInfo = {
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+	};
+
+	VK_CHECK(vkBeginCommandBuffer(cpyCommandBuffer, &beginInfo), create cpy buffer failed);
+
+	VkBufferCopy cpyRegion = {
+		.srcOffset = 0,
+		.dstOffset = 0,
+		.size = size,
+	};
+
+	vkCmdCopyBuffer(cpyCommandBuffer, src, dst, 1, &cpyRegion);
+
+	vkEndCommandBuffer(cpyCommandBuffer);
+
+	VkSubmitInfo submitInfo = {
+		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+		.commandBufferCount = 1,
+		.pCommandBuffers = &cpyCommandBuffer,
+	};
+
+	VkQueue copyQueue = m_vkGraphicsQueue;
+	VK_CHECK(vkQueueSubmit(copyQueue, 1, &submitInfo, VK_NULL_HANDLE), failed to submit copy command at line 1022);
+	vkQueueWaitIdle(copyQueue);
+	vkFreeCommandBuffers(m_vkDevice, m_vkCommandPool, 1, &cpyCommandBuffer);
 }
 
 bool HelloTriangleApplication::isDeviceSuitable(const VkPhysicalDevice& device)const

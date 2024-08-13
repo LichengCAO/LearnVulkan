@@ -83,7 +83,8 @@ private:
 	void recreateSwapChain();
 	void cleanUpSwapChain();
 	void createVertexBuffer();
-
+	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
+	void copyBuffer(VkBuffer& src, VkBuffer& dst, VkDeviceSize size);
 	bool isDeviceSuitable(const VkPhysicalDevice& device)const;
 
 	uint32_t findMemoryType(uint32_t typeFilter, VkMemoryPropertyFlags properties);
