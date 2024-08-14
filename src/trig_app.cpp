@@ -31,9 +31,14 @@ const std::vector<const char*> validationLayers = {
 };
 
 const std::vector<Vertex> vertices = {
-	{.pos = {0, -0.5f}, .color = {1,0,0}},
+	{.pos = {-0.5,-0.5}, .color = {1,0,0}},
+	{.pos = {0.5, -0.5f}, .color = {1,0,0}},
 	{.pos = {0.5, 0.5}, .color = {0,1,0}},
-	{.pos = {-0.5,0.5}, .color = {0,0,1}}
+	{.pos = {-0.5,0.5}, .color = {0,0,1}},
+};
+
+const std::vector<uint16_t> indices = {
+	0,1,2,2,3,0
 };
 
 const bool enableValidationLayer = true;
@@ -371,7 +376,9 @@ void HelloTriangleApplication::recordCommandBuffer(VkCommandBuffer commandBuffer
 			VkBuffer vertexBuffers[] = { m_vkVertexBuffer };
 			VkDeviceSize offsets[] = { 0 };
 			vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-			vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
+			vkCmdBindIndexBuffer(commandBuffer, m_vkIndexBuffer, 0, VK_INDEX_TYPE_UINT16);
+			//vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
+			vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 		}
 		vkCmdEndRenderPass(commandBuffer);
 	}
@@ -467,6 +474,7 @@ void HelloTriangleApplication::initVulkan(){
 	createFramebuffers();
 	createCommandPool();
 	createVertexBuffer();
+	createIndexBuffer();
 	createCommandBuffers();
 	createSyncObjects();
 }
@@ -963,6 +971,36 @@ void HelloTriangleApplication::createVertexBuffer()
 	vkFreeMemory(m_vkDevice, stagingBufferMemory, nullptr);
 }
 
+void HelloTriangleApplication::createIndexBuffer()
+{
+	VkDeviceSize bufferSize = sizeof(indices[0]) * indices.size();
+	VkBuffer stagingBuffer;
+	VkDeviceMemory stagingBufferMemory;
+	createBuffer(bufferSize,
+		VK_BUFFER_USAGE_TRANSFER_SRC_BIT,
+		VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT,
+		stagingBuffer,
+		stagingBufferMemory
+	);
+
+	void* data;
+	vkMapMemory(m_vkDevice, stagingBufferMemory, 0, bufferSize, 0, &data);
+	memcpy(data, indices.data(), (size_t)bufferSize);
+	vkUnmapMemory(m_vkDevice, stagingBufferMemory);
+
+	createBuffer(bufferSize,
+		VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_INDEX_BUFFER_BIT,
+		VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT,
+		m_vkIndexBuffer,
+		m_vkIndexBufferMemory
+	);
+
+	copyBuffer(stagingBuffer, m_vkIndexBuffer, bufferSize);
+
+	vkDestroyBuffer(m_vkDevice, stagingBuffer, nullptr);
+	vkFreeMemory(m_vkDevice, stagingBufferMemory, nullptr);
+}
+
 void HelloTriangleApplication::createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory)
 {
 	VkBufferCreateInfo bufferInfo = {
@@ -1197,6 +1235,8 @@ void HelloTriangleApplication::cleanUp()
 	}
 	vkDestroyBuffer(m_vkDevice, m_vkVertexBuffer, nullptr);
 	vkFreeMemory(m_vkDevice, m_vkVertexBufferMemory, nullptr);
+	vkDestroyBuffer(m_vkDevice, m_vkIndexBuffer, nullptr);
+	vkFreeMemory(m_vkDevice, m_vkIndexBufferMemory, nullptr);
 	vkDestroyCommandPool(m_vkDevice, m_vkCommandPool, nullptr);
 	vkDestroyPipeline(m_vkDevice, m_vkGraphicsPipeline, nullptr);
 	vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);

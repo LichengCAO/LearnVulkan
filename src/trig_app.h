@@ -31,6 +31,8 @@ private:
 	VkPipeline m_vkGraphicsPipeline;
 	VkBuffer m_vkVertexBuffer;
 	VkDeviceMemory m_vkVertexBufferMemory;
+	VkBuffer m_vkIndexBuffer;
+	VkDeviceMemory m_vkIndexBufferMemory;
 	std::vector<VkFramebuffer> m_vkFramebuffers;
 	VkCommandPool m_vkCommandPool;
 	std::vector<VkCommandBuffer> m_vkCommandBuffers;
@@ -83,6 +85,7 @@ private:
 	void recreateSwapChain();
 	void cleanUpSwapChain();
 	void createVertexBuffer();
+	void createIndexBuffer();
 	void createBuffer(VkDeviceSize size, VkBufferUsageFlags usage, VkMemoryPropertyFlags properties, VkBuffer& buffer, VkDeviceMemory& bufferMemory);
 	void copyBuffer(VkBuffer& src, VkBuffer& dst, VkDeviceSize size);
 	bool isDeviceSuitable(const VkPhysicalDevice& device)const;
