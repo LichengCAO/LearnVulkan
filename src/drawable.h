@@ -10,3 +10,15 @@ struct Vertex {
 	static VkVertexInputBindingDescription getVertexInputBindingDescription();
 	static std::array<VkVertexInputAttributeDescription,2> getVertexInputAttributeDescription();
 };
+
+//alignas(4) float
+//alignas(8) vec2
+//alignas(16) vec3 vec4 
+//alignas(16) struct 
+//alignas(16) mat4
+struct UniformBufferObject {
+	alignas(16) glm::mat4 model;
+	alignas(16) glm::mat4 view;
+	alignas(16) glm::mat4 proj;
+};
+

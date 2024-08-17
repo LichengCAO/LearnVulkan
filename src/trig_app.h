@@ -25,8 +25,9 @@ private:
 	std::vector<VkImage> m_vkSwapChainImages;
 	std::vector<VkImageView> m_vkSwapChainImageViews;
 	VkFormat m_swapChainImageFormat;
-	VkExtent2D m_swapChainExtent;
+	VkExtent2D m_vkSwapChainExtent;
 	VkRenderPass m_vkRenderPass;
+	
 	VkPipelineLayout m_vkPipelineLayout;
 	VkPipeline m_vkGraphicsPipeline;
 	VkBuffer m_vkVertexBuffer;
@@ -94,6 +95,22 @@ private:
 	
 	QueueFamilyIndices findQueueFamilies(const VkPhysicalDevice& device)const;
 	
+	//Uniform buffers Descriptor layout and buffer
+	void createDescriptorSetLayout();
+	VkDescriptorSetLayout m_vkDescriptorSetLayout;
+	std::vector<VkBuffer> m_vkUniformBuffers;
+	std::vector<VkDeviceMemory> m_vkUniformBuffersMemory;
+	std::vector<void*> m_vkUniformBuffersMapped;
+	void createUniformBuffers();
+	void updateUniformBuffer(uint32_t currentImage);
+
+	//Uniform buffers Descriptor pool and sets
+	void createDescriptorPool();
+	void createDescriptorSets();
+	VkDescriptorPool m_vkDescriptorPool;
+	std::vector<VkDescriptorSet> m_vkDescriptorSets;
+	void bindDescriptorSets();
+
 	void mainLoop();
 	void cleanUp();
 public:
