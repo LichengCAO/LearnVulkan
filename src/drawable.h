@@ -5,10 +5,11 @@
 #include <array>
 struct Vertex {
 	glm::vec2 pos;
-	glm::vec3 color;
+	alignas(16) glm::vec3 color;
+	alignas(8) glm::vec2 texcoord;
 
 	static VkVertexInputBindingDescription getVertexInputBindingDescription();
-	static std::array<VkVertexInputAttributeDescription,2> getVertexInputAttributeDescription();
+	static std::array<VkVertexInputAttributeDescription,3> getVertexInputAttributeDescription();
 };
 
 //alignas(4) float

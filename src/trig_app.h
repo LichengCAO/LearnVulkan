@@ -41,6 +41,7 @@ private:
 	std::vector<VkSemaphore> m_vkRenderFinishedSemaphores;
 	std::vector<VkFence> m_vkInFlightFences;
 	bool m_bufferResized = false;
+	VkPhysicalDeviceProperties m_vkDeviceProperties;
 
 	void printAvailableExtensions()const;
 	VkDebugUtilsMessengerCreateInfoEXT getDefaultDebugMessengerCreateInfo()const;
@@ -110,6 +111,29 @@ private:
 	VkDescriptorPool m_vkDescriptorPool;
 	std::vector<VkDescriptorSet> m_vkDescriptorSets;
 	void bindDescriptorSets();
+
+	//Texture mapping images
+	void createTextureImage();
+	VkImage m_vkTextureImage;
+	VkDeviceMemory m_vkTextureImageMemory;
+	void createImage(uint32_t width, uint32_t height, VkFormat format,
+		VkImageTiling tilling,
+		VkImageUsageFlags usage,
+		VkMemoryPropertyFlags properties,
+		VkImage& image,
+		VkDeviceMemory& imageMemory
+		);
+	VkCommandBuffer beginSingleTimeCommands();
+	void endSingleTimeCommands(VkCommandBuffer commandBuffer);
+	void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
+	void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
+
+	//Texture mapping image view and sampler
+	VkImageView m_vkTextureImageView;
+	VkImageView createImageView(VkImage _image, VkFormat _format = VK_FORMAT_R8G8B8A8_SRGB);
+	void createTextureImageView();
+	VkSampler m_vkTextureSampler;
+	void createTextureSampler();
 
 	void mainLoop();
 	void cleanUp();
