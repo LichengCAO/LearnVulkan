@@ -130,10 +130,19 @@ private:
 
 	//Texture mapping image view and sampler
 	VkImageView m_vkTextureImageView;
-	VkImageView createImageView(VkImage _image, VkFormat _format = VK_FORMAT_R8G8B8A8_SRGB);
+	VkImageView createImageView(VkImage _image, VkFormat _format = VK_FORMAT_R8G8B8A8_SRGB, VkImageAspectFlags aspectMaskk = VK_IMAGE_ASPECT_COLOR_BIT);
 	void createTextureImageView();
 	VkSampler m_vkTextureSampler;
 	void createTextureSampler();
+
+	//Depth buffering
+	VkImage m_vkDepthImage;
+	VkImageView m_vkDepthImageView;
+	VkDeviceMemory m_vkDepthImageMemory;
+	void createDepthImage();
+	VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tilling, VkFormatFeatureFlags features);
+	VkFormat findDepthFormat();
+	bool hasStencil(VkFormat format);
 
 	void mainLoop();
 	void cleanUp();
