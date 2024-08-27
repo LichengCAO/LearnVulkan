@@ -7,7 +7,7 @@
 #include <vector>
 #include <string>
 #include "vk_struct.h"
-
+#include "drawable.h"
 class HelloTriangleApplication {
 public:
 	void run();
@@ -30,10 +30,6 @@ private:
 	
 	VkPipelineLayout m_vkPipelineLayout;
 	VkPipeline m_vkGraphicsPipeline;
-	VkBuffer m_vkVertexBuffer;
-	VkDeviceMemory m_vkVertexBufferMemory;
-	VkBuffer m_vkIndexBuffer;
-	VkDeviceMemory m_vkIndexBufferMemory;
 	std::vector<VkFramebuffer> m_vkFramebuffers;
 	VkCommandPool m_vkCommandPool;
 	std::vector<VkCommandBuffer> m_vkCommandBuffers;
@@ -143,6 +139,16 @@ private:
 	VkFormat findSupportedFormat(const std::vector<VkFormat>& candidates, VkImageTiling tilling, VkFormatFeatureFlags features);
 	VkFormat findDepthFormat();
 	bool hasStencil(VkFormat format);
+
+	//Load models
+	std::vector<Vertex> vertices;
+	std::vector<uint32_t> indices;
+	VkBuffer m_vkVertexBuffer;
+	VkDeviceMemory m_vkVertexBufferMemory;
+	VkBuffer m_vkIndexBuffer;
+	VkDeviceMemory m_vkIndexBufferMemory;
+	void loadModel();
+
 
 	void mainLoop();
 	void cleanUp();

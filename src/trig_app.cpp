@@ -15,6 +15,9 @@
 #include <chrono>
 #define STB_IMAGE_IMPLEMENTATION
 #include "stb_image.h"
+#define TINYOBJLOADER_IMPLEMENTATION
+#include <tiny_obj_loader.h>
+#include <unordered_map>
 #define VK_CHECK(vkcommand) \
 do{\
 if((vkcommand)!=VK_SUCCESS){\
@@ -35,21 +38,26 @@ const std::vector<const char*> validationLayers = {
 	"VK_LAYER_KHRONOS_validation"
 };
 
-const std::vector<Vertex> vertices = {
-	{.pos = {-0.5,-0.5, 0}, .color = {1,0,0}, .texcoord = {1.0f,0.0f}},
-	{.pos = {0.5, -0.5f, 0}, .color = {1,0,0}, .texcoord = {0.0f,0.0f}},
-	{.pos = {0.5, 0.5, 0}, .color = {0,1,0}, .texcoord = {0.0f,1.0f}},
-	{.pos = {-0.5,0.5, 0}, .color = {0,0,1}, .texcoord = {1.0f,1.0f}},
-	{.pos = {-0.5,-0.5,  0.5f}, .color = {1,0,0}, .texcoord = {1.0f,0.0f}},
-	{.pos = {0.5, -0.5f, 0.5f}, .color = {1,0,0}, .texcoord = {0.0f,0.0f}},
-	{.pos = {0.5, 0.5,   0.5f}, .color = {0,1,0}, .texcoord = {0.0f,1.0f}},
-	{.pos = {-0.5,0.5,   0.5f}, .color = {0,0,1}, .texcoord = {1.0f,1.0f}},
-};
+//const std::vector<Vertex> vertices = {
+//	{.pos = {-0.5,-0.5, 0}, .color = {1,0,0}, .texcoord = {1.0f,0.0f}},
+//	{.pos = {0.5, -0.5f, 0}, .color = {1,0,0}, .texcoord = {0.0f,0.0f}},
+//	{.pos = {0.5, 0.5, 0}, .color = {0,1,0}, .texcoord = {0.0f,1.0f}},
+//	{.pos = {-0.5,0.5, 0}, .color = {0,0,1}, .texcoord = {1.0f,1.0f}},
+//	{.pos = {-0.5,-0.5,  0.5f}, .color = {1,0,0}, .texcoord = {1.0f,0.0f}},
+//	{.pos = {0.5, -0.5f, 0.5f}, .color = {1,0,0}, .texcoord = {0.0f,0.0f}},
+//	{.pos = {0.5, 0.5,   0.5f}, .color = {0,1,0}, .texcoord = {0.0f,1.0f}},
+//	{.pos = {-0.5,0.5,   0.5f}, .color = {0,0,1}, .texcoord = {1.0f,1.0f}},
+//};
+//
+//const std::vector<uint16_t> indices = {
+//	0,1,2,2,3,0,
+//	4,5,6,6,7,4,
+//};
 
-const std::vector<uint16_t> indices = {
-	0,1,2,2,3,0,
-	4,5,6,6,7,4,
-};
+const std::string MODEL_PATH = "E:/GitStorage/LearnVulkan/res/models/viking_room/viking_room.obj";
+const std::string TEXTURE_PATH = "E:/GitStorage/LearnVulkan/res/models/viking_room/viking_room.png";
+
+
 
 const bool enableValidationLayer = true;
 const int MAX_FRAMES_IN_FLIGHT = 2;
@@ -389,7 +397,7 @@ void HelloTriangleApplication::recordCommandBuffer(VkCommandBuffer commandBuffer
 			VkBuffer vertexBuffers[] = { m_vkVertexBuffer };
 			VkDeviceSize offsets[] = { 0 };
 			vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-			vkCmdBindIndexBuffer(commandBuffer, m_vkIndexBuffer, 0, VK_INDEX_TYPE_UINT16);
+			vkCmdBindIndexBuffer(commandBuffer, m_vkIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
 			//vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
 			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &m_vkDescriptorSets[m_curFrame], 0, nullptr);
 			vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
@@ -497,6 +505,7 @@ void HelloTriangleApplication::initVulkan(){
 	createTextureImage();
 	createTextureImageView();
 	createTextureSampler();
+	loadModel();
 	createVertexBuffer();
 	createIndexBuffer();
 	createUniformBuffers();
@@ -973,7 +982,7 @@ void HelloTriangleApplication::recreateSwapChain()
 
 	createSwapChain();
 	createImageViews();
-	createDepthImage(); //will be cleaned in cleanupswapchain
+	createDepthImage(); //will be cleaned in cleanupswapchain 
 	createFramebuffers();
 }
 
@@ -1396,7 +1405,7 @@ void HelloTriangleApplication::bindDescriptorSets()
 void HelloTriangleApplication::createTextureImage()
 {
 	int texWidth = 0, texHeight = 0, texChannels = 0;
-	auto* pixels = stbi_load("E:/GitStorage/LearnVulkan/res/images/anime.jpg", &texWidth, &texHeight, &texChannels,
+	auto* pixels = stbi_load(TEXTURE_PATH.c_str(), &texWidth, &texHeight, &texChannels,
 		STBI_rgb_alpha);
 	VkDeviceSize imageSize = texWidth * texHeight * 4;
 	
@@ -1714,6 +1723,44 @@ VkFormat HelloTriangleApplication::findDepthFormat()
 bool HelloTriangleApplication::hasStencil(VkFormat format)
 {
 	return format == VK_FORMAT_D32_SFLOAT_S8_UINT || format == VK_FORMAT_D24_UNORM_S8_UINT;
+}
+
+void HelloTriangleApplication::loadModel()
+{
+	tinyobj::attrib_t attrib;
+	std::vector<tinyobj::shape_t> shapes;
+	std::vector<tinyobj::material_t> materials;
+	std::string warn, err;
+
+	if (!tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, MODEL_PATH.c_str()))
+	{
+		throw std::runtime_error(warn + err);
+	}
+	std::unordered_map<Vertex, uint32_t> vertexMap;
+	for (const auto& shape : shapes)
+	{
+		for (const auto& index : shape.mesh.indices)
+		{
+			Vertex vertex{};
+			vertex.pos = {
+				attrib.vertices[3 * index.vertex_index + 0],
+				attrib.vertices[3 * index.vertex_index + 1],
+				attrib.vertices[3 * index.vertex_index + 2],
+			};
+			vertex.texcoord = {
+				attrib.texcoords[2 * index.texcoord_index + 0],
+				1.0 - attrib.texcoords[2 * index.texcoord_index + 1],
+			};
+
+			if (vertexMap.find(vertex) == vertexMap.end())
+			{
+				vertexMap[vertex] = static_cast<uint32_t>(vertices.size());
+				vertices.push_back(vertex);
+			}
+
+			indices.push_back(vertexMap[vertex]);
+		}
+	}
 }
 
 void HelloTriangleApplication::mainLoop()
