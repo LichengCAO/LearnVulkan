@@ -112,7 +112,8 @@ private:
 	void createTextureImage();
 	VkImage m_vkTextureImage;
 	VkDeviceMemory m_vkTextureImageMemory;
-	void createImage(uint32_t width, uint32_t height, VkFormat format,
+	void createImage(uint32_t width, uint32_t height, uint32_t mip,
+		VkFormat format,
 		VkImageTiling tilling,
 		VkImageUsageFlags usage,
 		VkMemoryPropertyFlags properties,
@@ -121,12 +122,12 @@ private:
 		);
 	VkCommandBuffer beginSingleTimeCommands();
 	void endSingleTimeCommands(VkCommandBuffer commandBuffer);
-	void transitionImageLayout(VkImage image, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
+	void transitionImageLayout(VkImage image, uint32_t mip, VkFormat format, VkImageLayout oldLayout, VkImageLayout newLayout);
 	void copyBufferToImage(VkBuffer buffer, VkImage image, uint32_t width, uint32_t height);
 
 	//Texture mapping image view and sampler
 	VkImageView m_vkTextureImageView;
-	VkImageView createImageView(VkImage _image, VkFormat _format = VK_FORMAT_R8G8B8A8_SRGB, VkImageAspectFlags aspectMaskk = VK_IMAGE_ASPECT_COLOR_BIT);
+	VkImageView createImageView(VkImage _image, uint32_t _mip = 1, VkFormat _format = VK_FORMAT_R8G8B8A8_SRGB, VkImageAspectFlags aspectMaskk = VK_IMAGE_ASPECT_COLOR_BIT);
 	void createTextureImageView();
 	VkSampler m_vkTextureSampler;
 	void createTextureSampler();
@@ -148,6 +149,10 @@ private:
 	VkBuffer m_vkIndexBuffer;
 	VkDeviceMemory m_vkIndexBufferMemory;
 	void loadModel();
+
+	//Generating Mipmaps
+	uint32_t m_mipLevels;
+	void generateMipmaps(VkImage image, VkFormat format, int32_t width, int32_t height, uint32_t mip);
 
 
 	void mainLoop();
