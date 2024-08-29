@@ -112,7 +112,7 @@ private:
 	void createTextureImage();
 	VkImage m_vkTextureImage;
 	VkDeviceMemory m_vkTextureImageMemory;
-	void createImage(uint32_t width, uint32_t height, uint32_t mip,
+	void createImage(uint32_t width, uint32_t height, uint32_t mip, VkSampleCountFlagBits numSamples,
 		VkFormat format,
 		VkImageTiling tilling,
 		VkImageUsageFlags usage,
@@ -154,6 +154,13 @@ private:
 	uint32_t m_mipLevels;
 	void generateMipmaps(VkImage image, VkFormat format, int32_t width, int32_t height, uint32_t mip);
 
+	//Multisampling
+	VkSampleCountFlagBits m_vkMSAASamples = VK_SAMPLE_COUNT_1_BIT;
+	VkSampleCountFlagBits getMaxUsableSampleCount();
+	VkImage m_vkColorImage; // stores the image for mulitsampling
+	VkDeviceMemory m_vkColorImageMemory;
+	VkImageView m_vkColorImageView;
+	void createColorResources();
 
 	void mainLoop();
 	void cleanUp();
