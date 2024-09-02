@@ -1205,6 +1205,9 @@ QueueFamilyIndices HelloTriangleApplication::findQueueFamilies(const VkPhysicalD
 		if (queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) {
 			indices.graphicsFamily = i;
 		}
+		if ((queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) && (queueFamily.queueFlags & VK_QUEUE_COMPUTE_BIT)) {
+			indices.graphicsAndComputeFamily = i;
+		}
 		VkBool32 supportPresent = false;
 		vkGetPhysicalDeviceSurfaceSupportKHR(device, i, m_vkSurface, &supportPresent);
 		if (supportPresent) {
@@ -1221,7 +1224,7 @@ void HelloTriangleApplication::createLogicalDevice()
 	QueueFamilyIndices indices = findQueueFamilies(m_vkPhysicDevice);
 	float priority = 1.f;
 	std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-	std::unordered_set<uint32_t> uniqueQueueFamilies{ indices.graphicsFamily.value(), indices.presentFamily.value() };
+	std::unordered_set<uint32_t> uniqueQueueFamilies{ indices.graphicsFamily.value(), indices.presentFamily.value(), indices.graphicsAndComputeFamily.value() };
 	for (auto queueFamily : uniqueQueueFamilies) {
 		VkDeviceQueueCreateInfo queueCreateInfo{
 			.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
@@ -1264,6 +1267,7 @@ void HelloTriangleApplication::createLogicalDevice()
 
 	vkGetDeviceQueue(m_vkDevice, indices.graphicsFamily.value(), 0, &m_vkGraphicsQueue);
 	vkGetDeviceQueue(m_vkDevice, indices.presentFamily.value(), 0, &m_vkPresentQueue);
+	vkGetDeviceQueue(m_vkDevice, indices.graphicsAndComputeFamily.value(), 0, &m_vkComputeQueue);
 }
 
 void HelloTriangleApplication::setupDebugMessenger()

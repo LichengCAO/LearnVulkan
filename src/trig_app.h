@@ -162,6 +162,9 @@ private:
 	VkImageView m_vkColorImageView;
 	void createColorResources();
 
+	//Compute Shader
+	VkQueue m_vkComputeQueue;
+
 	void mainLoop();
 	void cleanUp();
 public:

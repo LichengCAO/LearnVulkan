@@ -1,0 +1,15 @@
+struct Particle {
+    vec2 position;
+    vec2 velocity;
+    vec4 color;
+};
+
+//specifies the how member elements of the shader storage buffer are aligned in memory
+layout(std140, binding = 1) readonly buffer ParticleSSBOIn {
+    Particle particlesIn[];
+};
+
+layout(std140, binding = 2) buffer ParticleSSBOOut {
+    Particle particlesOut[];
+};
+
