@@ -13,3 +13,7 @@ layout(std140, binding = 2) buffer ParticleSSBOOut {
     Particle particlesOut[];
 };
 
+void main()
+{
+    particlesOut[index].position = particlesIn[index].position + particlesIn[index].velocity.xy * ubo.deltaTime;
+}

@@ -18,6 +18,12 @@ struct Vertex {
 	static std::array<VkVertexInputAttributeDescription,3> getVertexInputAttributeDescription();
 };
 
+struct Particle {
+	glm::vec2 pos;
+	glm::vec2 velocity;
+	glm::vec4 color;
+};
+
 namespace std {
 	template<> struct hash<Vertex> {
 		size_t operator()(Vertex const& vertex) const {

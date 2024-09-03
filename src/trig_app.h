@@ -4,6 +4,7 @@
 #include <GLFW/glfw3.h>
 #define WIDTH 800
 #define HEIGHT 600
+#define PARTICLE_COUNT 1000
 #include <vector>
 #include <string>
 #include "vk_struct.h"
@@ -76,7 +77,7 @@ private:
 	void createImageViews();
 	void createRenderPass();
 	void createGraphicsPipeline();
-	void createFramebuffers();
+	void createFrameBuffers();
 	void createCommandPool();
 	void createCommandBuffers();
 	void createSyncObjects();
@@ -164,6 +165,12 @@ private:
 
 	//Compute Shader
 	VkQueue m_vkComputeQueue;
+	void createComputePipeline();
+	std::vector<VkBuffer> m_vkShaderStorageBuffers;
+	std::vector<VkDeviceMemory> m_vkShaderStorageBuffersMemory;
+	void createShaderStorageBuffers();
+	VkDescriptorSetLayout m_vkCompDescriptorSetLayout;
+	std::vector<VkDescriptorSet> m_vkCompDescriptorSets;
 
 	void mainLoop();
 	void cleanUp();
