@@ -1314,26 +1314,18 @@ void HelloTriangleApplication::setupDebugMessenger()
 
 void HelloTriangleApplication::createDescriptorSetLayout()
 {
-	VkDescriptorSetLayoutBinding uboLayoutBinding = {
+	VkDescriptorSetLayoutBinding computedResultBinding = {
 		.binding = 0,
-		.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER,
-		.descriptorCount = 1,
+		.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_BUFFER,
+		.descriptorCount = 2,
 		.stageFlags = VK_SHADER_STAGE_VERTEX_BIT,
 		.pImmutableSamplers = nullptr,
 	};
 
-	VkDescriptorSetLayoutBinding samplerLayoutBinding = {
-		.binding = 1,
-		.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER,
-		.descriptorCount = 1,
-		.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT,
-		.pImmutableSamplers = nullptr
-	};
-
-	std::array<VkDescriptorSetLayoutBinding, 2> bindings = { uboLayoutBinding, samplerLayoutBinding};
+	std::array<VkDescriptorSetLayoutBinding, 1> bindings = { computedResultBinding};
 	VkDescriptorSetLayoutCreateInfo layoutCreateInfo = {
 		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-		.bindingCount = 2,
+		.bindingCount = bindings.size(),
 		.pBindings = bindings.data(),
 	};
 
@@ -2162,6 +2154,9 @@ void HelloTriangleApplication::cleanUp()
 		vkDestroySemaphore(m_vkDevice, m_vkRenderFinishedSemaphores[i], nullptr);
 		vkDestroyFence(m_vkDevice, m_vkInFlightFences[i], nullptr);
 
+		vkDestroySemaphore(m_vkDevice, m_vkComputeFinishedSemaphores[i], nullptr);
+		vkDestroyFence(m_vkDevice, m_vkComputeInFlightFences[i], nullptr);
+
 		vkDestroyBuffer(m_vkDevice, m_vkUniformBuffers[i], nullptr);
 		vkFreeMemory(m_vkDevice, m_vkUniformBuffersMemory[i], nullptr);
 	}
@@ -2177,8 +2172,12 @@ void HelloTriangleApplication::cleanUp()
 	vkDestroyCommandPool(m_vkDevice, m_vkCommandPool, nullptr);
 	vkDestroyPipeline(m_vkDevice, m_vkGraphicsPipeline, nullptr);
 	vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
+	vkDestroyPipeline(m_vkDevice, m_vkComputePipeline, nullptr);
+	vkDestroyPipelineLayout(m_vkDevice, m_vkComputePipelineLayout, nullptr);
+
 	vkDestroyDescriptorPool(m_vkDevice, m_vkDescriptorPool, nullptr); // descriptor sets will be destroyed automatically
 	vkDestroyDescriptorSetLayout(m_vkDevice, m_vkDescriptorSetLayout, nullptr);
+	vkDestroyDescriptorSetLayout(m_vkDevice, m_vkComputeDescriptorSetLayout, nullptr);
 	vkDestroyImageView(m_vkDevice, m_vkTextureImageView, nullptr); // destroy image view before image
 	vkDestroyImage(m_vkDevice, m_vkTextureImage, nullptr);
 	vkFreeMemory(m_vkDevice, m_vkTextureImageMemory, nullptr);

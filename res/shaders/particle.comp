@@ -23,7 +23,16 @@ void main()
 {
     uint index = gl_GlobalInvocationID.x;
     Particle particleIn = particlesIn[index];
-    particlesOut[index].position = particleIn.position + particleIn.velocity.xy * ubo.deltaTime;
+    vec2 newPos = particleIn.position + particleIn.velocity.xy * ubo.deltaTime;
+    particlesOut[index].position = newPos;
     particlesOut[index].color = vec4(1,1,1,1);
+    if (newPos.x < -1.0 || newPos.x > 1.0)
+    {
+        particleIn.velocity.x = -particleIn.velocity.x;
+    }
+    if (newPos.y < -1.0 || newPos.y > 1.0)
+    {
+        particleIn.velocity.y = -particleIn.velocity.y;
+    }
     particlesOut[index].velocity = particleIn.velocity;
 }

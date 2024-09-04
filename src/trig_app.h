@@ -169,7 +169,7 @@ private:
 	std::vector<VkBuffer> m_vkShaderStorageBuffers;
 	std::vector<VkDeviceMemory> m_vkShaderStorageBuffersMemory;
 	void createShaderStorageBuffers();
-	VkDescriptorSetLayout m_vkComputeDescriptorSetLayout;
+	VkDescriptorSetLayout m_vkComputeDescriptorSetLayout; // stays alive during the program
 	std::vector<VkDescriptorSet> m_vkComputeDescriptorSets;
 	VkPipelineLayout m_vkComputePipelineLayout;
 	VkPipeline m_vkComputePipeline;
