@@ -37,3 +37,19 @@ std::array<VkVertexInputAttributeDescription, 3> Vertex::getVertexInputAttribute
 	return res;
 }
 
+std::array<VkVertexInputAttributeDescription, 2> Particle::getAttributeDescriptions()
+{
+	std::array<VkVertexInputAttributeDescription, 2> res;
+
+	res[0].binding = 0;
+	res[0].location = 0;
+	res[0].format = VK_FORMAT_R32G32_SFLOAT;
+	res[0].offset = offsetof(Particle, pos);
+
+	res[0].binding = 0;
+	res[0].location = 1;
+	res[0].format = VK_FORMAT_R32G32B32A32_SFLOAT;
+	res[0].offset = offsetof(Particle, color);
+
+	return res;
+}

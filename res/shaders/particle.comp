@@ -4,6 +4,10 @@ struct Particle {
     vec4 color;
 };
 
+layout(binding = 0) uniform ParameterUBO{
+    float deltaTime;
+} ubo;
+
 //specifies the how member elements of the shader storage buffer are aligned in memory
 layout(std140, binding = 1) readonly buffer ParticleSSBOIn {
     Particle particlesIn[];
@@ -13,7 +17,13 @@ layout(std140, binding = 2) buffer ParticleSSBOOut {
     Particle particlesOut[];
 };
 
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
 void main()
 {
-    particlesOut[index].position = particlesIn[index].position + particlesIn[index].velocity.xy * ubo.deltaTime;
+    uint index = gl_GlobalInvocationID.x;
+    Particle particleIn = particlesIn[index];
+    particlesOut[index].position = particleIn.position + particleIn.velocity.xy * ubo.deltaTime;
+    particlesOut[index].color = vec4(1,1,1,1);
+    particlesOut[index].velocity = particleIn.velocity;
 }

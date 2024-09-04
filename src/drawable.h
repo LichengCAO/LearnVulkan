@@ -22,6 +22,8 @@ struct Particle {
 	glm::vec2 pos;
 	glm::vec2 velocity;
 	glm::vec4 color;
+
+	static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions();
 };
 
 namespace std {

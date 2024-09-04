@@ -169,8 +169,14 @@ private:
 	std::vector<VkBuffer> m_vkShaderStorageBuffers;
 	std::vector<VkDeviceMemory> m_vkShaderStorageBuffersMemory;
 	void createShaderStorageBuffers();
-	VkDescriptorSetLayout m_vkCompDescriptorSetLayout;
-	std::vector<VkDescriptorSet> m_vkCompDescriptorSets;
+	VkDescriptorSetLayout m_vkComputeDescriptorSetLayout;
+	std::vector<VkDescriptorSet> m_vkComputeDescriptorSets;
+	VkPipelineLayout m_vkComputePipelineLayout;
+	VkPipeline m_vkComputePipeline;
+	void recordComputeCommand(VkCommandBuffer commandBuffer, uint32_t imgIdx);
+	std::vector<VkSemaphore> m_vkComputeFinishedSemaphores;
+	std::vector<VkFence> m_vkComputeInFlightFences;
+	std::vector<VkCommandBuffer> m_vkComputeCommandBuffers;
 
 	void mainLoop();
 	void cleanUp();
