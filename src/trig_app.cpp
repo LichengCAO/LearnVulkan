@@ -509,36 +509,7 @@ void HelloTriangleApplication::initWindow()
 	glfwSetFramebufferSizeCallback(m_window, FrameBufferResizedCallback);
 }
 
-void HelloTriangleApplication::initVulkan(){
-	createInstance();
-	setupDebugMessenger();
-	createSurface();
-	pickPhysicalDevice();
-	createLogicalDevice();
-	createSwapChain();
-	createImageViews();
-	createRenderPass();
-	createDescriptorSetLayout();
-	createGraphicsPipeline();
-	createComputePipeline();
-	createCommandPool();
-	//createColorResources();
-	//createDepthImage();
-	createShaderStorageBuffers();
-	createFrameBuffers();
-	//createTextureImage();
-	//createTextureImageView();
-	//createTextureSampler();
-	//loadModel();
-	//createVertexBuffer();
-	//createIndexBuffer();
-	createUniformBuffers();
-	createDescriptorPool();
-	createComputeDescriptorSets();
-	//bindDescriptorSets();
-	createCommandBuffers();
-	createSyncObjects();
-}
+
 
 void HelloTriangleApplication::createInstance()
 {
@@ -670,10 +641,7 @@ void HelloTriangleApplication::createRenderPass()
 		.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
 		.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
 		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-		.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL //You'll notice that we have changed the finalLayout from VK_IMAGE_LAYOUT_PRESENT_SRC_KHR 
-																//to VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL. That's because multisampled images 
-																//cannot be presented directly.We first need to resolve them to a regular image. 
-																//This requirement does not apply to the depth buffer, since it won't be presented at any point.
+		.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
 	};
 
 	VkAttachmentReference colorAttachmentRef{
@@ -681,56 +649,22 @@ void HelloTriangleApplication::createRenderPass()
 		.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
 	};
 
-	VkAttachmentDescription colorResolveAttachment{
-	.format = m_swapChainImageFormat,
-	.samples = VK_SAMPLE_COUNT_1_BIT,
-	.loadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-	.storeOp = VK_ATTACHMENT_STORE_OP_STORE,
-	.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-	.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-	.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-	.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
-	};
-
-	VkAttachmentReference colorResolveAttachmentRef{
-		.attachment = 2,
-		.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
-	};
-
-	VkAttachmentDescription depthAttachment{
-		.format = findDepthFormat(),
-		.samples = m_vkMSAASamples,
-		.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR,
-		.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-		.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE,
-		.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE,
-		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
-		.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-	};
-
-	VkAttachmentReference depthAttachmentRef{
-		.attachment = 1,
-		.layout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL
-	};
-
 	VkSubpassDescription subpass{
 		.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
 		.colorAttachmentCount = 1,
 		.pColorAttachments = &colorAttachmentRef,
-		.pResolveAttachments = &colorResolveAttachmentRef,
-		.pDepthStencilAttachment = &depthAttachmentRef,
 	};
 
-	VkSubpassDependency dependencyInfo{
-	.srcSubpass = VK_SUBPASS_EXTERNAL,
-	.dstSubpass = 0,
-	.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-	.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT,
-	.srcAccessMask = 0,
-	.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT,
-	};
+	//VkSubpassDependency dependencyInfo{
+	//.srcSubpass = VK_SUBPASS_EXTERNAL,
+	//.dstSubpass = 0,
+	//.srcStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+	//.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+	//.srcAccessMask = 0,
+	//.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
+	//};
 
-	std::array<VkAttachmentDescription, 3> attachments = { colorAttachment, depthAttachment, colorResolveAttachment }; //must ordered same as attachment ref
+	std::array<VkAttachmentDescription, 1> attachments = { colorAttachment }; //must ordered same as attachment ref
 
 	VkRenderPassCreateInfo renderPassInfo{
 		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
@@ -738,8 +672,8 @@ void HelloTriangleApplication::createRenderPass()
 		.pAttachments = attachments.data(),
 		.subpassCount = 1,
 		.pSubpasses = &subpass,
-		.dependencyCount = 1,
-		.pDependencies = &dependencyInfo
+		//.dependencyCount = 1,
+		//.pDependencies = &dependencyInfo
 	};
 
 	if (vkCreateRenderPass(m_vkDevice, &renderPassInfo, nullptr, &m_vkRenderPass) != VK_SUCCESS) {
@@ -2174,4 +2108,35 @@ void HelloTriangleApplication::cleanUp()
 	vkDestroyInstance(m_vkInstance, nullptr);
 	glfwDestroyWindow(m_window);
 	glfwTerminate();
+}
+
+void HelloTriangleApplication::initVulkan() {
+	createInstance();
+	setupDebugMessenger();
+	createSurface();
+	pickPhysicalDevice();
+	createLogicalDevice();
+	createSwapChain();
+	createImageViews();
+	createRenderPass();
+	createDescriptorSetLayout();
+	createGraphicsPipeline();
+	createComputePipeline();
+	createCommandPool();
+	//createColorResources();
+	//createDepthImage();
+	createShaderStorageBuffers();
+	createFrameBuffers();
+	//createTextureImage();
+	//createTextureImageView();
+	//createTextureSampler();
+	//loadModel();
+	//createVertexBuffer();
+	//createIndexBuffer();
+	createUniformBuffers();
+	createDescriptorPool();
+	createComputeDescriptorSets();
+	//bindDescriptorSets();
+	createCommandBuffers();
+	createSyncObjects();
 }
