@@ -23,7 +23,8 @@ struct Particle {
 	glm::vec2 velocity;
 	glm::vec4 color;
 
-	static std::array<VkVertexInputAttributeDescription, 2> getAttributeDescriptions();
+	static std::vector<VkVertexInputBindingDescription> getVertexInputBindingDescription();
+	static std::vector<VkVertexInputAttributeDescription> getVertexInputAttributeDescription();
 };
 
 namespace std {
@@ -42,8 +43,9 @@ namespace std {
 //alignas(16) struct  
 //alignas(16) mat4
 struct UniformBufferObject {
-	alignas(16) glm::mat4 model;
-	alignas(16) glm::mat4 view;
-	alignas(16) glm::mat4 proj;
+	float deltaTime = 0.0f;
+	//alignas(16) glm::mat4 model;
+	//alignas(16) glm::mat4 view;
+	//alignas(16) glm::mat4 proj;
 };
 

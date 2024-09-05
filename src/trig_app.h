@@ -177,6 +177,7 @@ private:
 	std::vector<VkSemaphore> m_vkComputeFinishedSemaphores;
 	std::vector<VkFence> m_vkComputeInFlightFences;
 	std::vector<VkCommandBuffer> m_vkComputeCommandBuffers;
+	void createComputeDescriptorSets();
 
 	void mainLoop();
 	void cleanUp();

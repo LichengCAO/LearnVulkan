@@ -53,3 +53,33 @@ std::array<VkVertexInputAttributeDescription, 2> Particle::getAttributeDescripti
 
 	return res;
 }
+
+std::vector<VkVertexInputBindingDescription> Particle::getVertexInputBindingDescription()
+{
+	std::vector<VkVertexInputBindingDescription> res = { {
+		.binding = 0,
+		.stride = sizeof(Particle),
+		.inputRate = VK_VERTEX_INPUT_RATE_VERTEX
+	} };
+	return res;
+}
+
+std::vector<VkVertexInputAttributeDescription> Particle::getVertexInputAttributeDescription()
+{
+	std::vector<VkVertexInputAttributeDescription>res = {
+	{
+		.location = 0,
+		.binding = 0,
+		.format = VK_FORMAT_R32G32_SFLOAT,
+		.offset = offsetof(Particle, pos),
+	},
+	{
+		.location = 1,
+		.binding = 0,
+		.format = VK_FORMAT_R32G32B32A32_SFLOAT,
+		.offset = offsetof(Particle, color),
+	}
+	};
+
+	return res;
+}
