@@ -396,13 +396,13 @@ void HelloTriangleApplication::recordCommandBuffer(VkCommandBuffer commandBuffer
 			};
 			vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 			vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-			VkBuffer vertexBuffers[] = { m_vkVertexBuffer };
+			VkBuffer vertexBuffers[] = { m_vkShaderStorageBuffers[m_curFrame] };
 			VkDeviceSize offsets[] = { 0 };
 			vkCmdBindVertexBuffers(commandBuffer, 0, 1, vertexBuffers, offsets);
-			vkCmdBindIndexBuffer(commandBuffer, m_vkIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
-			//vkCmdDraw(commandBuffer, static_cast<uint32_t>(vertices.size()), 1, 0, 0);
-			vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &m_vkDescriptorSets[m_curFrame], 0, nullptr);
-			vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
+			//vkCmdBindIndexBuffer(commandBuffer, m_vkIndexBuffer, 0, VK_INDEX_TYPE_UINT32);
+			//vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, m_vkPipelineLayout, 0, 1, &m_vkDescriptorSets[m_curFrame], 0, nullptr);
+			vkCmdDraw(commandBuffer, static_cast<uint32_t>(PARTICLE_COUNT), 1, 0, 0);
+			//vkCmdDrawIndexed(commandBuffer, static_cast<uint32_t>(indices.size()), 1, 0, 0, 0);
 		}
 		vkCmdEndRenderPass(commandBuffer);
 	}
@@ -420,7 +420,8 @@ void HelloTriangleApplication::drawFrame(){
 	 *				COMPUTE SHADER
 	 * =======================================
 	 */
-	{
+
+
 		vkWaitForFences(m_vkDevice, 1, &m_vkComputeInFlightFences[m_curFrame], VK_TRUE, UINT64_MAX);
 		updateUniformBuffer(m_curFrame);
 		vkResetFences(m_vkDevice, 1, &m_vkComputeInFlightFences[m_curFrame]);
@@ -428,14 +429,13 @@ void HelloTriangleApplication::drawFrame(){
 		recordComputeCommand(m_vkComputeCommandBuffers[m_curFrame], m_curFrame);
 		VkSubmitInfo submitInfo{
 			.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
-			.waitSemaphoreCount = 1,
+			.waitSemaphoreCount = 0,
 			.commandBufferCount = 1,
 			.pCommandBuffers = &m_vkComputeCommandBuffers[m_curFrame],
 			.signalSemaphoreCount = 1,
 			.pSignalSemaphores = &m_vkComputeFinishedSemaphores[m_curFrame],
 		};
 		VK_CHECK(vkQueueSubmit(m_vkComputeQueue, 1, &submitInfo, m_vkComputeInFlightFences[m_curFrame]), failed to submit compute command buffer!);
-	}
 
 	//wait for previous fences
 	vkWaitForFences(m_vkDevice, 1, &m_vkInFlightFences[m_curFrame], VK_TRUE, UINT64_MAX);
@@ -852,9 +852,9 @@ void HelloTriangleApplication::createFrameBuffers()
 {
 	m_vkFramebuffers.resize(m_vkSwapChainImages.size());
 	for (size_t i = 0;i < m_vkSwapChainImageViews.size();++i) {
-		std::array<VkImageView,3 > attachements = {
-			m_vkColorImageView,
-			m_vkDepthImageView,
+		std::array<VkImageView,1 > attachements = {
+			//m_vkColorImageView,
+			//m_vkDepthImageView,
 			m_vkSwapChainImageViews[i],
 		}; //orders need to match the ref in createRenderPass
 
@@ -898,11 +898,11 @@ void HelloTriangleApplication::createCommandBuffers()
 		.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
 		.commandBufferCount = static_cast<uint32_t>(m_vkCommandBuffers.size())
 	};
-
 	if (vkAllocateCommandBuffers(m_vkDevice, &allocInfo, m_vkCommandBuffers.data()) != VK_SUCCESS) {
 		throw std::runtime_error("failed to allocate command buffers!");
 	}
 
+	allocInfo.commandBufferCount = static_cast<uint32_t>(m_vkComputeCommandBuffers.size());
 	if (vkAllocateCommandBuffers(m_vkDevice, &allocInfo, m_vkComputeCommandBuffers.data()) != VK_SUCCESS) {
 		throw std::runtime_error("failed to allocate compute command buffers!");
 	}
@@ -1327,21 +1327,22 @@ void HelloTriangleApplication::createDescriptorPool()
 
 void HelloTriangleApplication::createDescriptorSets()
 {
-	std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, m_vkDescriptorSetLayout);
+	//std::vector<VkDescriptorSetLayout> layouts(MAX_FRAMES_IN_FLIGHT, m_vkDescriptorSetLayout);
 	VkDescriptorSetAllocateInfo allocInfo = {
 		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
 		.descriptorPool = m_vkDescriptorPool,
 		.descriptorSetCount = static_cast<uint32_t>(MAX_FRAMES_IN_FLIGHT),
-		.pSetLayouts = layouts.data(),
+		//.pSetLayouts = layouts.data(),
 	};
 
 	m_vkDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-	VK_CHECK(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, m_vkDescriptorSets.data()), failed to allocate descriptor sets!);
+	//VK_CHECK(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, m_vkDescriptorSets.data()), failed to allocate descriptor sets!);
 
 	std::vector<VkDescriptorSetLayout> compLayouts(MAX_FRAMES_IN_FLIGHT, m_vkComputeDescriptorSetLayout);
 	allocInfo.pSetLayouts = compLayouts.data();
 	m_vkComputeDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
 	VK_CHECK(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, m_vkComputeDescriptorSets.data()), failed to allocate descriptor sets!);
+
 }
 
 void HelloTriangleApplication::bindDescriptorSets()
@@ -2007,7 +2008,7 @@ void HelloTriangleApplication::createShaderStorageBuffers()
 	memcpy(data, particles.data(), static_cast<size_t>(bufferSize));
 	vkUnmapMemory(m_vkDevice, stagingBufferMemory);
 
-	for (size_t i = 0; i < PARTICLE_COUNT; ++i)
+	for (size_t i = 0; i < MAX_FRAMES_IN_FLIGHT; ++i)
 	{
 		createBuffer(bufferSize,
 			VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT,
@@ -2136,7 +2137,7 @@ void HelloTriangleApplication::initVulkan() {
 	createUniformBuffers();
 	createDescriptorPool();
 	createComputeDescriptorSets();
-	//bindDescriptorSets();
+	bindDescriptorSets();
 	createCommandBuffers();
 	createSyncObjects();
 }
