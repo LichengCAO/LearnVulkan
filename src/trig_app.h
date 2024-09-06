@@ -179,6 +179,11 @@ private:
 	std::vector<VkCommandBuffer> m_vkComputeCommandBuffers;
 	void createComputeDescriptorSets();
 
+	//Create Debug info
+	void createDebugInfo(VkBuffer buffer, std::string name);
+	void createDebugInfo(VkDeviceMemory memory, std::string name);
+
+
 	void mainLoop();
 	void cleanUp();
 public:
