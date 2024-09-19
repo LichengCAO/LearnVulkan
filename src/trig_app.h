@@ -12,6 +12,7 @@
 class HelloTriangleApplication {
 public:
 	void run();
+	int bufferCnt = 0;
 private:
 	uint32_t m_curFrame = 0;
 	GLFWwindow* m_window;

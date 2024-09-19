@@ -109,6 +109,19 @@ static VKAPI_ATTR VkBool32 VKAPI_CALL testCallback(
 	return VK_FALSE;
 }
 
+static VKAPI_ATTR VkBool32 VKAPI_CALL nameCallback(
+	VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+	VkDebugUtilsMessageTypeFlagsEXT messageType,
+	const VkDebugUtilsMessengerCallbackDataEXT* pCallbackData,
+	void* pUserData
+) {
+	if (messageSeverity > VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) {
+		std::cout << "message based on severity" << std::endl;
+		std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
+	}
+	return VK_FALSE;
+}
+
 void HelloTriangleApplication::run()
 {
 	initWindow();
@@ -1062,6 +1075,8 @@ void HelloTriangleApplication::createBuffer(VkDeviceSize size, VkBufferUsageFlag
 
 	VkDeviceSize offset = 0; // should be divisible by memRequirements.alignment
 	vkBindBufferMemory(m_vkDevice, buffer, bufferMemory, offset);
+
+	createDebugInfo(buffer, std::to_string(bufferCnt++));
 }
 
 void HelloTriangleApplication::copyBuffer(VkBuffer& src, VkBuffer& dst, VkDeviceSize size)
@@ -1276,12 +1291,6 @@ void HelloTriangleApplication::createUniformBuffers()
 			);
 
 		VK_CHECK(vkMapMemory(m_vkDevice, m_vkUniformBuffersMemory[i], 0, bufferSize, 0, &m_vkUniformBuffersMapped[i]), failed to map uniform memory!);
-		std::string name = "uniform buffer ";
-		std::string name2 = "uniform buffer memory ";
-		name += std::to_string(i);
-		name2 += std::to_string(i);
-		createDebugInfo(m_vkUniformBuffers[i], name);
-		createDebugInfo(m_vkUniformBuffersMemory[i], name2);
 	}
 
 }
@@ -2024,6 +2033,8 @@ void HelloTriangleApplication::createShaderStorageBuffers()
 
 		copyBuffer(stagingBuffer, m_vkShaderStorageBuffers[i], bufferSize);
 	}
+	vkDestroyBuffer(m_vkDevice, stagingBuffer, nullptr);
+	vkFreeMemory(m_vkDevice, stagingBufferMemory, nullptr);
 }
 
 void HelloTriangleApplication::recordComputeCommand(VkCommandBuffer commandBuffer, uint32_t frameIdx)
@@ -2065,8 +2076,11 @@ void HelloTriangleApplication::createDebugInfo(VkBuffer buffer, std::string name
 		.objectHandle = (uint64_t)buffer,
 		.pObjectName = name.c_str()
 	};
-
-	VK_CHECK(vkSetDebugUtilsObjectNameEXT(m_vkDevice, &info), failed to assign debug info!);
+	auto func = (PFN_vkSetDebugUtilsObjectNameEXT)vkGetInstanceProcAddr(m_vkInstance, "vkSetDebugUtilsObjectNameEXT");
+	if (func != nullptr)
+	{
+		VK_CHECK(func(m_vkDevice, &info), failed to assign debug info!);
+	}
 }
 
 void HelloTriangleApplication::createDebugInfo(VkDeviceMemory memory, std::string name)
@@ -2079,7 +2093,11 @@ void HelloTriangleApplication::createDebugInfo(VkDeviceMemory memory, std::strin
 	.pObjectName = name.c_str()
 	};
 
-	VK_CHECK(vkSetDebugUtilsObjectNameEXT(m_vkDevice, &info), failed to assign debug info!);
+	auto func = (PFN_vkSetDebugUtilsObjectNameEXT)vkGetInstanceProcAddr(m_vkInstance, "vkSetDebugUtilsObjectNameEXT");
+	if (func != nullptr)
+	{
+		VK_CHECK(func(m_vkDevice, &info), failed to assign debug info!);
+	}
 }
 
 void HelloTriangleApplication::mainLoop()
