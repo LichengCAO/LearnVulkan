@@ -522,8 +522,6 @@ void HelloTriangleApplication::initWindow()
 	glfwSetFramebufferSizeCallback(m_window, FrameBufferResizedCallback);
 }
 
-
-
 void HelloTriangleApplication::createInstance()
 {
 	//optional
@@ -611,16 +609,17 @@ void HelloTriangleApplication::createSwapChain()
 		.oldSwapchain = VK_NULL_HANDLE
 	};
 	QueueFamilyIndices indices = findQueueFamilies(m_vkPhysicDevice);
-	uint32_t queueFamilyIndices[] = { indices.graphicsFamily.value(), indices.presentFamily.value() };
+	std::vector<uint32_t> queueFamilyIndices = { indices.graphicsFamily.value(), indices.transferFamily.value()};
 	if (indices.graphicsFamily != indices.presentFamily) {
+		queueFamilyIndices.push_back(indices.presentFamily.value());
 		createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-		createInfo.queueFamilyIndexCount = 2;
-		createInfo.pQueueFamilyIndices = queueFamilyIndices;
+		createInfo.queueFamilyIndexCount = static_cast<uint32_t>(queueFamilyIndices.size());
+		createInfo.pQueueFamilyIndices = queueFamilyIndices.data();
 	}
 	else {
-		createInfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		createInfo.queueFamilyIndexCount = 0;
-		createInfo.pQueueFamilyIndices = nullptr;
+		createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;//VK_SHARING_MODE_EXCLUSIVE;
+		createInfo.queueFamilyIndexCount = static_cast<uint32_t>(queueFamilyIndices.size());
+		createInfo.pQueueFamilyIndices = queueFamilyIndices.data();
 	}
 
 	if (vkCreateSwapchainKHR(m_vkDevice, &createInfo, nullptr, &m_vkSwapChain) != VK_SUCCESS) {
@@ -899,12 +898,17 @@ void HelloTriangleApplication::createCommandPool()
 	if (vkCreateCommandPool(m_vkDevice, &commandPoolInfo, nullptr, &m_vkCommandPool) != VK_SUCCESS) {
 		throw std::runtime_error("failed to create command pool!");
 	}
+
+	commandPoolInfo.queueFamilyIndex = queueFamilyIndices.transferFamily.value();
+	VK_CHECK(vkCreateCommandPool(m_vkDevice, &commandPoolInfo, nullptr, &m_vkCommandPool2), failed to create command pool2);
+	createDebugInfo({(uint64_t)m_vkCommandPool2, VK_OBJECT_TYPE_COMMAND_POOL, "m_vkCommandPool2" });
 }
 
 void HelloTriangleApplication::createCommandBuffers()
 {
 	m_vkCommandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
 	m_vkComputeCommandBuffers.resize(MAX_FRAMES_IN_FLIGHT);
+	m_vkCommandBuffers2.resize(MAX_FRAMES_IN_FLIGHT);
 	VkCommandBufferAllocateInfo allocInfo{
 		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
 		.commandPool = m_vkCommandPool,
@@ -920,6 +924,9 @@ void HelloTriangleApplication::createCommandBuffers()
 		throw std::runtime_error("failed to allocate compute command buffers!");
 	}
 
+	allocInfo.commandPool = m_vkCommandPool2;
+	allocInfo.commandBufferCount = static_cast<uint32_t>(m_vkCommandBuffers2.size());
+	VK_CHECK(vkAllocateCommandBuffers(m_vkDevice, &allocInfo, m_vkCommandBuffers2.data()), failed to allocate transfer command buffers!);
 }
 
 void HelloTriangleApplication::createSyncObjects(){
@@ -1081,8 +1088,21 @@ void HelloTriangleApplication::createBuffer(VkDeviceSize size, VkBufferUsageFlag
 
 void HelloTriangleApplication::copyBuffer(VkBuffer& src, VkBuffer& dst, VkDeviceSize size)
 {
+	VkCommandBufferAllocateInfo allocInfo = {
+	.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO,
+	.commandPool = m_vkCommandPool2,
+	.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+	.commandBufferCount = 1
+	};
+	VkCommandBuffer cpyCommandBuffer;
+	VK_CHECK(vkAllocateCommandBuffers(m_vkDevice, &allocInfo, &cpyCommandBuffer), failed to allocate single time copy command buffer!);
 
-	VkCommandBuffer cpyCommandBuffer = beginSingleTimeCommands();
+	VkCommandBufferBeginInfo beginInfo = {
+		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
+		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
+	};
+
+	VK_CHECK(vkBeginCommandBuffer(cpyCommandBuffer, &beginInfo), failed to begin single time copy command!);
 
 	VkBufferCopy cpyRegion = {
 		.srcOffset = 0,
@@ -1092,7 +1112,17 @@ void HelloTriangleApplication::copyBuffer(VkBuffer& src, VkBuffer& dst, VkDevice
 
 	vkCmdCopyBuffer(cpyCommandBuffer, src, dst, 1, &cpyRegion);
 
-	endSingleTimeCommands(cpyCommandBuffer);
+	vkEndCommandBuffer(cpyCommandBuffer);
+
+	VkSubmitInfo submitInfo = {
+		.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO,
+		.commandBufferCount = 1,
+		.pCommandBuffers = &cpyCommandBuffer,
+	};
+
+	VK_CHECK(vkQueueSubmit(m_vkTransferQueue, 1, &submitInfo, VK_NULL_HANDLE), failed to submit single time command to queue!);
+	vkQueueWaitIdle(m_vkTransferQueue);
+	vkFreeCommandBuffers(m_vkDevice, m_vkCommandPool2, 1, &cpyCommandBuffer);
 }
 
 bool HelloTriangleApplication::isDeviceSuitable(const VkPhysicalDevice& device)const
@@ -1177,6 +1207,10 @@ QueueFamilyIndices HelloTriangleApplication::findQueueFamilies(const VkPhysicalD
 		if (supportPresent) {
 			indices.presentFamily = i;
 		}
+		if (!(queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) && (queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT))
+		{
+			indices.transferFamily = i;
+		}
 		if (indices.isComplete())break;
 		++i;
 	}
@@ -1188,7 +1222,7 @@ void HelloTriangleApplication::createLogicalDevice()
 	QueueFamilyIndices indices = findQueueFamilies(m_vkPhysicDevice);
 	float priority = 1.f;
 	std::vector<VkDeviceQueueCreateInfo> queueCreateInfos;
-	std::unordered_set<uint32_t> uniqueQueueFamilies{ indices.graphicsFamily.value(), indices.presentFamily.value(), indices.graphicsAndComputeFamily.value() };
+	std::unordered_set<uint32_t> uniqueQueueFamilies{ indices.graphicsFamily.value(), indices.presentFamily.value(), indices.graphicsAndComputeFamily.value(), indices.transferFamily.value() };
 	for (auto queueFamily : uniqueQueueFamilies) {
 		VkDeviceQueueCreateInfo queueCreateInfo{
 			.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO,
@@ -1232,6 +1266,7 @@ void HelloTriangleApplication::createLogicalDevice()
 	vkGetDeviceQueue(m_vkDevice, indices.graphicsFamily.value(), 0, &m_vkGraphicsQueue);
 	vkGetDeviceQueue(m_vkDevice, indices.presentFamily.value(), 0, &m_vkPresentQueue);
 	vkGetDeviceQueue(m_vkDevice, indices.graphicsAndComputeFamily.value(), 0, &m_vkComputeQueue);
+	vkGetDeviceQueue(m_vkDevice, indices.transferFamily.value(), 0, &m_vkTransferQueue);
 }
 
 void HelloTriangleApplication::setupDebugMessenger()
@@ -2100,6 +2135,22 @@ void HelloTriangleApplication::createDebugInfo(VkDeviceMemory memory, std::strin
 	}
 }
 
+void HelloTriangleApplication::createDebugInfo(const DebugCreateInfo& _info)
+{
+	VkDebugUtilsObjectNameInfoEXT info{
+		.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT,
+		.pNext = nullptr,
+		.objectType = _info.type,
+		.objectHandle = (uint64_t)_info.handle,
+		.pObjectName = _info.name.c_str()
+	};
+	auto func = (PFN_vkSetDebugUtilsObjectNameEXT)vkGetInstanceProcAddr(m_vkInstance, "vkSetDebugUtilsObjectNameEXT");
+	if (func != nullptr)
+	{
+		VK_CHECK(func(m_vkDevice, &info), failed to assign debug info!);
+	}
+}
+
 void HelloTriangleApplication::mainLoop()
 {
 	while (!glfwWindowShouldClose(m_window))
@@ -2137,6 +2188,7 @@ void HelloTriangleApplication::cleanUp()
 	//vkDestroyBuffer(m_vkDevice, m_vkIndexBuffer, nullptr);
 	//vkFreeMemory(m_vkDevice, m_vkIndexBufferMemory, nullptr);
 	vkDestroyCommandPool(m_vkDevice, m_vkCommandPool, nullptr);
+	vkDestroyCommandPool(m_vkDevice, m_vkCommandPool2, nullptr);
 	vkDestroyPipeline(m_vkDevice, m_vkGraphicsPipeline, nullptr);
 	vkDestroyPipelineLayout(m_vkDevice, m_vkPipelineLayout, nullptr);
 	vkDestroyPipeline(m_vkDevice, m_vkComputePipeline, nullptr);

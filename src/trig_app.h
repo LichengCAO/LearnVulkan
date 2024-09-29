@@ -181,8 +181,19 @@ private:
 	void createComputeDescriptorSets();
 
 	//Create Debug info
+	struct DebugCreateInfo {
+		uint64_t handle;
+		VkObjectType type;
+		std::string name;
+	};
 	void createDebugInfo(VkBuffer buffer, std::string name);
 	void createDebugInfo(VkDeviceMemory memory, std::string name);
+	void createDebugInfo(const DebugCreateInfo& _info);
+
+	//Transfer Queue
+	VkQueue m_vkTransferQueue;
+	VkCommandPool m_vkCommandPool2;
+	std::vector<VkCommandBuffer> m_vkCommandBuffers2;
 
 
 	void mainLoop();
