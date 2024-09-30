@@ -22,6 +22,10 @@ endforeach()
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
 
 #add_subdirectory(src)
+configure_file (
+    "${PROJECT_SOURCE_DIR}/src/config.h.in"
+    "${PROJECT_SOURCE_DIR}/src/config.h"
+)
 
 file(GLOB SOURCES
      "src/*.cpp"
@@ -30,6 +34,7 @@ file(GLOB HEADERS
     "src/*.h"
     "src/*.hpp"
 )
+
 source_group("Sources" FILES ${SOURCES})
 source_group("Headers" FILES ${HEADERS})
 add_executable(${CMAKE_PROJECT_NAME} ${SOURCES} ${HEADERS})

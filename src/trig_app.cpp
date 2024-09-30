@@ -19,6 +19,7 @@
 #include <tiny_obj_loader.h>
 #include <unordered_map>
 #include <random>
+#include "VkBootstrap.h"
 
 #define VK_CHECK(vkcommand) \
 do{\
