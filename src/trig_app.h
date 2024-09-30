@@ -9,11 +9,15 @@
 #include <string>
 #include "vk_struct.h"
 #include "drawable.h"
+#include <VkBootstrap.h>
 class HelloTriangleApplication {
 public:
 	void run();
 	int bufferCnt = 0;
 private:
+	vkb::Instance m_instance;
+	vkb::Device m_device;
+
 	uint32_t m_curFrame = 0;
 	GLFWwindow* m_window;
 	VkInstance m_vkInstance;

@@ -37,6 +37,13 @@ if((vkcommand)!=VK_SUCCESS){\
 }\
 }while(0)
 
+#define VKB_CHECK(vkcommand, message)   \
+do{                                     \
+if(!(vkcommand)){                       \
+   throw std::runtime_error(#message);  \
+}                                       \
+}while(0)
+
 const std::vector<const char*> validationLayers = {
 	"VK_LAYER_KHRONOS_validation"
 };
@@ -525,15 +532,35 @@ void HelloTriangleApplication::initWindow()
 
 void HelloTriangleApplication::createInstance()
 {
-	//optional
-	VkApplicationInfo appInfo{};
-	appInfo.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
-	appInfo.pApplicationName = "Hello Triangle";
-	appInfo.applicationVersion = VK_MAKE_VERSION(1, 0, 0);
-	appInfo.pEngineName = "No Engine";
-	appInfo.engineVersion = VK_MAKE_VERSION(1, 0, 0);
-	appInfo.apiVersion = VK_API_VERSION_1_0;
-
+	vkb::InstanceBuilder instanceBuilder;
+	instanceBuilder.enable_extensions(getInstanceRequiredExtensions());
+	instanceBuilder.request_validation_layers(true);
+	instanceBuilder.set_app_name("Hello Triangle");
+	instanceBuilder.set_app_version(VK_MAKE_VERSION(1, 0, 0));
+	instanceBuilder.set_engine_name("No Engine");
+	instanceBuilder.set_engine_version(VK_MAKE_VERSION(1, 0, 0));
+	instanceBuilder.desire_api_version(VK_API_VERSION_1_0);
+	instanceBuilder.set_debug_callback(
+		[](
+			VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
+			VkDebugUtilsMessageTypeFlagsEXT messageType,
+			const VkDebugUtilsMessengerCallbackDataEXT * pCallbackData,
+			void* pUserData) -> VkBool32
+		{
+			if (messageSeverity > VK_DEBUG_UTILS_MESSAGE_SEVERITY_WARNING_BIT_EXT) 
+			{
+				std::cout << "message based on severity" << std::endl;
+				std::cerr << "validation layer: " << pCallbackData->pMessage << std::endl;
+			}
+			return VK_FALSE;
+		}
+	);
+	auto instanceBuildResult = instanceBuilder.build();
+	VKB_CHECK(instanceBuildResult, FAILED to create vulkan instance);
+	m_instance = instanceBuildResult.value();
+	
+	m_vkInstance = m_instance.instance;
+	/*
 	//mandatory
 	VkInstanceCreateInfo createInfo{};
 	createInfo.sType = VK_STRUCTURE_TYPE_INSTANCE_CREATE_INFO;
@@ -571,6 +598,7 @@ void HelloTriangleApplication::createInstance()
 	if (vkCreateInstance(&createInfo, nullptr, &m_vkInstance) != VK_SUCCESS) {
 		throw std::runtime_error("failed to create instance!");
 	}
+	*/
 }
 
 void HelloTriangleApplication::createSurface()
@@ -2208,7 +2236,8 @@ void HelloTriangleApplication::cleanUp()
 	vkDestroyRenderPass(m_vkDevice, m_vkRenderPass, nullptr);
 	vkDestroyDevice(m_vkDevice, nullptr);
 	vkDestroySurfaceKHR(m_vkInstance, m_vkSurface, nullptr);
-	vkDestroyInstance(m_vkInstance, nullptr);
+	//vkDestroyInstance(m_vkInstance, nullptr);
+	vkb::destroy_instance(m_instance);
 	glfwDestroyWindow(m_window);
 	glfwTerminate();
 }

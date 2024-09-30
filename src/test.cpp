@@ -1,3 +1,4 @@
+/*
 #include <stdio.h>
 
 #include <memory>
@@ -130,7 +131,6 @@ int get_queues(Init& init, RenderData& data) {
 		return -1;
 	}
 	data.graphics_queue = gq.value();
-
 	auto pq = init.device.get_queue(vkb::QueueType::present);
 	if (!pq.has_value()) {
 		std::cout << "failed to get present queue: " << pq.error().message() << "\n";
@@ -606,26 +606,26 @@ int main() {
 	cleanup(init, render_data);
 	return 0;
 }
+*/
 
-
-//#define GLM_FORCE_RADIANS
-//#define GLM_FORCE_DEPTH_ZERO_TO_ONE
-//#include <glm/vec4.hpp>
-//#include <glm/mat4x4.hpp>
-//#include <iostream>
-//#include "trig_app.h"
-//#include <cstdlib>
-//#include <stdexcept>
-////#include <vulkan/vulkan.h>
-//int main() {
-//    HelloTriangleApplication app;
-//    try {
-//        app.run();
-//    }
-//    catch (const std::exception& e) {
-//        std::cerr << e.what() << std::endl;
-//        return EXIT_FAILURE;
-//    }
-//    system("pause");
-//    return EXIT_SUCCESS;
-//}
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
+#include <glm/vec4.hpp>
+#include <glm/mat4x4.hpp>
+#include <iostream>
+#include "trig_app.h"
+#include <cstdlib>
+#include <stdexcept>
+//#include <vulkan/vulkan.h>
+int main() {
+    HelloTriangleApplication app;
+    try {
+        app.run();
+    }
+    catch (const std::exception& e) {
+        std::cerr << e.what() << std::endl;
+        return EXIT_FAILURE;
+    }
+    system("pause");
+    return EXIT_SUCCESS;
+}
