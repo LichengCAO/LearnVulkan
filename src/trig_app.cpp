@@ -1193,6 +1193,12 @@ uint32_t HelloTriangleApplication::findMemoryType(uint32_t typeFilter, VkMemoryP
 
 void HelloTriangleApplication::pickPhysicalDevice()
 {
+	vkb::PhysicalDeviceSelector physicalDeviceSelector(m_instance);
+	VkPhysicalDeviceFeatures requiredFeatures;
+	requiredFeatures.geometryShader = VK_TRUE;
+	physicalDeviceSelector.set_surface(m_vkSurface);
+	physicalDeviceSelector.set_required_features(requiredFeatures);
+	
 	//count devices
 	uint32_t device_cnt = 0;
 	vkEnumeratePhysicalDevices(m_vkInstance, &device_cnt, nullptr);
