@@ -18,6 +18,8 @@ private:
 	vkb::Instance m_instance;
 	vkb::Device m_device;
 	vkb::PhysicalDevice m_physicalDevice;
+	vkb::DispatchTable m_dispatchTable;
+	vkb::Swapchain m_swapchain;
 
 	uint32_t m_curFrame = 0;
 	GLFWwindow* m_window;

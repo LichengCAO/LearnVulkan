@@ -611,49 +611,67 @@ void HelloTriangleApplication::createSurface()
 void HelloTriangleApplication::createSwapChain()
 {
 	SwapChainSupportDetails swapChainSupport = querySwapChainSupport(m_vkPhysicDevice, m_vkSurface);
-
+	uint32_t imageCnt = swapChainSupport.capabilities.minImageCount + 1;
 	VkSurfaceFormatKHR surfaceFormat = chooseSwapChainFormat(swapChainSupport.formats);
 	VkPresentModeKHR presentMode = chooseSwapChainPresentMode(swapChainSupport.presentModes);
 	VkExtent2D extent = chooseSwapChainExtent(swapChainSupport.capabilities);
+	vkb::SwapchainBuilder swapchainBuilder{ m_device };
+	// swapchainBuilder.set_old_swapchain(m_swapchain); // it says that we need to set this, but if i leave it empty it still works, weird
+	swapchainBuilder.set_desired_format(surfaceFormat);
+	swapchainBuilder.set_desired_present_mode(presentMode);
+	swapchainBuilder.set_composite_alpha_flags(VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR);
+	swapchainBuilder.set_desired_min_image_count(imageCnt);
+	swapchainBuilder.set_desired_extent(extent.width, extent.height);
+	// swapchainBuilder.set_image_array_layer_count(1);
+	auto swapchainBuilderReturn = swapchainBuilder.build();
+	if (!swapchainBuilderReturn)
+	{
+		throw std::runtime_error(swapchainBuilderReturn.error().message());
+	}
+	m_swapchain = swapchainBuilderReturn.value();
+	m_vkSwapChain = m_swapchain.swapchain;
 
-	uint32_t imageCnt = swapChainSupport.capabilities.minImageCount + 1;
-	if (swapChainSupport.capabilities.maxImageCount > 0 // means has maximum image count 
-		&& imageCnt > swapChainSupport.capabilities.maxImageCount) {
-		imageCnt = swapChainSupport.capabilities.maxImageCount;
-	}
+	//SwapChainSupportDetails swapChainSupport = querySwapChainSupport(m_vkPhysicDevice, m_vkSurface);
+	//VkSurfaceFormatKHR surfaceFormat = chooseSwapChainFormat(swapChainSupport.formats);
+	//VkPresentModeKHR presentMode = chooseSwapChainPresentMode(swapChainSupport.presentModes);
+	//VkExtent2D extent = chooseSwapChainExtent(swapChainSupport.capabilities);
+	//uint32_t imageCnt = swapChainSupport.capabilities.minImageCount + 1;
+	//if (swapChainSupport.capabilities.maxImageCount > 0 // means has maximum image count 
+	//	&& imageCnt > swapChainSupport.capabilities.maxImageCount) {
+	//	imageCnt = swapChainSupport.capabilities.maxImageCount;
+	//}
+	//VkSwapchainCreateInfoKHR createInfo{
+	//	.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
+	//	.surface = m_vkSurface,
+	//	.minImageCount = imageCnt,
+	//	.imageFormat = surfaceFormat.format,
+	//	.imageColorSpace = surfaceFormat.colorSpace,
+	//	.imageExtent = extent,
+	//	.imageArrayLayers = 1,
+	//	.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
+	//	.preTransform = swapChainSupport.capabilities.currentTransform,
+	//	.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR, //application window should not blend with other windows
+	//	.presentMode = presentMode,
+	//	.clipped = VK_TRUE, //part where application's window is behind other windows
+	//	.oldSwapchain = VK_NULL_HANDLE
+	//};
+	//QueueFamilyIndices indices = findQueueFamilies(m_vkPhysicDevice);
+	//std::vector<uint32_t> queueFamilyIndices = { indices.graphicsFamily.value(), indices.transferFamily.value()};
+	//if (indices.graphicsFamily != indices.presentFamily) {
+	//	queueFamilyIndices.push_back(indices.presentFamily.value());
+	//	createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+	//	createInfo.queueFamilyIndexCount = static_cast<uint32_t>(queueFamilyIndices.size());
+	//	createInfo.pQueueFamilyIndices = queueFamilyIndices.data();
+	//}
+	//else {
+	//	createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;//VK_SHARING_MODE_EXCLUSIVE;
+	//	createInfo.queueFamilyIndexCount = static_cast<uint32_t>(queueFamilyIndices.size());
+	//	createInfo.pQueueFamilyIndices = queueFamilyIndices.data();
+	//}
 
-	VkSwapchainCreateInfoKHR createInfo{
-		.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR,
-		.surface = m_vkSurface,
-		.minImageCount = imageCnt,
-		.imageFormat = surfaceFormat.format,
-		.imageColorSpace = surfaceFormat.colorSpace,
-		.imageExtent = extent,
-		.imageArrayLayers = 1,
-		.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT,
-		.preTransform = swapChainSupport.capabilities.currentTransform,
-		.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR, //application window should not blend with other windows
-		.presentMode = presentMode,
-		.clipped = VK_TRUE, //part where application's window is behind other windows
-		.oldSwapchain = VK_NULL_HANDLE
-	};
-	QueueFamilyIndices indices = findQueueFamilies(m_vkPhysicDevice);
-	std::vector<uint32_t> queueFamilyIndices = { indices.graphicsFamily.value(), indices.transferFamily.value()};
-	if (indices.graphicsFamily != indices.presentFamily) {
-		queueFamilyIndices.push_back(indices.presentFamily.value());
-		createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
-		createInfo.queueFamilyIndexCount = static_cast<uint32_t>(queueFamilyIndices.size());
-		createInfo.pQueueFamilyIndices = queueFamilyIndices.data();
-	}
-	else {
-		createInfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;//VK_SHARING_MODE_EXCLUSIVE;
-		createInfo.queueFamilyIndexCount = static_cast<uint32_t>(queueFamilyIndices.size());
-		createInfo.pQueueFamilyIndices = queueFamilyIndices.data();
-	}
-
-	if (vkCreateSwapchainKHR(m_vkDevice, &createInfo, nullptr, &m_vkSwapChain) != VK_SUCCESS) {
-		throw std::runtime_error("failed to create swap chain!");
-	}
+	//if (vkCreateSwapchainKHR(m_vkDevice, &createInfo, nullptr, &m_vkSwapChain) != VK_SUCCESS) {
+	//	throw std::runtime_error("failed to create swap chain!");
+	//}
 
 	uint32_t imgCnt = 0;
 	vkGetSwapchainImagesKHR(m_vkDevice, m_vkSwapChain, &imgCnt, nullptr);
@@ -1293,8 +1311,9 @@ void HelloTriangleApplication::createLogicalDevice()
 		std::cout << deviceBuilderReturn.error().message() << std::endl;
 		VK_CHECK(false, FAILED to create logic device!);
 	}
-	vkb::Device device = deviceBuilderReturn.value();
-	m_vkDevice = device.device;
+	m_device = deviceBuilderReturn.value();
+	m_vkDevice = m_device.device;
+	m_dispatchTable = m_device.make_table();
 
 	//QueueFamilyIndices indices = findQueueFamilies(m_vkPhysicDevice);
 	//float priority = 1.f;
