@@ -17,6 +17,7 @@ public:
 private:
 	vkb::Instance m_instance;
 	vkb::Device m_device;
+	vkb::PhysicalDevice m_physicalDevice;
 
 	uint32_t m_curFrame = 0;
 	GLFWwindow* m_window;
