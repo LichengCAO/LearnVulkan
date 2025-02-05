@@ -692,6 +692,7 @@ void HelloTriangleApplication::createImageViews(){
 
 void HelloTriangleApplication::createRenderPass()
 {
+	// describes how the render result being PASSED to different shaders
 	VkAttachmentDescription colorAttachment{
 		.format = m_swapChainImageFormat,
 		.samples = m_vkMSAASamples,
@@ -702,16 +703,18 @@ void HelloTriangleApplication::createRenderPass()
 		.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED,
 		.finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR
 	};
+	std::array<VkAttachmentDescription, 1> attachments = { colorAttachment }; //must ordered same as attachment ref
 
 	VkAttachmentReference colorAttachmentRef{
-		.attachment = 0,
+		.attachment = 0, // the attachment at index 0
 		.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
 	};
+	std::array<VkAttachmentReference, 1> attachmentRefs = { colorAttachmentRef };
 
 	VkSubpassDescription subpass{
 		.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS,
-		.colorAttachmentCount = 1,
-		.pColorAttachments = &colorAttachmentRef,
+		.colorAttachmentCount = static_cast<uint32_t>(attachmentRefs.size()),
+		.pColorAttachments = attachmentRefs.data(),
 	};
 
 	//VkSubpassDependency dependencyInfo{
@@ -722,8 +725,6 @@ void HelloTriangleApplication::createRenderPass()
 	//.srcAccessMask = 0,
 	//.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT,
 	//};
-
-	std::array<VkAttachmentDescription, 1> attachments = { colorAttachment }; //must ordered same as attachment ref
 
 	VkRenderPassCreateInfo renderPassInfo{
 		.sType = VK_STRUCTURE_TYPE_RENDER_PASS_CREATE_INFO,
@@ -762,7 +763,7 @@ void HelloTriangleApplication::createGraphicsPipeline()
 	.pName = "main", // entry point function in shader
 	};
 
-	VkPipelineShaderStageCreateInfo shaderStageInfos[] = { vertShaderStageInfo, fragShaderStageInfo };
+	std::vector<VkPipelineShaderStageCreateInfo> shaderStageInfos = { vertShaderStageInfo, fragShaderStageInfo };
 	auto vertexBindingDescriptInfo = Particle::getVertexInputBindingDescription();
 	auto vertexAttributeDescriptInfo = Particle::getVertexInputAttributeDescription();
 
@@ -792,13 +793,14 @@ void HelloTriangleApplication::createGraphicsPipeline()
 	};
 
 	VkViewport viewport{
-	.x = 0.f,
-	.y = 0.f,
-	.width = (float)m_vkSwapChainExtent.width,
-	.height = (float)m_vkSwapChainExtent.height,
-	.minDepth = 0.f,
-	.maxDepth = 1.f
+		.x = 0.f,
+		.y = 0.f,
+		.width = (float)m_vkSwapChainExtent.width * 0.5f,
+		.height = (float)m_vkSwapChainExtent.height,
+		.minDepth = 0.f,
+		.maxDepth = 1.f
 	};
+
 	VkRect2D scissor{
 		.offset = {0,0},
 		.extent = m_vkSwapChainExtent
@@ -883,8 +885,8 @@ void HelloTriangleApplication::createGraphicsPipeline()
 	//GRAPHICS PIPELINE LAYOUT
 	VkGraphicsPipelineCreateInfo pipelineInfo{
 		.sType = VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO,
-		.stageCount = 2,
-		.pStages = shaderStageInfos,
+		.stageCount = static_cast<uint32_t>(shaderStageInfos.size()),
+		.pStages = shaderStageInfos.data(),
 		.pVertexInputState = &vertexInputInfo,
 		.pInputAssemblyState = &inputAssemblyInfo,
 		.pViewportState = &viewportStateInfo,
@@ -1282,7 +1284,8 @@ QueueFamilyIndices HelloTriangleApplication::findQueueFamilies(const VkPhysicalD
 		}
 		if (!(queueFamily.queueFlags & VK_QUEUE_GRAPHICS_BIT) && (queueFamily.queueFlags & VK_QUEUE_TRANSFER_BIT))
 		{
-			indices.transferFamily = i;
+			// The good news is that any queue family with VK_QUEUE_GRAPHICS_BIT or VK_QUEUE_COMPUTE_BIT capabilities already implicitly support VK_QUEUE_TRANSFER_BIT operations.
+			indices.transferFamily = i; 
 		}
 		if (indices.isComplete())break;
 		++i;
@@ -2312,9 +2315,9 @@ void HelloTriangleApplication::cleanUp()
 void HelloTriangleApplication::initVulkan() {
 	createInstance();
 	setupDebugMessenger();
-	createSurface();
-	pickPhysicalDevice();
-	createLogicalDevice();
+	createSurface(); // set based on instance by glfw
+	pickPhysicalDevice(); // physical device is bound with surface, its present queue family should be compatible with the surface
+	createLogicalDevice(); // logically present the part of the physical device that has a set of specified capabilities
 	createSwapChain();
 	createImageViews();
 	createRenderPass();
