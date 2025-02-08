@@ -2,14 +2,7 @@
 #include <iostream>
 #include <cstdint>
 #include <unordered_set>
-
-#define VK_CHECK(vkcommand, message) \
-do{\
-if((vkcommand)!=VK_SUCCESS){\
-   throw std::runtime_error(\
-#message);\
-}\
-}while(0)
+#include <algorithm>
 
 std::vector<const char*> MyDevice::_GetInstanceRequiredExtensions() const
 {
@@ -59,6 +52,70 @@ QueueFamilyIndices MyDevice::_GetQueueFamilyIndices(VkPhysicalDevice physicalDev
 		++i;
 	}
 	return indices;
+}
+
+SwapChainSupportDetails MyDevice::_QuerySwapchainSupport(VkPhysicalDevice phyiscalDevice, VkSurfaceKHR surface) const
+{
+	SwapChainSupportDetails res;
+
+	vkGetPhysicalDeviceSurfaceCapabilitiesKHR(phyiscalDevice, surface, &res.capabilities);
+
+	uint32_t formatCnt = 0;
+	vkGetPhysicalDeviceSurfaceFormatsKHR(phyiscalDevice, surface, &formatCnt, nullptr);
+	if (formatCnt != 0) {
+		res.formats.resize(formatCnt);
+		vkGetPhysicalDeviceSurfaceFormatsKHR(phyiscalDevice, surface, &formatCnt, res.formats.data());
+	}
+
+	uint32_t modeCnt = 0;
+	vkGetPhysicalDeviceSurfacePresentModesKHR(phyiscalDevice, surface, &modeCnt, nullptr);
+	if (modeCnt != 0) {
+		res.presentModes.resize(modeCnt);
+		vkGetPhysicalDeviceSurfacePresentModesKHR(phyiscalDevice, surface, &modeCnt, res.presentModes.data());
+	}
+	return res;
+}
+
+VkSurfaceFormatKHR MyDevice::_ChooseSwapchainFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) const
+{
+	for (const auto& availableFormat : availableFormats) 
+	{
+		if (availableFormat.format == VK_FORMAT_B8G8R8A8_SRGB && availableFormat.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR) 
+		{
+			return availableFormat;
+		}
+	}
+	return availableFormats[0];
+}
+
+VkPresentModeKHR MyDevice::_ChooseSwapchainPresentMode(const std::vector<VkPresentModeKHR>& availableModes) const
+{
+	for (const auto& availableMode : availableModes) 
+	{
+		if (availableMode == VK_PRESENT_MODE_MAILBOX_KHR) 
+		{
+			return availableMode;
+		}
+	}
+	return VK_PRESENT_MODE_FIFO_KHR;
+}
+
+VkExtent2D MyDevice::_ChooseSwapchainExtent(const VkSurfaceCapabilitiesKHR& capabilities) const
+{
+	if (capabilities.currentExtent.width != std::numeric_limits<uint32_t>::max()) 
+	{
+		return capabilities.currentExtent;
+	}
+	int width, height;
+	glfwGetFramebufferSize(pWindow, &width, &height);
+	VkExtent2D res{
+		static_cast<uint32_t>(width),
+		static_cast<uint32_t>(height)
+	};
+
+	res.width = std::clamp(res.width, capabilities.minImageExtent.width, capabilities.maxImageExtent.width);
+	res.height = std::clamp(res.height, capabilities.minImageExtent.height, capabilities.maxImageExtent.height);
+	return res;
 }
 
 void MyDevice::_InitGLFW()
@@ -145,12 +202,17 @@ void MyDevice::_CreateLogicalDevice()
 	vkb::DeviceBuilder deviceBuilder{ m_physicalDevice };
 	std::vector<vkb::CustomQueueDescription> queueDescription;
 	float priority = 1.0f;
-	QueueFamilyIndices indices = _GetQueueFamilyIndices(vkPhysicalDevice);
-	if (!indices.isComplete())
+	queueFamilyIndices = _GetQueueFamilyIndices(vkPhysicalDevice);
+	if (!queueFamilyIndices.isComplete())
 	{
 		throw std::runtime_error("Failed to find all queue families");
 	}
-	std::unordered_set<uint32_t> uniqueQueueFamilies{ indices.graphicsFamily.value(), indices.presentFamily.value(), indices.graphicsAndComputeFamily.value(), indices.transferFamily.value() };
+	std::unordered_set<uint32_t> uniqueQueueFamilies{ 
+		queueFamilyIndices.graphicsFamily.value(), 
+		queueFamilyIndices.presentFamily.value(), 
+		queueFamilyIndices.graphicsAndComputeFamily.value(), 
+		queueFamilyIndices.transferFamily.value() 
+	};
 	for (auto queueFamily : uniqueQueueFamilies) 
 	{
 		queueDescription.emplace_back(vkb::CustomQueueDescription{ queueFamily, {priority} });
@@ -171,11 +233,11 @@ void MyDevice::_CreateLogicalDevice()
 
 void MyDevice::_CreateSwapChain()
 {
-	SwapChainSupportDetails swapChainSupport = querySwapChainSupport(m_vkPhysicDevice, m_vkSurface);
+	SwapChainSupportDetails swapChainSupport = _QuerySwapchainSupport(vkPhysicalDevice, vkSurface);
 	uint32_t imageCnt = swapChainSupport.capabilities.minImageCount + 1;
-	VkSurfaceFormatKHR surfaceFormat = chooseSwapChainFormat(swapChainSupport.formats);
-	VkPresentModeKHR presentMode = chooseSwapChainPresentMode(swapChainSupport.presentModes);
-	VkExtent2D extent = chooseSwapChainExtent(swapChainSupport.capabilities);
+	VkSurfaceFormatKHR surfaceFormat = _ChooseSwapchainFormat(swapChainSupport.formats);
+	VkPresentModeKHR presentMode = _ChooseSwapchainPresentMode(swapChainSupport.presentModes);
+	VkExtent2D extent = _ChooseSwapchainExtent(swapChainSupport.capabilities);
 	vkb::SwapchainBuilder swapchainBuilder{ m_device };
 	// swapchainBuilder.set_old_swapchain(m_swapchain); // it says that we need to set this, but if i leave it empty it still works, weird
 	swapchainBuilder.set_desired_format(surfaceFormat);
@@ -190,7 +252,30 @@ void MyDevice::_CreateSwapChain()
 		throw std::runtime_error(swapchainBuilderReturn.error().message());
 	}
 	m_swapchain = swapchainBuilderReturn.value();
-	vkSwapChain = m_swapchain.swapchain;
+	vkSwapchain = m_swapchain.swapchain;
 }
 
-#undef VK_CHECK(vkcommand, message)
+void MyDevice::Init()
+{
+	_InitGLFW();
+	_CreateInstance();
+	_CreateSurface();
+	_SelectPhysicalDevice();
+	_CreateLogicalDevice();
+	_CreateSwapChain();
+}
+
+void MyDevice::Uninit()
+{
+	vkb::destroy_swapchain(m_swapchain);
+	vkb::destroy_device(m_device);
+	vkb::destroy_surface(m_instance, vkSurface);
+	vkb::destroy_instance(m_instance);
+	glfwDestroyWindow(pWindow);
+	glfwTerminate();
+}
+
+MyDevice& MyDevice::GetInstance()
+{
+	return s_instance;
+}
