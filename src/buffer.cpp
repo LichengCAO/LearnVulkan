@@ -57,6 +57,11 @@ void Buffer::FreeMemory()
 {
 	if (vkDeviceMemory.has_value())
 	{
+		if (m_mappedMemory != nullptr)
+		{
+			vkUnmapMemory(MyDevice::GetInstance().vkDevice, vkDeviceMemory.value());
+			m_mappedMemory = nullptr;
+		}
 		vkFreeMemory(MyDevice::GetInstance().vkDevice, vkDeviceMemory.value(), nullptr);
 		vkDeviceMemory.reset();
 	}
@@ -64,14 +69,15 @@ void Buffer::FreeMemory()
 
 void Buffer::CopyFromHost(void* src)
 {
-	void* data;
 	if (!vkDeviceMemory.has_value())
 	{
 		throw std::runtime_error("Not allocate memory yet!");
 	}
-	vkMapMemory(MyDevice::GetInstance().vkDevice, vkDeviceMemory.value(), 0, m_bufferInformation.size, 0, &data);
-	memcpy(data, src, (size_t)m_bufferInformation.size);
-	vkUnmapMemory(MyDevice::GetInstance().vkDevice, vkDeviceMemory.value());
+	if (m_mappedMemory == nullptr)
+	{
+		vkMapMemory(MyDevice::GetInstance().vkDevice, vkDeviceMemory.value(), 0, m_bufferInformation.size, 0, &m_mappedMemory);
+	}
+	memcpy(m_mappedMemory, src, (size_t)m_bufferInformation.size);
 }
 
 void Buffer::CopyFromBuffer(const Buffer& otherBuffer)

@@ -61,10 +61,8 @@ void Image::Uninit()
 	FreeMemory();
 }
 
-void Image::AllocateMemory(VkMemoryPropertyFlags properties)
+void Image::AllocateMemory()
 {
-	m_imageInformation.memoryProperty = properties;
-
 	MyDevice gMyDevice = MyDevice::GetInstance();
 	VkDeviceMemory deviceMemory;
 	VkMemoryRequirements memRequirements;
@@ -72,7 +70,7 @@ void Image::AllocateMemory(VkMemoryPropertyFlags properties)
 	VkMemoryAllocateInfo allocInfo = {
 		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 		.allocationSize = memRequirements.size,
-		.memoryTypeIndex = _FindMemoryTypeIndex(memRequirements.memoryTypeBits, properties)
+		.memoryTypeIndex = _FindMemoryTypeIndex(memRequirements.memoryTypeBits, m_imageInformation.memoryProperty)
 	};
 
 	VK_CHECK(vkAllocateMemory(gMyDevice.vkDevice, &allocInfo, nullptr, &deviceMemory), Failed to allocate image memory!);

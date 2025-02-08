@@ -48,7 +48,7 @@ public:
 	void Init(ImageInformation imageInfo);
 	void Uninit();
 	
-	void AllocateMemory(VkMemoryPropertyFlags properties);
+	void AllocateMemory();
 	void FreeMemory();
 	VkImageView NewImageView(std::string name, const ImageViewInformation& imageViewInfo);
 	std::optional<VkImageView> GetImageView(std::string name) const;
