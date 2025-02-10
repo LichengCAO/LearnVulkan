@@ -3,12 +3,16 @@
 
 struct PipelineInput
 {
-
+	
 };
 
 class GraphicsPipeline
 {
+private:
+
 public:
+	VkPipelineLayout vkPipelineLayout;
+
 	GraphicsPipeline();
 	void Init();
 	void Do(const PipelineInput& input);

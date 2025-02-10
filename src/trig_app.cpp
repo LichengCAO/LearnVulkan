@@ -707,7 +707,7 @@ void HelloTriangleApplication::createRenderPass()
 
 	VkAttachmentReference colorAttachmentRef{
 		.attachment = 0, // the attachment at index 0
-		.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+		.m_pLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
 	};
 	std::array<VkAttachmentReference, 1> attachmentRefs = { colorAttachmentRef };
 
@@ -894,7 +894,7 @@ void HelloTriangleApplication::createGraphicsPipeline()
 		.pMultisampleState = &multisampleInfo,
 		.pColorBlendState = &colorBlendStateInfo,
 		.pDynamicState = &dynamicStateInfo,
-		.layout = m_vkPipelineLayout,
+		.m_pLayout = m_vkPipelineLayout,
 		.renderPass = m_vkRenderPass,
 		.subpass = 0,
 		.basePipelineHandle = VK_NULL_HANDLE,//only when in graphics pipleininfo VK_PIPELINE_CREATE_DERIVATIVE_BIT flag is set
@@ -1404,7 +1404,7 @@ void HelloTriangleApplication::createDescriptorSetLayout()
 		.pBindings = layoutBindings.data(),
 	};
 
-	VK_CHECK(vkCreateDescriptorSetLayout(m_vkDevice, &createInfo, nullptr, &m_vkComputeDescriptorSetLayout), failed to create compute descriptor set layout!);
+	VK_CHECK(vkCreateDescriptorSetLayout(m_vkDevice, &createInfo, nullptr, &m_vkComputeDescriptorSetLayout), failed to create compute descriptor set m_pLayout!);
 }
 
 void HelloTriangleApplication::createUniformBuffers()

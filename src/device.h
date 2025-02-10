@@ -36,6 +36,8 @@ private:
 	void _SelectPhysicalDevice();
 	void _CreateLogicalDevice();
 	void _CreateSwapChain();
+	void _CreateCommandPool();// TODO
+	void _CreateDescriptorPool(); // TODO
 
 public:
 	GLFWwindow*			pWindow = nullptr;
@@ -45,9 +47,12 @@ public:
 	VkDevice			vkDevice;
 	QueueFamilyIndices	queueFamilyIndices;
 	VkSwapchainKHR		vkSwapchain;
+	VkCommandPool		vkCommandPool;
+	VkDescriptorPool	vkDescriptorPool;
 	void Init();
 	void Uninit();
 
+	// TODO:
 	VkCommandBuffer StartOneTimeCommands();
 	void FinishOneTimeCommands(VkCommandBuffer commandBuffer);
 public:

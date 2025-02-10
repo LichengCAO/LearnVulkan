@@ -26,6 +26,8 @@ public:
 	void AllocateMemory();
 	void FreeMemory();
 
-	void CopyFromHost(void* src);
+	void CopyFromHost(const void* src);
 	void CopyFromBuffer(const Buffer& otherBuffer);
+
+	BufferInformation GetBufferInformation()const;
 };

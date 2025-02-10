@@ -67,7 +67,7 @@ void Buffer::FreeMemory()
 	}
 }
 
-void Buffer::CopyFromHost(void* src)
+void Buffer::CopyFromHost(const void* src)
 {
 	if (!vkDeviceMemory.has_value())
 	{
@@ -94,4 +94,9 @@ void Buffer::CopyFromBuffer(const Buffer& otherBuffer)
 	vkCmdCopyBuffer(commandBuffer, otherBuffer.vkBuffer, vkBuffer, 1, &cpyRegion);
 
 	gDevice.FinishOneTimeCommands(commandBuffer);
+}
+
+BufferInformation Buffer::GetBufferInformation() const
+{
+	return m_bufferInformation;
 }
