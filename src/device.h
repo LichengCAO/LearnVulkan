@@ -9,6 +9,14 @@ if((vkcommand)!=VK_SUCCESS){\
 }\
 }while(0)
 
+#define CHECK_TRUE(condition, failedMessage) \
+do{\
+if(!(condition)){\
+   throw std::runtime_error(\
+#failedMessage);\
+}\
+}while(0)
+
 class MyDevice
 {
 private:

@@ -15,6 +15,13 @@ uint32_t Buffer::_FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags p
 	return uint32_t();
 }
 
+Buffer::~Buffer()
+{
+	assert(!vkBuffer.has_value());
+	assert(!vkDeviceMemory.has_value());
+	assert(m_mappedMemory == nullptr);
+}
+
 void Buffer::Init(BufferInformation info)
 {
 	VkBufferCreateInfo bufferInfo = {
@@ -24,19 +31,30 @@ void Buffer::Init(BufferInformation info)
 		.sharingMode = info.sharingMode,
 	};
 	m_bufferInformation = info;
-	VK_CHECK(vkCreateBuffer(MyDevice::GetInstance().vkDevice, &bufferInfo, nullptr, &vkBuffer), Failed to create buffer!);
+
+	VkBuffer buffer;
+
+	VK_CHECK(vkCreateBuffer(MyDevice::GetInstance().vkDevice, &bufferInfo, nullptr, &buffer), Failed to create buffer!);
+
+	vkBuffer = buffer;
 }
 
 void Buffer::Uninit()
 {
-	vkDestroyBuffer(MyDevice::GetInstance().vkDevice, vkBuffer, nullptr);
+	if (vkBuffer.has_value())
+	{
+		vkDestroyBuffer(MyDevice::GetInstance().vkDevice, vkBuffer.value(), nullptr);
+		vkBuffer.reset();
+	}
+	
 	FreeMemory();
 }
 
 void Buffer::AllocateMemory()
 {
+	CHECK_TRUE(vkBuffer.has_value(), Try to allocate for a uninitialized buffer!);
 	VkMemoryRequirements memRequirements;
-	vkGetBufferMemoryRequirements(MyDevice::GetInstance().vkDevice, vkBuffer, &memRequirements);
+	vkGetBufferMemoryRequirements(MyDevice::GetInstance().vkDevice, vkBuffer.value(), &memRequirements);
 
 	VkMemoryAllocateInfo allocInfo = {
 		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
@@ -50,7 +68,7 @@ void Buffer::AllocateMemory()
 	vkDeviceMemory = bufferMemory;
 
 	VkDeviceSize offset = 0; // should be divisible by memRequirements.alignment
-	vkBindBufferMemory(MyDevice::GetInstance().vkDevice, vkBuffer, bufferMemory, offset);
+	vkBindBufferMemory(MyDevice::GetInstance().vkDevice, vkBuffer.value(), bufferMemory, offset);
 }
 
 void Buffer::FreeMemory()
@@ -69,10 +87,7 @@ void Buffer::FreeMemory()
 
 void Buffer::CopyFromHost(const void* src)
 {
-	if (!vkDeviceMemory.has_value())
-	{
-		throw std::runtime_error("Not allocate memory yet!");
-	}
+	CHECK_TRUE(vkDeviceMemory.has_value(), Not allocate memory yet!);
 	if (m_mappedMemory == nullptr)
 	{
 		vkMapMemory(MyDevice::GetInstance().vkDevice, vkDeviceMemory.value(), 0, m_bufferInformation.size, 0, &m_mappedMemory);
@@ -82,6 +97,8 @@ void Buffer::CopyFromHost(const void* src)
 
 void Buffer::CopyFromBuffer(const Buffer& otherBuffer)
 {
+	CHECK_TRUE(otherBuffer.vkBuffer.has_value(), Source buffer is not initialized!);
+	CHECK_TRUE(vkBuffer.has_value(), This buffer is not initialized!);
 	MyDevice gDevice = MyDevice::GetInstance();
 	VkCommandBuffer commandBuffer = gDevice.StartOneTimeCommands();
 
@@ -91,7 +108,7 @@ void Buffer::CopyFromBuffer(const Buffer& otherBuffer)
 		.size = m_bufferInformation.size,
 	};
 
-	vkCmdCopyBuffer(commandBuffer, otherBuffer.vkBuffer, vkBuffer, 1, &cpyRegion);
+	vkCmdCopyBuffer(commandBuffer, otherBuffer.vkBuffer.value(), vkBuffer.value(), 1, &cpyRegion);
 
 	gDevice.FinishOneTimeCommands(commandBuffer);
 }

@@ -707,7 +707,7 @@ void HelloTriangleApplication::createRenderPass()
 
 	VkAttachmentReference colorAttachmentRef{
 		.attachment = 0, // the attachment at index 0
-		.m_pLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
+		.layout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL
 	};
 	std::array<VkAttachmentReference, 1> attachmentRefs = { colorAttachmentRef };
 
@@ -894,7 +894,7 @@ void HelloTriangleApplication::createGraphicsPipeline()
 		.pMultisampleState = &multisampleInfo,
 		.pColorBlendState = &colorBlendStateInfo,
 		.pDynamicState = &dynamicStateInfo,
-		.m_pLayout = m_vkPipelineLayout,
+		.layout = m_vkPipelineLayout,
 		.renderPass = m_vkRenderPass,
 		.subpass = 0,
 		.basePipelineHandle = VK_NULL_HANDLE,//only when in graphics pipleininfo VK_PIPELINE_CREATE_DERIVATIVE_BIT flag is set

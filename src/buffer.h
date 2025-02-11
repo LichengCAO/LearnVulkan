@@ -8,7 +8,6 @@ struct BufferInformation
 	VkSharingMode sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	VkMemoryPropertyFlags memoryProperty = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 };
-
 class Buffer
 {
 private:
@@ -17,7 +16,8 @@ private:
 
 	uint32_t _FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const;
 public:
-	VkBuffer vkBuffer;
+	~Buffer();
+	std::optional<VkBuffer> vkBuffer;
 	std::optional<VkDeviceMemory> vkDeviceMemory;
 
 	void Init(BufferInformation bufferInfo);
@@ -29,5 +29,5 @@ public:
 	void CopyFromHost(const void* src);
 	void CopyFromBuffer(const Buffer& otherBuffer);
 
-	BufferInformation GetBufferInformation()const;
+	BufferInformation GetBufferInformation() const;
 };

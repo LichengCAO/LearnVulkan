@@ -18,9 +18,10 @@ uint32_t Image::_FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags pr
 	return uint32_t();
 }
 
-void Image::_DestroyImageView(VkImageView imageView)
+Image::~Image()
 {
-	vkDestroyImageView(MyDevice::GetInstance().vkDevice, imageView, nullptr);
+	assert(!vkImage.has_value());
+	assert(!vkDeviceMemory.has_value());
 }
 
 void Image::Init(ImageInformation imageInfo)
@@ -47,7 +48,11 @@ void Image::Init(ImageInformation imageInfo)
 
 	m_imageInformation = imageInfo;
 
-	VK_CHECK(vkCreateImage(MyDevice::GetInstance().vkDevice, &imgInfo, nullptr, &vkImage), Failed to crate image!);
+	VkImage image;
+
+	VK_CHECK(vkCreateImage(MyDevice::GetInstance().vkDevice, &imgInfo, nullptr, &image), Failed to crate image!);
+
+	vkImage = image;
 }
 
 void Image::Uninit()
@@ -57,16 +62,21 @@ void Image::Uninit()
 		_DestroyImageView(p.second.vkImageView);
 	}
 	m_mapImageViews.clear();
-	vkDestroyImage(MyDevice::GetInstance().vkDevice, vkImage, nullptr);
+	if (vkImage.has_value())
+	{
+		vkDestroyImage(MyDevice::GetInstance().vkDevice, vkImage.value(), nullptr);
+		vkImage.reset();
+	}
 	FreeMemory();
 }
 
 void Image::AllocateMemory()
 {
+	CHECK_TRUE(vkImage.has_value(), Image is not initialized!);
 	MyDevice gMyDevice = MyDevice::GetInstance();
 	VkDeviceMemory deviceMemory;
 	VkMemoryRequirements memRequirements;
-	vkGetImageMemoryRequirements(gMyDevice.vkDevice, vkImage, &memRequirements);
+	vkGetImageMemoryRequirements(gMyDevice.vkDevice, vkImage.value(), &memRequirements);
 	VkMemoryAllocateInfo allocInfo = {
 		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 		.allocationSize = memRequirements.size,
@@ -75,7 +85,7 @@ void Image::AllocateMemory()
 
 	VK_CHECK(vkAllocateMemory(gMyDevice.vkDevice, &allocInfo, nullptr, &deviceMemory), Failed to allocate image memory!);
 
-	vkBindImageMemory(gMyDevice.vkDevice, vkImage, deviceMemory, 0);
+	vkBindImageMemory(gMyDevice.vkDevice, vkImage.value(), deviceMemory, 0);
 	vkDeviceMemory = deviceMemory;
 }
 
@@ -89,54 +99,10 @@ void Image::FreeMemory()
 	}
 }
 
-VkImageView Image::NewImageView(std::string name, const ImageViewInformation& imageViewInfo)
-{
-	VkImageViewCreateInfo viewInfo = {
-		.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-		.image = vkImage,
-		.viewType = imageViewInfo.viewType,
-		.format = m_imageInformation.format,
-		.subresourceRange = {
-			.aspectMask = imageViewInfo.aspectMask,
-			.baseMipLevel = imageViewInfo.baseMipLevel,
-			.levelCount = imageViewInfo.levelCount,
-			.baseArrayLayer = 0,
-			.layerCount = 1
-		}
-	};
-	VkImageView imageView;
-	VK_CHECK(vkCreateImageView(MyDevice::GetInstance().vkDevice, &viewInfo, nullptr, &imageView), Failed to create image view!);
-	ImageView val;
-	val.viewInformation = imageViewInfo;
-	val.vkImageView = imageView;
-
-	m_mapImageViews.insert({ name, val });
-
-	return imageView;
-}
-
-std::optional<VkImageView> Image::GetImageView(std::string name) const
-{
-	std::optional<VkImageView> ret;
-	if (m_mapImageViews.find(name) != m_mapImageViews.end())
-	{
-		ret = m_mapImageViews.at(name).vkImageView;
-	}
-	return ret;
-}
-
-void Image::DestroyImageView(std::string name)
-{
-	auto imageView = GetImageView(name);
-	if (imageView.has_value())
-	{
-		_DestroyImageView(imageView.value());
-		m_mapImageViews.erase(name);
-	}
-}
-
 void Image::CopyFromBuffer(const Buffer& stagingBuffer)
 {
+	CHECK_TRUE(vkImage.has_value(), Image is not initialized!);
+
 	MyDevice gDevice = MyDevice::GetInstance();
 	VkCommandBuffer commandBuffer = gDevice.StartOneTimeCommands();
 
@@ -156,12 +122,81 @@ void Image::CopyFromBuffer(const Buffer& stagingBuffer)
 
 	vkCmdCopyBufferToImage(
 		commandBuffer,
-		stagingBuffer.vkBuffer,
-		vkImage,
+		stagingBuffer.vkBuffer.value(),
+		vkImage.value(),
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 		1,
 		&region
 	);
 
 	gDevice.FinishOneTimeCommands(commandBuffer);
+}
+
+ImageView Image::NewImageView(const ImageViewInformation& imageViewInfo)
+{
+	CHECK_TRUE(vkImage.has_value(), Image is not initialized!);
+	VkImageViewCreateInfo viewInfo = {
+		.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+		.image = vkImage.value(),
+		.viewType = imageViewInfo.viewType,
+		.format = m_imageInformation.format,
+		.subresourceRange = {
+			.aspectMask = imageViewInfo.aspectMask,
+			.baseMipLevel = imageViewInfo.baseMipLevel,
+			.levelCount = imageViewInfo.levelCount,
+			.baseArrayLayer = 0,
+			.layerCount = 1
+		}
+	};
+	ImageView val;
+	val.m_viewInformation = imageViewInfo;
+	val.pImage = this;
+
+	return val;
+}
+
+ImageInformation Image::GetImageInformation() const
+{
+	return m_imageInformation;
+}
+
+ImageView::~ImageView()
+{
+	assert(!vkImageView.has_value());
+}
+
+void ImageView::Init()
+{
+	CHECK_TRUE(pImage != nullptr, No image!);
+	VkImageViewCreateInfo viewInfo = {
+	.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
+	.image = pImage->vkImage.value(),
+	.viewType = m_viewInformation.viewType,
+	.format = pImage->GetImageInformation().format,
+	.subresourceRange = {
+		.aspectMask = m_viewInformation.aspectMask,
+		.baseMipLevel = m_viewInformation.baseMipLevel,
+		.levelCount = m_viewInformation.levelCount,
+		.baseArrayLayer = 0,
+		.layerCount = 1
+	}
+	};
+	VkImageView imageView;
+	VK_CHECK(vkCreateImageView(MyDevice::GetInstance().vkDevice, &viewInfo, nullptr, &imageView), Failed to create image view!);
+	vkImageView = imageView;
+}
+
+void ImageView::Uninit()
+{
+	if (vkImageView.has_value())
+	{
+		vkDestroyImageView(MyDevice::GetInstance().vkDevice, vkImageView.value(), nullptr);
+		vkImageView.reset();
+	}
+	pImage = nullptr;
+}
+
+ImageViewInformation ImageView::GetImageViewInformation() const
+{
+	return m_viewInformation;
 }
