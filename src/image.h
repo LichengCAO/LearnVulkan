@@ -17,7 +17,7 @@ private:
 	ImageViewInformation m_viewInformation;
 public:
 	const Image* pImage = nullptr;
-	std::optional<VkImageView> vkImageView;
+	VkImageView vkImageView = VK_NULL_HANDLE;
 	~ImageView();
 	void Init();
 	void Uninit();
@@ -46,8 +46,8 @@ private:
 	uint32_t _FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const;
 public:
 	~Image();
-	std::optional<VkImage> vkImage;
-	std::optional<VkDeviceMemory> vkDeviceMemory;
+	VkImage vkImage = VK_NULL_HANDLE;
+	VkDeviceMemory vkDeviceMemory = VK_NULL_HANDLE;
 	
 	void Init(ImageInformation imageInfo);
 	void Uninit();

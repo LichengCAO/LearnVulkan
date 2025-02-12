@@ -49,14 +49,14 @@ private:
 
 public:
 	GLFWwindow*			pWindow = nullptr;
-	VkInstance			vkInstance;
-	VkSurfaceKHR		vkSurface;
-	VkPhysicalDevice	vkPhysicalDevice;
-	VkDevice			vkDevice;
+	VkInstance			vkInstance = VK_NULL_HANDLE;
+	VkSurfaceKHR		vkSurface = VK_NULL_HANDLE;
+	VkPhysicalDevice	vkPhysicalDevice = VK_NULL_HANDLE;
+	VkDevice			vkDevice = VK_NULL_HANDLE;
 	QueueFamilyIndices	queueFamilyIndices;
-	VkSwapchainKHR		vkSwapchain;
-	VkCommandPool		vkCommandPool;
-	VkDescriptorPool	vkDescriptorPool;
+	VkSwapchainKHR		vkSwapchain = VK_NULL_HANDLE;
+	VkCommandPool		vkCommandPool = VK_NULL_HANDLE;
+	VkDescriptorPool	vkDescriptorPool = VK_NULL_HANDLE;
 	void Init();
 	void Uninit();
 

@@ -15,7 +15,7 @@ private:
 	// std::vector<DescriptorSet*> m_pDescriptorSets;
 public:
 	~DescriptorSetLayout();
-	std::optional<VkDescriptorSetLayout> vkDescriptorSetLayout;
+	VkDescriptorSetLayout vkDescriptorSetLayout = VK_NULL_HANDLE;
 	std::vector<DescriptorSetEntry> bindings;
 	void AddBinding(const DescriptorSetEntry& _binding);
 	void Init();
@@ -32,11 +32,11 @@ private:
 
 private:
 	std::vector<DescriptorSetUpdate> m_updates;
-	DescriptorSetLayout* m_pLayout = nullptr;
+	const DescriptorSetLayout* m_pLayout = nullptr;
 
 public:
 	~DescriptorSet();
-	std::optional<VkDescriptorSet> vkDescriptorSet;
+	VkDescriptorSet vkDescriptorSet = VK_NULL_HANDLE;
 	void SetLayout(const DescriptorSetLayout* _layout);
 	void StartDescriptorSetUpdate();
 	void DescriptorSetUpdate_WriteBinding(int bindingId, const Buffer* pBuffer);
@@ -63,14 +63,16 @@ public:
 };
 class VertexInput
 {
-private:
-	const VertexInputLayout* m_pVertexInputLayout = nullptr;
-	const Buffer* m_pBuffer = nullptr;
-	const Buffer* m_pIndexBuffer = nullptr;
 public:
-	void SetLayout(const VertexInputLayout* _layout);
-	void SetBuffer(const Buffer* _pBuffer);
-	void SetIndexBuffer(const Buffer* _pIndexBuffer);
+	const VertexInputLayout* pVertexInputLayout = nullptr;
+	const Buffer* pBuffer = nullptr;
+	VkDeviceSize offset = 0;
+};
+class VertexIndexInput
+{
+public:
+	const Buffer* pBuffer = nullptr;
+	VkIndexType indexType = VK_INDEX_TYPE_UINT32;
 };
 
 // Pipeline only has one subpass to describe the output attachments
@@ -82,16 +84,16 @@ struct AttachmentInformation
 };
 struct SubpassInformation
 {
-	VkPipelineBindPoint pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 	std::vector<VkAttachmentReference> colorAttachments;
-	std::optional<VkAttachmentReference> depthStencilAttachment;
+	std::optional<VkAttachmentReference> optDepthStencilAttachment;
+	std::vector<VkAttachmentReference> resolveAttachments;
 };
 class Framebuffer
 {
 public:
 	const RenderPass* pRenderPass = nullptr;
+	VkFramebuffer vkFramebuffer = VK_NULL_HANDLE;
 	std::vector<const ImageView*> attachments;
-	std::optional<VkFramebuffer> vkFramebuffer;
 	~Framebuffer();
 	void Init();
 	void Uninit();
@@ -103,14 +105,13 @@ private:
 	std::vector<VkSubpassDependency> m_vkSubpassDependencies;
 public:
 	~RenderPass();
-	std::optional<VkRenderPass> vkRenderPass;
+	VkRenderPass vkRenderPass = VK_NULL_HANDLE;
 	std::vector<AttachmentInformation> attachments;
 	std::vector<SubpassInformation> subpasses;
-	void AddAttachment(AttachmentInformation _info);
-	void AddSubpass(SubpassInformation _subpass);
+	uint32_t AddAttachment(AttachmentInformation _info);
+	uint32_t AddSubpass(SubpassInformation _subpass);
 	void Init();
 	void Uninit();
 
 	Framebuffer NewFramebuffer(const std::vector<const ImageView*> _imageViews) const;
 };
-

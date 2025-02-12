@@ -4,7 +4,7 @@
 #include "image.h"
 DescriptorSet::~DescriptorSet()
 {
-	assert(!vkDescriptorSet.has_value());
+	assert(vkDescriptorSet == VK_NULL_HANDLE);
 }
 void DescriptorSet::SetLayout(const DescriptorSetLayout* _layout)
 {
@@ -16,7 +16,7 @@ void DescriptorSet::StartDescriptorSetUpdate()
 	{
 		throw std::runtime_error("Layout is not set!");
 	}
-	if (!vkDescriptorSet.has_value())
+	if (vkDescriptorSet == VK_NULL_HANDLE)
 	{
 		throw std::runtime_error("Descriptorset is not initialized");
 	}
@@ -36,7 +36,7 @@ void DescriptorSet::DescriptorSetUpdate_WriteBinding(int bindingId, const Buffer
 	newUpdate.bufferInfo.range = pBuffer->GetBufferInformation().size;
 
 	newUpdate.writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	newUpdate.writeDescriptorSet.dstSet = vkDescriptorSet.value();
+	newUpdate.writeDescriptorSet.dstSet = vkDescriptorSet;
 	newUpdate.writeDescriptorSet.dstBinding = bindingId;
 	newUpdate.writeDescriptorSet.dstArrayElement = 0;
 	newUpdate.writeDescriptorSet.descriptorCount = binding.descriptorCount;
@@ -65,40 +65,35 @@ void DescriptorSet::Init()
 		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
 		.descriptorPool = MyDevice::GetInstance().vkDescriptorPool,
 		.descriptorSetCount = 1,
-		.pSetLayouts = &m_pLayout->vkDescriptorSetLayout.value(),
+		.pSetLayouts = &m_pLayout->vkDescriptorSetLayout,
 	};
 
-	VkDescriptorSet descriptorSet;
-
-	VK_CHECK(vkAllocateDescriptorSets(MyDevice::GetInstance().vkDevice, &allocInfo, &descriptorSet), Failed to allocate descriptor set!);
-
-	vkDescriptorSet = descriptorSet;
+	VK_CHECK(vkAllocateDescriptorSets(MyDevice::GetInstance().vkDevice, &allocInfo, &vkDescriptorSet), Failed to allocate descriptor set!);
 }
 void DescriptorSet::Uninit()
 {
-	if (vkDescriptorSet.has_value())
+	if (vkDescriptorSet != VK_NULL_HANDLE)
 	{
-		vkDescriptorSet.reset();
+		vkFreeDescriptorSets(MyDevice::GetInstance().vkDevice, MyDevice::GetInstance().vkDescriptorPool, 1, &vkDescriptorSet);
+		vkDescriptorSet == VK_NULL_HANDLE;
 	}
 }
 
 DescriptorSetLayout::~DescriptorSetLayout()
 {
-	assert(!vkDescriptorSetLayout.has_value());
+	assert(vkDescriptorSetLayout == VK_NULL_HANDLE);
 }
-
 void DescriptorSetLayout::AddBinding(const DescriptorSetEntry& _binding)
 {
 	bindings.push_back(_binding);
 }
-
 void DescriptorSetLayout::Init()
 {
 	if (bindings.size() == 0)
 	{
 		throw std::runtime_error("No bindings set!");
 	}
-	if (vkDescriptorSetLayout.has_value())
+	if (vkDescriptorSetLayout != VK_NULL_HANDLE)
 	{
 		throw std::runtime_error("Layout is already initialized.");
 	}
@@ -121,19 +116,14 @@ void DescriptorSetLayout::Init()
 		.pBindings = layoutBindings.data(),
 	};
 
-	VkDescriptorSetLayout setLayout;
-
-	VK_CHECK(vkCreateDescriptorSetLayout(MyDevice::GetInstance().vkDevice, &createInfo, nullptr, &setLayout), Failed to create compute descriptor set m_pLayout!);
-
-	vkDescriptorSetLayout = setLayout;
+	VK_CHECK(vkCreateDescriptorSetLayout(MyDevice::GetInstance().vkDevice, &createInfo, nullptr, &vkDescriptorSetLayout), Failed to create compute descriptor set m_pLayout!);
 }
-
 void DescriptorSetLayout::Uninit()
 {
-	if (vkDescriptorSetLayout.has_value())
+	if (vkDescriptorSetLayout != VK_NULL_HANDLE)
 	{
-		vkDestroyDescriptorSetLayout(MyDevice::GetInstance().vkDevice, vkDescriptorSetLayout.value(), nullptr);
-		vkDescriptorSetLayout.reset();
+		vkDestroyDescriptorSetLayout(MyDevice::GetInstance().vkDevice, vkDescriptorSetLayout, nullptr);
+		vkDescriptorSetLayout = VK_NULL_HANDLE;
 	}
 }
 
@@ -141,7 +131,6 @@ void VertexInputLayout::AddLocation(const VertexInputEntry& _location)
 {
 	locations.push_back(_location);
 }
-
 VkVertexInputBindingDescription VertexInputLayout::GetVertexInputBindingDescription(uint32_t _binding) const
 {
 	VkVertexInputBindingDescription ret;
@@ -150,7 +139,6 @@ VkVertexInputBindingDescription VertexInputLayout::GetVertexInputBindingDescript
 	ret.inputRate = inputRate;
 	return ret;
 }
-
 std::vector<VkVertexInputAttributeDescription> VertexInputLayout::GetVertexInputAttributeDescriptions(uint32_t _binding) const
 {
 	std::vector<VkVertexInputAttributeDescription> ret;
@@ -166,33 +154,21 @@ std::vector<VkVertexInputAttributeDescription> VertexInputLayout::GetVertexInput
 	return ret;
 }
 
-void VertexInput::SetLayout(const VertexInputLayout* _layout)
-{
-	m_pVertexInputLayout = _layout;
-}
-
-void VertexInput::SetBuffer(const Buffer* _pBuffer)
-{
-	m_pBuffer = _pBuffer;
-}
-
-void VertexInput::SetIndexBuffer(const Buffer* _pIndexBuffer)
-{
-	m_pIndexBuffer = _pIndexBuffer;
-}
-
 RenderPass::~RenderPass()
 {
-	assert(!vkRenderPass.has_value());
+	assert(vkRenderPass == VK_NULL_HANDLE);
 }
-
-void RenderPass::AddAttachment(AttachmentInformation _info)
+uint32_t RenderPass::AddAttachment(AttachmentInformation _info)
 {
+	uint32_t ret = static_cast<uint32_t>(attachments.size());
+	assert(vkRenderPass == VK_NULL_HANDLE);
 	attachments.push_back(_info);
+	return ret;
 }
-
-void RenderPass::AddSubpass(SubpassInformation _subpass)
+uint32_t RenderPass::AddSubpass(SubpassInformation _subpass)
 {
+	uint32_t ret = static_cast<uint32_t>(subpasses.size());
+	assert(vkRenderPass == VK_NULL_HANDLE);
 	VkSubpassDependency subpassDependency;
 	subpassDependency.srcSubpass = subpasses.empty() ? VK_SUBPASS_EXTERNAL : static_cast<uint32_t>(subpasses.size() - 1);
 	subpassDependency.dstSubpass = static_cast<uint32_t>(subpasses.size());
@@ -201,7 +177,7 @@ void RenderPass::AddSubpass(SubpassInformation _subpass)
 	subpassDependency.dstStageMask = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	subpassDependency.dstAccessMask = VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 
-	if (_subpass.depthStencilAttachment.has_value())
+	if (_subpass.optDepthStencilAttachment.has_value())
 	{
 		subpassDependency.srcStageMask = subpassDependency.srcAccessMask | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
 		subpassDependency.dstStageMask = subpassDependency.dstStageMask | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;
@@ -210,8 +186,9 @@ void RenderPass::AddSubpass(SubpassInformation _subpass)
 
 	m_vkSubpassDependencies.push_back(subpassDependency);
 	subpasses.push_back(_subpass);
-}
 
+	return ret;
+}
 void RenderPass::Init()
 {
 	std::vector<VkAttachmentDescription> vkAttachments;
@@ -232,12 +209,16 @@ void RenderPass::Init()
 	for (int i = 0; i < subpasses.size(); ++i)
 	{
 		VkSubpassDescription vkSubpass;
-		vkSubpass.pipelineBindPoint = subpasses[i].pipelineBindPoint;
+		vkSubpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 		vkSubpass.colorAttachmentCount = static_cast<uint32_t>(subpasses[i].colorAttachments.size());
 		vkSubpass.pColorAttachments = subpasses[i].colorAttachments.data();
-		if (subpasses[i].depthStencilAttachment.has_value())
+		if (subpasses[i].optDepthStencilAttachment.has_value())
 		{
-			vkSubpass.pDepthStencilAttachment = &subpasses[i].depthStencilAttachment.value();
+			vkSubpass.pDepthStencilAttachment = &subpasses[i].optDepthStencilAttachment.value();
+		}
+		if (subpasses[i].resolveAttachments.size() > 0)
+		{
+			vkSubpass.pResolveAttachments = subpasses[i].resolveAttachments.data();
 		}
 		vkSubpasses.push_back(vkSubpass);
 	}
@@ -248,27 +229,23 @@ void RenderPass::Init()
 	renderPassInfo.pSubpasses = vkSubpasses.data();
 	renderPassInfo.dependencyCount = static_cast<uint32_t>(m_vkSubpassDependencies.size());
 	renderPassInfo.pDependencies = m_vkSubpassDependencies.data();
-	VkRenderPass renderPass;
-	VK_CHECK(vkCreateRenderPass(MyDevice::GetInstance().vkDevice, &renderPassInfo, nullptr, &renderPass), Failed to create render pass!);
 
-	vkRenderPass = renderPass;
+	VK_CHECK(vkCreateRenderPass(MyDevice::GetInstance().vkDevice, &renderPassInfo, nullptr, &vkRenderPass), Failed to create render pass!);
 }
-
 void RenderPass::Uninit()
 {
 	m_vkSubpassDependencies.clear();
 	attachments.clear();
 	subpasses.clear();
-	if (vkRenderPass.has_value())
+	if (vkRenderPass != VK_NULL_HANDLE)
 	{
-		vkDestroyRenderPass(MyDevice::GetInstance().vkDevice, vkRenderPass.value(), nullptr);
-		vkRenderPass.reset();
+		vkDestroyRenderPass(MyDevice::GetInstance().vkDevice, vkRenderPass, nullptr);
+		vkRenderPass = VK_NULL_HANDLE;
 	}
 }
-
 Framebuffer RenderPass::NewFramebuffer(const std::vector<const ImageView*> _imageViews) const
 {
-	CHECK_TRUE(vkRenderPass.has_value(), Renderpass is not initialized!);
+	CHECK_TRUE(vkRenderPass != VK_NULL_HANDLE, Renderpass is not initialized!);
 	CHECK_TRUE(_imageViews.size() == attachments.size(), Number of imageviews is not the same as number of attachments);
 	for (int i = 0; i < _imageViews.size(); ++i)
 	{
@@ -279,12 +256,10 @@ Framebuffer RenderPass::NewFramebuffer(const std::vector<const ImageView*> _imag
 	framebuffer.attachments = _imageViews;
 	return framebuffer;
 }
-
 Framebuffer::~Framebuffer()
 {
-	assert(!vkFramebuffer.has_value());
+	assert(vkFramebuffer == VK_NULL_HANDLE);
 }
-
 void Framebuffer::Init()
 {
 	CHECK_TRUE(pRenderPass != nullptr, No renderpass!);
@@ -295,26 +270,22 @@ void Framebuffer::Init()
 	std::vector<VkImageView> vkAttachments;
 	for (int i = 0; i < attachments.size(); ++i)
 	{
-		CHECK_TRUE(attachments[i]->vkImageView.has_value(), Imageview is not initialized!);
-		vkAttachments.push_back(attachments[i]->vkImageView.value());
+		CHECK_TRUE(attachments[i]->vkImageView != VK_NULL_HANDLE, Imageview is not initialized!);
+		vkAttachments.push_back(attachments[i]->vkImageView);
 	}
 	framebufferInfo.pAttachments = vkAttachments.data();
 	framebufferInfo.width = attachments[0]->pImage->GetImageInformation().width;
 	framebufferInfo.height = attachments[0]->pImage->GetImageInformation().height;
 	framebufferInfo.layers = 1;
 
-	VkFramebuffer framebuffer;
-	VK_CHECK(vkCreateFramebuffer(MyDevice::GetInstance().vkDevice, &framebufferInfo, nullptr, &framebuffer), Failed to create framebuffer!);
-
-	vkFramebuffer = framebuffer;
+	VK_CHECK(vkCreateFramebuffer(MyDevice::GetInstance().vkDevice, &framebufferInfo, nullptr, &vkFramebuffer), Failed to create framebuffer!);
 }
-
 void Framebuffer::Uninit()
 {
-	if (vkFramebuffer.has_value())
+	if (vkFramebuffer != VK_NULL_HANDLE)
 	{
-		vkDestroyFramebuffer(MyDevice::GetInstance().vkDevice, vkFramebuffer.value(), nullptr);
-		vkFramebuffer.reset();
+		vkDestroyFramebuffer(MyDevice::GetInstance().vkDevice, vkFramebuffer, nullptr);
+		vkFramebuffer = VK_NULL_HANDLE;
 	}
 	attachments.clear();
 	pRenderPass = nullptr;

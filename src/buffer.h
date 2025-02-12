@@ -17,8 +17,8 @@ private:
 	uint32_t _FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const;
 public:
 	~Buffer();
-	std::optional<VkBuffer> vkBuffer;
-	std::optional<VkDeviceMemory> vkDeviceMemory;
+	VkBuffer	   vkBuffer = VK_NULL_HANDLE;
+	VkDeviceMemory vkDeviceMemory = VK_NULL_HANDLE;
 
 	void Init(BufferInformation bufferInfo);
 	void Uninit();

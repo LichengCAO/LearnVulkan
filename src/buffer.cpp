@@ -17,8 +17,8 @@ uint32_t Buffer::_FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags p
 
 Buffer::~Buffer()
 {
-	assert(!vkBuffer.has_value());
-	assert(!vkDeviceMemory.has_value());
+	assert(vkBuffer == VK_NULL_HANDLE);
+	assert(vkDeviceMemory == VK_NULL_HANDLE);
 	assert(m_mappedMemory == nullptr);
 }
 
@@ -32,19 +32,15 @@ void Buffer::Init(BufferInformation info)
 	};
 	m_bufferInformation = info;
 
-	VkBuffer buffer;
-
-	VK_CHECK(vkCreateBuffer(MyDevice::GetInstance().vkDevice, &bufferInfo, nullptr, &buffer), Failed to create buffer!);
-
-	vkBuffer = buffer;
+	VK_CHECK(vkCreateBuffer(MyDevice::GetInstance().vkDevice, &bufferInfo, nullptr, &vkBuffer), Failed to create buffer!);
 }
 
 void Buffer::Uninit()
 {
-	if (vkBuffer.has_value())
+	if (vkBuffer != VK_NULL_HANDLE)
 	{
-		vkDestroyBuffer(MyDevice::GetInstance().vkDevice, vkBuffer.value(), nullptr);
-		vkBuffer.reset();
+		vkDestroyBuffer(MyDevice::GetInstance().vkDevice, vkBuffer, nullptr);
+		vkBuffer == VK_NULL_HANDLE;
 	}
 	
 	FreeMemory();
@@ -52,9 +48,9 @@ void Buffer::Uninit()
 
 void Buffer::AllocateMemory()
 {
-	CHECK_TRUE(vkBuffer.has_value(), Try to allocate for a uninitialized buffer!);
+	CHECK_TRUE(vkBuffer != VK_NULL_HANDLE, Try to allocate for a uninitialized buffer!);
 	VkMemoryRequirements memRequirements;
-	vkGetBufferMemoryRequirements(MyDevice::GetInstance().vkDevice, vkBuffer.value(), &memRequirements);
+	vkGetBufferMemoryRequirements(MyDevice::GetInstance().vkDevice, vkBuffer, &memRequirements);
 
 	VkMemoryAllocateInfo allocInfo = {
 		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
@@ -62,43 +58,39 @@ void Buffer::AllocateMemory()
 		.memoryTypeIndex = _FindMemoryTypeIndex(memRequirements.memoryTypeBits , m_bufferInformation.memoryProperty),
 	};
 
-	VkDeviceMemory bufferMemory;
-	VK_CHECK(vkAllocateMemory(MyDevice::GetInstance().vkDevice, &allocInfo, nullptr, &bufferMemory), Failed to allocate buffer memory!);
-
-	vkDeviceMemory = bufferMemory;
+	VK_CHECK(vkAllocateMemory(MyDevice::GetInstance().vkDevice, &allocInfo, nullptr, &vkDeviceMemory), Failed to allocate buffer memory!);
 
 	VkDeviceSize offset = 0; // should be divisible by memRequirements.alignment
-	vkBindBufferMemory(MyDevice::GetInstance().vkDevice, vkBuffer.value(), bufferMemory, offset);
+	vkBindBufferMemory(MyDevice::GetInstance().vkDevice, vkBuffer, vkDeviceMemory, offset);
 }
 
 void Buffer::FreeMemory()
 {
-	if (vkDeviceMemory.has_value())
+	if (vkDeviceMemory != VK_NULL_HANDLE)
 	{
 		if (m_mappedMemory != nullptr)
 		{
-			vkUnmapMemory(MyDevice::GetInstance().vkDevice, vkDeviceMemory.value());
+			vkUnmapMemory(MyDevice::GetInstance().vkDevice, vkDeviceMemory);
 			m_mappedMemory = nullptr;
 		}
-		vkFreeMemory(MyDevice::GetInstance().vkDevice, vkDeviceMemory.value(), nullptr);
-		vkDeviceMemory.reset();
+		vkFreeMemory(MyDevice::GetInstance().vkDevice, vkDeviceMemory, nullptr);
+		vkDeviceMemory = VK_NULL_HANDLE;
 	}
 }
 
 void Buffer::CopyFromHost(const void* src)
 {
-	CHECK_TRUE(vkDeviceMemory.has_value(), Not allocate memory yet!);
+	CHECK_TRUE(vkDeviceMemory != VK_NULL_HANDLE, Not allocate memory yet!);
 	if (m_mappedMemory == nullptr)
 	{
-		vkMapMemory(MyDevice::GetInstance().vkDevice, vkDeviceMemory.value(), 0, m_bufferInformation.size, 0, &m_mappedMemory);
+		vkMapMemory(MyDevice::GetInstance().vkDevice, vkDeviceMemory, 0, m_bufferInformation.size, 0, &m_mappedMemory);
 	}
 	memcpy(m_mappedMemory, src, (size_t)m_bufferInformation.size);
 }
 
 void Buffer::CopyFromBuffer(const Buffer& otherBuffer)
 {
-	CHECK_TRUE(otherBuffer.vkBuffer.has_value(), Source buffer is not initialized!);
-	CHECK_TRUE(vkBuffer.has_value(), This buffer is not initialized!);
+	CHECK_TRUE(vkBuffer != VK_NULL_HANDLE, This buffer is not initialized!);
 	MyDevice gDevice = MyDevice::GetInstance();
 	VkCommandBuffer commandBuffer = gDevice.StartOneTimeCommands();
 
@@ -108,7 +100,7 @@ void Buffer::CopyFromBuffer(const Buffer& otherBuffer)
 		.size = m_bufferInformation.size,
 	};
 
-	vkCmdCopyBuffer(commandBuffer, otherBuffer.vkBuffer.value(), vkBuffer.value(), 1, &cpyRegion);
+	vkCmdCopyBuffer(commandBuffer, otherBuffer.vkBuffer, vkBuffer, 1, &cpyRegion);
 
 	gDevice.FinishOneTimeCommands(commandBuffer);
 }
