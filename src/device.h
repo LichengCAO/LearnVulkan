@@ -27,6 +27,13 @@ private:
 	vkb::Device			m_device;
 	vkb::DispatchTable	m_dispatchTable;
 	vkb::Swapchain		m_swapchain;
+
+	std::vector<std::vector<VkSemaphore>> m_frameSemaphores;
+	std::vector<std::vector<VkFence>> m_frameFences;
+	std::vector<std::vector<VkCommandBuffer>> m_frameCommandBuffers;
+	uint32_t m_currentFrame = 0;
+	uint32_t m_currentCommandBuffer = 0;
+	uint32_t m_currentSemophore = 0;
 private:
 	MyDevice();
 
@@ -37,6 +44,8 @@ private:
 	VkSurfaceFormatKHR		 _ChooseSwapchainFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) const;
 	VkPresentModeKHR		 _ChooseSwapchainPresentMode(const std::vector<VkPresentModeKHR>& availableModes) const;
 	VkExtent2D				 _ChooseSwapchainExtent(const VkSurfaceCapabilitiesKHR& capabilities) const;
+	VkSemaphore				 _GetCurrentSemaphore();
+	VkFence					 _GetCurrentFence();
 
 	void _InitGLFW();
 	void _CreateInstance();
@@ -61,8 +70,17 @@ public:
 	void Uninit();
 
 	// TODO:
-	VkCommandBuffer StartOneTimeCommands();
-	void FinishOneTimeCommands(VkCommandBuffer commandBuffer);
+	void StartOneTimeCommands();
+	void FinishOneTimeCommands();
+
+	void StartGraphicsCommandBuffer();
+	void FinishGraphicsCommandBuffer();
+
+	void StartComputeCommandBuffer();
+	void FinishComputeCommandBuffer();
+
+	void StartFrame();
+	void EndFrame();
 public:
 	static MyDevice& GetInstance();
 };

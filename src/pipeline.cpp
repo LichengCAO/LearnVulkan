@@ -131,7 +131,6 @@ void GraphicsPipeline::Init()
 	pipelineLayoutInfo.pSetLayouts = m_descriptorSetLayouts.data();
 	pipelineLayoutInfo.pushConstantRangeCount = 0;
 	pipelineLayoutInfo.pPushConstantRanges = nullptr;
-
 	VK_CHECK(vkCreatePipelineLayout(MyDevice::GetInstance().vkDevice, &pipelineLayoutInfo, nullptr, &vkPipelineLayout), Failed to create pipeline layout!);
 
 	VkGraphicsPipelineCreateInfo pipelineInfo{ VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
@@ -149,7 +148,6 @@ void GraphicsPipeline::Init()
 	pipelineInfo.subpass = m_subpass;
 	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;//only when in graphics pipleininfo VK_PIPELINE_CREATE_DERIVATIVE_BIT flag is set
 	pipelineInfo.basePipelineIndex = -1;
-
 	VK_CHECK(vkCreateGraphicsPipelines(MyDevice::GetInstance().vkDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &vkPipeline), Failed to create graphics pipeline!);
 }
 
@@ -215,4 +213,62 @@ void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput& in
 		uint32_t vertCount = bufferSize / stride;
 		vkCmdDraw(commandBuffer, vertCount, 1, 0, 0);
 	}
+}
+
+ComputePipeline::~ComputePipeline()
+{
+	assert(vkPipeline == VK_NULL_HANDLE);
+	assert(vkPipelineLayout == VK_NULL_HANDLE);
+}
+
+void ComputePipeline::AddShader(const SimpleShader* simpleShader)
+{
+	assert(vkPipeline == VK_NULL_HANDLE);
+	m_shaderStageInfo = simpleShader->GetShaderStageInfo();
+}
+
+void ComputePipeline::AddDescriptorSetLayout(const DescriptorSetLayout* pSetLayout)
+{
+	assert(vkPipeline == VK_NULL_HANDLE);
+	m_descriptorSetLayouts.push_back(pSetLayout->vkDescriptorSetLayout);
+}
+
+void ComputePipeline::Init()
+{
+	VkPipelineLayoutCreateInfo pipelineLayoutInfo{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+	pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(m_descriptorSetLayouts.size());
+	pipelineLayoutInfo.pSetLayouts = m_descriptorSetLayouts.data();
+	VK_CHECK(vkCreatePipelineLayout(MyDevice::GetInstance().vkDevice, &pipelineLayoutInfo, nullptr, &vkPipelineLayout), Failed to create pipeline layout!);
+
+	VkComputePipelineCreateInfo pipelineInfo{ VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
+	pipelineInfo.stage = m_shaderStageInfo;
+	pipelineInfo.layout = vkPipelineLayout;
+	VK_CHECK(vkCreateComputePipelines(MyDevice::GetInstance().vkDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &vkPipeline), Failed to create compute pipeline!);
+}
+
+void ComputePipeline::Uninit()
+{
+	if (vkPipeline != VK_NULL_HANDLE)
+	{
+		vkDestroyPipeline(MyDevice::GetInstance().vkDevice, vkPipeline, nullptr);
+		vkPipeline = VK_NULL_HANDLE;
+	}
+	if (vkPipelineLayout != VK_NULL_HANDLE)
+	{
+		vkDestroyPipelineLayout(MyDevice::GetInstance().vkDevice, vkPipelineLayout, nullptr);
+		vkPipelineLayout = VK_NULL_HANDLE;
+	}
+}
+
+void ComputePipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput& input)
+{
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, vkPipeline);
+	std::vector<VkDescriptorSet> descriptorSets;
+	for (int i = 0; i < input.pDescriptorSets.size(); ++i)
+	{
+		descriptorSets.push_back(input.pDescriptorSets[i]->vkDescriptorSet);
+	}
+	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, vkPipelineLayout, 0, static_cast<uint32_t>(descriptorSets.size()), descriptorSets.data(), 0, nullptr);
+
+	vkCmdDispatch(commandBuffer, input.groupCountX, input.groupCountY, input.groupCountZ);
 }

@@ -45,7 +45,7 @@ public:
 	void Uninit();
 };
 
-// Pipeline can have multiple VertexLayouts, when execute the pipeline we need to provide VertexInputs for each of the VertexLayout 
+// Pipeline can have multiple VertexLayouts, when execute the pipeline we need to provide VertexInputs for each of the VertexLayout
 struct VertexInputEntry // location
 {
 	VkFormat format = VK_FORMAT_R32_SFLOAT;

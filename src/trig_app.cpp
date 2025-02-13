@@ -508,6 +508,7 @@ void HelloTriangleApplication::drawFrame(){
 		.pImageIndices = &imageIndex,
 		.pResults = nullptr
 	};
+	// However, presentation requests sent to a particular queue are always performed in order. Exact presentation timing is controlled by the semantics of the presentation engine and native platform in use.
 	result = vkQueuePresentKHR(m_vkPresentQueue, &presentInfo);
 	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR || m_bufferResized) {
 		recreateSwapChain();

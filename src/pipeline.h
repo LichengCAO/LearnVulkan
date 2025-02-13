@@ -53,9 +53,14 @@ public:
 
 class ComputePipeline
 {
+private:
+	VkPipelineShaderStageCreateInfo m_shaderStageInfo;
+	std::vector<VkDescriptorSetLayout> m_descriptorSetLayouts;
 public:
 	VkPipelineLayout vkPipelineLayout = VK_NULL_HANDLE;
 	VkPipeline vkPipeline = VK_NULL_HANDLE;
+
+	~ComputePipeline();
 
 	void AddShader(const SimpleShader* simpleShader);
 	void AddDescriptorSetLayout(const DescriptorSetLayout* pSetLayout);
