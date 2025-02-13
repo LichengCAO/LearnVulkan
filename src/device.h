@@ -64,7 +64,7 @@ public:
 	VkDevice			vkDevice = VK_NULL_HANDLE;
 	QueueFamilyIndices	queueFamilyIndices;
 	VkSwapchainKHR		vkSwapchain = VK_NULL_HANDLE;
-	VkCommandPool		vkCommandPool = VK_NULL_HANDLE;
+	std::vector<VkCommandPool>		vkCommandPools;
 	VkDescriptorPool	vkDescriptorPool = VK_NULL_HANDLE;
 	void Init();
 	void Uninit();
