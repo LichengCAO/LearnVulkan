@@ -2,10 +2,6 @@
 #include "device.h"
 #include "buffer.h"
 #include "image.h"
-DescriptorSet::~DescriptorSet()
-{
-	assert(vkDescriptorSet == VK_NULL_HANDLE);
-}
 void DescriptorSet::SetLayout(const DescriptorSetLayout* _layout)
 {
 	m_pLayout = _layout;
@@ -61,22 +57,7 @@ void DescriptorSet::Init()
 		throw std::runtime_error("No descriptor layout set!");
 	}
 
-	VkDescriptorSetAllocateInfo allocInfo = {
-		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO,
-		.descriptorPool = MyDevice::GetInstance().vkDescriptorPool,
-		.descriptorSetCount = 1,
-		.pSetLayouts = &m_pLayout->vkDescriptorSetLayout,
-	};
-
-	VK_CHECK(vkAllocateDescriptorSets(MyDevice::GetInstance().vkDevice, &allocInfo, &vkDescriptorSet), Failed to allocate descriptor set!);
-}
-void DescriptorSet::Uninit()
-{
-	if (vkDescriptorSet != VK_NULL_HANDLE)
-	{
-		vkFreeDescriptorSets(MyDevice::GetInstance().vkDevice, MyDevice::GetInstance().vkDescriptorPool, 1, &vkDescriptorSet);
-		vkDescriptorSet == VK_NULL_HANDLE;
-	}
+	MyDevice::GetInstance().descriptorAllocator.Allocate(&vkDescriptorSet, m_pLayout->vkDescriptorSetLayout);
 }
 
 DescriptorSetLayout::~DescriptorSetLayout()
@@ -116,7 +97,7 @@ void DescriptorSetLayout::Init()
 		.pBindings = layoutBindings.data(),
 	};
 
-	VK_CHECK(vkCreateDescriptorSetLayout(MyDevice::GetInstance().vkDevice, &createInfo, nullptr, &vkDescriptorSetLayout), Failed to create compute descriptor set m_pLayout!);
+	VK_CHECK(vkCreateDescriptorSetLayout(MyDevice::GetInstance().vkDevice, &createInfo, nullptr, &vkDescriptorSetLayout), Failed to create descriptor set layout!);
 }
 void DescriptorSetLayout::Uninit()
 {
@@ -289,4 +270,141 @@ void Framebuffer::Uninit()
 	}
 	attachments.clear();
 	pRenderPass = nullptr;
+}
+
+VkExtent2D Framebuffer::GetImageSize() const
+{
+	CHECK_TRUE(attachments.size() > 0, No image in this framebuffer!);
+	VkExtent2D ret;
+	ImageInformation imageInfo = attachments[0]->pImage->GetImageInformation();
+	ret.width = imageInfo.width;
+	ret.height = imageInfo.height;
+	return ret;
+}
+
+VkDescriptorPool DescriptorAllocator::_CreatePool()
+{
+	VkDevice device = MyDevice::GetInstance().vkDevice;
+
+	std::vector<VkDescriptorPoolSize> sizes;
+	sizes.reserve(m_poolSizes.sizes.size());
+	for (auto sz : m_poolSizes.sizes) 
+	{
+		sizes.push_back({ sz.first, sz.second });
+	}
+	VkDescriptorPoolCreateInfo pool_info = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+	pool_info.flags = 0;
+	pool_info.maxSets = 1000;
+	pool_info.poolSizeCount = static_cast<uint32_t>(sizes.size());
+	pool_info.pPoolSizes = sizes.data();
+
+	VkDescriptorPool descriptorPool;
+	vkCreateDescriptorPool(device, &pool_info, nullptr, &descriptorPool);
+
+	return descriptorPool;
+}
+
+VkDescriptorPool DescriptorAllocator::_GrabPool()
+{
+	//there are reusable pools available
+	if (m_freePools.size() > 0)
+	{
+		//grab pool from the back of the vector and remove it from there.
+		VkDescriptorPool pool = m_freePools.back();
+		m_freePools.pop_back();
+		return pool;
+	}
+	else
+	{
+		//no pools available, so create a new one
+		return _CreatePool();
+	}
+}
+
+void DescriptorAllocator::ResetPools()
+{
+	VkDevice device = MyDevice::GetInstance().vkDevice;
+	//reset all used pools and add them to the free pools
+	for (auto p : m_usedPools) 
+	{
+		vkResetDescriptorPool(device, p, 0);
+		m_freePools.push_back(p);
+	}
+
+	//clear the used pools, since we've put them all in the free pools
+	m_usedPools.clear();
+
+	//reset the current pool handle back to null
+	m_currentPool = VK_NULL_HANDLE;
+}
+
+bool DescriptorAllocator::Allocate(VkDescriptorSet* _vkSet, VkDescriptorSetLayout layout)
+{
+	VkDevice device = MyDevice::GetInstance().vkDevice;
+	//initialize the currentPool handle if it's null
+	if (m_currentPool == VK_NULL_HANDLE) 
+	{
+		m_currentPool = _GrabPool();
+		m_usedPools.push_back(m_currentPool);
+	}
+
+	VkDescriptorSetAllocateInfo allocInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+	allocInfo.pNext = nullptr;
+	allocInfo.pSetLayouts = &layout;
+	allocInfo.descriptorPool = m_currentPool;
+	allocInfo.descriptorSetCount = 1;
+
+	//try to allocate the descriptor set
+	VkResult allocResult = vkAllocateDescriptorSets(device, &allocInfo, _vkSet);
+	bool needReallocate = false;
+
+	switch (allocResult) 
+	{
+	case VK_SUCCESS:
+		//all good, return
+		return true;
+	case VK_ERROR_FRAGMENTED_POOL:
+	case VK_ERROR_OUT_OF_POOL_MEMORY:
+		//reallocate pool
+		needReallocate = true;
+		break;
+	default:
+		//unrecoverable error
+		return false;
+	}
+
+	if (needReallocate) 
+	{
+		//allocate a new pool and retry
+		m_currentPool = _GrabPool();
+		m_usedPools.push_back(m_currentPool);
+
+		allocResult = vkAllocateDescriptorSets(device, &allocInfo, _vkSet);
+
+		//if it still fails then we have big issues
+		if (allocResult == VK_SUCCESS) 
+		{
+			return true;
+		}
+	}
+
+	return false;
+}
+
+void DescriptorAllocator::Init()
+{
+}
+
+void DescriptorAllocator::Uninit()
+{
+	VkDevice device = MyDevice::GetInstance().vkDevice;
+	//delete every pool held
+	for (auto p : m_freePools)
+	{
+		vkDestroyDescriptorPool(device, p, nullptr);
+	}
+	for (auto p : m_usedPools)
+	{
+		vkDestroyDescriptorPool(device, p, nullptr);
+	}
 }

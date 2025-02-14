@@ -255,6 +255,55 @@ void MyDevice::_CreateSwapChain()
 	vkSwapchain = m_swapchain.swapchain;
 }
 
+void MyDevice::_CreateCommandPools()
+{
+	if (queueFamilyIndices.graphicsAndComputeFamily.has_value())
+	{
+		uint32_t key = queueFamilyIndices.graphicsAndComputeFamily.value();
+		VkCommandPool cmdPool;
+		VkCommandPoolCreateInfo commandPoolInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
+		commandPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+		commandPoolInfo.queueFamilyIndex = key;
+		VK_CHECK(vkCreateCommandPool(vkDevice, &commandPoolInfo, nullptr, &cmdPool), Failed to create command pool!);
+		vkCommandPools[key] = cmdPool;
+	}
+	if (queueFamilyIndices.graphicsFamily.has_value())
+	{
+		uint32_t key = queueFamilyIndices.graphicsFamily.value();
+		VkCommandPool cmdPool;
+		VkCommandPoolCreateInfo commandPoolInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
+		commandPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+		commandPoolInfo.queueFamilyIndex = key;
+		VK_CHECK(vkCreateCommandPool(vkDevice, &commandPoolInfo, nullptr, &cmdPool), Failed to create command pool!);
+		vkCommandPools[key] = cmdPool;
+	}
+	if (queueFamilyIndices.presentFamily.has_value())
+	{
+		uint32_t key = queueFamilyIndices.presentFamily.value();
+		VkCommandPool cmdPool;
+		VkCommandPoolCreateInfo commandPoolInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
+		commandPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+		commandPoolInfo.queueFamilyIndex = key;
+		VK_CHECK(vkCreateCommandPool(vkDevice, &commandPoolInfo, nullptr, &cmdPool), Failed to create command pool!);
+		vkCommandPools[key] = cmdPool;
+	}
+	if (queueFamilyIndices.transferFamily.has_value())
+	{
+		uint32_t key = queueFamilyIndices.transferFamily.value();
+		VkCommandPool cmdPool;
+		VkCommandPoolCreateInfo commandPoolInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
+		commandPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+		commandPoolInfo.queueFamilyIndex = key;
+		VK_CHECK(vkCreateCommandPool(vkDevice, &commandPoolInfo, nullptr, &cmdPool), Failed to create command pool!);
+		vkCommandPools[key] = cmdPool;
+	}
+}
+
+void MyDevice::_InitDescriptorAllocator()
+{
+	descriptorAllocator.Init();
+}
+
 void MyDevice::Init()
 {
 	_InitGLFW();
@@ -267,6 +316,27 @@ void MyDevice::Init()
 
 void MyDevice::Uninit()
 {
+	if (queueFamilyIndices.graphicsAndComputeFamily.has_value())
+	{
+		uint32_t key = queueFamilyIndices.graphicsAndComputeFamily.value();
+		vkDestroyCommandPool(vkDevice, vkCommandPools[key], nullptr);
+	}
+	if (queueFamilyIndices.graphicsFamily.has_value())
+	{
+		uint32_t key = queueFamilyIndices.graphicsFamily.value();
+		vkDestroyCommandPool(vkDevice, vkCommandPools[key], nullptr);
+	}
+	if (queueFamilyIndices.presentFamily.has_value())
+	{
+		uint32_t key = queueFamilyIndices.presentFamily.value();
+		vkDestroyCommandPool(vkDevice, vkCommandPools[key], nullptr);
+	}
+	if (queueFamilyIndices.transferFamily.has_value())
+	{
+		uint32_t key = queueFamilyIndices.transferFamily.value();
+		vkDestroyCommandPool(vkDevice, vkCommandPools[key], nullptr);
+	}
+	descriptorAllocator.Uninit();
 	vkb::destroy_swapchain(m_swapchain);
 	vkb::destroy_device(m_device);
 	vkb::destroy_surface(m_instance, vkSurface);

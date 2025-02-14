@@ -11,8 +11,6 @@ struct DescriptorSetEntry // binding
 };
 class DescriptorSetLayout
 {
-private:
-	// std::vector<DescriptorSet*> m_pDescriptorSets;
 public:
 	~DescriptorSetLayout();
 	VkDescriptorSetLayout vkDescriptorSetLayout = VK_NULL_HANDLE;
@@ -35,12 +33,48 @@ private:
 	const DescriptorSetLayout* m_pLayout = nullptr;
 
 public:
-	~DescriptorSet();
+	// ~DescriptorSet(); No worry, allocator will handle this
 	VkDescriptorSet vkDescriptorSet = VK_NULL_HANDLE;
 	void SetLayout(const DescriptorSetLayout* _layout);
 	void StartDescriptorSetUpdate();
 	void DescriptorSetUpdate_WriteBinding(int bindingId, const Buffer* pBuffer);
 	void FinishDescriptorSetUpdate();
+	void Init();
+};
+class DescriptorAllocator
+{
+	// https://vkguide.dev/docs/extra-chapter/abstracting_descriptors/
+public:
+	struct PoolSizes {
+		std::vector<std::pair<VkDescriptorType, uint32_t>> sizes =
+		{
+			{ VK_DESCRIPTOR_TYPE_SAMPLER, 500 },
+			{ VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, 4000 },
+			{ VK_DESCRIPTOR_TYPE_SAMPLED_IMAGE, 4000 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, 1000 },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_TEXEL_BUFFER, 1000 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, 1000 },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, 2000 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, 2000 },
+			{ VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER_DYNAMIC, 1000 },
+			{ VK_DESCRIPTOR_TYPE_STORAGE_BUFFER_DYNAMIC, 1000 },
+			{ VK_DESCRIPTOR_TYPE_INPUT_ATTACHMENT, 500 }
+		};
+	};
+
+private:
+	VkDescriptorPool _CreatePool();
+	VkDescriptorPool _GrabPool();
+	VkDescriptorPool m_currentPool = VK_NULL_HANDLE;
+	PoolSizes m_poolSizes;
+	std::vector<VkDescriptorPool> m_usedPools;
+	std::vector<VkDescriptorPool> m_freePools;
+
+public:
+	void ResetPools();
+
+	bool Allocate(VkDescriptorSet* _vkSet, VkDescriptorSetLayout layout);
+
 	void Init();
 	void Uninit();
 };
@@ -81,6 +115,7 @@ struct AttachmentInformation
 	VkFormat format = VK_FORMAT_R8G8B8A8_SRGB;
 	VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
 	VkImageLayout finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+	VkClearValue clearValue = { .color = {0.0f, 0.0f, 0.0f, 1.0f} };
 };
 struct SubpassInformation
 {
@@ -95,8 +130,11 @@ public:
 	VkFramebuffer vkFramebuffer = VK_NULL_HANDLE;
 	std::vector<const ImageView*> attachments;
 	~Framebuffer();
+	
 	void Init();
 	void Uninit();
+
+	VkExtent2D GetImageSize() const;
 	friend class Renderpass;
 };
 class RenderPass

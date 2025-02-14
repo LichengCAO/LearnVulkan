@@ -6,8 +6,7 @@ struct PipelineInput
 {
 	std::vector<const DescriptorSet*> pDescriptorSets;
 
-	VkViewport viewport;
-	VkRect2D scissor;
+	VkExtent2D imageSize;
 	const VertexIndexInput* pVertexIndexInput = nullptr;
 	std::vector<const VertexInput*> pVertexInputs;
 

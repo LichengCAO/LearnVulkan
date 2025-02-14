@@ -16,7 +16,7 @@ if(!(condition)){\
 #failedMessage);\
 }\
 }while(0)
-
+class DescriptorAllocator;
 class MyDevice
 {
 private:
@@ -28,12 +28,6 @@ private:
 	vkb::DispatchTable	m_dispatchTable;
 	vkb::Swapchain		m_swapchain;
 
-	std::vector<std::vector<VkSemaphore>> m_frameSemaphores;
-	std::vector<std::vector<VkFence>> m_frameFences;
-	std::vector<std::vector<VkCommandBuffer>> m_frameCommandBuffers;
-	uint32_t m_currentFrame = 0;
-	uint32_t m_currentCommandBuffer = 0;
-	uint32_t m_currentSemophore = 0;
 private:
 	MyDevice();
 
@@ -44,8 +38,6 @@ private:
 	VkSurfaceFormatKHR		 _ChooseSwapchainFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) const;
 	VkPresentModeKHR		 _ChooseSwapchainPresentMode(const std::vector<VkPresentModeKHR>& availableModes) const;
 	VkExtent2D				 _ChooseSwapchainExtent(const VkSurfaceCapabilitiesKHR& capabilities) const;
-	VkSemaphore				 _GetCurrentSemaphore();
-	VkFence					 _GetCurrentFence();
 
 	void _InitGLFW();
 	void _CreateInstance();
@@ -53,8 +45,8 @@ private:
 	void _SelectPhysicalDevice();
 	void _CreateLogicalDevice();
 	void _CreateSwapChain();
-	void _CreateCommandPool();// TODO
-	void _CreateDescriptorPool(); // TODO
+	void _CreateCommandPools();
+	void _InitDescriptorAllocator();
 
 public:
 	GLFWwindow*			pWindow = nullptr;
@@ -64,21 +56,12 @@ public:
 	VkDevice			vkDevice = VK_NULL_HANDLE;
 	QueueFamilyIndices	queueFamilyIndices;
 	VkSwapchainKHR		vkSwapchain = VK_NULL_HANDLE;
-	std::vector<VkCommandPool>		vkCommandPools;
-	VkDescriptorPool	vkDescriptorPool = VK_NULL_HANDLE;
+	DescriptorAllocator descriptorAllocator;
+	std::unordered_map<uint32_t, VkCommandPool>		vkCommandPools;
 	void Init();
 	void Uninit();
 
 	// TODO:
-	void StartOneTimeCommands();
-	void FinishOneTimeCommands();
-
-	void StartGraphicsCommandBuffer();
-	void FinishGraphicsCommandBuffer();
-
-	void StartComputeCommandBuffer();
-	void FinishComputeCommandBuffer();
-
 	void StartFrame();
 	void EndFrame();
 public:

@@ -1,5 +1,6 @@
 #include "buffer.h"
 #include "device.h"
+#include "commandbuffer.h"
 uint32_t Buffer::_FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const
 {
 	VkPhysicalDeviceMemoryProperties memProperties;
@@ -91,8 +92,10 @@ void Buffer::CopyFromHost(const void* src)
 void Buffer::CopyFromBuffer(const Buffer& otherBuffer)
 {
 	CHECK_TRUE(vkBuffer != VK_NULL_HANDLE, This buffer is not initialized!);
-	MyDevice gDevice = MyDevice::GetInstance();
-	VkCommandBuffer commandBuffer = gDevice.StartOneTimeCommands();
+
+	CommandSubmission cmdSubmit;
+	cmdSubmit.Init();
+	cmdSubmit.StartOneTimeCommands({});
 
 	VkBufferCopy cpyRegion = {
 		.srcOffset = 0,
@@ -100,9 +103,9 @@ void Buffer::CopyFromBuffer(const Buffer& otherBuffer)
 		.size = m_bufferInformation.size,
 	};
 
-	vkCmdCopyBuffer(commandBuffer, otherBuffer.vkBuffer, vkBuffer, 1, &cpyRegion);
+	vkCmdCopyBuffer(cmdSubmit.vkCommandBuffer, otherBuffer.vkBuffer, vkBuffer, 1, &cpyRegion);
 
-	gDevice.FinishOneTimeCommands(commandBuffer);
+	cmdSubmit.SubmitCommands();
 }
 
 BufferInformation Buffer::GetBufferInformation() const

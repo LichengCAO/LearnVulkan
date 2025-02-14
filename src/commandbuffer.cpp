@@ -1,5 +1,6 @@
 #include "commandbuffer.h"
 #include "device.h"
+#include "image.h"
 void CommandSubmission::_CreateSynchronizeObjects()
 {
 	VkSemaphoreCreateInfo semaphoreInfo{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
@@ -62,6 +63,7 @@ void CommandSubmission::StartCommands(const std::vector<VkSemaphore>& _waitSemap
 	}
 	vkWaitForFences(MyDevice::GetInstance().vkDevice, 1, &vkFence, VK_TRUE, UINT64_MAX);
 	vkResetFences(MyDevice::GetInstance().vkDevice, 1, &vkFence);
+	vkResetCommandBuffer(vkCommandBuffer, 0);
 	m_isRecording = true;
 	VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
 	VK_CHECK(vkBeginCommandBuffer(vkCommandBuffer, &beginInfo), Failed to begin command!);
@@ -79,6 +81,33 @@ void CommandSubmission::StartOneTimeCommands(const std::vector<VkSemaphore>& _wa
 	
 	VK_CHECK(vkBeginCommandBuffer(vkCommandBuffer, &beginInfo), Failed to begin single time command!);
 	m_vkWaitSemaphores = _waitSemaphores;
+}
+
+void CommandSubmission::StartRenderPass(const RenderPass* pRenderPass, const Framebuffer* pFramebuffer)
+{
+	std::vector<VkClearValue> clearValues;
+	CHECK_TRUE(pRenderPass->attachments.size() > 0, No attachment in renderpass!);
+	for (int i = 0; i < pRenderPass->attachments.size(); ++i)
+	{
+		// Note that the order of clearValues should be identical to the order of your attachments.
+		clearValues.push_back(pRenderPass->attachments[i].clearValue);
+	}
+	ImageInformation imageInfo = pFramebuffer->attachments[0]->pImage->GetImageInformation();
+	
+	VkRenderPassBeginInfo renderPassInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
+	renderPassInfo.renderPass = pRenderPass->vkRenderPass;
+	renderPassInfo.framebuffer = pFramebuffer->vkFramebuffer;
+	renderPassInfo.renderArea.offset = { 0,0 };
+	renderPassInfo.renderArea.extent = { imageInfo.width, imageInfo.height };
+	renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
+	renderPassInfo.pClearValues = clearValues.data();
+
+	vkCmdBeginRenderPass(vkCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+}
+
+void CommandSubmission::EndRenderPass()
+{
+	vkCmdEndRenderPass(vkCommandBuffer);
 }
 
 VkSemaphore CommandSubmission::SubmitCommands()

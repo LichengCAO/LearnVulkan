@@ -16,7 +16,7 @@
 //	const CommandPool* pCommandPool = nullptr;
 //	VkCommandBuffer vkCommandBuffer;
 //};
-
+#include "pipeline_io.h";
 class CommandSubmission
 {
 private:
@@ -38,6 +38,8 @@ public:
 
 	void WaitTillAvailable() const; // make sure ALL values used in this command is update AFTER this call or we may access the value while the device still using it
 	void StartCommands(const std::vector<VkSemaphore>& _waitSemaphores);
+	void StartRenderPass(const RenderPass* pRenderPass, const Framebuffer* pFramebuffer);
+	void EndRenderPass();
 	void StartOneTimeCommands(const std::vector<VkSemaphore>& _waitSemaphores);
 	VkSemaphore SubmitCommands();
 };

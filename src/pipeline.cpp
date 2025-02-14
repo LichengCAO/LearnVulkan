@@ -170,8 +170,20 @@ void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput& in
 {
 	// TODO: check m_subpass should match number of vkCmdNextSubpass calls after vkCmdBeginRenderPass
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
-	vkCmdSetViewport(commandBuffer, 0, 1, &input.viewport);
-	vkCmdSetScissor(commandBuffer, 0, 1, &input.scissor);
+
+	VkViewport viewport;
+	viewport.x = 0.f;
+	viewport.y = 0.f;
+	viewport.width = static_cast<float>(input.imageSize.width);
+	viewport.height = static_cast<float>(input.imageSize.height);
+	viewport.minDepth = 0.f;
+	viewport.maxDepth = 1.f;
+	VkRect2D scissor;
+	scissor.offset = { 0, 0 };
+	scissor.extent = input.imageSize;
+
+	vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
+	vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
 	std::vector<VkDescriptorSet> descriptorSets;
 	for (int i = 0; i < input.pDescriptorSets.size(); ++i)
 	{

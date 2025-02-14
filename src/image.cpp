@@ -1,7 +1,7 @@
 #include "image.h"
 #include "device.h"
 #include "buffer.h"
-
+#include "commandbuffer.h"
 uint32_t Image::_FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const
 {
 	VkPhysicalDeviceMemoryProperties memProperties;
@@ -92,8 +92,11 @@ void Image::CopyFromBuffer(const Buffer& stagingBuffer)
 {
 	CHECK_TRUE(vkImage != VK_NULL_HANDLE, Image is not initialized!);
 
-	MyDevice gDevice = MyDevice::GetInstance();
-	VkCommandBuffer commandBuffer = gDevice.StartOneTimeCommands();
+	CommandSubmission cmdSubmit;
+	
+	cmdSubmit.Init();
+
+	cmdSubmit.StartOneTimeCommands({});
 
 	VkBufferImageCopy region = {
 	.bufferOffset = 0,
@@ -110,7 +113,7 @@ void Image::CopyFromBuffer(const Buffer& stagingBuffer)
 	};
 
 	vkCmdCopyBufferToImage(
-		commandBuffer,
+		cmdSubmit.vkCommandBuffer,
 		stagingBuffer.vkBuffer,
 		vkImage,
 		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
@@ -118,7 +121,7 @@ void Image::CopyFromBuffer(const Buffer& stagingBuffer)
 		&region
 	);
 
-	gDevice.FinishOneTimeCommands(commandBuffer);
+	cmdSubmit.SubmitCommands();
 }
 
 ImageView Image::NewImageView(const ImageViewInformation& imageViewInfo)
