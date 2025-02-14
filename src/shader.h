@@ -1,5 +1,5 @@
 #pragma once
-#include "trig_app.h"
+#include "common.h"
 
 class SimpleShader
 {

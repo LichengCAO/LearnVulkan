@@ -1,21 +1,8 @@
 #pragma once
-#include "trig_app.h"
+#include "common.h"
+#include "vk_struct.h"
+#include <VkBootstrap.h>
 
-#define VK_CHECK(vkcommand, message) \
-do{\
-if((vkcommand)!=VK_SUCCESS){\
-   throw std::runtime_error(\
-#message);\
-}\
-}while(0)
-
-#define CHECK_TRUE(condition, failedMessage) \
-do{\
-if(!(condition)){\
-   throw std::runtime_error(\
-#failedMessage);\
-}\
-}while(0)
 class DescriptorAllocator;
 class MyDevice
 {

@@ -1,5 +1,5 @@
 #pragma once
-#include "trig_app.h"
+#include "common.h"
 class Buffer;
 class ImageView;
 // Pipeline can have multiple DescriptorSetLayout, when execute the pipeline we need to provide DescriptorSets for each of the DescriptorSetLayout

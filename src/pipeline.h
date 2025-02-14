@@ -1,5 +1,5 @@
 #pragma once
-#include "trig_app.h"
+#include "common.h"
 #include "shader.h"
 #include "pipeline_io.h"
 struct PipelineInput

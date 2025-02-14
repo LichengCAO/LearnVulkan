@@ -1,6 +1,5 @@
 #pragma once
-#include "trig_app.h"
-#include <map>
+#include "common.h"
 
 class Buffer;
 
@@ -9,7 +8,7 @@ struct ImageViewInformation
 	uint32_t baseMipLevel = 0;
 	uint32_t levelCount = 0;
 	VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_2D;
-	VkImageAspectFlags aspectMask;
+	VkImageAspectFlags aspectMask = 0;
 };
 class ImageView
 {
@@ -38,6 +37,7 @@ struct ImageInformation
 	VkImageUsageFlags usage = 0;
 	VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
 	VkMemoryPropertyFlags memoryProperty = 0;
+	VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
 };
 class Image
 {
@@ -55,6 +55,7 @@ public:
 	void AllocateMemory();
 	void FreeMemory();
 	
+	void TransitionLayout(VkImageLayout newLayout);
 	void CopyFromBuffer(const Buffer& stagingBuffer);
 
 	ImageView NewImageView(const ImageViewInformation& imageViewInfo);

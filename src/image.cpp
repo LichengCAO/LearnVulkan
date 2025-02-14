@@ -26,21 +26,18 @@ Image::~Image()
 
 void Image::Init(ImageInformation imageInfo)
 {
-	VkImageCreateInfo imgInfo = {
-		.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO,
-		.imageType = imgInfo.imageType,
-		.extent = {
-			.width = imageInfo.width,
-			.height = imageInfo.height,
-			.depth = imageInfo.depth
-		},
-		.mipLevels = imageInfo.mipLevels,
-		.arrayLayers = imageInfo.arrayLayers,
+	VkImageCreateInfo imgInfo{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
+	imgInfo.imageType = imgInfo.imageType;
+	imgInfo.extent = {
+		.width = imageInfo.width,
+		.height = imageInfo.height,
+		.depth = imageInfo.depth
 	};
-
+	imgInfo.mipLevels = imageInfo.mipLevels;
+	imgInfo.arrayLayers = imageInfo.arrayLayers;
 	imgInfo.format = imageInfo.format;
 	imgInfo.tiling = imageInfo.tiling;
-	imgInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+	imgInfo.initialLayout = imageInfo.layout;
 	imgInfo.usage = imageInfo.usage;
 	imgInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	imgInfo.samples = imageInfo.samples;
@@ -88,6 +85,86 @@ void Image::FreeMemory()
 	}
 }
 
+void Image::TransitionLayout(VkImageLayout newLayout)
+{
+	if (m_imageInformation.layout == newLayout) return;
+	CommandSubmission cmdSubmit;
+	cmdSubmit.Init();
+	cmdSubmit.StartOneTimeCommands({});
+	VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
+	barrier.oldLayout = m_imageInformation.layout;
+	barrier.newLayout = newLayout;
+	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.image = vkImage;
+
+	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	if (newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) 
+	{
+		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		bool hasStencilComponent = (m_imageInformation.format == VK_FORMAT_D32_SFLOAT_S8_UINT || m_imageInformation.format == VK_FORMAT_D24_UNORM_S8_UINT);
+		if (hasStencilComponent) 
+		{
+			barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+		}
+	}
+	barrier.subresourceRange.baseMipLevel = 0;
+	barrier.subresourceRange.levelCount = 1;
+	barrier.subresourceRange.baseArrayLayer = 0;
+	barrier.subresourceRange.layerCount = 1;
+
+	VkPipelineStageFlags srcStage = VK_PIPELINE_STAGE_NONE;
+	VkPipelineStageFlags dstStage = VK_PIPELINE_STAGE_NONE;
+	if (m_imageInformation.layout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) 
+	{
+		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
+		bool hasStencilComponent = (m_imageInformation.format == VK_FORMAT_D32_SFLOAT_S8_UINT || m_imageInformation.format == VK_FORMAT_D24_UNORM_S8_UINT);
+		if (hasStencilComponent)
+		{
+			barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+		}
+		barrier.srcAccessMask = 0;
+		barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		//The reading happens in the VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT stage 
+		//and the writing in the VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT
+		dstStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;	// the earlist pipeline stage that matches the specified operations
+		srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+
+	}
+	else if (m_imageInformation.layout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) 
+	{
+		barrier.srcAccessMask = 0;
+		barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
+		dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+	}
+	else if (m_imageInformation.layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) 
+	{
+		barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+		srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
+		dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	}
+	else 
+	{
+		throw std::invalid_argument("unsupported layout transition!");
+	}
+
+	vkCmdPipelineBarrier(
+		cmdSubmit.vkCommandBuffer,
+		srcStage, 
+		dstStage,
+		0,
+		0, nullptr,
+		0, nullptr,
+		1, &barrier
+	);
+
+	cmdSubmit.SubmitCommands();
+	m_imageInformation.layout = newLayout;
+}
+
 void Image::CopyFromBuffer(const Buffer& stagingBuffer)
 {
 	CHECK_TRUE(vkImage != VK_NULL_HANDLE, Image is not initialized!);
@@ -112,11 +189,13 @@ void Image::CopyFromBuffer(const Buffer& stagingBuffer)
 	.imageExtent = {m_imageInformation.width, m_imageInformation.height, 1},
 	};
 
+	CHECK_TRUE(m_imageInformation.layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, The layout is not transform to dst optimal yet!);
+
 	vkCmdCopyBufferToImage(
 		cmdSubmit.vkCommandBuffer,
 		stagingBuffer.vkBuffer,
 		vkImage,
-		VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+		m_imageInformation.layout,
 		1,
 		&region
 	);
