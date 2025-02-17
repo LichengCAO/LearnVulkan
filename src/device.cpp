@@ -3,6 +3,7 @@
 #include <cstdint>
 #include <unordered_set>
 #include <algorithm>
+#include "image.h"
 
 std::vector<const char*> MyDevice::_GetInstanceRequiredExtensions() const
 {
@@ -231,7 +232,7 @@ void MyDevice::_CreateLogicalDevice()
 	m_dispatchTable = m_device.make_table();
 }
 
-void MyDevice::_CreateSwapChain()
+void MyDevice::CreateSwapchain()
 {
 	SwapChainSupportDetails swapChainSupport = _QuerySwapchainSupport(vkPhysicalDevice, vkSurface);
 	uint32_t imageCnt = swapChainSupport.capabilities.minImageCount + 1;
@@ -253,6 +254,42 @@ void MyDevice::_CreateSwapChain()
 	}
 	m_swapchain = swapchainBuilderReturn.value();
 	vkSwapchain = m_swapchain.swapchain;
+}
+
+std::vector<Image> MyDevice::GetSwapchainImages() const
+{
+	uint32_t imgCnt = 0;
+	std::vector<VkImage> swapchainImages;
+	std::vector<Image> ret;
+	vkGetSwapchainImagesKHR(vkDevice, vkSwapchain, &imgCnt, nullptr);
+	swapchainImages.resize(imgCnt);
+	ret.reserve(imgCnt);
+	vkGetSwapchainImagesKHR(vkDevice, vkSwapchain, &imgCnt, swapchainImages.data());
+
+	for (const auto& vkImage : swapchainImages)
+	{
+		Image tmpImage;
+		ImageInformation imageInfo;
+		imageInfo.width = m_swapchain.extent.width;
+		imageInfo.height = m_swapchain.extent.height;
+		imageInfo.usage = m_swapchain.image_usage_flags;
+		imageInfo.format = m_swapchain.image_format;
+		tmpImage.SetImageInformation(imageInfo);
+		tmpImage.vkImage = vkImage;
+		ret.push_back(tmpImage);
+	}
+
+	return ret;
+}
+
+void MyDevice::DestroySwapchain()
+{
+	vkb::destroy_swapchain(m_swapchain);
+}
+
+VkExtent2D MyDevice::GetCurrentSwapchainExtent() const
+{
+	return m_swapchain.extent;
 }
 
 void MyDevice::_CreateCommandPools()
@@ -311,7 +348,7 @@ void MyDevice::Init()
 	_CreateSurface();
 	_SelectPhysicalDevice();
 	_CreateLogicalDevice();
-	_CreateSwapChain();
+	CreateSwapchain();
 }
 
 void MyDevice::Uninit()
@@ -337,7 +374,7 @@ void MyDevice::Uninit()
 		vkDestroyCommandPool(vkDevice, vkCommandPools[key], nullptr);
 	}
 	descriptorAllocator.Uninit();
-	vkb::destroy_swapchain(m_swapchain);
+	DestroySwapchain();
 	vkb::destroy_device(m_device);
 	vkb::destroy_surface(m_instance, vkSurface);
 	vkb::destroy_instance(m_instance);

@@ -9,7 +9,7 @@ private:
 
 public:
 	VkShaderModule vkShaderModule = VK_NULL_HANDLE;
-	VkShaderStageFlagBits stag = static_cast<VkShaderStageFlagBits>(0);
+	VkShaderStageFlagBits stage = static_cast<VkShaderStageFlagBits>(0);
 	std::string name = "main";
 	~SimpleShader();
 	void SetSPVFile(const std::string& file);

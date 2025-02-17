@@ -5,7 +5,7 @@ std::vector<char> SimpleShader::_ReadFile(const std::string& filename) const
 {
 	std::ifstream file(filename, std::ios::ate | std::ios::binary);
 	
-	CHECK_TRUE(file.is_open(), Failed to open file!);
+	CHECK_TRUE(file.is_open(), "Failed to open file!");
 	
 	size_t fileSize = (size_t)file.tellg();
 	std::vector<char> ans(fileSize);
@@ -27,7 +27,7 @@ void SimpleShader::SetSPVFile(const std::string& file)
 
 void SimpleShader::Init()
 {
-	CHECK_TRUE(!m_spvFile.empty(), SPV file is unset!);
+	CHECK_TRUE(!m_spvFile.empty(), "SPV file is unset!");
 	auto code = _ReadFile(m_spvFile);
 	VkShaderModuleCreateInfo createInfo{
 	.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
@@ -49,7 +49,7 @@ void SimpleShader::Uninit()
 VkPipelineShaderStageCreateInfo SimpleShader::GetShaderStageInfo() const
 {
 	VkPipelineShaderStageCreateInfo shaderStageInfo{ VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
-	shaderStageInfo.stage = stag;
+	shaderStageInfo.stage = stage;
 	shaderStageInfo.module = vkShaderModule;
 	shaderStageInfo.pName = name.c_str();
 	return shaderStageInfo;

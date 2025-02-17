@@ -21,7 +21,7 @@ void CommandSubmission::Init()
 	if (!m_optQueueFamilyIndex.has_value())
 	{
 		auto fallbackIndex = MyDevice::GetInstance().queueFamilyIndices.graphicsAndComputeFamily;
-		CHECK_TRUE(fallbackIndex.has_value(), Queue family index is not set!);
+		CHECK_TRUE(fallbackIndex.has_value(), "Queue family index is not set!");
 		m_optQueueFamilyIndex = fallbackIndex.value();
 	}
 	vkGetDeviceQueue(MyDevice::GetInstance().vkDevice, m_optQueueFamilyIndex.value(), 0, &m_vkQueue);
@@ -50,13 +50,13 @@ void CommandSubmission::Uninit()
 		m_vkSemaphore = VK_NULL_HANDLE;
 	}
 	m_vkWaitSemaphores.clear();
-	CHECK_TRUE(!m_isRecording, Still recording commands!);
+	CHECK_TRUE(!m_isRecording, "Still recording commands!");
 }
 
 void CommandSubmission::StartCommands(const std::vector<VkSemaphore>& _waitSemaphores)
 {
-	CHECK_TRUE(vkCommandBuffer != VK_NULL_HANDLE, Command buffer is not initialized!);
-	CHECK_TRUE(!m_isRecording, Already start commands!);
+	CHECK_TRUE(vkCommandBuffer != VK_NULL_HANDLE, "Command buffer is not initialized!");
+	CHECK_TRUE(!m_isRecording, "Already start commands!");
 	if (vkFence == VK_NULL_HANDLE)
 	{
 		_CreateSynchronizeObjects();
@@ -72,8 +72,8 @@ void CommandSubmission::StartCommands(const std::vector<VkSemaphore>& _waitSemap
 
 void CommandSubmission::StartOneTimeCommands(const std::vector<VkSemaphore>& _waitSemaphores)
 {
-	CHECK_TRUE(vkCommandBuffer != VK_NULL_HANDLE, Command buffer is not initialized!);
-	CHECK_TRUE(!m_isRecording, Already start commands!);
+	CHECK_TRUE(vkCommandBuffer != VK_NULL_HANDLE, "Command buffer is not initialized!");
+	CHECK_TRUE(!m_isRecording, "Already start commands!");
 	
 	m_isRecording = true;
 	VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
@@ -86,7 +86,7 @@ void CommandSubmission::StartOneTimeCommands(const std::vector<VkSemaphore>& _wa
 void CommandSubmission::StartRenderPass(const RenderPass* pRenderPass, const Framebuffer* pFramebuffer)
 {
 	std::vector<VkClearValue> clearValues;
-	CHECK_TRUE(pRenderPass->attachments.size() > 0, No attachment in renderpass!);
+	CHECK_TRUE(pRenderPass->attachments.size() > 0, "No attachment in renderpass!");
 	for (int i = 0; i < pRenderPass->attachments.size(); ++i)
 	{
 		// Note that the order of clearValues should be identical to the order of your attachments.
@@ -112,7 +112,7 @@ void CommandSubmission::EndRenderPass()
 
 VkSemaphore CommandSubmission::SubmitCommands()
 {
-	CHECK_TRUE(m_isRecording, Do not start commands yet!);
+	CHECK_TRUE(m_isRecording, "Do not start commands yet!");
 	VkSubmitInfo submitInfo = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
 	submitInfo.commandBufferCount = 1;
 	submitInfo.pCommandBuffers = &vkCommandBuffer;

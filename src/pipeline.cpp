@@ -213,13 +213,13 @@ void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput& in
 			stride = sizeof(uint16_t);
 			break;
 		}
-		CHECK_TRUE(stride != 0, Size of index is unset!);
+		CHECK_TRUE(stride != 0, "Size of index is unset!");
 		uint32_t indexCount = bufferSize / stride;
 		vkCmdDrawIndexed(commandBuffer, indexCount, 1, 0, 0, 0);
 	}
 	else
 	{
-		CHECK_TRUE(vertBuffers.size() > 0, No vertex input!);
+		CHECK_TRUE(vertBuffers.size() > 0, "No vertex input!");
 		uint32_t bufferSize = static_cast<uint32_t>(input.pVertexInputs[0]->pBuffer->GetBufferInformation().size);
 		uint32_t stride = static_cast<uint32_t>(input.pVertexInputs[0]->pVertexInputLayout->stride);
 		uint32_t vertCount = bufferSize / stride;

@@ -15,6 +15,8 @@ private:
 	void* m_mappedMemory = nullptr; // we store this value, since mapping is not free
 
 	uint32_t _FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const;
+	void _AllocateMemory();
+	void _FreeMemory();
 public:
 	~Buffer();
 	VkBuffer	   vkBuffer = VK_NULL_HANDLE;
@@ -23,11 +25,9 @@ public:
 	void Init(BufferInformation bufferInfo);
 	void Uninit();
 
-	void AllocateMemory();
-	void FreeMemory();
-
 	void CopyFromHost(const void* src);
 	void CopyFromBuffer(const Buffer& otherBuffer);
+	void CopyFromBuffer(const Buffer* pOtherBuffer);
 
 	BufferInformation GetBufferInformation() const;
 };

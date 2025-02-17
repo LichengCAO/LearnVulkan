@@ -4,6 +4,7 @@
 #include <VkBootstrap.h>
 
 class DescriptorAllocator;
+class Image;
 class MyDevice
 {
 private:
@@ -31,7 +32,6 @@ private:
 	void _CreateSurface();
 	void _SelectPhysicalDevice();
 	void _CreateLogicalDevice();
-	void _CreateSwapChain();
 	void _CreateCommandPools();
 	void _InitDescriptorAllocator();
 
@@ -47,6 +47,11 @@ public:
 	std::unordered_map<uint32_t, VkCommandPool>		vkCommandPools;
 	void Init();
 	void Uninit();
+	
+	void CreateSwapchain();
+	std::vector<Image> GetSwapchainImages() const;
+	void DestroySwapchain();
+	VkExtent2D GetCurrentSwapchainExtent() const;
 
 	// TODO:
 	void StartFrame();

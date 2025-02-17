@@ -5,6 +5,7 @@
 #include <vector>
 #include <string>
 #include <optional>
+#include <unordered_map>
 
 #define VK_CHECK(vkcommand, message) \
 do{\
@@ -18,6 +19,6 @@ if((vkcommand)!=VK_SUCCESS){\
 do{\
 if(!(condition)){\
    throw std::runtime_error(\
-#failedMessage);\
+failedMessage);\
 }\
 }while(0)

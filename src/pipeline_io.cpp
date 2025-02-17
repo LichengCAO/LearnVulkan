@@ -226,11 +226,11 @@ void RenderPass::Uninit()
 }
 Framebuffer RenderPass::NewFramebuffer(const std::vector<const ImageView*> _imageViews) const
 {
-	CHECK_TRUE(vkRenderPass != VK_NULL_HANDLE, Renderpass is not initialized!);
-	CHECK_TRUE(_imageViews.size() == attachments.size(), Number of imageviews is not the same as number of attachments);
+	CHECK_TRUE(vkRenderPass != VK_NULL_HANDLE, "Renderpass is not initialized!");
+	CHECK_TRUE(_imageViews.size() == attachments.size(), "Number of imageviews is not the same as number of attachments");
 	for (int i = 0; i < _imageViews.size(); ++i)
 	{
-		CHECK_TRUE(attachments[i].format == _imageViews[i]->pImage->GetImageInformation().format, Format of the imageview is not the same as the format of attachment);
+		CHECK_TRUE(attachments[i].format == _imageViews[i]->pImage->GetImageInformation().format, "Format of the imageview is not the same as the format of attachment");
 	}
 	Framebuffer framebuffer;
 	framebuffer.pRenderPass = this;
@@ -243,15 +243,15 @@ Framebuffer::~Framebuffer()
 }
 void Framebuffer::Init()
 {
-	CHECK_TRUE(pRenderPass != nullptr, No renderpass!);
-	CHECK_TRUE(attachments.size() > 0, No attachment!);
+	CHECK_TRUE(pRenderPass != nullptr, "No renderpass!");
+	CHECK_TRUE(attachments.size() > 0, "No attachment!");
 	VkFramebufferCreateInfo framebufferInfo{ VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
 	framebufferInfo.renderPass = pRenderPass->vkRenderPass.value();
 	framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
 	std::vector<VkImageView> vkAttachments;
 	for (int i = 0; i < attachments.size(); ++i)
 	{
-		CHECK_TRUE(attachments[i]->vkImageView != VK_NULL_HANDLE, Imageview is not initialized!);
+		CHECK_TRUE(attachments[i]->vkImageView != VK_NULL_HANDLE, "Imageview is not initialized!");
 		vkAttachments.push_back(attachments[i]->vkImageView);
 	}
 	framebufferInfo.pAttachments = vkAttachments.data();
@@ -274,7 +274,7 @@ void Framebuffer::Uninit()
 
 VkExtent2D Framebuffer::GetImageSize() const
 {
-	CHECK_TRUE(attachments.size() > 0, No image in this framebuffer!);
+	CHECK_TRUE(attachments.size() > 0, "No image in this framebuffer!");
 	VkExtent2D ret;
 	ImageInformation imageInfo = attachments[0]->pImage->GetImageInformation();
 	ret.width = imageInfo.width;
@@ -407,4 +407,19 @@ void DescriptorAllocator::Uninit()
 	{
 		vkDestroyDescriptorPool(device, p, nullptr);
 	}
+}
+
+void SubpassInformation::AddColorAttachment(uint32_t _binding)
+{
+	colorAttachments.push_back({ _binding, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
+}
+
+void SubpassInformation::SetDepthStencilAttachment(uint32_t _binding)
+{
+	optDepthStencilAttachment = { _binding, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
+}
+
+void SubpassInformation::AddResolveAttachment(uint32_t _binding)
+{
+	resolveAttachments.push_back({ _binding, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
 }

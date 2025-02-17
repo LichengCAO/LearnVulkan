@@ -24,28 +24,37 @@ Image::~Image()
 	assert(vkDeviceMemory == VK_NULL_HANDLE);
 }
 
-void Image::Init(ImageInformation imageInfo)
+void Image::SetImageInformation(ImageInformation& imageInfo)
 {
+	CHECK_TRUE(vkImage == VK_NULL_HANDLE, "Image is already initialized!");
+	m_imageInformation = imageInfo;
+}
+
+void Image::Init()
+{
+	if (vkImage != VK_NULL_HANDLE) return;
 	VkImageCreateInfo imgInfo{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
-	imgInfo.imageType = imgInfo.imageType;
+	imgInfo.imageType = m_imageInformation.imageType;
 	imgInfo.extent = {
-		.width = imageInfo.width,
-		.height = imageInfo.height,
-		.depth = imageInfo.depth
+		.width = m_imageInformation.width,
+		.height = m_imageInformation.height,
+		.depth = m_imageInformation.depth
 	};
-	imgInfo.mipLevels = imageInfo.mipLevels;
-	imgInfo.arrayLayers = imageInfo.arrayLayers;
-	imgInfo.format = imageInfo.format;
-	imgInfo.tiling = imageInfo.tiling;
-	imgInfo.initialLayout = imageInfo.layout;
-	imgInfo.usage = imageInfo.usage;
+	imgInfo.mipLevels = m_imageInformation.mipLevels;
+	imgInfo.arrayLayers = m_imageInformation.arrayLayers;
+	imgInfo.format = m_imageInformation.format;
+	imgInfo.tiling = m_imageInformation.tiling;
+	CHECK_TRUE(m_imageInformation.layout == VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED || m_imageInformation.layout == VkImageLayout::VK_IMAGE_LAYOUT_PREINITIALIZED,
+		"According to the Vulkan specification, VkImageCreateInfo::initialLayout must be set to VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED at image creation.");
+	imgInfo.initialLayout = m_imageInformation.layout;
+	imgInfo.usage = m_imageInformation.usage;
 	imgInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	imgInfo.samples = imageInfo.samples;
+	imgInfo.samples = m_imageInformation.samples;
 	imgInfo.flags = 0;
 
-	m_imageInformation = imageInfo;
-
 	VK_CHECK(vkCreateImage(MyDevice::GetInstance().vkDevice, &imgInfo, nullptr, &vkImage), Failed to crate image!);
+
+	_AllocateMemory();
 }
 
 void Image::Uninit()
@@ -55,12 +64,11 @@ void Image::Uninit()
 		vkDestroyImage(MyDevice::GetInstance().vkDevice, vkImage, nullptr);
 		vkImage = VK_NULL_HANDLE;
 	}
-	FreeMemory();
+	_FreeMemory();
 }
 
-void Image::AllocateMemory()
+void Image::_AllocateMemory()
 {
-	CHECK_TRUE(vkImage != VK_NULL_HANDLE, Image is not initialized!);
 	MyDevice gMyDevice = MyDevice::GetInstance();
 	VkMemoryRequirements memRequirements;
 	vkGetImageMemoryRequirements(gMyDevice.vkDevice, vkImage, &memRequirements);
@@ -75,7 +83,7 @@ void Image::AllocateMemory()
 	vkBindImageMemory(gMyDevice.vkDevice, vkImage, vkDeviceMemory, 0);
 }
 
-void Image::FreeMemory()
+void Image::_FreeMemory()
 {
 	if (vkDeviceMemory != VK_NULL_HANDLE)
 	{
@@ -167,7 +175,7 @@ void Image::TransitionLayout(VkImageLayout newLayout)
 
 void Image::CopyFromBuffer(const Buffer& stagingBuffer)
 {
-	CHECK_TRUE(vkImage != VK_NULL_HANDLE, Image is not initialized!);
+	CHECK_TRUE(vkImage != VK_NULL_HANDLE, "Image is not initialized!");
 
 	CommandSubmission cmdSubmit;
 	
@@ -189,7 +197,7 @@ void Image::CopyFromBuffer(const Buffer& stagingBuffer)
 	.imageExtent = {m_imageInformation.width, m_imageInformation.height, 1},
 	};
 
-	CHECK_TRUE(m_imageInformation.layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, The layout is not transform to dst optimal yet!);
+	CHECK_TRUE(m_imageInformation.layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, "The layout is not transform to dst optimal yet!");
 
 	vkCmdCopyBufferToImage(
 		cmdSubmit.vkCommandBuffer,
@@ -205,7 +213,7 @@ void Image::CopyFromBuffer(const Buffer& stagingBuffer)
 
 ImageView Image::NewImageView(const ImageViewInformation& imageViewInfo)
 {
-	CHECK_TRUE(vkImage != VK_NULL_HANDLE, Image is not initialized!);
+	CHECK_TRUE(vkImage != VK_NULL_HANDLE, "Image is not initialized!");
 	VkImageViewCreateInfo viewInfo = {
 		.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 		.image = vkImage,
@@ -238,7 +246,7 @@ ImageView::~ImageView()
 
 void ImageView::Init()
 {
-	CHECK_TRUE(pImage != nullptr, No image!);
+	CHECK_TRUE(pImage != nullptr, "No image!");
 	VkImageViewCreateInfo viewInfo = {
 	.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 	.image = pImage->vkImage,

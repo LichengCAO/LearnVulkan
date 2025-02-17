@@ -6,9 +6,9 @@ class Buffer;
 struct ImageViewInformation
 {
 	uint32_t baseMipLevel = 0;
-	uint32_t levelCount = 0;
+	uint32_t levelCount = 1;
 	VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_2D;
-	VkImageAspectFlags aspectMask = 0;
+	VkImageAspectFlags aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
 };
 class ImageView
 {
@@ -44,16 +44,17 @@ class Image
 private:
 	ImageInformation m_imageInformation;
 	uint32_t _FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const;
+	void _AllocateMemory();
+	void _FreeMemory();
 public:
 	~Image();
 	VkImage vkImage = VK_NULL_HANDLE;
 	VkDeviceMemory vkDeviceMemory = VK_NULL_HANDLE;
 	
-	void Init(ImageInformation imageInfo);
+	void SetImageInformation(ImageInformation& imageInfo);
+
+	void Init();
 	void Uninit();
-	
-	void AllocateMemory();
-	void FreeMemory();
 	
 	void TransitionLayout(VkImageLayout newLayout);
 	void CopyFromBuffer(const Buffer& stagingBuffer);

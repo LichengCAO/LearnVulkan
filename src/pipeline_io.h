@@ -115,13 +115,17 @@ struct AttachmentInformation
 	VkFormat format = VK_FORMAT_R8G8B8A8_SRGB;
 	VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
 	VkImageLayout finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-	VkClearValue clearValue = { .color = {0.0f, 0.0f, 0.0f, 1.0f} };
+	VkClearValue clearValue = { .color = {0.0f, 0.0f, 0.0f, 1.0f}/*, .depthStencil = {0.0f, 1}*/};
 };
 struct SubpassInformation
 {
 	std::vector<VkAttachmentReference> colorAttachments;
 	std::optional<VkAttachmentReference> optDepthStencilAttachment;
 	std::vector<VkAttachmentReference> resolveAttachments;
+
+	void AddColorAttachment(uint32_t _binding);
+	void SetDepthStencilAttachment(uint32_t _binding);
+	void AddResolveAttachment(uint32_t _binding);
 };
 class Framebuffer
 {

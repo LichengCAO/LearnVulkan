@@ -34,6 +34,8 @@ void Buffer::Init(BufferInformation info)
 	m_bufferInformation = info;
 
 	VK_CHECK(vkCreateBuffer(MyDevice::GetInstance().vkDevice, &bufferInfo, nullptr, &vkBuffer), Failed to create buffer!);
+
+	_AllocateMemory();
 }
 
 void Buffer::Uninit()
@@ -44,12 +46,12 @@ void Buffer::Uninit()
 		vkBuffer == VK_NULL_HANDLE;
 	}
 	
-	FreeMemory();
+	_FreeMemory();
 }
 
-void Buffer::AllocateMemory()
+void Buffer::_AllocateMemory()
 {
-	CHECK_TRUE(vkBuffer != VK_NULL_HANDLE, Try to allocate for a uninitialized buffer!);
+	CHECK_TRUE(vkBuffer != VK_NULL_HANDLE, "Try to allocate for a uninitialized buffer!");
 	VkMemoryRequirements memRequirements;
 	vkGetBufferMemoryRequirements(MyDevice::GetInstance().vkDevice, vkBuffer, &memRequirements);
 
@@ -65,7 +67,7 @@ void Buffer::AllocateMemory()
 	vkBindBufferMemory(MyDevice::GetInstance().vkDevice, vkBuffer, vkDeviceMemory, offset);
 }
 
-void Buffer::FreeMemory()
+void Buffer::_FreeMemory()
 {
 	if (vkDeviceMemory != VK_NULL_HANDLE)
 	{
@@ -81,7 +83,7 @@ void Buffer::FreeMemory()
 
 void Buffer::CopyFromHost(const void* src)
 {
-	CHECK_TRUE(vkDeviceMemory != VK_NULL_HANDLE, Not allocate memory yet!);
+	CHECK_TRUE(vkDeviceMemory != VK_NULL_HANDLE, "Not allocate memory yet!");
 	if (m_mappedMemory == nullptr)
 	{
 		vkMapMemory(MyDevice::GetInstance().vkDevice, vkDeviceMemory, 0, m_bufferInformation.size, 0, &m_mappedMemory);
@@ -91,7 +93,7 @@ void Buffer::CopyFromHost(const void* src)
 
 void Buffer::CopyFromBuffer(const Buffer& otherBuffer)
 {
-	CHECK_TRUE(vkBuffer != VK_NULL_HANDLE, This buffer is not initialized!);
+	CHECK_TRUE(vkBuffer != VK_NULL_HANDLE, "This buffer is not initialized!");
 
 	CommandSubmission cmdSubmit;
 	cmdSubmit.Init();
@@ -106,6 +108,11 @@ void Buffer::CopyFromBuffer(const Buffer& otherBuffer)
 	vkCmdCopyBuffer(cmdSubmit.vkCommandBuffer, otherBuffer.vkBuffer, vkBuffer, 1, &cpyRegion);
 
 	cmdSubmit.SubmitCommands();
+}
+
+void Buffer::CopyFromBuffer(const Buffer* pOtherBuffer)
+{
+	CopyFromBuffer(*pOtherBuffer);
 }
 
 BufferInformation Buffer::GetBufferInformation() const
