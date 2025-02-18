@@ -60,17 +60,21 @@ private:
 	std::vector<Framebuffer> m_framebuffers;
 	//pipelines
 	GraphicsPipeline m_gPipeline;
-
+	// semaphores
+	std::vector<VkSemaphore>	   m_swapchainImageAvailabilities;
 	std::vector<CommandSubmission> m_commandSubmissions;
 private:
-	VkFormat _FindSupportFormat(const std::vector<VkFormat>& candidates, VkImageTiling tilling, VkFormatFeatureFlags features) const;
 	void _Init();
 	void _InitVertexInputs();
 	void _InitDescriptorSets();
 	void _InitRenderPass();
+	void _InitImageViewsAndFramebuffers();
 	void _InitPipelines();
+	void _InitSynchronizeObjects();
 	void _MainLoop();
 	void _DrawFrame();
+	void _UninitSynchronizeObjects();
+	void _UninitImageViewsAndFramebuffers();
 	void _Uninit();
 public:
 	void Run();

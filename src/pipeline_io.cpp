@@ -271,7 +271,6 @@ void Framebuffer::Uninit()
 	attachments.clear();
 	pRenderPass = nullptr;
 }
-
 VkExtent2D Framebuffer::GetImageSize() const
 {
 	CHECK_TRUE(attachments.size() > 0, "No image in this framebuffer!");
@@ -303,7 +302,6 @@ VkDescriptorPool DescriptorAllocator::_CreatePool()
 
 	return descriptorPool;
 }
-
 VkDescriptorPool DescriptorAllocator::_GrabPool()
 {
 	//there are reusable pools available
@@ -320,7 +318,6 @@ VkDescriptorPool DescriptorAllocator::_GrabPool()
 		return _CreatePool();
 	}
 }
-
 void DescriptorAllocator::ResetPools()
 {
 	VkDevice device = MyDevice::GetInstance().vkDevice;
@@ -337,7 +334,6 @@ void DescriptorAllocator::ResetPools()
 	//reset the current pool handle back to null
 	m_currentPool = VK_NULL_HANDLE;
 }
-
 bool DescriptorAllocator::Allocate(VkDescriptorSet* _vkSet, VkDescriptorSetLayout layout)
 {
 	VkDevice device = MyDevice::GetInstance().vkDevice;
@@ -390,11 +386,9 @@ bool DescriptorAllocator::Allocate(VkDescriptorSet* _vkSet, VkDescriptorSetLayou
 
 	return false;
 }
-
 void DescriptorAllocator::Init()
 {
 }
-
 void DescriptorAllocator::Uninit()
 {
 	VkDevice device = MyDevice::GetInstance().vkDevice;
@@ -413,12 +407,10 @@ void SubpassInformation::AddColorAttachment(uint32_t _binding)
 {
 	colorAttachments.push_back({ _binding, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
 }
-
 void SubpassInformation::SetDepthStencilAttachment(uint32_t _binding)
 {
 	optDepthStencilAttachment = { _binding, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
 }
-
 void SubpassInformation::AddResolveAttachment(uint32_t _binding)
 {
 	resolveAttachments.push_back({ _binding, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });

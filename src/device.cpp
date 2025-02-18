@@ -125,8 +125,8 @@ void MyDevice::_InitGLFW()
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
 	pWindow = glfwCreateWindow(WIDTH, HEIGHT, "hello triangle", nullptr, nullptr);
-	// glfwSetWindowUserPointer(pWindow, this);
-	// glfwSetFramebufferSizeCallback(pWindow, FrameBufferResizedCallback);
+	glfwSetWindowUserPointer(pWindow, this);
+	glfwSetFramebufferSizeCallback(pWindow, OnFramebufferResized);
 }
 
 void MyDevice::_CreateInstance()
@@ -230,9 +230,11 @@ void MyDevice::_CreateLogicalDevice()
 	m_device = deviceBuilderReturn.value();
 	vkDevice = m_device.device;
 	m_dispatchTable = m_device.make_table();
+	
+	vkGetDeviceQueue(vkDevice, queueFamilyIndices.presentFamily.value(), 0, &m_vkPresentQueue);
 }
 
-void MyDevice::CreateSwapchain()
+void MyDevice::_CreateSwapchain()
 {
 	SwapChainSupportDetails swapChainSupport = _QuerySwapchainSupport(vkPhysicalDevice, vkSurface);
 	uint32_t imageCnt = swapChainSupport.capabilities.minImageCount + 1;
@@ -254,6 +256,22 @@ void MyDevice::CreateSwapchain()
 	}
 	m_swapchain = swapchainBuilderReturn.value();
 	vkSwapchain = m_swapchain.swapchain;
+	m_needRecreate = false;
+}
+
+void MyDevice::RecreateSwapchain()
+{
+	int width = 0;
+	int height = 0;
+	glfwGetFramebufferSize(pWindow, &width, &height);
+	while (width == 0 || height == 0) 
+	{
+		glfwGetFramebufferSize(pWindow, &width, &height);
+		glfwWaitEvents();
+	}
+	vkDeviceWaitIdle(vkDevice);
+	_DestroySwapchain();
+	_CreateSwapchain();
 }
 
 std::vector<Image> MyDevice::GetSwapchainImages() const
@@ -282,14 +300,79 @@ std::vector<Image> MyDevice::GetSwapchainImages() const
 	return ret;
 }
 
-void MyDevice::DestroySwapchain()
+std::optional<uint32_t> MyDevice::AquireAvailableSwapchainImageIndex(VkSemaphore finishSignal)
+{
+	uint32_t imageIndex = 0;
+	std::optional<uint32_t> ret;
+	VkResult result = vkAcquireNextImageKHR(vkDevice, vkSwapchain, UINT64_MAX, finishSignal, VK_NULL_HANDLE, &imageIndex);
+	if (result != VK_SUCCESS && result != VK_SUBOPTIMAL_KHR) 
+	{
+		throw std::runtime_error("Failed to acquire swap chain image!");
+	}
+	else if (result != VK_ERROR_OUT_OF_DATE_KHR)
+	{
+		ret = imageIndex;
+	}
+	else
+	{
+		m_needRecreate = true;
+	}
+	return ret;
+}
+
+void MyDevice::PresentSwapchainImage(const std::vector<VkSemaphore>& waitSemaphores, uint32_t imageIdx)
+{
+	VkSwapchainKHR swapChains[] = { vkSwapchain };
+	VkPresentInfoKHR presentInfo{ VK_STRUCTURE_TYPE_PRESENT_INFO_KHR };
+	presentInfo.waitSemaphoreCount = static_cast<uint32_t>(waitSemaphores.size());
+	presentInfo.pWaitSemaphores = waitSemaphores.data();
+	presentInfo.swapchainCount = 1;
+	presentInfo.pSwapchains = swapChains;
+	presentInfo.pImageIndices = &imageIdx;
+	presentInfo.pResults = nullptr;
+
+	VkResult result = vkQueuePresentKHR(m_vkPresentQueue, &presentInfo);
+	if (result == VK_ERROR_OUT_OF_DATE_KHR || result == VK_SUBOPTIMAL_KHR) 
+	{
+		m_needRecreate = true;
+	}
+	else if (result != VK_SUCCESS) 
+	{
+		throw std::runtime_error("Failed to present swapchain!");
+	}
+}
+
+bool MyDevice::NeedRecreateSwapchain() const
+{
+	return m_needRecreate;
+}
+
+void MyDevice::_DestroySwapchain()
 {
 	vkb::destroy_swapchain(m_swapchain);
 }
 
-VkExtent2D MyDevice::GetCurrentSwapchainExtent() const
+VkExtent2D MyDevice::GetSwapchainExtent() const
 {
 	return m_swapchain.extent;
+}
+
+VkFormat MyDevice::FindSupportFormat(const std::vector<VkFormat>& candidates, VkImageTiling tilling, VkFormatFeatureFlags features) const
+{
+	for (auto format : candidates)
+	{
+		VkFormatProperties props;
+		vkGetPhysicalDeviceFormatProperties(vkPhysicalDevice, format, &props);
+		if (tilling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features)
+		{
+			return format;
+		}
+		else if (tilling == VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures & features) == features)
+		{
+			return format;
+		}
+	}
+	throw std::runtime_error("Failed to find supported format!");
 }
 
 void MyDevice::_CreateCommandPools()
@@ -348,7 +431,7 @@ void MyDevice::Init()
 	_CreateSurface();
 	_SelectPhysicalDevice();
 	_CreateLogicalDevice();
-	CreateSwapchain();
+	_CreateSwapchain();
 }
 
 void MyDevice::Uninit()
@@ -374,7 +457,7 @@ void MyDevice::Uninit()
 		vkDestroyCommandPool(vkDevice, vkCommandPools[key], nullptr);
 	}
 	descriptorAllocator.Uninit();
-	DestroySwapchain();
+	_DestroySwapchain();
 	vkb::destroy_device(m_device);
 	vkb::destroy_surface(m_instance, vkSurface);
 	vkb::destroy_instance(m_instance);
@@ -385,4 +468,10 @@ void MyDevice::Uninit()
 MyDevice& MyDevice::GetInstance()
 {
 	return s_instance;
+}
+
+void MyDevice::OnFramebufferResized(GLFWwindow* _pWindow, int width, int height)
+{
+	auto mydevice = reinterpret_cast<MyDevice*>(glfwGetWindowUserPointer(_pWindow));
+	mydevice->m_needRecreate = true;
 }

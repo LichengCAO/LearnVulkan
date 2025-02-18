@@ -2,32 +2,23 @@
 #include "device.h"
 #include "tiny_obj_loader.h"
 #define MAX_FRAME_COUNT 3
-VkFormat TransparentApp::_FindSupportFormat(const std::vector<VkFormat>& candidates, VkImageTiling tilling, VkFormatFeatureFlags features) const
-{
-	for (auto format : candidates)
-	{
-		VkFormatProperties props;
-		vkGetPhysicalDeviceFormatProperties(MyDevice::GetInstance().vkPhysicalDevice, format, &props);
-		if (tilling == VK_IMAGE_TILING_LINEAR && (props.linearTilingFeatures & features) == features)
-		{
-			return format;
-		}
-		else if (tilling == VK_IMAGE_TILING_OPTIMAL && (props.optimalTilingFeatures & features) == features)
-		{
-			return format;
-		}
-	}
-	throw std::runtime_error("failed to find supported format!");
-}
 void TransparentApp::_Init()
 {
 	MyDevice::GetInstance().Init();
 
 	_InitDescriptorSets();
 	_InitRenderPass();
+	_InitImageViewsAndFramebuffers();
 	_InitVertexInputs();
 	_InitPipelines();
-
+	_InitSynchronizeObjects();
+	// init semaphores and command buffers
+	VkSemaphoreCreateInfo semaphoreInfo{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+	m_swapchainImageAvailabilities.resize(MAX_FRAME_COUNT);
+	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+	{
+		VK_CHECK(vkCreateSemaphore(MyDevice::GetInstance().vkDevice, &semaphoreInfo, nullptr, &m_swapchainImageAvailabilities[i]), "Failed to create semaphore!");
+	}
 	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 	{
 		CommandSubmission newCmd;
@@ -90,20 +81,27 @@ void TransparentApp::_InitRenderPass()
 	subpassInfo.SetDepthStencilAttachment(1);
 	m_renderPass.AddSubpass(subpassInfo);
 	m_renderPass.Init();
-	
+}
+
+void TransparentApp::_InitImageViewsAndFramebuffers()
+{
 	// Create images and views for frame buffers
 	m_swapchainImages = MyDevice::GetInstance().GetSwapchainImages(); // no need to call Init() here, swapchain images are special
 	ImageInformation depthImageInfo;
-	depthImageInfo.width = MyDevice::GetInstance().GetCurrentSwapchainExtent().width;
-	depthImageInfo.height = MyDevice::GetInstance().GetCurrentSwapchainExtent().height;
+	depthImageInfo.width = MyDevice::GetInstance().GetSwapchainExtent().width;
+	depthImageInfo.height = MyDevice::GetInstance().GetSwapchainExtent().height;
 	depthImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-	depthImageInfo.format = depthInfo.format;
+	depthImageInfo.format = _FindSupportFormat( 
+		{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT }, 
+		VK_IMAGE_TILING_OPTIMAL, 
+		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+	);
 	depthImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 	ImageViewInformation depthImageViewInfo;
 	depthImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_DEPTH_BIT;
 	ImageViewInformation swapchainImageViewInfo;
 	swapchainImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
-	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+	for (int i = 0; i < m_swapchainImages.size(); ++i)
 	{
 		Image depthImage;
 		depthImage.SetImageInformation(depthImageInfo);
@@ -116,9 +114,8 @@ void TransparentApp::_InitRenderPass()
 		m_depthImageViews.push_back(depthImageView);
 		m_swapchainImageViews.push_back(swapchainImageView);
 	}
-
 	// Setup frame buffers
-	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+	for (int i = 0; i < m_swapchainImages.size(); ++i)
 	{
 		std::vector<const ImageView*> imageviews = { &m_swapchainImageViews[i], &m_depthImageViews[i] };
 		Framebuffer framebuffer = m_renderPass.NewFramebuffer(imageviews);
@@ -236,6 +233,7 @@ void TransparentApp::_MainLoop()
 	while (!glfwWindowShouldClose(MyDevice::GetInstance().pWindow))
 	{
 		glfwPollEvents();
+		_DrawFrame();
 	}
 
 	vkDeviceWaitIdle(MyDevice::GetInstance().vkDevice);
@@ -243,20 +241,59 @@ void TransparentApp::_MainLoop()
 
 void TransparentApp::_DrawFrame()
 {
+	if (MyDevice::GetInstance().NeedRecreateSwapchain())
+	{
+		_UninitImageViewsAndFramebuffers();
+		MyDevice::GetInstance().RecreateSwapchain();
+		_InitImageViewsAndFramebuffers();
+	}
+
 	auto& cmd = m_commandSubmissions[m_currentFrame];
 	auto& uniformBuffer = m_uniformBuffers[m_currentFrame];
 	cmd.WaitTillAvailable();
-	cmd.StartCommands({});
-	cmd.StartRenderPass(&m_renderPass, &m_framebuffers[m_currentFrame]);
+	auto imageIndex = MyDevice::GetInstance().AquireAvailableSwapchainImageIndex(m_swapchainImageAvailabilities[m_currentFrame]);
+	if (!imageIndex.has_value()) return;
+
+	cmd.StartCommands({ m_swapchainImageAvailabilities[m_currentFrame] });
+	cmd.StartRenderPass(&m_renderPass, &m_framebuffers[imageIndex.value()]);
 	PipelineInput input;
 	input.pDescriptorSets = { &m_dSets[m_currentFrame] };
-	input.imageSize = MyDevice::GetInstance().GetCurrentSwapchainExtent();
+	input.imageSize = MyDevice::GetInstance().GetSwapchainExtent();
 	input.pVertexIndexInput = &m_vertIndexInput;
 	input.pVertexInputs = { &m_vertInput };
 	m_gPipeline.Do(cmd.vkCommandBuffer, input);
-	//TODO: present swapchain, resize
+	// m_gPipeline.Do(cmd.vkCommandBuffer, input); // if we want to draw another, this draw will begin after the first draw is done
 	cmd.EndRenderPass();
-	cmd.SubmitCommands();
+	VkSemaphore renderpassFinish = cmd.SubmitCommands();
+
+	MyDevice::GetInstance().PresentSwapchainImage({ renderpassFinish }, imageIndex.value());
+	
+	m_currentFrame = (m_currentFrame + 1) % MAX_FRAME_COUNT;
+}
+
+void TransparentApp::_UninitImageViewsAndFramebuffers()
+{
+	vkDeviceWaitIdle(MyDevice::GetInstance().vkDevice);
+	for (auto& view : m_depthImageViews)
+	{
+		view.Uninit();
+	}
+	m_depthImageViews.clear();
+	for (auto& image : m_depthImages)
+	{
+		image.Uninit();
+	}
+	m_depthImages.clear();
+	for (auto& view : m_swapchainImageViews)
+	{
+		view.Uninit();
+	}
+	m_swapchainImageViews.clear();
+	for (auto& framebuffer : m_framebuffers)
+	{
+		framebuffer.Uninit();
+	}
+	m_framebuffers.clear();
 }
 
 void TransparentApp::_Uninit()
@@ -265,28 +302,13 @@ void TransparentApp::_Uninit()
 	{
 		cmd.Uninit();
 	}
-	for (auto& framebuffer : m_framebuffers)
+	for (auto& semaphore : m_swapchainImageAvailabilities)
 	{
-		framebuffer.Uninit();
+		vkDestroySemaphore(MyDevice::GetInstance().vkDevice, semaphore, nullptr);
 	}
+	_UninitImageViewsAndFramebuffers();
 	m_gPipeline.Uninit();
 	m_dSetLayout.Uninit();
 	m_renderPass.Uninit();
-	for (auto& view : m_depthImageViews)
-	{
-		view.Uninit();
-	}
-	for (auto& image : m_depthImages)
-	{
-		image.Uninit();
-	}
-	for (auto& view : m_swapchainImageViews)
-	{
-		view.Uninit();
-	}
-	for (auto& image : m_swapchainImages)
-	{
-		image.Uninit();
-	}
 	MyDevice::GetInstance().Uninit();
 }

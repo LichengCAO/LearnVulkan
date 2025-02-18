@@ -15,7 +15,8 @@ private:
 	vkb::Device			m_device;
 	vkb::DispatchTable	m_dispatchTable;
 	vkb::Swapchain		m_swapchain;
-
+	VkQueue				m_vkPresentQueue = VK_NULL_HANDLE;
+	bool				m_needRecreate = false;
 private:
 	MyDevice();
 
@@ -34,6 +35,8 @@ private:
 	void _CreateLogicalDevice();
 	void _CreateCommandPools();
 	void _InitDescriptorAllocator();
+	void _CreateSwapchain();
+	void _DestroySwapchain();
 
 public:
 	GLFWwindow*			pWindow = nullptr;
@@ -48,14 +51,15 @@ public:
 	void Init();
 	void Uninit();
 	
-	void CreateSwapchain();
+	void RecreateSwapchain();
 	std::vector<Image> GetSwapchainImages() const;
-	void DestroySwapchain();
-	VkExtent2D GetCurrentSwapchainExtent() const;
+	std::optional<uint32_t> AquireAvailableSwapchainImageIndex(VkSemaphore finishSignal);
+	void PresentSwapchainImage(const std::vector<VkSemaphore>& waitSemaphores, uint32_t imageIdx);
+	bool NeedRecreateSwapchain() const;
+	VkExtent2D GetSwapchainExtent() const;
 
-	// TODO:
-	void StartFrame();
-	void EndFrame();
+	VkFormat FindSupportFormat(const std::vector<VkFormat>& candidates, VkImageTiling tilling, VkFormatFeatureFlags features) const;
 public:
 	static MyDevice& GetInstance();
+	static void OnFramebufferResized(GLFWwindow* _pWindow, int width, int height);
 };
