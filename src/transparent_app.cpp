@@ -11,7 +11,6 @@ void TransparentApp::_Init()
 	_InitImageViewsAndFramebuffers();
 	_InitVertexInputs();
 	_InitPipelines();
-	_InitSynchronizeObjects();
 	// init semaphores and command buffers
 	VkSemaphoreCreateInfo semaphoreInfo{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
 	m_swapchainImageAvailabilities.resize(MAX_FRAME_COUNT);
@@ -67,7 +66,7 @@ void TransparentApp::_InitRenderPass()
 	// Setup render pass
 	AttachmentInformation attInfo;
 	AttachmentInformation depthInfo;
-	depthInfo.format = _FindSupportFormat(
+	depthInfo.format = MyDevice::GetInstance().FindSupportFormat(
 		{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
 		VK_IMAGE_TILING_OPTIMAL,
 		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
@@ -91,7 +90,7 @@ void TransparentApp::_InitImageViewsAndFramebuffers()
 	depthImageInfo.width = MyDevice::GetInstance().GetSwapchainExtent().width;
 	depthImageInfo.height = MyDevice::GetInstance().GetSwapchainExtent().height;
 	depthImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-	depthImageInfo.format = _FindSupportFormat( 
+	depthImageInfo.format = MyDevice::GetInstance().FindSupportFormat( 
 		{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT }, 
 		VK_IMAGE_TILING_OPTIMAL, 
 		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
@@ -160,72 +159,74 @@ void TransparentApp::_InitVertexInputs()
 	m_vertLayout.stride = sizeof(Vertex);
 	m_vertLayout.inputRate = VkVertexInputRate::VK_VERTEX_INPUT_RATE_VERTEX;
 
-	// Load model
-	std::vector<Vertex> vertices;
-	std::vector<uint32_t> indices;
-	tinyobj::attrib_t attrib;
-	std::vector<tinyobj::shape_t> shapes;
-	std::vector<tinyobj::material_t> materials;
-	std::string warn, err;
-	CHECK_TRUE(tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, "models/viking_room.obj"), warn + err);
-	std::unordered_map<Vertex, uint32_t> uniqueVertices{};
-	for (const auto& shape : shapes)
+	// Load models
+	std::vector<std::string> models = {"models/viking_room.obj"};
+	for (int i = 0; i < models.size(); ++i)
 	{
-		for (const auto& index : shape.mesh.indices)
+		std::vector<Vertex> vertices;
+		std::vector<uint32_t> indices;
+		tinyobj::attrib_t attrib;
+		std::vector<tinyobj::shape_t> shapes;
+		std::vector<tinyobj::material_t> materials;
+		std::string warn, err;
+		CHECK_TRUE(tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, "models/viking_room.obj"), warn + err);
+		std::unordered_map<Vertex, uint32_t> uniqueVertices{};
+		for (const auto& shape : shapes)
 		{
-			Vertex vertex{};
-			vertex.pos = {
-				attrib.vertices[3 * index.vertex_index + 0],
-				attrib.vertices[3 * index.vertex_index + 1],
-				attrib.vertices[3 * index.vertex_index + 2]
-			};
-			vertex.uv = {
-				attrib.texcoords[2 * index.texcoord_index + 0],
-				attrib.texcoords[2 * index.texcoord_index + 1]
-			};
-			if (uniqueVertices.count(vertex) == 0)
+			for (const auto& index : shape.mesh.indices)
 			{
-				uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
-				vertices.push_back(vertex);
+				Vertex vertex{};
+				vertex.pos = {
+					attrib.vertices[3 * index.vertex_index + 0],
+					attrib.vertices[3 * index.vertex_index + 1],
+					attrib.vertices[3 * index.vertex_index + 2]
+				};
+				vertex.uv = {
+					attrib.texcoords[2 * index.texcoord_index + 0],
+					attrib.texcoords[2 * index.texcoord_index + 1]
+				};
+				if (uniqueVertices.count(vertex) == 0)
+				{
+					uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+					vertices.push_back(vertex);
+				}
+				indices.push_back(uniqueVertices[vertex]);
 			}
-			indices.push_back(uniqueVertices[vertex]);
+
+			// Upload to device
+			BufferInformation localBufferInfo;
+			BufferInformation stagingBufferInfo;
+			Buffer stagingBuffer;
+			Buffer vertBuffer;
+			Buffer indexBuffer;
+			stagingBufferInfo.size = sizeof(Vertex) * vertices.size();
+			stagingBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+			stagingBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+			stagingBuffer.Init(stagingBufferInfo);
+			stagingBuffer.CopyFromHost(vertices.data());
+
+			localBufferInfo.size = sizeof(Vertex) * vertices.size();
+			localBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+			localBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+			vertBuffer.Init(localBufferInfo);
+			vertBuffer.CopyFromBuffer(stagingBuffer);
+
+			stagingBuffer.Uninit();
+			stagingBufferInfo.size = sizeof(uint32_t) * indices.size();
+			stagingBuffer.Init(localBufferInfo);
+			stagingBuffer.CopyFromHost(indices.data());
+
+			localBufferInfo.size = sizeof(uint32_t) * indices.size();;
+			localBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+			localBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+			indexBuffer.Init(localBufferInfo);
+			indexBuffer.CopyFromBuffer(stagingBuffer);
+
+			m_vertBuffers.push_back(vertBuffer);
+			m_indexBuffers.push_back(indexBuffer);
+			stagingBuffer.Uninit();
 		}
 	}
-
-	// Upload to device
-	BufferInformation localBufferInfo;
-	BufferInformation stagingBufferInfo;
-	Buffer stagingBuffer;
-	stagingBufferInfo.size = sizeof(Vertex) * vertices.size();
-	stagingBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-	stagingBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-	stagingBuffer.Init(stagingBufferInfo);
-	stagingBuffer.CopyFromHost(vertices.data());
-
-	localBufferInfo.size = sizeof(Vertex) * vertices.size();
-	localBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-	localBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-	m_vertBuffer.Init(localBufferInfo);
-	m_vertBuffer.CopyFromBuffer(stagingBuffer);
-
-	stagingBuffer.Uninit();
-	stagingBufferInfo.size = sizeof(uint32_t) * indices.size();
-	stagingBuffer.Init(localBufferInfo);
-	stagingBuffer.CopyFromHost(indices.data());
-
-	localBufferInfo.size = sizeof(uint32_t) * indices.size();;
-	localBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-	localBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-	m_indexBuffer.Init(localBufferInfo);
-	m_indexBuffer.CopyFromBuffer(stagingBuffer);
-
-	stagingBuffer.Uninit();
-	
-	// Setup vertex inputs
-	m_vertInput.pBuffer = &m_vertBuffer;
-	m_vertInput.pVertexInputLayout = &m_vertLayout;
-	m_vertIndexInput.pBuffer = &m_indexBuffer;
-	m_vertIndexInput.indexType = VkIndexType::VK_INDEX_TYPE_UINT32;
 }
 
 void TransparentApp::_MainLoop()
@@ -256,14 +257,28 @@ void TransparentApp::_DrawFrame()
 
 	cmd.StartCommands({ m_swapchainImageAvailabilities[m_currentFrame] });
 	cmd.StartRenderPass(&m_renderPass, &m_framebuffers[imageIndex.value()]);
-	PipelineInput input;
-	input.pDescriptorSets = { &m_dSets[m_currentFrame] };
-	input.imageSize = MyDevice::GetInstance().GetSwapchainExtent();
-	input.pVertexIndexInput = &m_vertIndexInput;
-	input.pVertexInputs = { &m_vertInput };
-	m_gPipeline.Do(cmd.vkCommandBuffer, input);
-	// m_gPipeline.Do(cmd.vkCommandBuffer, input); // if we want to draw another, this draw will begin after the first draw is done
+	for (int i = 0; i < m_vertBuffers.size(); ++i)
+	{
+		PipelineInput input;
+		VertexIndexInput indexInput;
+		VertexInput vertInput;
+		indexInput.pBuffer = &m_indexBuffers[i];
+		vertInput.pVertexInputLayout = &m_vertLayout;
+		vertInput.pBuffer = &m_vertBuffers[i];
+		input.pDescriptorSets = { &m_dSets[m_currentFrame] };
+		input.imageSize = MyDevice::GetInstance().GetSwapchainExtent();
+		input.pVertexIndexInput = &indexInput;
+		input.pVertexInputs = { &vertInput };
+		
+		m_gPipeline.Do(cmd.vkCommandBuffer, input);
+	}
+	// m_gPipeline.Do(cmd.vkCommandBuffer, input); // the draw will be done unordered
 	cmd.EndRenderPass();
+
+	// use a memory barrier here to synchronize the order of the 2 render passes
+	// start another render pass if we want to do deferred shading or post process shader, loadOp = LOAD_OP_LOAD 
+	// from my understanding now, we can safely read the neighboring pixels in the next render pass, since the store operations will happen after a render pass end unlike subpass
+
 	VkSemaphore renderpassFinish = cmd.SubmitCommands();
 
 	MyDevice::GetInstance().PresentSwapchainImage({ renderpassFinish }, imageIndex.value());
@@ -311,4 +326,11 @@ void TransparentApp::_Uninit()
 	m_dSetLayout.Uninit();
 	m_renderPass.Uninit();
 	MyDevice::GetInstance().Uninit();
+}
+
+void TransparentApp::Run()
+{
+	_Init();
+	_MainLoop();
+	_Uninit();
 }

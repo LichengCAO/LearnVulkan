@@ -4,6 +4,9 @@
 #include <unordered_set>
 #include <algorithm>
 #include "image.h"
+#include "pipeline_io.h"
+
+MyDevice* MyDevice::s_pInstance = nullptr;
 
 std::vector<const char*> MyDevice::_GetInstanceRequiredExtensions() const
 {
@@ -124,7 +127,7 @@ void MyDevice::_InitGLFW()
 	glfwInit();
 	glfwWindowHint(GLFW_CLIENT_API, GLFW_NO_API);
 	glfwWindowHint(GLFW_RESIZABLE, GLFW_TRUE);
-	pWindow = glfwCreateWindow(WIDTH, HEIGHT, "hello triangle", nullptr, nullptr);
+	pWindow = glfwCreateWindow(800, 600, "My Vulkan", nullptr, nullptr);
 	glfwSetWindowUserPointer(pWindow, this);
 	glfwSetFramebufferSizeCallback(pWindow, OnFramebufferResized);
 }
@@ -432,6 +435,7 @@ void MyDevice::Init()
 	_SelectPhysicalDevice();
 	_CreateLogicalDevice();
 	_CreateSwapchain();
+	_InitDescriptorAllocator();
 }
 
 void MyDevice::Uninit()
@@ -467,7 +471,11 @@ void MyDevice::Uninit()
 
 MyDevice& MyDevice::GetInstance()
 {
-	return s_instance;
+	if (s_pInstance == nullptr)
+	{
+		s_pInstance = new MyDevice();
+	}
+	return *s_pInstance;
 }
 
 void MyDevice::OnFramebufferResized(GLFWwindow* _pWindow, int width, int height)

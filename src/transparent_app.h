@@ -30,8 +30,7 @@ namespace std
 	{
 		size_t operator()(Vertex const& vertex) const 
 		{
-			return ((hash<glm::vec3>()(vertex.pos) ^
-				(hash<glm::vec3>()(vertex.color) << 1)) >> 1) ^
+			return hash<glm::vec3>()(vertex.pos) ^
 				(hash<glm::vec2>()(vertex.uv) << 1);
 		}
 	};
@@ -47,10 +46,8 @@ private:
 	std::vector<DescriptorSet> m_dSets;
 	// Vertex inputs
 	VertexInputLayout m_vertLayout;
-	Buffer m_vertBuffer;
-	Buffer m_indexBuffer;
-	VertexInput m_vertInput;
-	VertexIndexInput m_vertIndexInput;
+	std::vector<Buffer> m_vertBuffers;
+	std::vector<Buffer> m_indexBuffers;
 	// Renderpass
 	RenderPass m_renderPass;
 	std::vector<Image> m_swapchainImages;
@@ -70,10 +67,8 @@ private:
 	void _InitRenderPass();
 	void _InitImageViewsAndFramebuffers();
 	void _InitPipelines();
-	void _InitSynchronizeObjects();
 	void _MainLoop();
 	void _DrawFrame();
-	void _UninitSynchronizeObjects();
 	void _UninitImageViewsAndFramebuffers();
 	void _Uninit();
 public:

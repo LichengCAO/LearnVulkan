@@ -127,6 +127,7 @@ struct SubpassInformation
 	void SetDepthStencilAttachment(uint32_t _binding);
 	void AddResolveAttachment(uint32_t _binding);
 };
+class RenderPass;
 class Framebuffer
 {
 public:
@@ -139,7 +140,6 @@ public:
 	void Uninit();
 
 	VkExtent2D GetImageSize() const;
-	friend class Renderpass;
 };
 class RenderPass
 {

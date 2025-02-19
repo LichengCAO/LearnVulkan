@@ -2,13 +2,13 @@
 #include "common.h"
 #include "vk_struct.h"
 #include <VkBootstrap.h>
+#include "pipeline_io.h"
 
-class DescriptorAllocator;
 class Image;
 class MyDevice
 {
 private:
-	static MyDevice s_instance;
+	static MyDevice* s_pInstance;
 
 	vkb::Instance		m_instance;
 	vkb::PhysicalDevice m_physicalDevice;
@@ -18,7 +18,7 @@ private:
 	VkQueue				m_vkPresentQueue = VK_NULL_HANDLE;
 	bool				m_needRecreate = false;
 private:
-	MyDevice();
+	MyDevice() {};
 
 	std::vector<const char*> _GetInstanceRequiredExtensions() const;
 	std::vector<const char*> _GetPhysicalDeviceRequiredExtensions() const;

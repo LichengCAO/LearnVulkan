@@ -43,7 +43,7 @@ void Buffer::Uninit()
 	if (vkBuffer != VK_NULL_HANDLE)
 	{
 		vkDestroyBuffer(MyDevice::GetInstance().vkDevice, vkBuffer, nullptr);
-		vkBuffer == VK_NULL_HANDLE;
+		vkBuffer = VK_NULL_HANDLE;
 	}
 	
 	_FreeMemory();

@@ -246,7 +246,7 @@ void Framebuffer::Init()
 	CHECK_TRUE(pRenderPass != nullptr, "No renderpass!");
 	CHECK_TRUE(attachments.size() > 0, "No attachment!");
 	VkFramebufferCreateInfo framebufferInfo{ VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
-	framebufferInfo.renderPass = pRenderPass->vkRenderPass.value();
+	framebufferInfo.renderPass = pRenderPass->vkRenderPass;
 	framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
 	std::vector<VkImageView> vkAttachments;
 	for (int i = 0; i < attachments.size(); ++i)

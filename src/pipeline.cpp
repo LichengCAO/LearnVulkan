@@ -56,7 +56,7 @@ void GraphicsPipeline::_InitCreateInfos()
 	multisampleStateInfo.alphaToCoverageEnable = VK_FALSE;
 	multisampleStateInfo.alphaToOneEnable = VK_FALSE;
 	multisampleStateInfo.sampleShadingEnable = VK_TRUE; // enable sample shading in the pipeline
-	multisampleStateInfo.minSampleShading = .2; // min fraction for sample shading; closer to one is smoother
+	multisampleStateInfo.minSampleShading = .2f; // min fraction for sample shading; closer to one is smoother
 }
 
 GraphicsPipeline::GraphicsPipeline()

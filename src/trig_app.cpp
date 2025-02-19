@@ -5,7 +5,6 @@
 #include <iostream>
 #include <unordered_set>
 #include <string>
-#include "help.h"
 #include <cstdint>
 #include <limits>
 #include <algorithm>
@@ -461,7 +460,7 @@ void HelloTriangleApplication::drawFrame(){
 	//wait for previous fences
 	vkWaitForFences(m_vkDevice, 1, &m_vkInFlightFences[m_curFrame], VK_TRUE, UINT64_MAX);
 
-	//aquire Image from swap chain
+	//acquire Image from swap chain
 	result = vkAcquireNextImageKHR(m_vkDevice, m_vkSwapChain, UINT64_MAX, m_vkImageAvailableSemaphores[m_curFrame], VK_NULL_HANDLE, &imageIndex);
 	if (result == VK_ERROR_OUT_OF_DATE_KHR) {
 		recreateSwapChain();
@@ -1192,7 +1191,7 @@ bool HelloTriangleApplication::isDeviceSuitable(const VkPhysicalDevice& device)c
 		SwapChainSupportDetails swapChainSupport = querySwapChainSupport(device, m_vkSurface);
 		swapChainAdequate = !swapChainSupport.formats.empty() && !swapChainSupport.presentModes.empty();
 	}
-	bool featuresSupported = deviceFeatures.samplerAnisotropy == true;
+	bool featuresSupported = static_cast<bool>(deviceFeatures.samplerAnisotropy);
 
 	return indices.isComplete() && extensionsSupported && swapChainAdequate && featuresSupported;
 }

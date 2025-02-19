@@ -2,7 +2,7 @@
 #include "common.h"
 
 class Buffer;
-
+class Image;
 struct ImageViewInformation
 {
 	uint32_t baseMipLevel = 0;
