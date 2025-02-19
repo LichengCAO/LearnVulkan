@@ -2,6 +2,7 @@
 #include "device.h"
 #include "buffer.h"
 #include "commandbuffer.h"
+#include "stb_image.h"
 uint32_t Image::_FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const
 {
 	VkPhysicalDeviceMemoryProperties memProperties;
@@ -20,6 +21,7 @@ uint32_t Image::_FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags pr
 
 Image::~Image()
 {
+	if (!m_initCalled) return;
 	assert(vkImage == VK_NULL_HANDLE);
 	assert(vkDeviceMemory == VK_NULL_HANDLE);
 }
@@ -32,6 +34,7 @@ void Image::SetImageInformation(ImageInformation& imageInfo)
 
 void Image::Init()
 {
+	m_initCalled = true;
 	if (vkImage != VK_NULL_HANDLE) return;
 	VkImageCreateInfo imgInfo{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
 	imgInfo.imageType = m_imageInformation.imageType;
@@ -276,4 +279,92 @@ void ImageView::Uninit()
 ImageViewInformation ImageView::GetImageViewInformation() const
 {
 	return m_viewInformation;
+}
+
+void Texture::SetFilePath(std::string path)
+{
+	m_filePath = path;
+}
+
+Texture::~Texture()
+{
+	assert(vkSampler == VK_NULL_HANDLE);
+}
+
+void Texture::Init()
+{
+	CHECK_TRUE(!m_filePath.empty(), "No image file!");
+	// load image
+	int texWidth, texHeight, texChannels;
+	stbi_uc* pixels = stbi_load(m_filePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
+	CHECK_TRUE(!pixels, "Failed to load texture image!");
+	VkDeviceSize imageSize = texWidth * texHeight * 4;
+
+	Buffer stagingBuffer;
+	BufferInformation bufferInfo;
+	bufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+	bufferInfo.size = imageSize;
+	bufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+	stagingBuffer.Init(bufferInfo);
+	stagingBuffer.CopyFromHost(pixels);
+
+	stbi_image_free(pixels);
+
+	ImageInformation imageInfo;
+	imageInfo.width = static_cast<uint32_t>(texWidth);
+	imageInfo.height = static_cast<uint32_t>(texHeight);
+	imageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	imageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
+	image.SetImageInformation(imageInfo);
+	image.Init();
+	image.TransitionLayout(VkImageLayout::VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	image.CopyFromBuffer(stagingBuffer);
+	image.TransitionLayout(VkImageLayout::VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL);
+
+	stagingBuffer.Uninit();
+
+	ImageViewInformation imageviewInfo;
+	imageviewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
+	imageView = image.NewImageView(imageviewInfo);
+	imageView.Init();
+
+	VkSamplerCreateInfo samplerInfo{ VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+	samplerInfo.magFilter = VK_FILTER_LINEAR;
+	samplerInfo.minFilter = VK_FILTER_LINEAR;
+	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+	samplerInfo.unnormalizedCoordinates = VK_FALSE;
+	samplerInfo.compareEnable = VK_FALSE;
+	samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	samplerInfo.mipLodBias = 0.0f;
+	samplerInfo.minLod = 0.0f;
+	samplerInfo.maxLod = 0.0f;
+	VkPhysicalDeviceProperties properties{};
+	vkGetPhysicalDeviceProperties(MyDevice::GetInstance().vkPhysicalDevice, &properties);
+	samplerInfo.anisotropyEnable = VK_TRUE;
+	samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+	//samplerInfo.anisotropyEnable = VK_FALSE;
+	//samplerInfo.maxAnisotropy = 1.0f;
+	VK_CHECK(vkCreateSampler(MyDevice::GetInstance().vkDevice, &samplerInfo, nullptr, &vkSampler), "Failed to create texture sampler!");
+}
+
+void Texture::Uninit()
+{
+	vkDestroySampler(MyDevice::GetInstance().vkDevice, vkSampler, nullptr);
+	vkSampler = VK_NULL_HANDLE;
+	m_filePath = "";
+	imageView.Uninit();
+	image.Uninit();
+}
+
+VkDescriptorImageInfo Texture::GetVkDescriptorImageInfo() const
+{
+	VkDescriptorImageInfo info;
+	info.imageLayout = image.GetImageInformation().layout;
+	info.sampler = vkSampler;
+	info.imageView = imageView.vkImageView;
+	return info;
 }

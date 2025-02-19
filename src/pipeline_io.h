@@ -25,6 +25,7 @@ private:
 	struct DescriptorSetUpdate
 	{
 		VkDescriptorBufferInfo bufferInfo;
+		VkDescriptorImageInfo  imageInfo;
 		VkWriteDescriptorSet   writeDescriptorSet;
 	};
 
@@ -38,6 +39,7 @@ public:
 	void SetLayout(const DescriptorSetLayout* _layout);
 	void StartDescriptorSetUpdate();
 	void DescriptorSetUpdate_WriteBinding(int bindingId, const Buffer* pBuffer);
+	void DescriptorSetUpdate_WriteBinding(int bindingId, const VkDescriptorImageInfo& dImageInfo);
 	void FinishDescriptorSetUpdate();
 	void Init();
 };

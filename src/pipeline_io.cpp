@@ -40,6 +40,23 @@ void DescriptorSet::DescriptorSetUpdate_WriteBinding(int bindingId, const Buffer
 	newUpdate.writeDescriptorSet.pBufferInfo = &newUpdate.bufferInfo;
 
 }
+void DescriptorSet::DescriptorSetUpdate_WriteBinding(int bindingId, const VkDescriptorImageInfo& dImageInfo)
+{
+	DescriptorSetUpdate tmpUpdate;
+	DescriptorSetEntry binding = m_pLayout->bindings[bindingId];
+
+	m_updates.push_back(tmpUpdate);
+
+	DescriptorSetUpdate& newUpdate = m_updates.back();
+	newUpdate.imageInfo = dImageInfo;
+	newUpdate.writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
+	newUpdate.writeDescriptorSet.dstSet = vkDescriptorSet;
+	newUpdate.writeDescriptorSet.dstBinding = bindingId;
+	newUpdate.writeDescriptorSet.dstArrayElement = 0;
+	newUpdate.writeDescriptorSet.descriptorCount = binding.descriptorCount;
+	newUpdate.writeDescriptorSet.descriptorType = binding.descriptorType;
+	newUpdate.writeDescriptorSet.pImageInfo = &newUpdate.imageInfo;
+}
 void DescriptorSet::FinishDescriptorSetUpdate()
 {
 	std::vector<VkWriteDescriptorSet> writes;

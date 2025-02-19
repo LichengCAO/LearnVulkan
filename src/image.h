@@ -42,6 +42,7 @@ struct ImageInformation
 class Image
 {
 private:
+	bool m_initCalled = false;
 	ImageInformation m_imageInformation;
 	uint32_t _FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const;
 	void _AllocateMemory();
@@ -62,4 +63,19 @@ public:
 	ImageView NewImageView(const ImageViewInformation& imageViewInfo);
 
 	ImageInformation GetImageInformation() const;
+};
+
+class Texture
+{
+private:
+	std::string m_filePath;
+public:
+	Image     image;
+	ImageView imageView;
+	VkSampler vkSampler = VK_NULL_HANDLE;
+	~Texture();
+	void SetFilePath(std::string path);
+	void Init();
+	void Uninit();
+	VkDescriptorImageInfo GetVkDescriptorImageInfo() const;
 };

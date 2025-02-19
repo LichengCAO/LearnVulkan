@@ -20,9 +20,8 @@ void TransparentApp::_Init()
 	}
 	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 	{
-		CommandSubmission newCmd;
-		newCmd.Init();
-		m_commandSubmissions.push_back(newCmd);
+		m_commandSubmissions.push_back(CommandSubmission{});
+		m_commandSubmissions.back().Init();
 	}
 }
 
@@ -43,21 +42,19 @@ void TransparentApp::_InitDescriptorSets()
 	bufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 	{
-		Buffer newUniformBuffer;
-		newUniformBuffer.Init(bufferInfo);
-		m_uniformBuffers.push_back(newUniformBuffer);
+		m_uniformBuffers.push_back(Buffer{});
+		m_uniformBuffers.back().Init(bufferInfo);
 	}
 
 	// Setup descriptor sets 
 	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 	{
-		DescriptorSet newDSet;
-		newDSet.SetLayout(&m_dSetLayout);
-		newDSet.Init();
-		newDSet.StartDescriptorSetUpdate();
-		newDSet.DescriptorSetUpdate_WriteBinding(0, &m_uniformBuffers[i]);
-		newDSet.FinishDescriptorSetUpdate();
-		m_dSets.push_back(newDSet);
+		m_dSets.push_back(DescriptorSet{});
+		m_dSets.back().SetLayout(&m_dSetLayout);
+		m_dSets.back().Init();
+		m_dSets.back().StartDescriptorSetUpdate();
+		m_dSets.back().DescriptorSetUpdate_WriteBinding(0, &m_uniformBuffers[i]);
+		m_dSets.back().FinishDescriptorSetUpdate();
 	}
 }
 
@@ -102,24 +99,23 @@ void TransparentApp::_InitImageViewsAndFramebuffers()
 	swapchainImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
 	for (int i = 0; i < m_swapchainImages.size(); ++i)
 	{
-		Image depthImage;
+		m_depthImages.push_back(Image{});
+		Image& depthImage = m_depthImages.back();
 		depthImage.SetImageInformation(depthImageInfo);
 		depthImage.Init();
-		m_depthImages.push_back(depthImage);
-		ImageView depthImageView = depthImage.NewImageView(depthImageViewInfo);
-		depthImageView.Init();
-		ImageView swapchainImageView = m_swapchainImages[i].NewImageView(swapchainImageViewInfo);
-		swapchainImageView.Init();
-		m_depthImageViews.push_back(depthImageView);
-		m_swapchainImageViews.push_back(swapchainImageView);
+
+		m_depthImageViews.push_back(depthImage.NewImageView(depthImageViewInfo));
+		m_depthImageViews.back().Init();
+
+		m_swapchainImageViews.push_back(m_swapchainImages[i].NewImageView(swapchainImageViewInfo));
+		m_swapchainImageViews.back().Init();
 	}
 	// Setup frame buffers
 	for (int i = 0; i < m_swapchainImages.size(); ++i)
 	{
 		std::vector<const ImageView*> imageviews = { &m_swapchainImageViews[i], &m_depthImageViews[i] };
-		Framebuffer framebuffer = m_renderPass.NewFramebuffer(imageviews);
-		framebuffer.Init();
-		m_framebuffers.push_back(framebuffer);
+		m_framebuffers.push_back(m_renderPass.NewFramebuffer(imageviews));
+		m_framebuffers.back().Init();
 	}
 }
 
@@ -160,7 +156,7 @@ void TransparentApp::_InitVertexInputs()
 	m_vertLayout.inputRate = VkVertexInputRate::VK_VERTEX_INPUT_RATE_VERTEX;
 
 	// Load models
-	std::vector<std::string> models = {"models/viking_room.obj"};
+	std::vector<std::string> models = {};
 	for (int i = 0; i < models.size(); ++i)
 	{
 		std::vector<Vertex> vertices;
@@ -194,11 +190,13 @@ void TransparentApp::_InitVertexInputs()
 			}
 
 			// Upload to device
+			m_vertBuffers.push_back(Buffer{});
+			m_indexBuffers.push_back(Buffer{});
 			BufferInformation localBufferInfo;
 			BufferInformation stagingBufferInfo;
 			Buffer stagingBuffer;
-			Buffer vertBuffer;
-			Buffer indexBuffer;
+			Buffer& vertBuffer = m_vertBuffers.back();
+			Buffer& indexBuffer = m_indexBuffers.back();
 			stagingBufferInfo.size = sizeof(Vertex) * vertices.size();
 			stagingBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 			stagingBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
@@ -222,8 +220,6 @@ void TransparentApp::_InitVertexInputs()
 			indexBuffer.Init(localBufferInfo);
 			indexBuffer.CopyFromBuffer(stagingBuffer);
 
-			m_vertBuffers.push_back(vertBuffer);
-			m_indexBuffers.push_back(indexBuffer);
 			stagingBuffer.Uninit();
 		}
 	}

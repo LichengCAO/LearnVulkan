@@ -613,14 +613,15 @@ int main() {
 #include <glm/vec4.hpp>
 #include <glm/mat4x4.hpp>
 #include <iostream>
-#include "trig_app.h"
+//#include "trig_app.h"
+#include "transparent_app.h"
 #include <cstdlib>
 #include <stdexcept>
 //#include <vulkan/vulkan.h>
 int main() {
-    HelloTriangleApplication app;
+    TransparentApp app;
     try {
-        app.run();
+        app.Run();
     }
     catch (const std::exception& e) {
         std::cerr << e.what() << std::endl;
