@@ -217,19 +217,6 @@ void Image::CopyFromBuffer(const Buffer& stagingBuffer)
 ImageView Image::NewImageView(const ImageViewInformation& imageViewInfo)
 {
 	CHECK_TRUE(vkImage != VK_NULL_HANDLE, "Image is not initialized!");
-	VkImageViewCreateInfo viewInfo = {
-		.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-		.image = vkImage,
-		.viewType = imageViewInfo.viewType,
-		.format = m_imageInformation.format,
-		.subresourceRange = {
-			.aspectMask = imageViewInfo.aspectMask,
-			.baseMipLevel = imageViewInfo.baseMipLevel,
-			.levelCount = imageViewInfo.levelCount,
-			.baseArrayLayer = 0,
-			.layerCount = 1
-		}
-	};
 	ImageView val{};
 	val.m_viewInformation = imageViewInfo;
 	val.pImage = this;
@@ -347,10 +334,10 @@ void Texture::Init()
 	samplerInfo.maxLod = 0.0f;
 	VkPhysicalDeviceProperties properties{};
 	vkGetPhysicalDeviceProperties(MyDevice::GetInstance().vkPhysicalDevice, &properties);
-	samplerInfo.anisotropyEnable = VK_TRUE;
-	samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
-	//samplerInfo.anisotropyEnable = VK_FALSE;
-	//samplerInfo.maxAnisotropy = 1.0f;
+	// samplerInfo.anisotropyEnable = VK_TRUE;
+	// samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+	samplerInfo.anisotropyEnable = VK_FALSE;
+	samplerInfo.maxAnisotropy = 1.0f;
 	VK_CHECK(vkCreateSampler(MyDevice::GetInstance().vkDevice, &samplerInfo, nullptr, &vkSampler), "Failed to create texture sampler!");
 }
 

@@ -357,6 +357,8 @@ void MyDevice::_DestroySwapchain()
 
 VkExtent2D MyDevice::GetSwapchainExtent() const
 {
+	// SwapChainSupportDetails swapChainSupport = _QuerySwapchainSupport(vkPhysicalDevice, vkSurface);
+	// return _ChooseSwapchainExtent(swapChainSupport.capabilities);
 	return m_swapchain.extent;
 }
 

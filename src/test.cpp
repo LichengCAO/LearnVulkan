@@ -613,20 +613,32 @@ int main() {
 #include <glm/vec4.hpp>
 #include <glm/mat4x4.hpp>
 #include <iostream>
-//#include "trig_app.h"
-#include "transparent_app.h"
 #include <cstdlib>
 #include <stdexcept>
-//#include <vulkan/vulkan.h>
+//#include "trig_app.h"
+//int main() {
+//	HelloTriangleApplication app;
+//    try {
+//        app.run();
+//    }
+//    catch (const std::exception& e) {
+//        std::cerr << e.what() << std::endl;
+//        return EXIT_FAILURE;
+//    }
+//    system("pause");
+//    return EXIT_SUCCESS;
+//}
+
+#include "transparent_app.h"
 int main() {
-    TransparentApp app;
-    try {
-        app.Run();
-    }
-    catch (const std::exception& e) {
-        std::cerr << e.what() << std::endl;
-        return EXIT_FAILURE;
-    }
-    system("pause");
-    return EXIT_SUCCESS;
+	TransparentApp app;
+	try {
+		app.Run();
+	}
+	catch (const std::exception& e) {
+		std::cerr << e.what() << std::endl;
+		return EXIT_FAILURE;
+	}
+	system("pause");
+	return EXIT_SUCCESS;
 }

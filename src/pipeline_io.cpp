@@ -260,7 +260,7 @@ Framebuffer::~Framebuffer()
 }
 void Framebuffer::Init()
 {
-	CHECK_TRUE(pRenderPass != nullptr, "No renderpass!");
+	CHECK_TRUE(pRenderPass != nullptr, "No render pass!");
 	CHECK_TRUE(attachments.size() > 0, "No attachment!");
 	VkFramebufferCreateInfo framebufferInfo{ VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
 	framebufferInfo.renderPass = pRenderPass->vkRenderPass;
@@ -268,7 +268,7 @@ void Framebuffer::Init()
 	std::vector<VkImageView> vkAttachments;
 	for (int i = 0; i < attachments.size(); ++i)
 	{
-		CHECK_TRUE(attachments[i]->vkImageView != VK_NULL_HANDLE, "Imageview is not initialized!");
+		CHECK_TRUE(attachments[i]->vkImageView != VK_NULL_HANDLE, "Image view is not initialized!");
 		vkAttachments.push_back(attachments[i]->vkImageView);
 	}
 	framebufferInfo.pAttachments = vkAttachments.data();
