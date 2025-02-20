@@ -196,7 +196,7 @@ void RenderPass::Init()
 		vkAttachment.format = attachments[i].format;
 		vkAttachment.samples = attachments[i].samples;
 		vkAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		vkAttachment.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		vkAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;/*VK_ATTACHMENT_STORE_OP_DONT_CARE;*/ // https://www.reddit.com/r/vulkan/comments/d8meej/gridlike_pattern_over_a_basic_clearcolor_vulkan/?rdt=33712
 		vkAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		vkAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		vkAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;

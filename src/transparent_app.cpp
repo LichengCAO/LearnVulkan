@@ -289,7 +289,7 @@ void TransparentApp::_DrawFrame()
 	scissor.offset = { 0, 0 };
 	scissor.extent = extent2d;
 	vkCmdSetScissor(cmd.vkCommandBuffer, 0, 1, &scissor);
-	vkCmdDraw(cmd.vkCommandBuffer, 0, 0, 0, 0);
+	vkCmdDraw(cmd.vkCommandBuffer, 3, 1, 0, 0);
 	cmd.EndRenderPass();
 
 	// use a memory barrier here to synchronize the order of the 2 render passes
