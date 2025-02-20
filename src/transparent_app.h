@@ -69,7 +69,11 @@ private:
 	void _InitPipelines();
 	void _MainLoop();
 	void _DrawFrame();
+	void _UninitVertexInputs();
+	void _UninitDescriptorSets();
+	void _UninitRenderPass();
 	void _UninitImageViewsAndFramebuffers();
+	void _UninitPipelines();
 	void _Uninit();
 public:
 	void Run();

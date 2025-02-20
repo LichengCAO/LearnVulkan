@@ -34,6 +34,7 @@ private:
 	void _SelectPhysicalDevice();
 	void _CreateLogicalDevice();
 	void _CreateCommandPools();
+	void _DestroyCommandPools();
 	void _InitDescriptorAllocator();
 	void _CreateSwapchain();
 	void _DestroySwapchain();
@@ -44,9 +45,9 @@ public:
 	VkSurfaceKHR		vkSurface = VK_NULL_HANDLE;
 	VkPhysicalDevice	vkPhysicalDevice = VK_NULL_HANDLE;
 	VkDevice			vkDevice = VK_NULL_HANDLE;
-	QueueFamilyIndices	queueFamilyIndices;
+	QueueFamilyIndices	queueFamilyIndices{};
 	VkSwapchainKHR		vkSwapchain = VK_NULL_HANDLE;
-	DescriptorAllocator descriptorAllocator;
+	DescriptorAllocator descriptorAllocator{};
 	std::unordered_map<uint32_t, VkCommandPool>		vkCommandPools;
 	void Init();
 	void Uninit();

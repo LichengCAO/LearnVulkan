@@ -114,7 +114,7 @@ void DescriptorSetLayout::Init()
 		.pBindings = layoutBindings.data(),
 	};
 
-	VK_CHECK(vkCreateDescriptorSetLayout(MyDevice::GetInstance().vkDevice, &createInfo, nullptr, &vkDescriptorSetLayout), Failed to create descriptor set layout!);
+	VK_CHECK(vkCreateDescriptorSetLayout(MyDevice::GetInstance().vkDevice, &createInfo, nullptr, &vkDescriptorSetLayout), "Failed to create descriptor set layout!");
 }
 void DescriptorSetLayout::Uninit()
 {
@@ -131,7 +131,7 @@ void VertexInputLayout::AddLocation(const VertexInputEntry& _location)
 }
 VkVertexInputBindingDescription VertexInputLayout::GetVertexInputBindingDescription(uint32_t _binding) const
 {
-	VkVertexInputBindingDescription ret;
+	VkVertexInputBindingDescription ret{};
 	ret.binding = _binding;
 	ret.stride = stride;
 	ret.inputRate = inputRate;
@@ -142,7 +142,7 @@ std::vector<VkVertexInputAttributeDescription> VertexInputLayout::GetVertexInput
 	std::vector<VkVertexInputAttributeDescription> ret;
 	for (int i = 0; i < locations.size(); ++i)
 	{
-		VkVertexInputAttributeDescription attr;
+		VkVertexInputAttributeDescription attr{};
 		attr.binding = _binding;
 		attr.location = static_cast<uint32_t>(i);
 		attr.format = locations[i].format;
@@ -167,7 +167,7 @@ uint32_t RenderPass::AddSubpass(SubpassInformation _subpass)
 {
 	uint32_t ret = static_cast<uint32_t>(subpasses.size());
 	assert(vkRenderPass == VK_NULL_HANDLE);
-	VkSubpassDependency subpassDependency;
+	VkSubpassDependency subpassDependency{};
 	subpassDependency.srcSubpass = subpasses.empty() ? VK_SUBPASS_EXTERNAL : static_cast<uint32_t>(subpasses.size() - 1);
 	subpassDependency.dstSubpass = static_cast<uint32_t>(subpasses.size());
 	subpassDependency.srcStageMask =  VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
@@ -192,7 +192,7 @@ void RenderPass::Init()
 	std::vector<VkAttachmentDescription> vkAttachments;
 	for (int i = 0; i < attachments.size(); ++i)
 	{
-		VkAttachmentDescription vkAttachment;
+		VkAttachmentDescription vkAttachment{};
 		vkAttachment.format = attachments[i].format;
 		vkAttachment.samples = attachments[i].samples;
 		vkAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
@@ -206,7 +206,7 @@ void RenderPass::Init()
 	std::vector<VkSubpassDescription> vkSubpasses;
 	for (int i = 0; i < subpasses.size(); ++i)
 	{
-		VkSubpassDescription vkSubpass;
+		VkSubpassDescription vkSubpass{};
 		vkSubpass.pipelineBindPoint = VK_PIPELINE_BIND_POINT_GRAPHICS;
 		vkSubpass.colorAttachmentCount = static_cast<uint32_t>(subpasses[i].colorAttachments.size());
 		vkSubpass.pColorAttachments = subpasses[i].colorAttachments.data();
@@ -228,7 +228,7 @@ void RenderPass::Init()
 	renderPassInfo.dependencyCount = static_cast<uint32_t>(m_vkSubpassDependencies.size());
 	renderPassInfo.pDependencies = m_vkSubpassDependencies.data();
 
-	VK_CHECK(vkCreateRenderPass(MyDevice::GetInstance().vkDevice, &renderPassInfo, nullptr, &vkRenderPass), Failed to create render pass!);
+	VK_CHECK(vkCreateRenderPass(MyDevice::GetInstance().vkDevice, &renderPassInfo, nullptr, &vkRenderPass), "Failed to create render pass!");
 }
 void RenderPass::Uninit()
 {
@@ -243,13 +243,13 @@ void RenderPass::Uninit()
 }
 Framebuffer RenderPass::NewFramebuffer(const std::vector<const ImageView*> _imageViews) const
 {
-	CHECK_TRUE(vkRenderPass != VK_NULL_HANDLE, "Renderpass is not initialized!");
-	CHECK_TRUE(_imageViews.size() == attachments.size(), "Number of imageviews is not the same as number of attachments");
+	CHECK_TRUE(vkRenderPass != VK_NULL_HANDLE, "Render pass is not initialized!");
+	CHECK_TRUE(_imageViews.size() == attachments.size(), "Number of image views is not the same as number of attachments");
 	for (int i = 0; i < _imageViews.size(); ++i)
 	{
 		CHECK_TRUE(attachments[i].format == _imageViews[i]->pImage->GetImageInformation().format, "Format of the imageview is not the same as the format of attachment");
 	}
-	Framebuffer framebuffer;
+	Framebuffer framebuffer{};
 	framebuffer.pRenderPass = this;
 	framebuffer.attachments = _imageViews;
 	return framebuffer;
@@ -276,7 +276,7 @@ void Framebuffer::Init()
 	framebufferInfo.height = attachments[0]->pImage->GetImageInformation().height;
 	framebufferInfo.layers = 1;
 
-	VK_CHECK(vkCreateFramebuffer(MyDevice::GetInstance().vkDevice, &framebufferInfo, nullptr, &vkFramebuffer), Failed to create framebuffer!);
+	VK_CHECK(vkCreateFramebuffer(MyDevice::GetInstance().vkDevice, &framebufferInfo, nullptr, &vkFramebuffer), "Failed to create framebuffer!");
 }
 void Framebuffer::Uninit()
 {
@@ -291,7 +291,7 @@ void Framebuffer::Uninit()
 VkExtent2D Framebuffer::GetImageSize() const
 {
 	CHECK_TRUE(attachments.size() > 0, "No image in this framebuffer!");
-	VkExtent2D ret;
+	VkExtent2D ret{};
 	ImageInformation imageInfo = attachments[0]->pImage->GetImageInformation();
 	ret.width = imageInfo.width;
 	ret.height = imageInfo.height;

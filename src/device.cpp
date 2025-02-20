@@ -170,7 +170,7 @@ void MyDevice::_CreateInstance()
 
 void MyDevice::_CreateSurface()
 {
-	VK_CHECK(glfwCreateWindowSurface(vkInstance, pWindow, nullptr, &vkSurface), Failed to create window surface!);
+	VK_CHECK(glfwCreateWindowSurface(vkInstance, pWindow, nullptr, &vkSurface), "Failed to create window surface!");
 }
 
 void MyDevice::_SelectPhysicalDevice()
@@ -289,7 +289,7 @@ std::vector<Image> MyDevice::GetSwapchainImages() const
 
 	for (const auto& vkImage : swapchainImages)
 	{
-		Image tmpImage;
+		Image tmpImage{};
 		ImageInformation imageInfo;
 		imageInfo.width = m_swapchain.extent.width;
 		imageInfo.height = m_swapchain.extent.height;
@@ -380,44 +380,29 @@ VkFormat MyDevice::FindSupportFormat(const std::vector<VkFormat>& candidates, Vk
 
 void MyDevice::_CreateCommandPools()
 {
-	if (queueFamilyIndices.graphicsAndComputeFamily.has_value())
+	std::set<uint32_t> uniqueFamilyIndex;
+	std::vector<std::optional<uint32_t>> familyIndices =
+	{ 
+		queueFamilyIndices.graphicsAndComputeFamily,
+		queueFamilyIndices.graphicsFamily,
+		queueFamilyIndices.presentFamily,
+		queueFamilyIndices.transferFamily,
+	};
+	for (const auto& opt : familyIndices)
 	{
-		uint32_t key = queueFamilyIndices.graphicsAndComputeFamily.value();
-		VkCommandPool cmdPool;
-		VkCommandPoolCreateInfo commandPoolInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
-		commandPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-		commandPoolInfo.queueFamilyIndex = key;
-		VK_CHECK(vkCreateCommandPool(vkDevice, &commandPoolInfo, nullptr, &cmdPool), Failed to create command pool!);
-		vkCommandPools[key] = cmdPool;
+		if (opt.has_value())
+		{
+			uint32_t key = opt.value();
+			uniqueFamilyIndex.insert(key);
+		}
 	}
-	if (queueFamilyIndices.graphicsFamily.has_value())
+	for (auto key : uniqueFamilyIndex)
 	{
-		uint32_t key = queueFamilyIndices.graphicsFamily.value();
 		VkCommandPool cmdPool;
 		VkCommandPoolCreateInfo commandPoolInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
 		commandPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 		commandPoolInfo.queueFamilyIndex = key;
-		VK_CHECK(vkCreateCommandPool(vkDevice, &commandPoolInfo, nullptr, &cmdPool), Failed to create command pool!);
-		vkCommandPools[key] = cmdPool;
-	}
-	if (queueFamilyIndices.presentFamily.has_value())
-	{
-		uint32_t key = queueFamilyIndices.presentFamily.value();
-		VkCommandPool cmdPool;
-		VkCommandPoolCreateInfo commandPoolInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
-		commandPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-		commandPoolInfo.queueFamilyIndex = key;
-		VK_CHECK(vkCreateCommandPool(vkDevice, &commandPoolInfo, nullptr, &cmdPool), Failed to create command pool!);
-		vkCommandPools[key] = cmdPool;
-	}
-	if (queueFamilyIndices.transferFamily.has_value())
-	{
-		uint32_t key = queueFamilyIndices.transferFamily.value();
-		VkCommandPool cmdPool;
-		VkCommandPoolCreateInfo commandPoolInfo{ VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO };
-		commandPoolInfo.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-		commandPoolInfo.queueFamilyIndex = key;
-		VK_CHECK(vkCreateCommandPool(vkDevice, &commandPoolInfo, nullptr, &cmdPool), Failed to create command pool!);
+		VK_CHECK(vkCreateCommandPool(vkDevice, &commandPoolInfo, nullptr, &cmdPool), "Failed to create command pool!");
 		vkCommandPools[key] = cmdPool;
 	}
 }
@@ -425,6 +410,14 @@ void MyDevice::_CreateCommandPools()
 void MyDevice::_InitDescriptorAllocator()
 {
 	descriptorAllocator.Init();
+}
+
+void MyDevice::_DestroyCommandPools()
+{
+	for (const auto& p : vkCommandPools)
+	{
+		vkDestroyCommandPool(vkDevice, p.second, nullptr);
+	}
 }
 
 void MyDevice::Init()
@@ -436,30 +429,12 @@ void MyDevice::Init()
 	_CreateLogicalDevice();
 	_CreateSwapchain();
 	_InitDescriptorAllocator();
+	_CreateCommandPools();
 }
 
 void MyDevice::Uninit()
 {
-	if (queueFamilyIndices.graphicsAndComputeFamily.has_value())
-	{
-		uint32_t key = queueFamilyIndices.graphicsAndComputeFamily.value();
-		vkDestroyCommandPool(vkDevice, vkCommandPools[key], nullptr);
-	}
-	if (queueFamilyIndices.graphicsFamily.has_value())
-	{
-		uint32_t key = queueFamilyIndices.graphicsFamily.value();
-		vkDestroyCommandPool(vkDevice, vkCommandPools[key], nullptr);
-	}
-	if (queueFamilyIndices.presentFamily.has_value())
-	{
-		uint32_t key = queueFamilyIndices.presentFamily.value();
-		vkDestroyCommandPool(vkDevice, vkCommandPools[key], nullptr);
-	}
-	if (queueFamilyIndices.transferFamily.has_value())
-	{
-		uint32_t key = queueFamilyIndices.transferFamily.value();
-		vkDestroyCommandPool(vkDevice, vkCommandPools[key], nullptr);
-	}
+	_DestroyCommandPools();
 	descriptorAllocator.Uninit();
 	_DestroySwapchain();
 	vkb::destroy_device(m_device);

@@ -24,9 +24,9 @@ class DescriptorSet
 private:
 	struct DescriptorSetUpdate
 	{
-		VkDescriptorBufferInfo bufferInfo;
-		VkDescriptorImageInfo  imageInfo;
-		VkWriteDescriptorSet   writeDescriptorSet;
+		VkDescriptorBufferInfo bufferInfo{};
+		VkDescriptorImageInfo  imageInfo{};
+		VkWriteDescriptorSet   writeDescriptorSet{};
 	};
 
 private:
@@ -68,7 +68,7 @@ private:
 	VkDescriptorPool _CreatePool();
 	VkDescriptorPool _GrabPool();
 	VkDescriptorPool m_currentPool = VK_NULL_HANDLE;
-	PoolSizes m_poolSizes;
+	PoolSizes m_poolSizes{};
 	std::vector<VkDescriptorPool> m_usedPools;
 	std::vector<VkDescriptorPool> m_freePools;
 
@@ -117,7 +117,7 @@ struct AttachmentInformation
 	VkFormat format = VK_FORMAT_R8G8B8A8_SRGB;
 	VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
 	VkImageLayout finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-	VkClearValue clearValue = { .color = {0.0f, 0.0f, 0.0f, 1.0f}/*, .depthStencil = {0.0f, 1}*/};
+	VkClearValue clearValue = { .color = {0.0f, 0.0f, 1.0f, 1.0f}/*, .depthStencil = {0.0f, 1}*/};
 };
 struct SubpassInformation
 {

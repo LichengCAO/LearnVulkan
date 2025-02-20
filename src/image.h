@@ -13,7 +13,7 @@ struct ImageViewInformation
 class ImageView
 {
 private:
-	ImageViewInformation m_viewInformation;
+	ImageViewInformation m_viewInformation{};
 public:
 	const Image* pImage = nullptr;
 	VkImageView vkImageView = VK_NULL_HANDLE;
@@ -36,14 +36,14 @@ struct ImageInformation
 	VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL;
 	VkImageUsageFlags usage = 0;
 	VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
-	VkMemoryPropertyFlags memoryProperty = 0;
-	VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED;
+	VkMemoryPropertyFlags memoryProperty = 0; // image memory
+	VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED; // transfer layout
 };
 class Image
 {
 private:
 	bool m_initCalled = false;
-	ImageInformation m_imageInformation;
+	ImageInformation m_imageInformation{};
 	uint32_t _FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const;
 	void _AllocateMemory();
 	void _FreeMemory();
@@ -70,8 +70,8 @@ class Texture
 private:
 	std::string m_filePath;
 public:
-	Image     image;
-	ImageView imageView;
+	Image     image{};
+	ImageView imageView{};
 	VkSampler vkSampler = VK_NULL_HANDLE;
 	~Texture();
 	void SetFilePath(std::string path);

@@ -11,7 +11,7 @@ struct BufferInformation
 class Buffer
 {
 private:
-	BufferInformation m_bufferInformation;
+	BufferInformation m_bufferInformation{};
 	void* m_mappedMemory = nullptr; // we store this value, since mapping is not free
 
 	uint32_t _FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const;

@@ -6,18 +6,19 @@ void TransparentApp::_Init()
 {
 	MyDevice::GetInstance().Init();
 
-	_InitDescriptorSets();
+	// _InitDescriptorSets();
 	_InitRenderPass();
 	_InitImageViewsAndFramebuffers();
-	_InitVertexInputs();
+	// _InitVertexInputs();
 	_InitPipelines();
-	// init semaphores and command buffers
+	// init semaphores 
 	VkSemaphoreCreateInfo semaphoreInfo{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
 	m_swapchainImageAvailabilities.resize(MAX_FRAME_COUNT);
 	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 	{
 		VK_CHECK(vkCreateSemaphore(MyDevice::GetInstance().vkDevice, &semaphoreInfo, nullptr, &m_swapchainImageAvailabilities[i]), "Failed to create semaphore!");
 	}
+	// init command buffers
 	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 	{
 		m_commandSubmissions.push_back(CommandSubmission{});
@@ -61,8 +62,9 @@ void TransparentApp::_InitDescriptorSets()
 void TransparentApp::_InitRenderPass()
 {
 	// Setup render pass
-	AttachmentInformation attInfo;
-	AttachmentInformation depthInfo;
+	AttachmentInformation attInfo{};
+	AttachmentInformation depthInfo{};
+	attInfo.format = VkFormat::VK_FORMAT_B8G8R8A8_SRGB;
 	depthInfo.format = MyDevice::GetInstance().FindSupportFormat(
 		{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
 		VK_IMAGE_TILING_OPTIMAL,
@@ -71,10 +73,10 @@ void TransparentApp::_InitRenderPass()
 	depthInfo.clearValue.depthStencil = { 0.0f, 1 };
 	depthInfo.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 	m_renderPass.AddAttachment(attInfo);
-	m_renderPass.AddAttachment(depthInfo);
+	// m_renderPass.AddAttachment(depthInfo);
 	SubpassInformation subpassInfo;
 	subpassInfo.AddColorAttachment(0);
-	subpassInfo.SetDepthStencilAttachment(1);
+	// subpassInfo.SetDepthStencilAttachment(1);
 	m_renderPass.AddSubpass(subpassInfo);
 	m_renderPass.Init();
 }
@@ -97,23 +99,25 @@ void TransparentApp::_InitImageViewsAndFramebuffers()
 	depthImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_DEPTH_BIT;
 	ImageViewInformation swapchainImageViewInfo;
 	swapchainImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
+	m_swapchainImageViews.reserve(m_swapchainImages.size());
 	for (int i = 0; i < m_swapchainImages.size(); ++i)
 	{
-		m_depthImages.push_back(Image{});
-		Image& depthImage = m_depthImages.back();
-		depthImage.SetImageInformation(depthImageInfo);
-		depthImage.Init();
+		// m_depthImages.push_back(Image{});
+		// Image& depthImage = m_depthImages.back();
+		// depthImage.SetImageInformation(depthImageInfo);
+		// depthImage.Init();
 
-		m_depthImageViews.push_back(depthImage.NewImageView(depthImageViewInfo));
-		m_depthImageViews.back().Init();
-
-		m_swapchainImageViews.push_back(m_swapchainImages[i].NewImageView(swapchainImageViewInfo));
+		// m_depthImageViews.push_back(depthImage.NewImageView(depthImageViewInfo));
+		// m_depthImageViews.back().Init();
+		ImageView view = m_swapchainImages[i].NewImageView(swapchainImageViewInfo);
+		m_swapchainImageViews.push_back(view);
 		m_swapchainImageViews.back().Init();
 	}
 	// Setup frame buffers
+	m_framebuffers.reserve(m_swapchainImages.size());
 	for (int i = 0; i < m_swapchainImages.size(); ++i)
 	{
-		std::vector<const ImageView*> imageviews = { &m_swapchainImageViews[i], &m_depthImageViews[i] };
+		std::vector<const ImageView*> imageviews = { &m_swapchainImageViews[i], /*&m_depthImageViews[i] */ };
 		m_framebuffers.push_back(m_renderPass.NewFramebuffer(imageviews));
 		m_framebuffers.back().Init();
 	}
@@ -123,18 +127,18 @@ void TransparentApp::_InitPipelines()
 {
 	SimpleShader vertShader;
 	SimpleShader fragShader;
-	vertShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/particle.vert.spv");
-	fragShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/particle.frag.spv");
+	vertShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/trig.vert.spv");
+	fragShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/trig.frag.spv");
 	vertShader.stage = VK_SHADER_STAGE_VERTEX_BIT;
 	fragShader.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
 	vertShader.Init();
 	fragShader.Init();
 
-	m_gPipeline.AddDescriptorSetLayout(&m_dSetLayout);
+	// m_gPipeline.AddDescriptorSetLayout(&m_dSetLayout);
 	m_gPipeline.AddShader(&vertShader);
 	m_gPipeline.AddShader(&fragShader);
 	m_gPipeline.BindToSubpass(&m_renderPass, 0);
-	m_gPipeline.AddVertexInputLayout(&m_vertLayout);
+	// m_gPipeline.AddVertexInputLayout(&m_vertLayout);
 	m_gPipeline.Init();
 
 	vertShader.Uninit();
@@ -246,29 +250,46 @@ void TransparentApp::_DrawFrame()
 	}
 
 	auto& cmd = m_commandSubmissions[m_currentFrame];
-	auto& uniformBuffer = m_uniformBuffers[m_currentFrame];
+	// auto& uniformBuffer = m_uniformBuffers[m_currentFrame];
 	cmd.WaitTillAvailable();
 	auto imageIndex = MyDevice::GetInstance().AquireAvailableSwapchainImageIndex(m_swapchainImageAvailabilities[m_currentFrame]);
 	if (!imageIndex.has_value()) return;
 
-	cmd.StartCommands({ m_swapchainImageAvailabilities[m_currentFrame] });
+	WaitInformation waitInfo{};
+	waitInfo.waitSamaphore = m_swapchainImageAvailabilities[m_currentFrame];
+	cmd.StartCommands({ waitInfo });
 	cmd.StartRenderPass(&m_renderPass, &m_framebuffers[imageIndex.value()]);
-	for (int i = 0; i < m_vertBuffers.size(); ++i)
-	{
-		PipelineInput input;
-		VertexIndexInput indexInput;
-		VertexInput vertInput;
-		indexInput.pBuffer = &m_indexBuffers[i];
-		vertInput.pVertexInputLayout = &m_vertLayout;
-		vertInput.pBuffer = &m_vertBuffers[i];
-		input.pDescriptorSets = { &m_dSets[m_currentFrame] };
-		input.imageSize = MyDevice::GetInstance().GetSwapchainExtent();
-		input.pVertexIndexInput = &indexInput;
-		input.pVertexInputs = { &vertInput };
-		
-		m_gPipeline.Do(cmd.vkCommandBuffer, input);
-	}
+	//for (int i = 0; i < m_vertBuffers.size(); ++i)
+	//{
+	//	PipelineInput input;
+	//	VertexIndexInput indexInput;
+	//	VertexInput vertInput;
+	//	indexInput.pBuffer = &m_indexBuffers[i];
+	//	vertInput.pVertexInputLayout = &m_vertLayout;
+	//	vertInput.pBuffer = &m_vertBuffers[i];
+	//	input.pDescriptorSets = { &m_dSets[m_currentFrame] };
+	//	input.imageSize = MyDevice::GetInstance().GetSwapchainExtent();
+	//	input.pVertexIndexInput = &indexInput;
+	//	input.pVertexInputs = { &vertInput };
+	//	
+	//	m_gPipeline.Do(cmd.vkCommandBuffer, input);
+	//}
 	// m_gPipeline.Do(cmd.vkCommandBuffer, input); // the draw will be done unordered
+	vkCmdBindPipeline(cmd.vkCommandBuffer, VkPipelineBindPoint::VK_PIPELINE_BIND_POINT_GRAPHICS, m_gPipeline.vkPipeline);
+	VkExtent2D extent2d = MyDevice::GetInstance().GetSwapchainExtent();
+	VkViewport viewport{};
+	viewport.x = 0.0f;
+	viewport.y = 0.0f;
+	viewport.width = static_cast<float>(extent2d.width);
+	viewport.height = static_cast<float>(extent2d.height);
+	viewport.minDepth = 0.0f;
+	viewport.maxDepth = 1.0f;
+	vkCmdSetViewport(cmd.vkCommandBuffer, 0, 1, &viewport);
+	VkRect2D scissor{};
+	scissor.offset = { 0, 0 };
+	scissor.extent = extent2d;
+	vkCmdSetScissor(cmd.vkCommandBuffer, 0, 1, &scissor);
+	vkCmdDraw(cmd.vkCommandBuffer, 0, 0, 0, 0);
 	cmd.EndRenderPass();
 
 	// use a memory barrier here to synchronize the order of the 2 render passes
@@ -282,19 +303,46 @@ void TransparentApp::_DrawFrame()
 	m_currentFrame = (m_currentFrame + 1) % MAX_FRAME_COUNT;
 }
 
+void TransparentApp::_UninitVertexInputs()
+{
+	for (auto& vertBuffer : m_vertBuffers)
+	{
+		vertBuffer.Uninit();
+	}
+	for (auto& indexBuffer : m_indexBuffers)
+	{
+		indexBuffer.Uninit();
+	}
+}
+
+void TransparentApp::_UninitDescriptorSets()
+{
+	m_dSets.clear();
+	m_dSetLayout.Uninit();
+	for (auto& buffer : m_uniformBuffers)
+	{
+		buffer.Uninit();
+	}
+}
+
+void TransparentApp::_UninitRenderPass()
+{
+	m_renderPass.Uninit();
+}
+
 void TransparentApp::_UninitImageViewsAndFramebuffers()
 {
 	vkDeviceWaitIdle(MyDevice::GetInstance().vkDevice);
-	for (auto& view : m_depthImageViews)
-	{
-		view.Uninit();
-	}
-	m_depthImageViews.clear();
-	for (auto& image : m_depthImages)
-	{
-		image.Uninit();
-	}
-	m_depthImages.clear();
+	// for (auto& view : m_depthImageViews)
+	// {
+	// 	view.Uninit();
+	// }
+	// m_depthImageViews.clear();
+	// for (auto& image : m_depthImages)
+	// {
+	// 	image.Uninit();
+	// }
+	// m_depthImages.clear();
 	for (auto& view : m_swapchainImageViews)
 	{
 		view.Uninit();
@@ -307,6 +355,11 @@ void TransparentApp::_UninitImageViewsAndFramebuffers()
 	m_framebuffers.clear();
 }
 
+void TransparentApp::_UninitPipelines()
+{
+	m_gPipeline.Uninit();
+}
+
 void TransparentApp::_Uninit()
 {
 	for (auto& cmd : m_commandSubmissions)
@@ -317,10 +370,11 @@ void TransparentApp::_Uninit()
 	{
 		vkDestroySemaphore(MyDevice::GetInstance().vkDevice, semaphore, nullptr);
 	}
+	_UninitPipelines();
+	// _UninitVertexInputs();
 	_UninitImageViewsAndFramebuffers();
-	m_gPipeline.Uninit();
-	m_dSetLayout.Uninit();
-	m_renderPass.Uninit();
+	_UninitRenderPass();
+	// _UninitDescriptorSets();
 	MyDevice::GetInstance().Uninit();
 }
 

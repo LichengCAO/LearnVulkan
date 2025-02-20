@@ -34,7 +34,7 @@ void SimpleShader::Init()
 	.codeSize = code.size(),
 	.pCode = reinterpret_cast<const uint32_t*>(code.data())
 	};
-	VK_CHECK(vkCreateShaderModule(MyDevice::GetInstance().vkDevice, &createInfo, nullptr, &vkShaderModule), Failed to create shader module!);
+	VK_CHECK(vkCreateShaderModule(MyDevice::GetInstance().vkDevice, &createInfo, nullptr, &vkShaderModule), "Failed to create shader module!");
 }
 
 void SimpleShader::Uninit()

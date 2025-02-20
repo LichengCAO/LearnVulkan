@@ -6,7 +6,7 @@ struct PipelineInput
 {
 	std::vector<const DescriptorSet*> pDescriptorSets;
 
-	VkExtent2D imageSize;
+	VkExtent2D imageSize{};
 	const VertexIndexInput* pVertexIndexInput = nullptr;
 	std::vector<const VertexInput*> pVertexInputs;
 
@@ -22,9 +22,9 @@ private:
 	std::vector<VkVertexInputBindingDescription> m_vertBindingDescriptions;
 	std::vector<VkVertexInputAttributeDescription> m_vertAttributeDescriptions;
 	std::vector<VkDynamicState> m_dynamicStates;
-	VkPipelineViewportStateCreateInfo m_viewportStateInfo;
+	VkPipelineViewportStateCreateInfo m_viewportStateInfo{};
 	std::vector<VkPipelineColorBlendAttachmentState> m_colorBlendAttachmentStates;
-	VkPipelineColorBlendStateCreateInfo m_colorBlendStateInfo;
+	VkPipelineColorBlendStateCreateInfo m_colorBlendStateInfo{};
 	std::vector<VkDescriptorSetLayout> m_descriptorSetLayouts;
 	const RenderPass* m_pRenderPass = nullptr;
 	uint32_t m_subpass = 0;
@@ -32,9 +32,9 @@ private:
 public:
 	VkPipelineLayout vkPipelineLayout = VK_NULL_HANDLE;
 	VkPipeline vkPipeline = VK_NULL_HANDLE;
-	VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateInfo;
-	VkPipelineRasterizationStateCreateInfo rasterizerStateInfo;
-	VkPipelineMultisampleStateCreateInfo multisampleStateInfo;
+	VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateInfo{};
+	VkPipelineRasterizationStateCreateInfo rasterizerStateInfo{};
+	VkPipelineMultisampleStateCreateInfo multisampleStateInfo{};
 	
 	GraphicsPipeline();
 	~GraphicsPipeline();
@@ -53,7 +53,7 @@ public:
 class ComputePipeline
 {
 private:
-	VkPipelineShaderStageCreateInfo m_shaderStageInfo;
+	VkPipelineShaderStageCreateInfo m_shaderStageInfo{};
 	std::vector<VkDescriptorSetLayout> m_descriptorSetLayouts;
 public:
 	VkPipelineLayout vkPipelineLayout = VK_NULL_HANDLE;

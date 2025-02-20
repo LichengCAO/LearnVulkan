@@ -131,7 +131,7 @@ void GraphicsPipeline::Init()
 	pipelineLayoutInfo.pSetLayouts = m_descriptorSetLayouts.data();
 	pipelineLayoutInfo.pushConstantRangeCount = 0;
 	pipelineLayoutInfo.pPushConstantRanges = nullptr;
-	VK_CHECK(vkCreatePipelineLayout(MyDevice::GetInstance().vkDevice, &pipelineLayoutInfo, nullptr, &vkPipelineLayout), Failed to create pipeline layout!);
+	VK_CHECK(vkCreatePipelineLayout(MyDevice::GetInstance().vkDevice, &pipelineLayoutInfo, nullptr, &vkPipelineLayout), "Failed to create pipeline layout!");
 
 	VkGraphicsPipelineCreateInfo pipelineInfo{ VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
 	pipelineInfo.stageCount = static_cast<uint32_t>(m_shaderStageInfos.size());
@@ -148,7 +148,7 @@ void GraphicsPipeline::Init()
 	pipelineInfo.subpass = m_subpass;
 	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;//only when in graphics pipleininfo VK_PIPELINE_CREATE_DERIVATIVE_BIT flag is set
 	pipelineInfo.basePipelineIndex = -1;
-	VK_CHECK(vkCreateGraphicsPipelines(MyDevice::GetInstance().vkDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &vkPipeline), Failed to create graphics pipeline!);
+	VK_CHECK(vkCreateGraphicsPipelines(MyDevice::GetInstance().vkDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &vkPipeline), "Failed to create graphics pipeline!");
 }
 
 void GraphicsPipeline::Uninit()
@@ -181,50 +181,57 @@ void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput& in
 	VkRect2D scissor;
 	scissor.offset = { 0, 0 };
 	scissor.extent = input.imageSize;
-
 	vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
 	vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-	std::vector<VkDescriptorSet> descriptorSets;
-	for (int i = 0; i < input.pDescriptorSets.size(); ++i)
+	
+	if (input.pDescriptorSets.size() > 0)
 	{
-		descriptorSets.push_back(input.pDescriptorSets[i]->vkDescriptorSet);
-	}
-	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipelineLayout, 0, static_cast<uint32_t>(descriptorSets.size()), descriptorSets.data(), 0, nullptr);
-	std::vector<VkBuffer> vertBuffers;
-	std::vector<VkDeviceSize> offsets;
-	for (int i = 0; i < input.pVertexInputs.size(); ++i)
-	{
-		vertBuffers.push_back(input.pVertexInputs[i]->pBuffer->vkBuffer);
-		offsets.push_back(input.pVertexInputs[i]->offset);
-	}
-	vkCmdBindVertexBuffers(commandBuffer, 0, static_cast<uint32_t>(vertBuffers.size()), vertBuffers.data(), offsets.data());
-	if (input.pVertexIndexInput != nullptr)
-	{
-		VkIndexType indexType = input.pVertexIndexInput->indexType;
-		vkCmdBindIndexBuffer(commandBuffer, input.pVertexIndexInput->pBuffer->vkBuffer, 0, indexType);
-		uint32_t bufferSize = static_cast<uint32_t>(input.pVertexIndexInput->pBuffer->GetBufferInformation().size);
-		uint32_t stride = 0;
-		switch (indexType)
+		std::vector<VkDescriptorSet> descriptorSets;
+		for (int i = 0; i < input.pDescriptorSets.size(); ++i)
 		{
-		case VK_INDEX_TYPE_UINT32:
-			stride = sizeof(uint32_t);
-			break;
-		case VK_INDEX_TYPE_UINT16:
-			stride = sizeof(uint16_t);
-			break;
+			descriptorSets.push_back(input.pDescriptorSets[i]->vkDescriptorSet);
 		}
-		CHECK_TRUE(stride != 0, "Size of index is unset!");
-		uint32_t indexCount = bufferSize / stride;
-		vkCmdDrawIndexed(commandBuffer, indexCount, 1, 0, 0, 0);
+		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipelineLayout, 0, static_cast<uint32_t>(descriptorSets.size()), descriptorSets.data(), 0, nullptr);
 	}
-	else
+	if (input.pVertexInputs.size() > 0)
 	{
-		CHECK_TRUE(vertBuffers.size() > 0, "No vertex input!");
-		uint32_t bufferSize = static_cast<uint32_t>(input.pVertexInputs[0]->pBuffer->GetBufferInformation().size);
-		uint32_t stride = static_cast<uint32_t>(input.pVertexInputs[0]->pVertexInputLayout->stride);
-		uint32_t vertCount = bufferSize / stride;
-		vkCmdDraw(commandBuffer, vertCount, 1, 0, 0);
+		std::vector<VkBuffer> vertBuffers;
+		std::vector<VkDeviceSize> offsets;
+		for (int i = 0; i < input.pVertexInputs.size(); ++i)
+		{
+			vertBuffers.push_back(input.pVertexInputs[i]->pBuffer->vkBuffer);
+			offsets.push_back(input.pVertexInputs[i]->offset);
+		}
+		vkCmdBindVertexBuffers(commandBuffer, 0, static_cast<uint32_t>(vertBuffers.size()), vertBuffers.data(), offsets.data());
+		if (input.pVertexIndexInput != nullptr)
+		{
+			VkIndexType indexType = input.pVertexIndexInput->indexType;
+			vkCmdBindIndexBuffer(commandBuffer, input.pVertexIndexInput->pBuffer->vkBuffer, 0, indexType);
+			uint32_t bufferSize = static_cast<uint32_t>(input.pVertexIndexInput->pBuffer->GetBufferInformation().size);
+			uint32_t stride = 0;
+			switch (indexType)
+			{
+			case VK_INDEX_TYPE_UINT32:
+				stride = sizeof(uint32_t);
+				break;
+			case VK_INDEX_TYPE_UINT16:
+				stride = sizeof(uint16_t);
+				break;
+			}
+			CHECK_TRUE(stride != 0, "Size of index is unset!");
+			uint32_t indexCount = bufferSize / stride;
+			vkCmdDrawIndexed(commandBuffer, indexCount, 1, 0, 0, 0);
+		}
+		else
+		{
+			CHECK_TRUE(vertBuffers.size() > 0, "No vertex input!");
+			uint32_t bufferSize = static_cast<uint32_t>(input.pVertexInputs[0]->pBuffer->GetBufferInformation().size);
+			uint32_t stride = static_cast<uint32_t>(input.pVertexInputs[0]->pVertexInputLayout->stride);
+			uint32_t vertCount = bufferSize / stride;
+			vkCmdDraw(commandBuffer, vertCount, 1, 0, 0);
+		}
 	}
+
 }
 
 ComputePipeline::~ComputePipeline()
@@ -250,12 +257,12 @@ void ComputePipeline::Init()
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
 	pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(m_descriptorSetLayouts.size());
 	pipelineLayoutInfo.pSetLayouts = m_descriptorSetLayouts.data();
-	VK_CHECK(vkCreatePipelineLayout(MyDevice::GetInstance().vkDevice, &pipelineLayoutInfo, nullptr, &vkPipelineLayout), Failed to create pipeline layout!);
+	VK_CHECK(vkCreatePipelineLayout(MyDevice::GetInstance().vkDevice, &pipelineLayoutInfo, nullptr, &vkPipelineLayout), "Failed to create pipeline layout!");
 
 	VkComputePipelineCreateInfo pipelineInfo{ VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
 	pipelineInfo.stage = m_shaderStageInfo;
 	pipelineInfo.layout = vkPipelineLayout;
-	VK_CHECK(vkCreateComputePipelines(MyDevice::GetInstance().vkDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &vkPipeline), Failed to create compute pipeline!);
+	VK_CHECK(vkCreateComputePipelines(MyDevice::GetInstance().vkDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &vkPipeline), "Failed to create compute pipeline!");
 }
 
 void ComputePipeline::Uninit()

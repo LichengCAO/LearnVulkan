@@ -55,7 +55,7 @@ void Image::Init()
 	imgInfo.samples = m_imageInformation.samples;
 	imgInfo.flags = 0;
 
-	VK_CHECK(vkCreateImage(MyDevice::GetInstance().vkDevice, &imgInfo, nullptr, &vkImage), Failed to crate image!);
+	VK_CHECK(vkCreateImage(MyDevice::GetInstance().vkDevice, &imgInfo, nullptr, &vkImage), "Failed to crate image!");
 
 	_AllocateMemory();
 }
@@ -81,7 +81,7 @@ void Image::_AllocateMemory()
 		.memoryTypeIndex = _FindMemoryTypeIndex(memRequirements.memoryTypeBits, m_imageInformation.memoryProperty)
 	};
 
-	VK_CHECK(vkAllocateMemory(gMyDevice.vkDevice, &allocInfo, nullptr, &vkDeviceMemory), Failed to allocate image memory!);
+	VK_CHECK(vkAllocateMemory(gMyDevice.vkDevice, &allocInfo, nullptr, &vkDeviceMemory), "Failed to allocate image memory!");
 
 	vkBindImageMemory(gMyDevice.vkDevice, vkImage, vkDeviceMemory, 0);
 }
@@ -159,7 +159,7 @@ void Image::TransitionLayout(VkImageLayout newLayout)
 	}
 	else 
 	{
-		throw std::invalid_argument("unsupported layout transition!");
+		throw std::invalid_argument("Unsupported layout transition!");
 	}
 
 	vkCmdPipelineBarrier(
@@ -230,7 +230,7 @@ ImageView Image::NewImageView(const ImageViewInformation& imageViewInfo)
 			.layerCount = 1
 		}
 	};
-	ImageView val;
+	ImageView val{};
 	val.m_viewInformation = imageViewInfo;
 	val.pImage = this;
 
@@ -263,7 +263,7 @@ void ImageView::Init()
 		.layerCount = 1
 	}
 	};
-	VK_CHECK(vkCreateImageView(MyDevice::GetInstance().vkDevice, &viewInfo, nullptr, &vkImageView), Failed to create image view!);
+	VK_CHECK(vkCreateImageView(MyDevice::GetInstance().vkDevice, &viewInfo, nullptr, &vkImageView), "Failed to create image view!");
 }
 
 void ImageView::Uninit()
@@ -300,6 +300,7 @@ void Texture::Init()
 	CHECK_TRUE(!pixels, "Failed to load texture image!");
 	VkDeviceSize imageSize = texWidth * texHeight * 4;
 
+	// copy host image to device
 	Buffer stagingBuffer;
 	BufferInformation bufferInfo;
 	bufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
@@ -323,11 +324,13 @@ void Texture::Init()
 
 	stagingBuffer.Uninit();
 
+	// create image view
 	ImageViewInformation imageviewInfo;
 	imageviewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
 	imageView = image.NewImageView(imageviewInfo);
 	imageView.Init();
 
+	// create sampler
 	VkSamplerCreateInfo samplerInfo{ VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
 	samplerInfo.magFilter = VK_FILTER_LINEAR;
 	samplerInfo.minFilter = VK_FILTER_LINEAR;

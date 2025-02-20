@@ -33,7 +33,7 @@ void Buffer::Init(BufferInformation info)
 	};
 	m_bufferInformation = info;
 
-	VK_CHECK(vkCreateBuffer(MyDevice::GetInstance().vkDevice, &bufferInfo, nullptr, &vkBuffer), Failed to create buffer!);
+	VK_CHECK(vkCreateBuffer(MyDevice::GetInstance().vkDevice, &bufferInfo, nullptr, &vkBuffer), "Failed to create buffer!");
 
 	_AllocateMemory();
 }
@@ -61,7 +61,7 @@ void Buffer::_AllocateMemory()
 		.memoryTypeIndex = _FindMemoryTypeIndex(memRequirements.memoryTypeBits , m_bufferInformation.memoryProperty),
 	};
 
-	VK_CHECK(vkAllocateMemory(MyDevice::GetInstance().vkDevice, &allocInfo, nullptr, &vkDeviceMemory), Failed to allocate buffer memory!);
+	VK_CHECK(vkAllocateMemory(MyDevice::GetInstance().vkDevice, &allocInfo, nullptr, &vkDeviceMemory), "Failed to allocate buffer memory!");
 
 	VkDeviceSize offset = 0; // should be divisible by memRequirements.alignment
 	vkBindBufferMemory(MyDevice::GetInstance().vkDevice, vkBuffer, vkDeviceMemory, offset);

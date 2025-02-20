@@ -6,12 +6,14 @@
 #include <string>
 #include <optional>
 #include <unordered_map>
-
-#define VK_CHECK(vkcommand, message) \
+#include <memory>
+#include <iostream>
+#include <set>
+#define VK_CHECK(vkcommand, failedMessage) \
 do{\
 if((vkcommand)!=VK_SUCCESS){\
    throw std::runtime_error(\
-#message);\
+failedMessage);\
 }\
 }while(0)
 
