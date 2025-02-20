@@ -60,6 +60,8 @@ public:
 	VkExtent2D GetSwapchainExtent() const;
 
 	VkFormat FindSupportFormat(const std::vector<VkFormat>& candidates, VkImageTiling tilling, VkFormatFeatureFlags features) const;
+	VkFormat GetDepthFormat() const;
+	VkFormat GetSwapchainFormat() const;
 public:
 	static MyDevice& GetInstance();
 	static void OnFramebufferResized(GLFWwindow* _pWindow, int width, int height);

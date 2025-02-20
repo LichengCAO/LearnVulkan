@@ -539,7 +539,7 @@ void HelloTriangleApplication::createInstance()
 	instanceBuilder.set_app_version(VK_MAKE_VERSION(1, 0, 0));
 	instanceBuilder.set_engine_name("No Engine");
 	instanceBuilder.set_engine_version(VK_MAKE_VERSION(1, 0, 0));
-	instanceBuilder.desire_api_version(VK_API_VERSION_1_0);
+	// instanceBuilder.desire_api_version(VK_API_VERSION_1_0);
 	instanceBuilder.set_debug_callback(
 		[](
 			VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,

@@ -115,8 +115,8 @@ void CommandSubmission::StartRenderPass(const RenderPass* pRenderPass, const Fra
 	renderPassInfo.framebuffer = pFramebuffer->vkFramebuffer;
 	renderPassInfo.renderArea.offset = { 0,0 };
 	renderPassInfo.renderArea.extent = { imageInfo.width, imageInfo.height };
-	renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size());
-	renderPassInfo.pClearValues = clearValues.data();
+	renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size()); 
+	renderPassInfo.pClearValues = clearValues.data(); // should have same length as attachments, although index of those who don't clear on load will be ignored
 
 	vkCmdBeginRenderPass(vkCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
 }

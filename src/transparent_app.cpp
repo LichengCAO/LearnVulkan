@@ -62,16 +62,8 @@ void TransparentApp::_InitDescriptorSets()
 void TransparentApp::_InitRenderPass()
 {
 	// Setup render pass
-	AttachmentInformation attInfo{};
-	AttachmentInformation depthInfo{};
-	attInfo.format = VkFormat::VK_FORMAT_B8G8R8A8_SRGB;
-	depthInfo.format = MyDevice::GetInstance().FindSupportFormat(
-		{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
-		VK_IMAGE_TILING_OPTIMAL,
-		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
-	);
-	depthInfo.clearValue.depthStencil = { 0.0f, 1 };
-	depthInfo.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+	AttachmentInformation attInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::SWAPCHAIN);
+	AttachmentInformation depthInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::DEPTH);
 	m_renderPass.AddAttachment(attInfo);
 	// m_renderPass.AddAttachment(depthInfo);
 	SubpassInformation subpassInfo;
@@ -83,38 +75,42 @@ void TransparentApp::_InitRenderPass()
 
 void TransparentApp::_InitImageViewsAndFramebuffers()
 {
-	// Create images and views for frame buffers
+	// prevent implicit copy
 	m_swapchainImages = MyDevice::GetInstance().GetSwapchainImages(); // no need to call Init() here, swapchain images are special
-	ImageInformation depthImageInfo;
-	depthImageInfo.width = MyDevice::GetInstance().GetSwapchainExtent().width;
-	depthImageInfo.height = MyDevice::GetInstance().GetSwapchainExtent().height;
-	depthImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-	depthImageInfo.format = MyDevice::GetInstance().FindSupportFormat( 
-		{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT }, 
-		VK_IMAGE_TILING_OPTIMAL, 
-		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
-	);
-	depthImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-	ImageViewInformation depthImageViewInfo;
-	depthImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_DEPTH_BIT;
+	m_swapchainImageViews.reserve(m_swapchainImages.size());
+	m_depthImages.reserve(m_swapchainImages.size());
+	m_depthImageViews.reserve(m_swapchainImages.size());
+	m_framebuffers.reserve(m_swapchainImages.size());
+
+	// Create depth image and view
+	//ImageInformation depthImageInfo;
+	//depthImageInfo.width = MyDevice::GetInstance().GetSwapchainExtent().width;
+	//depthImageInfo.height = MyDevice::GetInstance().GetSwapchainExtent().height;
+	//depthImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+	//depthImageInfo.format = MyDevice::GetInstance().GetDepthFormat();
+	//depthImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	//ImageViewInformation depthImageViewInfo;
+	//depthImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_DEPTH_BIT;
+	//for (int i = 0; i < m_swapchainImages.size(); ++i)
+	//{
+	//	m_depthImages.push_back(Image{});
+	//	Image& depthImage = m_depthImages.back();
+	//	depthImage.SetImageInformation(depthImageInfo);
+	//	depthImage.Init();
+	//	m_depthImageViews.push_back(depthImage.NewImageView(depthImageViewInfo));
+	//	m_depthImageViews.back().Init();
+	//}
+
+	// create swapchain view
 	ImageViewInformation swapchainImageViewInfo;
 	swapchainImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
-	m_swapchainImageViews.reserve(m_swapchainImages.size());
 	for (int i = 0; i < m_swapchainImages.size(); ++i)
 	{
-		// m_depthImages.push_back(Image{});
-		// Image& depthImage = m_depthImages.back();
-		// depthImage.SetImageInformation(depthImageInfo);
-		// depthImage.Init();
-
-		// m_depthImageViews.push_back(depthImage.NewImageView(depthImageViewInfo));
-		// m_depthImageViews.back().Init();
-		ImageView view = m_swapchainImages[i].NewImageView(swapchainImageViewInfo);
-		m_swapchainImageViews.push_back(view);
+		m_swapchainImageViews.push_back(m_swapchainImages[i].NewImageView(swapchainImageViewInfo));
 		m_swapchainImageViews.back().Init();
 	}
+
 	// Setup frame buffers
-	m_framebuffers.reserve(m_swapchainImages.size());
 	for (int i = 0; i < m_swapchainImages.size(); ++i)
 	{
 		std::vector<const ImageView*> imageviews = { &m_swapchainImageViews[i], /*&m_depthImageViews[i] */ };
@@ -333,16 +329,16 @@ void TransparentApp::_UninitRenderPass()
 void TransparentApp::_UninitImageViewsAndFramebuffers()
 {
 	vkDeviceWaitIdle(MyDevice::GetInstance().vkDevice);
-	// for (auto& view : m_depthImageViews)
-	// {
-	// 	view.Uninit();
-	// }
-	// m_depthImageViews.clear();
-	// for (auto& image : m_depthImages)
-	// {
-	// 	image.Uninit();
-	// }
-	// m_depthImages.clear();
+	//for (auto& view : m_depthImageViews)
+	//{
+	//	view.Uninit();
+	//}
+	//m_depthImageViews.clear();
+	//for (auto& image : m_depthImages)
+	//{
+	//	image.Uninit();
+	//}
+	//m_depthImages.clear();
 	for (auto& view : m_swapchainImageViews)
 	{
 		view.Uninit();

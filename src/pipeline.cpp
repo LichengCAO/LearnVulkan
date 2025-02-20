@@ -46,7 +46,8 @@ void GraphicsPipeline::_InitCreateInfos()
 	rasterizerStateInfo.depthBiasSlopeFactor = 0.0f;
 	rasterizerStateInfo.lineWidth = 1.0f; //use values bigger than 1.0, enable wideLines GPU features, extensions
 	rasterizerStateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
-	rasterizerStateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;//otherwise the image won't be drawn
+	//TODO: if application won't draw, try to change this 
+	rasterizerStateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;// otherwise the image won't be drawn 
 
 	multisampleStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 	multisampleStateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -103,7 +104,7 @@ void GraphicsPipeline::BindToSubpass(const RenderPass* pRenderPass, uint32_t sub
 	if (pRenderPass->subpasses[subpass].colorAttachments.size() > 0)
 	{
 		uint32_t attachmentId = pRenderPass->subpasses[subpass].colorAttachments[0].attachment;
-		multisampleStateInfo.rasterizationSamples = pRenderPass->attachments[attachmentId].samples;
+		multisampleStateInfo.rasterizationSamples = pRenderPass->attachments[attachmentId].attachmentDescription.samples;
 	}
 }
 

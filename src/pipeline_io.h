@@ -112,12 +112,13 @@ public:
 };
 
 // Pipeline only has one subpass to describe the output attachments
+enum class AttachmentPreset{SWAPCHAIN, DEPTH};
 struct AttachmentInformation
 {
-	VkFormat format = VK_FORMAT_R8G8B8A8_SRGB;
-	VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
-	VkImageLayout finalLayout = VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
-	VkClearValue clearValue = { .color = {0.0f, 0.0f, 1.0f, 1.0f}/*, .depthStencil = {0.0f, 1}*/};
+	VkAttachmentDescription attachmentDescription{};
+	VkClearValue clearValue{};
+
+	static AttachmentInformation GetPresetInformation(AttachmentPreset _preset);
 };
 struct SubpassInformation
 {

@@ -192,16 +192,7 @@ void RenderPass::Init()
 	std::vector<VkAttachmentDescription> vkAttachments;
 	for (int i = 0; i < attachments.size(); ++i)
 	{
-		VkAttachmentDescription vkAttachment{};
-		vkAttachment.format = attachments[i].format;
-		vkAttachment.samples = attachments[i].samples;
-		vkAttachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-		vkAttachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;/*VK_ATTACHMENT_STORE_OP_DONT_CARE;*/ // https://www.reddit.com/r/vulkan/comments/d8meej/gridlike_pattern_over_a_basic_clearcolor_vulkan/?rdt=33712
-		vkAttachment.stencilLoadOp = VK_ATTACHMENT_LOAD_OP_DONT_CARE;
-		vkAttachment.stencilStoreOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
-		vkAttachment.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		vkAttachment.finalLayout = attachments[i].finalLayout;
-		vkAttachments.push_back(vkAttachment);
+		vkAttachments.push_back(attachments[i].attachmentDescription);
 	}
 	std::vector<VkSubpassDescription> vkSubpasses;
 	for (int i = 0; i < subpasses.size(); ++i)
@@ -247,7 +238,7 @@ Framebuffer RenderPass::NewFramebuffer(const std::vector<const ImageView*> _imag
 	CHECK_TRUE(_imageViews.size() == attachments.size(), "Number of image views is not the same as number of attachments");
 	for (int i = 0; i < _imageViews.size(); ++i)
 	{
-		CHECK_TRUE(attachments[i].format == _imageViews[i]->pImage->GetImageInformation().format, "Format of the imageview is not the same as the format of attachment");
+		CHECK_TRUE(attachments[i].attachmentDescription.format == _imageViews[i]->pImage->GetImageInformation().format, "Format of the imageview is not the same as the format of attachment");
 	}
 	Framebuffer framebuffer{};
 	framebuffer.pRenderPass = this;
@@ -431,4 +422,47 @@ void SubpassInformation::SetDepthStencilAttachment(uint32_t _binding)
 void SubpassInformation::AddResolveAttachment(uint32_t _binding)
 {
 	resolveAttachments.push_back({ _binding, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
+}
+
+AttachmentInformation AttachmentInformation::GetPresetInformation(AttachmentPreset _preset)
+{
+	AttachmentInformation info{};
+	VkAttachmentDescription& vkAttachment = info.attachmentDescription;
+	switch(_preset)
+	{
+	case AttachmentPreset::SWAPCHAIN:
+	{
+		vkAttachment.format = MyDevice::GetInstance().GetSwapchainFormat();
+		vkAttachment.samples = VkSampleCountFlagBits::VK_SAMPLE_COUNT_1_BIT;
+		vkAttachment.loadOp = VkAttachmentLoadOp::VK_ATTACHMENT_LOAD_OP_CLEAR;
+		vkAttachment.storeOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_STORE; // https://www.reddit.com/r/vulkan/comments/d8meej/gridlike_pattern_over_a_basic_clearcolor_vulkan/?rdt=33712
+		vkAttachment.stencilLoadOp = VkAttachmentLoadOp::VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		vkAttachment.stencilStoreOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		vkAttachment.initialLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
+		vkAttachment.finalLayout = VkImageLayout::VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
+		info.clearValue = VkClearValue{};
+		info.clearValue.color = { 0.0f, 0.0f, 1.0f, 1.0f };
+		break;
+	}
+	case AttachmentPreset::DEPTH:
+	{
+		vkAttachment.format = MyDevice::GetInstance().GetDepthFormat();
+		vkAttachment.samples = VkSampleCountFlagBits::VK_SAMPLE_COUNT_1_BIT;
+		vkAttachment.loadOp = VkAttachmentLoadOp::VK_ATTACHMENT_LOAD_OP_CLEAR;
+		vkAttachment.storeOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		vkAttachment.stencilLoadOp = VkAttachmentLoadOp::VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		vkAttachment.stencilStoreOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		vkAttachment.initialLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
+		vkAttachment.finalLayout = VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		info.clearValue = VkClearValue{};
+		info.clearValue.depthStencil = { 0.0f, 1 };
+		break;
+	}
+	default:
+	{
+		CHECK_TRUE(false, "No such attachment preset!");
+		break;
+	}
+	}
+	return info;
 }

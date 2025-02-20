@@ -141,7 +141,7 @@ void MyDevice::_CreateInstance()
 	instanceBuilder.set_app_version(VK_MAKE_VERSION(1, 0, 0));
 	instanceBuilder.set_engine_name("No Engine");
 	instanceBuilder.set_engine_version(VK_MAKE_VERSION(1, 0, 0));
-	instanceBuilder.desire_api_version(VK_API_VERSION_1_0);
+	// instanceBuilder.desire_api_version(VK_API_VERSION_1_0);
 	instanceBuilder.set_debug_callback(
 		[](
 			VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -360,6 +360,20 @@ VkExtent2D MyDevice::GetSwapchainExtent() const
 	// SwapChainSupportDetails swapChainSupport = _QuerySwapchainSupport(vkPhysicalDevice, vkSurface);
 	// return _ChooseSwapchainExtent(swapChainSupport.capabilities);
 	return m_swapchain.extent;
+}
+
+VkFormat MyDevice::GetDepthFormat() const
+{
+	return FindSupportFormat(
+		{ VK_FORMAT_D32_SFLOAT, VK_FORMAT_D32_SFLOAT_S8_UINT, VK_FORMAT_D24_UNORM_S8_UINT },
+		VK_IMAGE_TILING_OPTIMAL,
+		VK_FORMAT_FEATURE_DEPTH_STENCIL_ATTACHMENT_BIT
+	);
+}
+
+VkFormat MyDevice::GetSwapchainFormat() const
+{
+	return m_swapchain.image_format;
 }
 
 VkFormat MyDevice::FindSupportFormat(const std::vector<VkFormat>& candidates, VkImageTiling tilling, VkFormatFeatureFlags features) const
