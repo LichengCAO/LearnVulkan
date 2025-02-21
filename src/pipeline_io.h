@@ -24,9 +24,14 @@ class DescriptorSet
 private:
 	struct DescriptorSetUpdate
 	{
-		VkDescriptorBufferInfo bufferInfo{};
-		VkDescriptorImageInfo  imageInfo{};
-		VkWriteDescriptorSet   writeDescriptorSet{};
+		union DescriptorInfo
+		{
+			VkDescriptorBufferInfo bufferInfo;
+			VkDescriptorImageInfo  imageInfo;
+		};
+		bool            isBufferInfo = true;
+		uint32_t        binding = 0;
+		DescriptorInfo  descriptorInfo{};
 	};
 
 private:

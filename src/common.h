@@ -1,5 +1,7 @@
 #pragma once
 #define GLFW_INCLUDE_VULKAN //->auto load <vulkan/vulkan.h>
+#define GLM_FORCE_RADIANS
+#define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <vector>

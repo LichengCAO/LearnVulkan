@@ -39,15 +39,13 @@ void GraphicsPipeline::_InitCreateInfos()
 	rasterizerStateInfo.rasterizerDiscardEnable = VK_FALSE;
 	rasterizerStateInfo.polygonMode = VK_POLYGON_MODE_FILL;
 	rasterizerStateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
-	rasterizerStateInfo.frontFace = VK_FRONT_FACE_CLOCKWISE;
 	rasterizerStateInfo.depthBiasEnable = VK_FALSE;//use for shadow mapping
 	rasterizerStateInfo.depthBiasConstantFactor = 0.0f;
 	rasterizerStateInfo.depthBiasClamp = 0.0f;
 	rasterizerStateInfo.depthBiasSlopeFactor = 0.0f;
 	rasterizerStateInfo.lineWidth = 1.0f; //use values bigger than 1.0, enable wideLines GPU features, extensions
 	rasterizerStateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
-	//TODO: if application won't draw, try to change this 
-	rasterizerStateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;// otherwise the image won't be drawn 
+	rasterizerStateInfo.frontFace = VK_FRONT_FACE_COUNTER_CLOCKWISE;// TODO: otherwise the image won't be drawn if we apply the transform matrix
 
 	multisampleStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_MULTISAMPLE_STATE_CREATE_INFO;
 	multisampleStateInfo.rasterizationSamples = VK_SAMPLE_COUNT_1_BIT;
@@ -106,6 +104,20 @@ void GraphicsPipeline::BindToSubpass(const RenderPass* pRenderPass, uint32_t sub
 		uint32_t attachmentId = pRenderPass->subpasses[subpass].colorAttachments[0].attachment;
 		multisampleStateInfo.rasterizationSamples = pRenderPass->attachments[attachmentId].attachmentDescription.samples;
 	}
+	if (pRenderPass->subpasses[subpass].optDepthStencilAttachment.has_value())
+	{
+		VkPipelineDepthStencilStateCreateInfo depthStencil{ VK_STRUCTURE_TYPE_PIPELINE_DEPTH_STENCIL_STATE_CREATE_INFO };
+		depthStencil.depthTestEnable = VK_TRUE;
+		depthStencil.depthWriteEnable = VK_TRUE;
+		depthStencil.depthCompareOp = VK_COMPARE_OP_LESS;
+		depthStencil.depthBoundsTestEnable = VK_FALSE;
+		depthStencil.minDepthBounds = 0.0f; // Optional
+		depthStencil.maxDepthBounds = 1.0f; // Optional
+		depthStencil.stencilTestEnable = VK_FALSE;
+		depthStencil.front = {}; // Optional
+		depthStencil.back = {}; // Optional
+		m_depthStencilInfo = depthStencil;
+	}
 }
 
 void GraphicsPipeline::Init()
@@ -149,6 +161,7 @@ void GraphicsPipeline::Init()
 	pipelineInfo.subpass = m_subpass;
 	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;//only when in graphics pipleininfo VK_PIPELINE_CREATE_DERIVATIVE_BIT flag is set
 	pipelineInfo.basePipelineIndex = -1;
+	pipelineInfo.pDepthStencilState = &m_depthStencilInfo;
 	VK_CHECK(vkCreateGraphicsPipelines(MyDevice::GetInstance().vkDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &vkPipeline), "Failed to create graphics pipeline!");
 }
 

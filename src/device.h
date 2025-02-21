@@ -4,6 +4,20 @@
 #include <VkBootstrap.h>
 #include "pipeline_io.h"
 
+struct UserInput
+{
+	bool W = false;
+	bool S = false;
+	bool A = false;
+	bool D = false;
+	bool Q = false;
+	bool E = false;
+	bool LMB = false;
+	bool RMB = false;
+	double xPos = 0.0;
+	double yPos = 0.0;
+};
+
 class Image;
 class MyDevice
 {
@@ -17,6 +31,7 @@ private:
 	vkb::Swapchain		m_swapchain;
 	VkQueue				m_vkPresentQueue = VK_NULL_HANDLE;
 	bool				m_needRecreate = false;
+	UserInput			m_userInput{};
 private:
 	MyDevice() {};
 
@@ -49,6 +64,8 @@ public:
 	VkSwapchainKHR		vkSwapchain = VK_NULL_HANDLE;
 	DescriptorAllocator descriptorAllocator{};
 	std::unordered_map<uint32_t, VkCommandPool>		vkCommandPools;
+	
+	
 	void Init();
 	void Uninit();
 	
@@ -62,7 +79,10 @@ public:
 	VkFormat FindSupportFormat(const std::vector<VkFormat>& candidates, VkImageTiling tilling, VkFormatFeatureFlags features) const;
 	VkFormat GetDepthFormat() const;
 	VkFormat GetSwapchainFormat() const;
+
+	UserInput GetUserInput() const;
 public:
 	static MyDevice& GetInstance();
 	static void OnFramebufferResized(GLFWwindow* _pWindow, int width, int height);
+	static void CursorPosCallBack(GLFWwindow* _pWindow, double _xPos, double _yPos);
 };

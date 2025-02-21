@@ -138,6 +138,7 @@ VkSemaphore CommandSubmission::SubmitCommands()
 	if (vkFence == VK_NULL_HANDLE)
 	{
 		VK_CHECK(vkEndCommandBuffer(vkCommandBuffer), "Failed to end command buffer!");
+		m_isRecording = false;
 		VK_CHECK(vkQueueSubmit(m_vkQueue, 1, &submitInfo, vkFence), "Failed to submit single time commands to queue!");
 		vkQueueWaitIdle(m_vkQueue);
 		Uninit(); // destroy the command buffer after one submission
@@ -147,9 +148,9 @@ VkSemaphore CommandSubmission::SubmitCommands()
 		submitInfo.signalSemaphoreCount = 1;
 		submitInfo.pSignalSemaphores = &m_vkSemaphore;
 		VK_CHECK(vkEndCommandBuffer(vkCommandBuffer), "Failed to end command buffer!");
+		m_isRecording = false;
 		VK_CHECK(vkQueueSubmit(m_vkQueue, 1, &submitInfo, vkFence), "Failed to submit commands to queue!");
 	}
-	m_isRecording = false;
 	return m_vkSemaphore;
 }
 

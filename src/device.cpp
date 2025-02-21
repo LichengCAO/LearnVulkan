@@ -6,6 +6,7 @@
 #include "image.h"
 #include "pipeline_io.h"
 
+#include <iomanip>
 MyDevice* MyDevice::s_pInstance = nullptr;
 
 std::vector<const char*> MyDevice::_GetInstanceRequiredExtensions() const
@@ -130,6 +131,7 @@ void MyDevice::_InitGLFW()
 	pWindow = glfwCreateWindow(800, 600, "My Vulkan", nullptr, nullptr);
 	glfwSetWindowUserPointer(pWindow, this);
 	glfwSetFramebufferSizeCallback(pWindow, OnFramebufferResized);
+	glfwSetCursorPosCallback(pWindow, CursorPosCallBack);
 }
 
 void MyDevice::_CreateInstance()
@@ -460,6 +462,20 @@ void MyDevice::Uninit()
 	glfwTerminate();
 }
 
+UserInput MyDevice::GetUserInput() const
+{
+	UserInput ret = m_userInput;
+	ret.W = (glfwGetKey(pWindow, GLFW_KEY_W) == GLFW_PRESS);
+	ret.S = (glfwGetKey(pWindow, GLFW_KEY_S) == GLFW_PRESS);
+	ret.A = (glfwGetKey(pWindow, GLFW_KEY_A) == GLFW_PRESS);
+	ret.D = (glfwGetKey(pWindow, GLFW_KEY_D) == GLFW_PRESS);
+	ret.Q = (glfwGetKey(pWindow, GLFW_KEY_Q) == GLFW_PRESS);
+	ret.E = (glfwGetKey(pWindow, GLFW_KEY_E) == GLFW_PRESS);
+	ret.LMB = (glfwGetMouseButton(pWindow, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS);
+	ret.RMB = (glfwGetMouseButton(pWindow, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS);
+	return ret;
+}
+
 MyDevice& MyDevice::GetInstance()
 {
 	if (s_pInstance == nullptr)
@@ -473,4 +489,13 @@ void MyDevice::OnFramebufferResized(GLFWwindow* _pWindow, int width, int height)
 {
 	auto mydevice = reinterpret_cast<MyDevice*>(glfwGetWindowUserPointer(_pWindow));
 	mydevice->m_needRecreate = true;
+}
+
+void MyDevice::CursorPosCallBack(GLFWwindow* _pWindow, double _xPos, double _yPos)
+{
+	// only called when the pos changes
+	auto mydevice = reinterpret_cast<MyDevice*>(glfwGetWindowUserPointer(_pWindow));
+	auto& userInput = mydevice->m_userInput;
+	userInput.xPos = _xPos;
+	userInput.yPos = _yPos;
 }

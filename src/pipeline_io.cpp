@@ -20,49 +20,43 @@ void DescriptorSet::StartDescriptorSetUpdate()
 }
 void DescriptorSet::DescriptorSetUpdate_WriteBinding(int bindingId, const Buffer* pBuffer)
 {
-	DescriptorSetUpdate tmpUpdate;
-	DescriptorSetEntry binding = m_pLayout->bindings[bindingId];
-
-	m_updates.push_back(tmpUpdate);
-
-	DescriptorSetUpdate& newUpdate = m_updates.back();
-
-	newUpdate.bufferInfo.buffer = pBuffer->vkBuffer;
-	newUpdate.bufferInfo.offset = 0;
-	newUpdate.bufferInfo.range = pBuffer->GetBufferInformation().size;
-
-	newUpdate.writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	newUpdate.writeDescriptorSet.dstSet = vkDescriptorSet;
-	newUpdate.writeDescriptorSet.dstBinding = bindingId;
-	newUpdate.writeDescriptorSet.dstArrayElement = 0;
-	newUpdate.writeDescriptorSet.descriptorCount = binding.descriptorCount;
-	newUpdate.writeDescriptorSet.descriptorType = binding.descriptorType;
-	newUpdate.writeDescriptorSet.pBufferInfo = &newUpdate.bufferInfo;
-
+	DescriptorSetUpdate newUpdate{};
+	newUpdate.binding = bindingId;
+	newUpdate.descriptorInfo.bufferInfo.buffer = pBuffer->vkBuffer;
+	newUpdate.descriptorInfo.bufferInfo.offset = 0;
+	newUpdate.descriptorInfo.bufferInfo.range = pBuffer->GetBufferInformation().size;
+	newUpdate.isBufferInfo = true;
+	m_updates.push_back(newUpdate);
 }
 void DescriptorSet::DescriptorSetUpdate_WriteBinding(int bindingId, const VkDescriptorImageInfo& dImageInfo)
 {
-	DescriptorSetUpdate tmpUpdate;
-	DescriptorSetEntry binding = m_pLayout->bindings[bindingId];
-
-	m_updates.push_back(tmpUpdate);
-
-	DescriptorSetUpdate& newUpdate = m_updates.back();
-	newUpdate.imageInfo = dImageInfo;
-	newUpdate.writeDescriptorSet.sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET;
-	newUpdate.writeDescriptorSet.dstSet = vkDescriptorSet;
-	newUpdate.writeDescriptorSet.dstBinding = bindingId;
-	newUpdate.writeDescriptorSet.dstArrayElement = 0;
-	newUpdate.writeDescriptorSet.descriptorCount = binding.descriptorCount;
-	newUpdate.writeDescriptorSet.descriptorType = binding.descriptorType;
-	newUpdate.writeDescriptorSet.pImageInfo = &newUpdate.imageInfo;
+	DescriptorSetUpdate newUpdate{};
+	newUpdate.binding = bindingId;
+	newUpdate.descriptorInfo.imageInfo = dImageInfo;
+	newUpdate.isBufferInfo = false;
+	m_updates.push_back(newUpdate);
 }
 void DescriptorSet::FinishDescriptorSetUpdate()
 {
 	std::vector<VkWriteDescriptorSet> writes;
 	for (auto& eUpdate : m_updates)
 	{
-		writes.push_back(eUpdate.writeDescriptorSet);
+		// eUpdate.writeDescriptorSet.pImageInfo = &eUpdate.descriptorInfo;
+		VkWriteDescriptorSet wds{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+		wds.dstSet = vkDescriptorSet;
+		wds.dstBinding = eUpdate.binding;
+		wds.dstArrayElement = 0;
+		wds.descriptorCount = m_pLayout->bindings[eUpdate.binding].descriptorCount;
+		wds.descriptorType = m_pLayout->bindings[eUpdate.binding].descriptorType;
+		if (eUpdate.isBufferInfo)
+		{
+			wds.pBufferInfo = reinterpret_cast<VkDescriptorBufferInfo*>(&eUpdate.descriptorInfo);
+		}
+		else
+		{
+			wds.pImageInfo = reinterpret_cast<VkDescriptorImageInfo*>(&eUpdate.descriptorInfo);
+		}
+		writes.push_back(wds);
 	}
 	vkUpdateDescriptorSets(MyDevice::GetInstance().vkDevice, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
 	m_updates.clear();
@@ -106,6 +100,7 @@ void DescriptorSetLayout::Init()
 		layoutBinding.descriptorType = bindings[i].descriptorType;
 		layoutBinding.pImmutableSamplers = nullptr;
 		layoutBinding.stageFlags = bindings[i].stageFlags;
+		layoutBindings.push_back(layoutBinding);
 	}
 
 	VkDescriptorSetLayoutCreateInfo createInfo = {
@@ -441,7 +436,7 @@ AttachmentInformation AttachmentInformation::GetPresetInformation(AttachmentPres
 		vkAttachment.initialLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
 		vkAttachment.finalLayout = VkImageLayout::VK_IMAGE_LAYOUT_PRESENT_SRC_KHR;
 		info.clearValue = VkClearValue{};
-		info.clearValue.color = { 0.0f, 0.0f, 1.0f, 1.0f };
+		info.clearValue.color = { 0.0f, 0.0f, 0.0f, 1.0f };
 		break;
 	}
 	case AttachmentPreset::DEPTH:
@@ -455,7 +450,7 @@ AttachmentInformation AttachmentInformation::GetPresetInformation(AttachmentPres
 		vkAttachment.initialLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
 		vkAttachment.finalLayout = VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
 		info.clearValue = VkClearValue{};
-		info.clearValue.depthStencil = { 0.0f, 1 };
+		info.clearValue.depthStencil = { 1.0f, 0 };
 		break;
 	}
 	default:

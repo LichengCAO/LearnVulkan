@@ -284,7 +284,7 @@ void Texture::Init()
 	// load image
 	int texWidth, texHeight, texChannels;
 	stbi_uc* pixels = stbi_load(m_filePath.c_str(), &texWidth, &texHeight, &texChannels, STBI_rgb_alpha);
-	CHECK_TRUE(!pixels, "Failed to load texture image!");
+	CHECK_TRUE(pixels, "Failed to load texture image!");
 	VkDeviceSize imageSize = texWidth * texHeight * 4;
 
 	// copy host image to device
@@ -307,7 +307,7 @@ void Texture::Init()
 	image.Init();
 	image.TransitionLayout(VkImageLayout::VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 	image.CopyFromBuffer(stagingBuffer);
-	image.TransitionLayout(VkImageLayout::VK_IMAGE_LAYOUT_READ_ONLY_OPTIMAL);
+	image.TransitionLayout(VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 	stagingBuffer.Uninit();
 

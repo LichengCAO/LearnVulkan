@@ -1,6 +1,5 @@
 #pragma once
 #include "common.h"
-
 #include "pipeline.h"
 #include "pipeline_io.h"
 #include "image.h"
@@ -8,8 +7,7 @@
 #include "commandbuffer.h"
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
-#include "glm/glm.hpp"
-
+#include "camera.h"
 struct UBO
 {
 	alignas(16) glm::mat4 model;
@@ -44,6 +42,7 @@ private:
 	DescriptorSetLayout m_dSetLayout;
 	std::vector<Buffer> m_uniformBuffers;
 	std::vector<DescriptorSet> m_dSets;
+	Texture m_texture{};
 	// Vertex inputs
 	VertexInputLayout m_vertLayout;
 	std::vector<Buffer> m_vertBuffers;
@@ -60,6 +59,7 @@ private:
 	// semaphores
 	std::vector<VkSemaphore>	   m_swapchainImageAvailabilities;
 	std::vector<CommandSubmission> m_commandSubmissions;
+	PersCamera m_camera{400, 300, glm::vec3(2,2,2), glm::vec3(0,0,0), glm::vec3(0,0,1)};
 private:
 	void _Init();
 	void _InitVertexInputs();
@@ -68,6 +68,7 @@ private:
 	void _InitImageViewsAndFramebuffers();
 	void _InitPipelines();
 	void _MainLoop();
+	void _UpdateUniformBuffer();
 	void _DrawFrame();
 	void _UninitVertexInputs();
 	void _UninitDescriptorSets();

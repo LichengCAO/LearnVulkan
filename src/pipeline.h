@@ -26,6 +26,7 @@ private:
 	std::vector<VkPipelineColorBlendAttachmentState> m_colorBlendAttachmentStates;
 	VkPipelineColorBlendStateCreateInfo m_colorBlendStateInfo{};
 	std::vector<VkDescriptorSetLayout> m_descriptorSetLayouts;
+	VkPipelineDepthStencilStateCreateInfo m_depthStencilInfo{};
 	const RenderPass* m_pRenderPass = nullptr;
 	uint32_t m_subpass = 0;
 	void _InitCreateInfos();
