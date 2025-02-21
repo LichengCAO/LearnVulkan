@@ -54,8 +54,14 @@ private:
 	std::vector<Image> m_depthImages;
 	std::vector<ImageView> m_depthImageViews;
 	std::vector<Framebuffer> m_framebuffers;
+	RenderPass m_gbufferRenderPass;
+	std::vector<Image> m_uvImages;
+	std::vector<ImageView> m_uvImageViews;
+	std::vector<Image> m_posImages;
+	std::vector<ImageView> m_posImageViews;
 	//pipelines
 	GraphicsPipeline m_gPipeline;
+	GraphicsPipeline m_gbufferPipeline;
 	// semaphores
 	std::vector<VkSemaphore>	   m_swapchainImageAvailabilities;
 	std::vector<CommandSubmission> m_commandSubmissions;

@@ -73,10 +73,25 @@ void TransparentApp::_InitDescriptorSets()
 
 void TransparentApp::_InitRenderPass()
 {
-	// Setup render pass
-	AttachmentInformation attInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::SWAPCHAIN);
+	AttachmentInformation swapchainInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::SWAPCHAIN);
 	AttachmentInformation depthInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::DEPTH);
-	m_renderPass.AddAttachment(attInfo);
+	
+	// Setup render pass
+	AttachmentInformation uvInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::GBUFFER_UV);
+	AttachmentInformation posInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::GBUFFER_POSITION);
+	m_gbufferRenderPass.AddAttachment(swapchainInfo);
+	m_gbufferRenderPass.AddAttachment(uvInfo);
+	m_gbufferRenderPass.AddAttachment(posInfo);
+	m_gbufferRenderPass.AddAttachment(depthInfo);
+	SubpassInformation gSubpassInfo{};
+	gSubpassInfo.AddColorAttachment(0);
+	gSubpassInfo.AddColorAttachment(1);
+	gSubpassInfo.AddColorAttachment(2);
+	gSubpassInfo.SetDepthStencilAttachment(3);
+	m_gbufferRenderPass.AddSubpass(gSubpassInfo);
+	m_gbufferRenderPass.Init();
+
+	m_renderPass.AddAttachment(swapchainInfo);
 	m_renderPass.AddAttachment(depthInfo);
 	SubpassInformation subpassInfo;
 	subpassInfo.AddColorAttachment(0);
@@ -89,10 +104,15 @@ void TransparentApp::_InitImageViewsAndFramebuffers()
 {
 	// prevent implicit copy
 	m_swapchainImages = MyDevice::GetInstance().GetSwapchainImages(); // no need to call Init() here, swapchain images are special
-	m_swapchainImageViews.reserve(m_swapchainImages.size());
-	m_depthImages.reserve(m_swapchainImages.size());
-	m_depthImageViews.reserve(m_swapchainImages.size());
-	m_framebuffers.reserve(m_swapchainImages.size());
+	auto n = m_swapchainImages.size();
+	m_swapchainImageViews.reserve(n);
+	m_depthImages.reserve(n);
+	m_depthImageViews.reserve(n);
+	m_framebuffers.reserve(n);
+	m_posImages.reserve(n);
+	m_posImageViews.reserve(n);
+	m_uvImages.reserve(n);
+	m_uvImageViews.reserve(n);
 
 	// Create depth image and view
 	ImageInformation depthImageInfo;
@@ -137,24 +157,43 @@ void TransparentApp::_InitImageViewsAndFramebuffers()
 
 void TransparentApp::_InitPipelines()
 {
+	SimpleShader gbufferVertShader;
+	SimpleShader gbufferFragShader;
+	gbufferVertShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/gbuffer.vert.spv");
+	gbufferFragShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/gbuffer.frag.spv");
+	gbufferVertShader.stage = VK_SHADER_STAGE_VERTEX_BIT;
+	gbufferFragShader.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	gbufferVertShader.Init();
+	gbufferFragShader.Init();
+
+	m_gbufferPipeline.AddDescriptorSetLayout(&m_dSetLayout);
+	m_gbufferPipeline.AddShader(&gbufferVertShader);
+	m_gbufferPipeline.AddShader(&gbufferFragShader);
+	m_gbufferPipeline.BindToSubpass(&m_renderPass, 0);
+	m_gbufferPipeline.AddVertexInputLayout(&m_vertLayout);
+	m_gbufferPipeline.Init();
+
+	gbufferVertShader.Uninit();
+	gbufferFragShader.Uninit();
+
 	SimpleShader vertShader;
-	SimpleShader fragShader;
+	SimpleShader gbufferFragShader;
 	vertShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/room.vert.spv");
-	fragShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/room.frag.spv");
+	gbufferFragShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/room.frag.spv");
 	vertShader.stage = VK_SHADER_STAGE_VERTEX_BIT;
-	fragShader.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
+	gbufferFragShader.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
 	vertShader.Init();
-	fragShader.Init();
+	gbufferFragShader.Init();
 
 	m_gPipeline.AddDescriptorSetLayout(&m_dSetLayout);
 	m_gPipeline.AddShader(&vertShader);
-	m_gPipeline.AddShader(&fragShader);
+	m_gPipeline.AddShader(&gbufferFragShader);
 	m_gPipeline.BindToSubpass(&m_renderPass, 0);
 	m_gPipeline.AddVertexInputLayout(&m_vertLayout);
 	m_gPipeline.Init();
 
 	vertShader.Uninit();
-	fragShader.Uninit();
+	gbufferFragShader.Uninit();
 }
 
 void TransparentApp::_InitVertexInputs()
@@ -372,6 +411,7 @@ void TransparentApp::_UninitDescriptorSets()
 void TransparentApp::_UninitRenderPass()
 {
 	m_renderPass.Uninit();
+	m_gbufferRenderPass.Uninit();
 }
 
 void TransparentApp::_UninitImageViewsAndFramebuffers()
@@ -402,6 +442,7 @@ void TransparentApp::_UninitImageViewsAndFramebuffers()
 void TransparentApp::_UninitPipelines()
 {
 	m_gPipeline.Uninit();
+	m_gbufferPipeline.Uninit();
 }
 
 void TransparentApp::_Uninit()
