@@ -117,7 +117,7 @@ public:
 };
 
 // Pipeline only has one subpass to describe the output attachments
-enum class AttachmentPreset{SWAPCHAIN, DEPTH, GBUFFER_UV, GBUFFER_NORMAL, GBUFFER_POSITION};
+enum class AttachmentPreset{SWAPCHAIN, DEPTH, GBUFFER_UV, GBUFFER_NORMAL, GBUFFER_POSITION, GBUFFER_ALBEDO};
 struct AttachmentInformation
 {
 	VkAttachmentDescription attachmentDescription{};
