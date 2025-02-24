@@ -7,6 +7,7 @@ void TransparentApp::_Init()
 	MyDevice::GetInstance().Init();
 
 	_InitRenderPass();
+	_InitSampler();
 	_InitImageViewsAndFramebuffers();
 	_InitDescriptorSets();
 	_InitVertexInputs();
@@ -39,12 +40,12 @@ void TransparentApp::_Uninit()
 	_UninitVertexInputs();
 	_UninitDescriptorSets();
 	_UninitImageViewsAndFramebuffers();
+	_UninitSampler();
 	_UninitRenderPass();
 	
 	MyDevice::GetInstance().Uninit();
 }
 
-//TODO:
 void TransparentApp::_InitDescriptorSets()
 {
 	m_uniformBuffers.reserve(MAX_FRAME_COUNT);
@@ -54,10 +55,43 @@ void TransparentApp::_InitDescriptorSets()
 		DescriptorSetEntry binding0;
 		binding0.descriptorCount = 1;
 		binding0.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		binding0.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;// | VK_SHADER_STAGE_FRAGMENT_BIT;
+		binding0.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		DescriptorSetEntry binding1;
+		binding1.descriptorCount = 1;
+		binding1.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		binding1.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 		
 		m_gbufferDSetLayout.AddBinding(binding0);
+		m_gbufferDSetLayout.AddBinding(binding1);
 		m_gbufferDSetLayout.Init();
+
+		// init uniform buffers, storage buffers
+		BufferInformation bufferInfo;
+		bufferInfo.size = sizeof(UBO);
+		bufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;// | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT; this is use for device to device transfer
+		bufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+		{
+			m_uniformBuffers.push_back(Buffer{});
+			m_uniformBuffers.back().Init(bufferInfo);
+		}
+		// init texture
+		m_texture.SetFilePath("E:/GitStorage/LearnVulkan/res/models/viking_room/viking_room.png");
+		m_texture.Init();
+
+		// Setup descriptor sets 
+		VkDescriptorImageInfo imageInfo = m_texture.GetVkDescriptorImageInfo();
+		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+		{
+			m_gbufferDSets.push_back(DescriptorSet{});
+			m_gbufferDSets.back().SetLayout(&m_gbufferDSetLayout);
+			m_gbufferDSets.back().Init();
+			m_gbufferDSets.back().StartDescriptorSetUpdate();
+			m_gbufferDSets.back().DescriptorSetUpdate_WriteBinding(0, &m_uniformBuffers[i]);
+			m_gbufferDSets.back().DescriptorSetUpdate_WriteBinding(1, imageInfo);
+			m_gbufferDSets.back().FinishDescriptorSetUpdate();
+		}
 	}
 	
 	{
@@ -80,40 +114,42 @@ void TransparentApp::_InitDescriptorSets()
 		m_dSetLayout.AddBinding(binding1);
 		m_dSetLayout.AddBinding(binding2);
 		m_dSetLayout.Init();
-	}
 
-	// init uniform buffers, storage buffers
-	BufferInformation bufferInfo;
-	bufferInfo.size = sizeof(UBO);
-	bufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;// | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-	bufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
-	{
-		m_uniformBuffers.push_back(Buffer{});
-		m_uniformBuffers.back().Init(bufferInfo);
-	}
+		// Setup descriptor sets 
+		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+		{
+			VkDescriptorImageInfo imageInfo0;
+			imageInfo0.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			imageInfo0.imageView = m_gbufferAlbedoImageViews[i].vkImageView;
+			imageInfo0.sampler = m_vkSampler;
 
-	// init texture
-	m_texture.SetFilePath("E:/GitStorage/LearnVulkan/res/models/viking_room/viking_room.png");
-	m_texture.Init();
+			VkDescriptorImageInfo imageInfo1;
+			imageInfo1.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			imageInfo1.imageView = m_gbufferPosImageViews[i].vkImageView;
+			imageInfo1.sampler = m_vkSampler;
 
-	// Setup descriptor sets 
-	VkDescriptorImageInfo imageInfo = m_texture.GetVkDescriptorImageInfo();
-	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
-	{
-		m_dSets.push_back(DescriptorSet{});
-		m_dSets.back().SetLayout(&m_dSetLayout);
-		m_dSets.back().Init();
-		m_dSets.back().StartDescriptorSetUpdate();
-		m_dSets.back().DescriptorSetUpdate_WriteBinding(0, &m_uniformBuffers[i]);
-		m_dSets.back().DescriptorSetUpdate_WriteBinding(1, imageInfo);
-		m_dSets.back().FinishDescriptorSetUpdate();
+			VkDescriptorImageInfo imageInfo2;
+			imageInfo2.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			imageInfo2.imageView = m_gbufferNormalImageViews[i].vkImageView;
+			imageInfo2.sampler = m_vkSampler;
+
+			m_dSets.push_back(DescriptorSet{});
+			m_dSets.back().SetLayout(&m_dSetLayout);
+			m_dSets.back().Init();
+			m_dSets.back().StartDescriptorSetUpdate();
+			m_dSets.back().DescriptorSetUpdate_WriteBinding(0, imageInfo0);
+			m_dSets.back().DescriptorSetUpdate_WriteBinding(1, imageInfo1);
+			m_dSets.back().DescriptorSetUpdate_WriteBinding(2, imageInfo2);
+			m_dSets.back().FinishDescriptorSetUpdate();
+		}
 	}
 }
 void TransparentApp::_UninitDescriptorSets()
 {
 	m_dSets.clear();
 	m_dSetLayout.Uninit();
+	m_gbufferDSets.clear();
+	m_gbufferDSetLayout.Uninit();
 	for (auto& buffer : m_uniformBuffers)
 	{
 		buffer.Uninit();
@@ -160,10 +196,13 @@ void TransparentApp::_InitImageViewsAndFramebuffers()
 {
 	// prevent implicit copy
 	m_swapchainImages = MyDevice::GetInstance().GetSwapchainImages(); // no need to call Init() here, swapchain images are special
-	auto n = m_swapchainImages.size();
 	uint32_t width = MyDevice::GetInstance().GetSwapchainExtent().width;
 	uint32_t height = MyDevice::GetInstance().GetSwapchainExtent().height;
-	m_swapchainImageViews.reserve(n);
+	
+	m_swapchainImageViews.reserve(m_swapchainImages.size());
+	m_framebuffers.reserve(m_swapchainImages.size());
+	
+	auto n = MAX_FRAME_COUNT;
 	m_depthImages.reserve(n);
 	m_depthImageViews.reserve(n);
 	m_gbufferPosImages.reserve(n);
@@ -173,7 +212,6 @@ void TransparentApp::_InitImageViewsAndFramebuffers()
 	m_gbufferAlbedoImages.reserve(n);
 	m_gbufferAlbedoImageViews.reserve(n);
 	m_gbufferFramebuffers.reserve(n);
-	m_framebuffers.reserve(n);
 
 	// Create depth image and view
 	ImageInformation depthImageInfo;
@@ -198,24 +236,27 @@ void TransparentApp::_InitImageViewsAndFramebuffers()
 	ImageInformation gbufferAlbedoImageInfo;
 	gbufferAlbedoImageInfo.width = width;
 	gbufferAlbedoImageInfo.height = height;
-	gbufferAlbedoImageInfo.format = VkFormat::VK_FORMAT_R8G8B8_SRGB;
+	gbufferAlbedoImageInfo.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
 	gbufferAlbedoImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	gbufferAlbedoImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
 	ImageViewInformation gbufferAlbedoImageViewInfo;
 	gbufferAlbedoImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
 
 	ImageInformation gbufferPosImageInfo;
 	gbufferPosImageInfo.width = width;
 	gbufferPosImageInfo.height = height;
-	gbufferPosImageInfo.format = VkFormat::VK_FORMAT_R32G32B32_SFLOAT;
+	gbufferPosImageInfo.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
 	gbufferPosImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	gbufferPosImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
 	ImageViewInformation gbufferPosImageViewInfo;
 	gbufferPosImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
 
 	ImageInformation gbufferNormalImageInfo;
 	gbufferNormalImageInfo.width = width;
 	gbufferNormalImageInfo.height = height;
-	gbufferNormalImageInfo.format = VkFormat::VK_FORMAT_R16G16B16_SFLOAT;
+	gbufferNormalImageInfo.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
 	gbufferNormalImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	gbufferNormalImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
 	ImageViewInformation gbufferNormalImageViewInfo;
 	gbufferNormalImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
 
@@ -243,7 +284,7 @@ void TransparentApp::_InitImageViewsAndFramebuffers()
 	// create swapchain view
 	ImageViewInformation swapchainImageViewInfo;
 	swapchainImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
-	for (int i = 0; i < n; ++i)
+	for (int i = 0; i < m_swapchainImages.size(); ++i)
 	{
 		m_swapchainImageViews.push_back(m_swapchainImages[i].NewImageView(swapchainImageViewInfo));
 		m_swapchainImageViews.back().Init();
@@ -257,11 +298,12 @@ void TransparentApp::_InitImageViewsAndFramebuffers()
 			&m_gbufferAlbedoImageViews[i],
 			&m_gbufferPosImageViews[i],
 			&m_gbufferNormalImageViews[i],
+			&m_depthImageViews[i]
 		};
 		m_gbufferFramebuffers.push_back(m_gbufferRenderPass.NewFramebuffer(gbufferViews));
 		m_gbufferFramebuffers.back().Init();
 	}
-	for (int i = 0; i < n; ++i)
+	for (int i = 0; i < m_swapchainImages.size(); ++i)
 	{
 		std::vector<const ImageView*> imageviews = 
 		{ 
@@ -350,8 +392,8 @@ void TransparentApp::_InitPipelines()
 
 	SimpleShader vertShader;
 	SimpleShader fragShader;
-	vertShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/room.vert.spv");
-	fragShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/room.frag.spv");
+	vertShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/quad.vert.spv");
+	fragShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/quad.frag.spv");
 	vertShader.stage = VK_SHADER_STAGE_VERTEX_BIT;
 	fragShader.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
 	vertShader.Init();
@@ -373,20 +415,46 @@ void TransparentApp::_UninitPipelines()
 	m_gbufferPipeline.Uninit();
 }
 
-//TODO:
 void TransparentApp::_InitVertexInputs()
 {
 	// Setup vertex input layout
-	VertexInputEntry location0;
-	location0.format = VkFormat::VK_FORMAT_R32G32B32_SFLOAT;
-	location0.offset = offsetof(Vertex, pos);
-	VertexInputEntry location1;
-	location1.format = VkFormat::VK_FORMAT_R32G32_SFLOAT;
-	location1.offset = offsetof(Vertex, uv);
-	m_vertLayout.AddLocation(location0);
-	m_vertLayout.AddLocation(location1);
-	m_vertLayout.stride = sizeof(Vertex);
-	m_vertLayout.inputRate = VkVertexInputRate::VK_VERTEX_INPUT_RATE_VERTEX;
+	{
+		VertexInputEntry location0;
+		location0.format = VkFormat::VK_FORMAT_R32G32B32_SFLOAT;
+		location0.offset = offsetof(Vertex, pos);
+		VertexInputEntry location1;
+		location1.format = VkFormat::VK_FORMAT_R32G32B32_SFLOAT;
+		location1.offset = offsetof(Vertex, normal);
+		VertexInputEntry location2;
+		location2.format = VkFormat::VK_FORMAT_R32G32_SFLOAT;
+		location2.offset = offsetof(Vertex, uv);
+
+		m_gbufferVertLayout.AddLocation(location0);
+		m_gbufferVertLayout.AddLocation(location1);
+		m_gbufferVertLayout.AddLocation(location2);
+		m_gbufferVertLayout.stride = sizeof(Vertex);
+		m_gbufferVertLayout.inputRate = VkVertexInputRate::VK_VERTEX_INPUT_RATE_VERTEX;
+	}
+
+	struct QuadVertex
+	{
+		alignas(8) glm::vec2 pos{};
+		alignas(8) glm::vec2 uv{};
+	};
+
+	{
+		VertexInputEntry location0;
+		location0.format = VkFormat::VK_FORMAT_R32G32_SFLOAT;
+		location0.offset = offsetof(QuadVertex, pos);
+		VertexInputEntry location1;
+		location1.format = VkFormat::VK_FORMAT_R32G32_SFLOAT;
+		location1.offset = offsetof(QuadVertex, uv);
+		m_vertLayout.AddLocation(location0);
+		m_vertLayout.AddLocation(location1);
+		m_vertLayout.stride = sizeof(QuadVertex);
+		m_vertLayout.inputRate = VkVertexInputRate::VK_VERTEX_INPUT_RATE_VERTEX;
+	}
+
 
 	// Load models
 	std::vector<std::string> models = {"E:/GitStorage/LearnVulkan/res/models/viking_room/viking_room.obj"};
@@ -414,6 +482,11 @@ void TransparentApp::_InitVertexInputs()
 					attrib.texcoords[2 * index.texcoord_index + 0],
 					1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
 				};
+				vertex.normal = {
+					attrib.normals[3 * index.normal_index + 0],
+					attrib.normals[3 * index.normal_index + 1],
+					attrib.normals[3 * index.normal_index + 2],
+				};
 				if (uniqueVertices.count(vertex) == 0)
 				{
 					uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
@@ -421,57 +494,133 @@ void TransparentApp::_InitVertexInputs()
 				}
 				indices.push_back(uniqueVertices[vertex]);
 			}
-
-			// Upload to device
-			m_vertBuffers.push_back(Buffer{});
-			m_indexBuffers.push_back(Buffer{});
-			BufferInformation localBufferInfo;
-			BufferInformation stagingBufferInfo;
-			Buffer stagingBuffer;
-			Buffer& vertBuffer = m_vertBuffers.back();
-			Buffer& indexBuffer = m_indexBuffers.back();
-			stagingBufferInfo.size = sizeof(Vertex) * vertices.size();
-			stagingBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-			stagingBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-			stagingBuffer.Init(stagingBufferInfo);
-			stagingBuffer.CopyFromHost(vertices.data());
-
-			localBufferInfo.size = sizeof(Vertex) * vertices.size();
-			localBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-			localBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-			vertBuffer.Init(localBufferInfo);
-			vertBuffer.CopyFromBuffer(stagingBuffer);
-
-			stagingBuffer.Uninit();
-			stagingBufferInfo.size = sizeof(uint32_t) * indices.size();
-			stagingBuffer.Init(stagingBufferInfo);
-			stagingBuffer.CopyFromHost(indices.data());
-
-			localBufferInfo.size = sizeof(uint32_t) * indices.size();;
-			localBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-			localBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-			indexBuffer.Init(localBufferInfo);
-			indexBuffer.CopyFromBuffer(stagingBuffer);
-
-			stagingBuffer.Uninit();
 		}
+		// Upload to device
+		m_gbufferVertBuffers.push_back(Buffer{});
+		m_gbufferIndexBuffers.push_back(Buffer{});
+		BufferInformation localBufferInfo;
+		BufferInformation stagingBufferInfo;
+		Buffer stagingBuffer;
+		Buffer& vertBuffer = m_gbufferVertBuffers.back();
+		Buffer& indexBuffer = m_gbufferIndexBuffers.back();
+		stagingBufferInfo.size = sizeof(Vertex) * vertices.size();
+		stagingBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+		stagingBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		stagingBuffer.Init(stagingBufferInfo);
+		stagingBuffer.CopyFromHost(vertices.data());
+
+		localBufferInfo.size = sizeof(Vertex) * vertices.size();
+		localBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+		localBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		vertBuffer.Init(localBufferInfo);
+		vertBuffer.CopyFromBuffer(stagingBuffer);
+
+		stagingBuffer.Uninit();
+		stagingBufferInfo.size = sizeof(uint32_t) * indices.size();
+		stagingBuffer.Init(stagingBufferInfo);
+		stagingBuffer.CopyFromHost(indices.data());
+
+		localBufferInfo.size = sizeof(uint32_t) * indices.size();;
+		localBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+		localBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		indexBuffer.Init(localBufferInfo);
+		indexBuffer.CopyFromBuffer(stagingBuffer);
+
+		stagingBuffer.Uninit();
+	}
+
+	{
+		std::vector<QuadVertex> vertices = 
+		{
+			//{{-1.f, -1.f}, {0.0f, 0.0f}},
+			//{{ 1.f, -1.f}, {0.0f, 1.0f}},
+			//{{ 1.f,  1.f}, {1.0f, 1.0f}},
+			//{{-1.f,  1.f}, {1.0f, 0.0f}}
+			{{-1.f, -1.f}, {0.0f, 0.0f}},
+			{{ 1.f, -1.f}, {1.0f, 0.0f}},
+			{{ 1.f,  1.f}, {1.0f, 1.0f}},
+			{{-1.f,  1.f}, {0.0f, 1.0f}}
+		};
+		std::vector<uint32_t> indices = { 2, 1, 0, 0, 3, 2 };
+		BufferInformation localBufferInfo;
+		BufferInformation stagingBufferInfo;
+		Buffer stagingBuffer;
+		Buffer& vertBuffer = m_vertBuffer;
+		Buffer& indexBuffer = m_indexBuffer;
+		stagingBufferInfo.size = sizeof(QuadVertex) * vertices.size();
+		stagingBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+		stagingBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		stagingBuffer.Init(stagingBufferInfo);
+		stagingBuffer.CopyFromHost(vertices.data());
+
+		localBufferInfo.size = sizeof(QuadVertex) * vertices.size();
+		localBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+		localBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		vertBuffer.Init(localBufferInfo);
+		vertBuffer.CopyFromBuffer(stagingBuffer);
+
+		stagingBuffer.Uninit();
+		stagingBufferInfo.size = sizeof(uint32_t) * indices.size();
+		stagingBuffer.Init(stagingBufferInfo);
+		stagingBuffer.CopyFromHost(indices.data());
+
+		localBufferInfo.size = sizeof(uint32_t) * indices.size();;
+		localBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+		localBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		indexBuffer.Init(localBufferInfo);
+		indexBuffer.CopyFromBuffer(stagingBuffer);
+
+		stagingBuffer.Uninit();
 	}
 }
 void TransparentApp::_UninitVertexInputs()
 {
-	for (auto& vertBuffer : m_vertBuffers)
+	for (auto& vertBuffer : m_gbufferVertBuffers)
 	{
 		vertBuffer.Uninit();
 	}
-	m_vertBuffers.clear();
-	for (auto& indexBuffer : m_indexBuffers)
+	m_gbufferVertBuffers.clear();
+	for (auto& indexBuffer : m_gbufferIndexBuffers)
 	{
 		indexBuffer.Uninit();
 	}
-	m_indexBuffers.clear();
+	m_gbufferIndexBuffers.clear();
+
+	m_vertBuffer.Uninit();
+	m_indexBuffer.Uninit();
 }
 
-//TODO:
+void TransparentApp::_InitSampler()
+{
+	// create sampler
+	VkSamplerCreateInfo samplerInfo{ VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+	samplerInfo.magFilter = VK_FILTER_LINEAR;
+	samplerInfo.minFilter = VK_FILTER_LINEAR;
+	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+	samplerInfo.unnormalizedCoordinates = VK_FALSE;
+	samplerInfo.compareEnable = VK_FALSE;
+	samplerInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+	samplerInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
+	samplerInfo.mipLodBias = 0.0f;
+	samplerInfo.minLod = 0.0f;
+	samplerInfo.maxLod = 0.0f;
+	VkPhysicalDeviceProperties properties{};
+	vkGetPhysicalDeviceProperties(MyDevice::GetInstance().vkPhysicalDevice, &properties);
+	// samplerInfo.anisotropyEnable = VK_TRUE;
+	// samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
+	samplerInfo.anisotropyEnable = VK_FALSE;
+	samplerInfo.maxAnisotropy = 1.0f;
+	VK_CHECK(vkCreateSampler(MyDevice::GetInstance().vkDevice, &samplerInfo, nullptr, &m_vkSampler), "Failed to create app sampler!");
+}
+void TransparentApp::_UninitSampler()
+{
+	vkDestroySampler(MyDevice::GetInstance().vkDevice, m_vkSampler, nullptr);
+	m_vkSampler = VK_NULL_HANDLE;
+}
+
 void TransparentApp::_MainLoop()
 {
 	while (!glfwWindowShouldClose(MyDevice::GetInstance().pWindow))
@@ -521,16 +670,19 @@ void TransparentApp::_UpdateUniformBuffer()
 	ubo.proj = m_camera.GetProjectionMatrix();
 	ubo.proj[1][1] *= -1;
 	ubo.view = m_camera.GetViewMatrix();
-
+	ubo.modelInvTranspose = glm::mat4(1.0f);
 	m_uniformBuffers[m_currentFrame].CopyFromHost(&ubo);
 }
 void TransparentApp::_DrawFrame()
 {
 	if (MyDevice::GetInstance().NeedRecreateSwapchain())
 	{
+		vkDeviceWaitIdle(MyDevice::GetInstance().vkDevice);
+		_UninitDescriptorSets();
 		_UninitImageViewsAndFramebuffers();
 		MyDevice::GetInstance().RecreateSwapchain();
 		_InitImageViewsAndFramebuffers();
+		_InitDescriptorSets();
 	}
 
 	auto& cmd = m_commandSubmissions[m_currentFrame];
@@ -543,27 +695,91 @@ void TransparentApp::_DrawFrame()
 	waitInfo.waitSamaphore = m_swapchainImageAvailabilities[m_currentFrame];
 	waitInfo.waitStage = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	cmd.StartCommands({ waitInfo });
-	cmd.StartRenderPass(&m_renderPass, &m_framebuffers[imageIndex.value()]);
-	for (int i = 0; i < m_indexBuffers.size(); ++i)
+	cmd.StartRenderPass(&m_gbufferRenderPass, &m_gbufferFramebuffers[m_currentFrame]);
+	for (int i = 0; i < m_gbufferIndexBuffers.size(); ++i)
 	{
 		PipelineInput input;
 		VertexIndexInput indexInput;
 		VertexInput vertInput;
-		indexInput.pBuffer = &m_indexBuffers[i];
-		vertInput.pVertexInputLayout = &m_vertLayout;
-		vertInput.pBuffer = &m_vertBuffers[i];
-		input.pDescriptorSets = { &m_dSets[m_currentFrame] };
+		indexInput.pBuffer = &m_gbufferIndexBuffers[i];
+		vertInput.pVertexInputLayout = &m_gbufferVertLayout;
+		vertInput.pBuffer = &m_gbufferVertBuffers[i];
+		input.pDescriptorSets = { &m_gbufferDSets[m_currentFrame] };
 		input.imageSize = MyDevice::GetInstance().GetSwapchainExtent();
 		input.pVertexIndexInput = &indexInput;
 		input.pVertexInputs = { &vertInput };
 		
-		m_gPipeline.Do(cmd.vkCommandBuffer, input); // the draw will be done unordered
+		m_gbufferPipeline.Do(cmd.vkCommandBuffer, input); // the draw will be done unordered
 	}
 	cmd.EndRenderPass();
 
 	// use a memory barrier here to synchronize the order of the 2 render passes
 	// start another render pass if we want to do deferred shading or post process shader, loadOp = LOAD_OP_LOAD 
 	// from my understanding now, we can safely read the neighboring pixels in the next render pass, since the store operations will happen after a render pass end unlike subpass
+
+	{
+		std::vector<const ImageView*> pViewsToSync = 
+		{ 
+			m_gbufferFramebuffers[m_currentFrame].attachments[0], //albedo
+			m_gbufferFramebuffers[m_currentFrame].attachments[1], //pos
+			m_gbufferFramebuffers[m_currentFrame].attachments[2]  //normal
+		};
+		std::vector<VkImageMemoryBarrier> imageBarriers;
+		imageBarriers.reserve(pViewsToSync.size());
+		
+		for (int i = 0; i < pViewsToSync.size(); ++i)
+		{
+			VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+			const ImageView* pViewToSync = pViewsToSync[i];
+			ImageInformation imageInfo = pViewToSync->pImage->GetImageInformation();
+			ImageViewInformation viewInfo = pViewToSync->GetImageViewInformation();
+			barrier.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+			barrier.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			barrier.image = pViewToSync->pImage->vkImage;
+			barrier.subresourceRange.aspectMask = viewInfo.aspectMask;
+			barrier.subresourceRange.baseMipLevel = viewInfo.baseMipLevel;
+			barrier.subresourceRange.levelCount = viewInfo.levelCount;
+			barrier.subresourceRange.baseArrayLayer = 0;
+			barrier.subresourceRange.layerCount = 1;
+			barrier.srcAccessMask = VkAccessFlagBits::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT; // when it could be read
+			barrier.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT; // when it need to be read
+
+			imageBarriers.push_back(barrier);
+		}
+
+		
+		//Keep your srcStageMask as early as possible in the pipeline. make resource be available(valid)
+		//Keep your dstStageMask as late as possible in the pipeline. make resource be visible(validate resource)
+		VkPipelineStageFlags srcStage = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		VkPipelineStageFlags dstStage = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+
+		vkCmdPipelineBarrier(cmd.vkCommandBuffer,
+			srcStage, dstStage,
+			0, 
+			0, nullptr,
+			0, nullptr,
+			static_cast<uint32_t>(imageBarriers.size()), imageBarriers.data()
+			);
+	}
+
+	cmd.StartRenderPass(&m_renderPass, &m_framebuffers[imageIndex.value()]);
+	{
+		PipelineInput input;
+		VertexIndexInput indexInput;
+		VertexInput vertInput;
+		indexInput.pBuffer = &m_indexBuffer;
+		vertInput.pVertexInputLayout = &m_vertLayout;
+		vertInput.pBuffer = &m_vertBuffer;
+		input.pDescriptorSets = { &m_dSets[m_currentFrame] };
+		input.imageSize = MyDevice::GetInstance().GetSwapchainExtent();
+		input.pVertexIndexInput = &indexInput;
+		input.pVertexInputs = { &vertInput };
+
+		m_gPipeline.Do(cmd.vkCommandBuffer, input);
+	}
+	cmd.EndRenderPass();
 
 	VkSemaphore renderpassFinish = cmd.SubmitCommands();
 

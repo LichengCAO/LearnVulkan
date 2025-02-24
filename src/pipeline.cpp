@@ -9,19 +9,6 @@ void GraphicsPipeline::_InitCreateInfos()
 	m_viewportStateInfo.viewportCount = 1;
 	m_viewportStateInfo.scissorCount = 1;
 
-	VkPipelineColorBlendAttachmentState colorBlendAttachmentState
-	{
-		.blendEnable = VK_TRUE,
-		.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
-		.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
-		.colorBlendOp = VK_BLEND_OP_ADD,
-		.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
-		.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
-		.alphaBlendOp = VK_BLEND_OP_ADD,
-		.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
-	};
-	m_colorBlendAttachmentStates.push_back(colorBlendAttachmentState);
-
 	m_colorBlendStateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_COLOR_BLEND_STATE_CREATE_INFO;
 	m_colorBlendStateInfo.logicOpEnable = VK_FALSE;
 	m_colorBlendStateInfo.logicOp = VK_LOGIC_OP_COPY;
@@ -136,6 +123,23 @@ void GraphicsPipeline::Init()
 	viewportStateInfo.viewportCount = 1;
 	viewportStateInfo.scissorCount = 1;
 
+	VkPipelineColorBlendAttachmentState colorBlendAttachmentState
+	{
+		.blendEnable = VK_TRUE,
+		.srcColorBlendFactor = VK_BLEND_FACTOR_SRC_ALPHA,
+		.dstColorBlendFactor = VK_BLEND_FACTOR_ONE_MINUS_SRC_ALPHA,
+		.colorBlendOp = VK_BLEND_OP_ADD,
+		.srcAlphaBlendFactor = VK_BLEND_FACTOR_ONE,
+		.dstAlphaBlendFactor = VK_BLEND_FACTOR_ZERO,
+		.alphaBlendOp = VK_BLEND_OP_ADD,
+		.colorWriteMask = VK_COLOR_COMPONENT_R_BIT | VK_COLOR_COMPONENT_G_BIT | VK_COLOR_COMPONENT_B_BIT | VK_COLOR_COMPONENT_A_BIT,
+	};
+	int colorAttachmentCount = m_pRenderPass->subpasses[m_subpass].colorAttachments.size();
+	m_colorBlendAttachmentStates.reserve(colorAttachmentCount);
+	for (int i = 0; i < colorAttachmentCount; ++i)
+	{
+		m_colorBlendAttachmentStates.push_back(colorBlendAttachmentState);
+	}
 	m_colorBlendStateInfo.attachmentCount = static_cast<uint32_t>(m_colorBlendAttachmentStates.size());
 	m_colorBlendStateInfo.pAttachments = m_colorBlendAttachmentStates.data();
 

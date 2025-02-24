@@ -13,6 +13,7 @@ struct UBO
 	alignas(16) glm::mat4 model;
 	alignas(16) glm::mat4 view;
 	alignas(16) glm::mat4 proj;
+	alignas(16) glm::mat4 modelInvTranspose;
 };
 struct Vertex
 {
@@ -40,20 +41,22 @@ private:
 	uint32_t m_currentFrame = 0;
 	// Descriptor sets
 	DescriptorSetLayout m_dSetLayout;
-	Texture m_texture{};
 	std::vector<DescriptorSet> m_dSets;
 	
 	DescriptorSetLayout m_gbufferDSetLayout;
 	std::vector<Buffer> m_uniformBuffers;
+	Texture m_texture{};
 	std::vector<DescriptorSet> m_gbufferDSets;
 	// Vertex inputs
-	VertexInputLayout m_vertLayout;
-	std::vector<Buffer> m_vertBuffers;
-	std::vector<Buffer> m_indexBuffers;
-
 	VertexInputLayout m_gbufferVertLayout;
-	Buffer m_gbufferVertBuffer;
-	Buffer m_gbufferIndexBuffer;
+	std::vector<Buffer> m_gbufferVertBuffers;
+	std::vector<Buffer> m_gbufferIndexBuffers;
+	
+	VertexInputLayout m_vertLayout;
+	Buffer m_vertBuffer;
+	Buffer m_indexBuffer;
+	// Samplers
+	VkSampler m_vkSampler = VK_NULL_HANDLE;
 	// Renderpass
 	RenderPass m_gbufferRenderPass;
 	std::vector<Image> m_depthImages;
@@ -71,8 +74,9 @@ private:
 	std::vector<ImageView> m_swapchainImageViews;
 	std::vector<Framebuffer> m_framebuffers;
 	//pipelines
-	GraphicsPipeline m_gPipeline;
 	GraphicsPipeline m_gbufferPipeline;
+	
+	GraphicsPipeline m_gPipeline;
 	// semaphores
 	std::vector<VkSemaphore>	   m_swapchainImageAvailabilities;
 	std::vector<CommandSubmission> m_commandSubmissions;
@@ -82,6 +86,8 @@ private:
 	void _Uninit();
 	void _InitVertexInputs();
 	void _UninitVertexInputs();
+	void _InitSampler();
+	void _UninitSampler();
 	void _InitDescriptorSets();
 	void _UninitDescriptorSets();
 	void _InitRenderPass();
