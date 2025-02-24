@@ -9,6 +9,7 @@ void TransparentApp::_Init()
 	_InitRenderPass();
 	_InitSampler();
 	_InitImageViewsAndFramebuffers();
+	_InitDescriptorSetLayouts();
 	_InitDescriptorSets();
 	_InitVertexInputs();
 	_InitPipelines();
@@ -39,6 +40,7 @@ void TransparentApp::_Uninit()
 	_UninitPipelines();
 	_UninitVertexInputs();
 	_UninitDescriptorSets();
+	_UninitDescriptorSetLayouts();
 	_UninitImageViewsAndFramebuffers();
 	_UninitSampler();
 	_UninitRenderPass();
@@ -52,20 +54,6 @@ void TransparentApp::_InitDescriptorSets()
 
 	// Setup descriptor set layout
 	{
-		DescriptorSetEntry binding0;
-		binding0.descriptorCount = 1;
-		binding0.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		binding0.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-
-		DescriptorSetEntry binding1;
-		binding1.descriptorCount = 1;
-		binding1.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		binding1.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		
-		m_gbufferDSetLayout.AddBinding(binding0);
-		m_gbufferDSetLayout.AddBinding(binding1);
-		m_gbufferDSetLayout.Init();
-
 		// init uniform buffers, storage buffers
 		BufferInformation bufferInfo;
 		bufferInfo.size = sizeof(UBO);
@@ -95,26 +83,6 @@ void TransparentApp::_InitDescriptorSets()
 	}
 	
 	{
-		DescriptorSetEntry binding0;
-		binding0.descriptorCount = 1;
-		binding0.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		binding0.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
-
-		DescriptorSetEntry binding1;
-		binding1.descriptorCount = 1;
-		binding1.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		binding1.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
-
-		DescriptorSetEntry binding2;
-		binding2.descriptorCount = 1;
-		binding2.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		binding2.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
-		
-		m_dSetLayout.AddBinding(binding0);
-		m_dSetLayout.AddBinding(binding1);
-		m_dSetLayout.AddBinding(binding2);
-		m_dSetLayout.Init();
-
 		// Setup descriptor sets 
 		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 		{
@@ -147,9 +115,8 @@ void TransparentApp::_InitDescriptorSets()
 void TransparentApp::_UninitDescriptorSets()
 {
 	m_dSets.clear();
-	m_dSetLayout.Uninit();
 	m_gbufferDSets.clear();
-	m_gbufferDSetLayout.Uninit();
+	
 	for (auto& buffer : m_uniformBuffers)
 	{
 		buffer.Uninit();
@@ -619,6 +586,52 @@ void TransparentApp::_UninitSampler()
 {
 	vkDestroySampler(MyDevice::GetInstance().vkDevice, m_vkSampler, nullptr);
 	m_vkSampler = VK_NULL_HANDLE;
+}
+
+void TransparentApp::_InitDescriptorSetLayouts()
+{
+	{
+		DescriptorSetEntry binding0;
+		binding0.descriptorCount = 1;
+		binding0.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		binding0.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		DescriptorSetEntry binding1;
+		binding1.descriptorCount = 1;
+		binding1.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		binding1.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		m_gbufferDSetLayout.AddBinding(binding0);
+		m_gbufferDSetLayout.AddBinding(binding1);
+		m_gbufferDSetLayout.Init();
+	}
+
+	{
+		DescriptorSetEntry binding0;
+		binding0.descriptorCount = 1;
+		binding0.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		binding0.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		DescriptorSetEntry binding1;
+		binding1.descriptorCount = 1;
+		binding1.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		binding1.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		DescriptorSetEntry binding2;
+		binding2.descriptorCount = 1;
+		binding2.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		binding2.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		m_dSetLayout.AddBinding(binding0);
+		m_dSetLayout.AddBinding(binding1);
+		m_dSetLayout.AddBinding(binding2);
+		m_dSetLayout.Init();
+	}
+}
+void TransparentApp::_UninitDescriptorSetLayouts()
+{
+	m_dSetLayout.Uninit();
+	m_gbufferDSetLayout.Uninit();
 }
 
 void TransparentApp::_MainLoop()

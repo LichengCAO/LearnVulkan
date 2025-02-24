@@ -88,6 +88,8 @@ private:
 	void _UninitVertexInputs();
 	void _InitSampler();
 	void _UninitSampler();
+	void _InitDescriptorSetLayouts();
+	void _UninitDescriptorSetLayouts();
 	void _InitDescriptorSets();
 	void _UninitDescriptorSets();
 	void _InitRenderPass();
