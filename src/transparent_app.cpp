@@ -51,8 +51,6 @@ void TransparentApp::_Uninit()
 void TransparentApp::_InitDescriptorSets()
 {
 	m_uniformBuffers.reserve(MAX_FRAME_COUNT);
-
-	// Setup descriptor set layout
 	{
 		// init uniform buffers, storage buffers
 		BufferInformation bufferInfo;
@@ -81,7 +79,6 @@ void TransparentApp::_InitDescriptorSets()
 			m_gbufferDSets.back().FinishDescriptorSetUpdate();
 		}
 	}
-	
 	{
 		// Setup descriptor sets 
 		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
@@ -283,8 +280,6 @@ void TransparentApp::_InitImageViewsAndFramebuffers()
 }
 void TransparentApp::_UninitImageViewsAndFramebuffers()
 {
-	vkDeviceWaitIdle(MyDevice::GetInstance().vkDevice);
-
 	std::vector<std::vector<Framebuffer>*> pFramebufferVecsToUninit =
 	{
 		&m_framebuffers,
@@ -708,6 +703,7 @@ void TransparentApp::_DrawFrame()
 	waitInfo.waitSamaphore = m_swapchainImageAvailabilities[m_currentFrame];
 	waitInfo.waitStage = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	cmd.StartCommands({ waitInfo });
+	
 	cmd.StartRenderPass(&m_gbufferRenderPass, &m_gbufferFramebuffers[m_currentFrame]);
 	for (int i = 0; i < m_gbufferIndexBuffers.size(); ++i)
 	{
@@ -729,7 +725,6 @@ void TransparentApp::_DrawFrame()
 	// use a memory barrier here to synchronize the order of the 2 render passes
 	// start another render pass if we want to do deferred shading or post process shader, loadOp = LOAD_OP_LOAD 
 	// from my understanding now, we can safely read the neighboring pixels in the next render pass, since the store operations will happen after a render pass end unlike subpass
-
 	{
 		std::vector<const ImageView*> pViewsToSync = 
 		{ 
@@ -762,7 +757,6 @@ void TransparentApp::_DrawFrame()
 			imageBarriers.push_back(barrier);
 		}
 
-		
 		//Keep your srcStageMask as early as possible in the pipeline. make resource be available(valid)
 		//Keep your dstStageMask as late as possible in the pipeline. make resource be visible(validate resource)
 		VkPipelineStageFlags srcStage = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
