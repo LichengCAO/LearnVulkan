@@ -1,0 +1,65 @@
+#version 450
+
+// Dimensionality: uimageBuffer is 1D, while uimage2D is 2D.
+// Use Cases: Choose based on whether your application requires handling data with a natural 2D layout (uimage2D) or a linear 1D layout (uimageBuffer).
+#define OIT_LAYERS 5
+layout(set = 0, binding = 1) uniform sampler2D uSampler;
+layout(set = 1, binding = 0, r32ui) uniform readonly uimageBuffer imgAbuffer;
+layout(set = 1, binding = 1, r32ui) uniform readonly uimage2D imgAux;
+layout(set = 1, binding = 4) uniform ivec3 viewport; // width, height, width * height 
+layout(set = 2, binding = 0) uniform writeonly image2D imgOutput;
+layout(location = 0) in vec2 inUV;
+
+layout(location = 0) out vec4 outColor;
+ivec2 coord = ivec2(gl_FragCoord.xy);
+void main()
+{
+    ivec2 coord;
+    int abufferCoord = coord.y * viewport.x + coord.x;
+    vec4 arrSamples[OIT_LAYERS];
+    int sampleCount = int(imageLoad(imgAux, coord).r);
+    sampleCount = min(sampleCount, OIT_LAYERS);
+    
+    for (int i = 0; i < sampleCount; ++i)
+    {
+        arrSamples[i] = imageLoad(imgAbuffer, abufferCoord + i * viewport.z);
+    }
+
+    // bubble sort samples
+    for (int i = 0; i < sampleCount - 1; ++i) 
+    {
+        // Track if any elements were swapped during this pass
+        bool swapped = false;
+        // Last i elements are already sorted
+        for (int j = 0; j < sampleCount - i - 1; ++j) 
+        {
+            int  frontDepth = arrSamples[j].r;
+            int  postDepth = arrSamples[j + 1].r;
+            bool needSwap = frontDepth < postDepth;
+            if (needSwap) 
+            {
+                // Swap if the element found is greater than the next element
+                vec4 tmp = arrSamples[j + 1];
+                arrSamples[j + 1] = arrSamples[j];
+                arrSamples[j] = tmp;
+                swapped = true;
+            }
+        }
+        // If no elements were swapped, the array is already sorted
+        if (!swapped) 
+        {
+            break;
+        }
+    }
+
+    // accumulate color
+    vec4 colorSum = vec4(0);
+    for (int i = 0; i < sampleCount; ++i)
+    {
+        vec4 currentColor = arrSamples[i];
+        colorSum.rgb = colorSum.rgb * (1.0f - currentColor.a) + currentColor.rgb * currentColor.a;
+        colorSum.a = currentColor.a + colorSum.a * (1.0 - currentColor.a);
+    }
+
+    imageStore(imgOutput, coord, colorSum);
+}
