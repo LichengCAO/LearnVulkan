@@ -8,11 +8,14 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
 #include "camera.h"
-struct UBO
+struct CameraBuffer
 {
-	alignas(16) glm::mat4 model;
 	alignas(16) glm::mat4 view;
 	alignas(16) glm::mat4 proj;
+};
+struct ModelTransform
+{
+	alignas(16) glm::mat4 model;
 	alignas(16) glm::mat4 modelInvTranspose;
 };
 struct Vertex
@@ -43,10 +46,14 @@ private:
 	DescriptorSetLayout m_dSetLayout;
 	std::vector<DescriptorSet> m_dSets;
 	
-	DescriptorSetLayout m_gbufferDSetLayout;
-	std::vector<Buffer> m_uniformBuffers;
-	Texture m_texture{};
-	std::vector<DescriptorSet> m_gbufferDSets;
+	DescriptorSetLayout m_modelDSetLayout;
+	std::vector<Texture> m_modelTextures;
+	std::vector<std::vector<Buffer>> m_vecModelBuffers;
+	std::vector<std::vector<DescriptorSet>> m_vecModelDSets;
+	
+	DescriptorSetLayout m_cameraDSetLayout;
+	std::vector<Buffer> m_cameraBuffers;
+	std::vector<DescriptorSet> m_cameraDSets;
 	// Vertex inputs
 	VertexInputLayout m_gbufferVertLayout;
 	std::vector<Buffer> m_gbufferVertBuffers;

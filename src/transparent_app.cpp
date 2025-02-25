@@ -1,6 +1,7 @@
 #include "transparent_app.h"
 #include "device.h"
 #include "tiny_obj_loader.h"
+#include "transform.h"
 #define MAX_FRAME_COUNT 3
 void TransparentApp::_Init()
 {
@@ -50,35 +51,79 @@ void TransparentApp::_Uninit()
 
 void TransparentApp::_InitDescriptorSets()
 {
-	m_uniformBuffers.reserve(MAX_FRAME_COUNT);
+	// model descriptor set
+	{
+		BufferInformation modelBufferInfo;
+		modelBufferInfo.size = sizeof(ModelTransform);
+		modelBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+		modelBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		m_vecModelBuffers.reserve(MAX_FRAME_COUNT);
+		std::vector<std::string> textures =
+		{
+			"E:/GitStorage/LearnVulkan/res/models/viking_room/viking_room.png",
+			"E:/GitStorage/LearnVulkan/res/models/wahoo/wahoo.bmp"
+		};
+		m_modelTextures.reserve(textures.size());
+		for (int i = 0; i < textures.size(); ++i)
+		{
+			m_modelTextures.push_back(Texture{});
+			m_modelTextures[i].SetFilePath(textures[i]);
+			m_modelTextures[i].Init();
+		}
+		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+		{
+			m_vecModelBuffers.push_back(std::vector<Buffer>{});
+			m_vecModelBuffers[i].reserve(textures.size());
+			for (int j = 0; j < textures.size(); ++j)
+			{
+				m_vecModelBuffers[i].push_back(Buffer{});
+				m_vecModelBuffers[i].back().Init(modelBufferInfo);
+			}
+		}
+
+		m_vecModelDSets.reserve(MAX_FRAME_COUNT);
+		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+		{
+			m_vecModelDSets.push_back(std::vector<DescriptorSet>{});
+			m_vecModelDSets[i].reserve(textures.size());
+			for (int j = 0; j < textures.size(); ++j)
+			{
+				m_vecModelDSets[i].push_back(DescriptorSet{});
+				m_vecModelDSets[i][j].SetLayout(&m_modelDSetLayout);
+				m_vecModelDSets[i][j].Init();
+				m_vecModelDSets[i][j].StartDescriptorSetUpdate();
+				m_vecModelDSets[i][j].DescriptorSetUpdate_WriteBinding(0, &m_vecModelBuffers[i][j]);
+				m_vecModelDSets[i][j].DescriptorSetUpdate_WriteBinding(1, m_modelTextures[j].GetVkDescriptorImageInfo());
+				m_vecModelDSets[i][j].FinishDescriptorSetUpdate();
+			}
+		}
+	}
+	// camera descriptor set
 	{
 		// init uniform buffers, storage buffers
 		BufferInformation bufferInfo;
-		bufferInfo.size = sizeof(UBO);
+		bufferInfo.size = sizeof(CameraBuffer);
 		bufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;// | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT; this is use for device to device transfer
 		bufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		m_cameraBuffers.reserve(MAX_FRAME_COUNT);
 		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 		{
-			m_uniformBuffers.push_back(Buffer{});
-			m_uniformBuffers.back().Init(bufferInfo);
+			m_cameraBuffers.push_back(Buffer{});
+			m_cameraBuffers.back().Init(bufferInfo);
 		}
-		// init texture
-		m_texture.SetFilePath("E:/GitStorage/LearnVulkan/res/models/viking_room/viking_room.png");
-		m_texture.Init();
 
 		// Setup descriptor sets 
-		VkDescriptorImageInfo imageInfo = m_texture.GetVkDescriptorImageInfo();
 		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 		{
-			m_gbufferDSets.push_back(DescriptorSet{});
-			m_gbufferDSets.back().SetLayout(&m_gbufferDSetLayout);
-			m_gbufferDSets.back().Init();
-			m_gbufferDSets.back().StartDescriptorSetUpdate();
-			m_gbufferDSets.back().DescriptorSetUpdate_WriteBinding(0, &m_uniformBuffers[i]);
-			m_gbufferDSets.back().DescriptorSetUpdate_WriteBinding(1, imageInfo);
-			m_gbufferDSets.back().FinishDescriptorSetUpdate();
+			m_cameraDSets.push_back(DescriptorSet{});
+			m_cameraDSets.back().SetLayout(&m_cameraDSetLayout);
+			m_cameraDSets.back().Init();
+			m_cameraDSets.back().StartDescriptorSetUpdate();
+			m_cameraDSets.back().DescriptorSetUpdate_WriteBinding(0, &m_cameraBuffers[i]);
+			m_cameraDSets.back().FinishDescriptorSetUpdate();
 		}
 	}
+	// gbuffer descriptor set
 	{
 		// Setup descriptor sets 
 		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
@@ -112,14 +157,32 @@ void TransparentApp::_InitDescriptorSets()
 void TransparentApp::_UninitDescriptorSets()
 {
 	m_dSets.clear();
-	m_gbufferDSets.clear();
-	
-	for (auto& buffer : m_uniformBuffers)
+	m_cameraDSets.clear();
+	for (auto& buffer : m_cameraBuffers)
 	{
 		buffer.Uninit();
 	}
-	m_uniformBuffers.clear();
-	m_texture.Uninit();
+	m_cameraBuffers.clear();
+
+	for (auto& dsets : m_vecModelDSets)
+	{
+		dsets.clear();
+	}
+	m_vecModelDSets.clear();
+	for (auto& texture : m_modelTextures)
+	{
+		texture.Uninit();
+	}
+	m_modelTextures.clear();
+	for (auto& buffers : m_vecModelBuffers)
+	{
+		for (auto& buffer : buffers)
+		{
+			buffer.Uninit();
+		}
+		buffers.clear();
+	}
+	m_vecModelBuffers.clear();
 }
 
 void TransparentApp::_InitRenderPass()
@@ -342,7 +405,8 @@ void TransparentApp::_InitPipelines()
 	gbufferVertShader.Init();
 	gbufferFragShader.Init();
 
-	m_gbufferPipeline.AddDescriptorSetLayout(&m_gbufferDSetLayout);
+	m_gbufferPipeline.AddDescriptorSetLayout(&m_cameraDSetLayout);
+	m_gbufferPipeline.AddDescriptorSetLayout(&m_modelDSetLayout);
 	m_gbufferPipeline.AddShader(&gbufferVertShader);
 	m_gbufferPipeline.AddShader(&gbufferFragShader);
 	m_gbufferPipeline.BindToSubpass(&m_gbufferRenderPass, 0);
@@ -419,7 +483,13 @@ void TransparentApp::_InitVertexInputs()
 
 
 	// Load models
-	std::vector<std::string> models = {"E:/GitStorage/LearnVulkan/res/models/viking_room/viking_room.obj"};
+	std::vector<std::string> models = 
+	{ 
+		"E:/GitStorage/LearnVulkan/res/models/viking_room/viking_room.obj",
+		"E:/GitStorage/LearnVulkan/res/models/wahoo/wahoo.obj"
+	};
+	m_gbufferVertBuffers.reserve(models.size());
+	m_gbufferIndexBuffers.reserve(models.size());
 	for (int i = 0; i < models.size(); ++i)
 	{
 		std::vector<Vertex> vertices;
@@ -494,10 +564,6 @@ void TransparentApp::_InitVertexInputs()
 	{
 		std::vector<QuadVertex> vertices = 
 		{
-			//{{-1.f, -1.f}, {0.0f, 0.0f}},
-			//{{ 1.f, -1.f}, {0.0f, 1.0f}},
-			//{{ 1.f,  1.f}, {1.0f, 1.0f}},
-			//{{-1.f,  1.f}, {1.0f, 0.0f}}
 			{{-1.f, -1.f}, {0.0f, 0.0f}},
 			{{ 1.f, -1.f}, {1.0f, 0.0f}},
 			{{ 1.f,  1.f}, {1.0f, 1.0f}},
@@ -585,22 +651,35 @@ void TransparentApp::_UninitSampler()
 
 void TransparentApp::_InitDescriptorSetLayouts()
 {
+	// model related
 	{
 		DescriptorSetEntry binding0;
 		binding0.descriptorCount = 1;
 		binding0.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		binding0.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
+		binding0.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
 
 		DescriptorSetEntry binding1;
 		binding1.descriptorCount = 1;
 		binding1.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		binding1.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
 
-		m_gbufferDSetLayout.AddBinding(binding0);
-		m_gbufferDSetLayout.AddBinding(binding1);
-		m_gbufferDSetLayout.Init();
+		m_modelDSetLayout.AddBinding(binding0);
+		m_modelDSetLayout.AddBinding(binding1);
+		m_modelDSetLayout.Init();
+	}
+	
+	//camera
+	{
+		DescriptorSetEntry binding0;
+		binding0.descriptorCount = 1;
+		binding0.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		binding0.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+
+		m_cameraDSetLayout.AddBinding(binding0);
+		m_cameraDSetLayout.Init();
 	}
 
+	// post process
 	{
 		DescriptorSetEntry binding0;
 		binding0.descriptorCount = 1;
@@ -626,7 +705,8 @@ void TransparentApp::_InitDescriptorSetLayouts()
 void TransparentApp::_UninitDescriptorSetLayouts()
 {
 	m_dSetLayout.Uninit();
-	m_gbufferDSetLayout.Uninit();
+	m_cameraDSetLayout.Uninit();
+	m_modelDSetLayout.Uninit();
 }
 
 void TransparentApp::_MainLoop()
@@ -661,7 +741,7 @@ void TransparentApp::_UpdateUniformBuffer()
 	if (userInput.RMB)
 	{
 		glm::vec3 fwd = glm::normalize(glm::cross(m_camera.world_up, m_camera.right));
-		float speed = 0.0002f;
+		float speed = 0.0005f;
 		glm::vec3 mov = m_camera.eye;
 		if (userInput.W) mov += (speed * fwd);
 		if (userInput.S) mov += (-speed * fwd);
@@ -672,14 +752,29 @@ void TransparentApp::_UpdateUniformBuffer()
 		m_camera.MoveTo(mov);
 	}
 
-	UBO ubo{};
+	CameraBuffer ubo{};
 	VkExtent2D swapchainExtent = MyDevice::GetInstance().GetSwapchainExtent();
-	ubo.model = glm::rotate(glm::mat4(1.0f), glm::radians(90.0f), glm::vec3(0.0f, 0.0f, 1.0f));
 	ubo.proj = m_camera.GetProjectionMatrix();
 	ubo.proj[1][1] *= -1;
 	ubo.view = m_camera.GetViewMatrix();
-	ubo.modelInvTranspose = glm::mat4(1.0f);
-	m_uniformBuffers[m_currentFrame].CopyFromHost(&ubo);
+	m_cameraBuffers[m_currentFrame].CopyFromHost(&ubo);
+
+	ModelTransform roomTransform{};
+	ModelTransform wahooTransform{};
+	Transform roomT{};
+	Transform wahooT{};
+
+	wahooT.SetScale({ 0.05, 0.05, 0.05 });
+	wahooT.SetRotation({ 90, 0, 0 });
+	wahooT.SetPosition({ 0, 0, 0.5 });
+
+	roomTransform.model = roomT.GetModelMatrix();
+	roomTransform.modelInvTranspose = roomT.GetModelInverseTransposeMatrix();
+	wahooTransform.model = wahooT.GetModelMatrix();
+	wahooTransform.modelInvTranspose = wahooT.GetModelInverseTransposeMatrix();
+
+	m_vecModelBuffers[m_currentFrame][0].CopyFromHost(&roomTransform);
+	m_vecModelBuffers[m_currentFrame][1].CopyFromHost(&wahooTransform);
 }
 void TransparentApp::_DrawFrame()
 {
@@ -694,7 +789,7 @@ void TransparentApp::_DrawFrame()
 	}
 
 	auto& cmd = m_commandSubmissions[m_currentFrame];
-	auto& uniformBuffer = m_uniformBuffers[m_currentFrame];
+	auto& uniformBuffer = m_cameraBuffers[m_currentFrame];
 	cmd.WaitTillAvailable();
 	auto imageIndex = MyDevice::GetInstance().AquireAvailableSwapchainImageIndex(m_swapchainImageAvailabilities[m_currentFrame]);
 	if (!imageIndex.has_value()) return;
@@ -705,7 +800,7 @@ void TransparentApp::_DrawFrame()
 	cmd.StartCommands({ waitInfo });
 	
 	cmd.StartRenderPass(&m_gbufferRenderPass, &m_gbufferFramebuffers[m_currentFrame]);
-	for (int i = 0; i < m_gbufferIndexBuffers.size(); ++i)
+	for (int i = 0; i < m_gbufferVertBuffers.size(); ++i)
 	{
 		PipelineInput input;
 		VertexIndexInput indexInput;
@@ -713,7 +808,7 @@ void TransparentApp::_DrawFrame()
 		indexInput.pBuffer = &m_gbufferIndexBuffers[i];
 		vertInput.pVertexInputLayout = &m_gbufferVertLayout;
 		vertInput.pBuffer = &m_gbufferVertBuffers[i];
-		input.pDescriptorSets = { &m_gbufferDSets[m_currentFrame] };
+		input.pDescriptorSets = { &m_cameraDSets[m_currentFrame], &m_vecModelDSets[m_currentFrame][i] };
 		input.imageSize = MyDevice::GetInstance().GetSwapchainExtent();
 		input.pVertexIndexInput = &indexInput;
 		input.pVertexInputs = { &vertInput };
