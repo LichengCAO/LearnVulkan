@@ -1,6 +1,7 @@
 #pragma once
 #include "common.h"
 class Buffer;
+class BufferView;
 class ImageView;
 // Pipeline can have multiple DescriptorSetLayout, when execute the pipeline we need to provide DescriptorSets for each of the DescriptorSetLayout
 struct DescriptorSetEntry // binding
@@ -22,16 +23,18 @@ public:
 class DescriptorSet
 {
 private:
+	enum class DescriptorType {BUFFER, IMAGE, TEXEL_BUFFER};
 	struct DescriptorSetUpdate
 	{
 		union DescriptorInfo
 		{
 			VkDescriptorBufferInfo bufferInfo;
 			VkDescriptorImageInfo  imageInfo;
+			VkBufferView           bufferView;
 		};
-		bool            isBufferInfo = true;
 		uint32_t        binding = 0;
 		DescriptorInfo  descriptorInfo{};
+		DescriptorType  descriptorType = DescriptorType::BUFFER;
 	};
 
 private:
@@ -45,6 +48,7 @@ public:
 	void StartDescriptorSetUpdate();
 	void DescriptorSetUpdate_WriteBinding(int bindingId, const Buffer* pBuffer);
 	void DescriptorSetUpdate_WriteBinding(int bindingId, const VkDescriptorImageInfo& dImageInfo);
+	void DescriptorSetUpdate_WriteBinding(int bindingId, const BufferView* bufferView);
 	void FinishDescriptorSetUpdate();
 	void Init();
 };

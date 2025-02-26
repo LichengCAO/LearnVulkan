@@ -4,11 +4,11 @@
 // Use Cases: Choose based on whether your application requires handling data with a natural 2D layout (uimage2D) or a linear 1D layout (uimageBuffer).
 #define OIT_LAYERS 5
 layout(set = 0, binding = 1) uniform sampler2D uSampler;
-layout(set = 1, binding = 0, r32ui) uniform coherent uimageBuffer imgAbuffer;
-layout(set = 1, binding = 1, r32ui) uniform coherent uimage2D imgAux;
-layout(set = 1, binding = 2, r32ui) uniform coherent uimage2D imgSpin;
-layout(set = 1, binding = 3, r32ui) uniform coherent uimage2D imgDepth;
-layout(set = 1, binding = 4) uniform ivec3 viewport; // width, height, width * height 
+layout(set = 1, binding = 0, rg32ui) uniform coherent uimageBuffer imgAbuffer; // sample data
+layout(set = 1, binding = 1, r32ui) uniform coherent uimage2D imgAux; // sample count
+layout(set = 1, binding = 2, r32ui) uniform coherent uimage2D imgSpin; // flow control
+// layout(set = 1, binding = 3, r32ui) uniform coherent uimage2D imgDepth;
+layout(set = 1, binding = 3) uniform ivec3 viewport; // width, height, width * height 
 layout(location = 0) in vec2 inUV;
 
 layout(location = 0) out vec4 outColor;

@@ -25,7 +25,7 @@ void DescriptorSet::DescriptorSetUpdate_WriteBinding(int bindingId, const Buffer
 	newUpdate.descriptorInfo.bufferInfo.buffer = pBuffer->vkBuffer;
 	newUpdate.descriptorInfo.bufferInfo.offset = 0;
 	newUpdate.descriptorInfo.bufferInfo.range = pBuffer->GetBufferInformation().size;
-	newUpdate.isBufferInfo = true;
+	newUpdate.descriptorType = DescriptorType::BUFFER;
 	m_updates.push_back(newUpdate);
 }
 void DescriptorSet::DescriptorSetUpdate_WriteBinding(int bindingId, const VkDescriptorImageInfo& dImageInfo)
@@ -33,7 +33,15 @@ void DescriptorSet::DescriptorSetUpdate_WriteBinding(int bindingId, const VkDesc
 	DescriptorSetUpdate newUpdate{};
 	newUpdate.binding = bindingId;
 	newUpdate.descriptorInfo.imageInfo = dImageInfo;
-	newUpdate.isBufferInfo = false;
+	newUpdate.descriptorType = DescriptorType::IMAGE;
+	m_updates.push_back(newUpdate);
+}
+void DescriptorSet::DescriptorSetUpdate_WriteBinding(int bindingId, const BufferView* pBufferView)
+{
+	DescriptorSetUpdate newUpdate{};
+	newUpdate.binding = bindingId;
+	newUpdate.descriptorInfo.bufferView = pBufferView->vkBufferView;
+	newUpdate.descriptorType = DescriptorType::TEXEL_BUFFER;
 	m_updates.push_back(newUpdate);
 }
 void DescriptorSet::FinishDescriptorSetUpdate()
@@ -41,20 +49,34 @@ void DescriptorSet::FinishDescriptorSetUpdate()
 	std::vector<VkWriteDescriptorSet> writes;
 	for (auto& eUpdate : m_updates)
 	{
-		// eUpdate.writeDescriptorSet.pImageInfo = &eUpdate.descriptorInfo;
 		VkWriteDescriptorSet wds{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
 		wds.dstSet = vkDescriptorSet;
 		wds.dstBinding = eUpdate.binding;
 		wds.dstArrayElement = 0;
 		wds.descriptorCount = m_pLayout->bindings[eUpdate.binding].descriptorCount;
 		wds.descriptorType = m_pLayout->bindings[eUpdate.binding].descriptorType;
-		if (eUpdate.isBufferInfo)
+		switch (eUpdate.descriptorType)
+		{
+		case DescriptorType::BUFFER:
 		{
 			wds.pBufferInfo = reinterpret_cast<VkDescriptorBufferInfo*>(&eUpdate.descriptorInfo);
+			break;
 		}
-		else
+		case DescriptorType::IMAGE:
 		{
 			wds.pImageInfo = reinterpret_cast<VkDescriptorImageInfo*>(&eUpdate.descriptorInfo);
+			break;
+		}
+		case DescriptorType::TEXEL_BUFFER:
+		{
+			wds.pTexelBufferView = reinterpret_cast<VkBufferView*>(&eUpdate.descriptorInfo);
+			break;
+		}
+		default:
+		{
+			std::runtime_error("No such descriptor type!");
+			break;
+		}
 		}
 		writes.push_back(wds);
 	}

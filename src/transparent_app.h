@@ -8,6 +8,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
 #include "camera.h"
+#include "transform.h"
 struct CameraBuffer
 {
 	alignas(16) glm::mat4 view;
@@ -37,23 +38,44 @@ namespace std
 		}
 	};
 }
+struct Model
+{
+	std::string objFilePath;
+	std::string texturePath;
+	Transform   transform{};
+};
 
 class TransparentApp
 {
 private:
+	double lastTime = 0.0;
+	float frameTime = 0.0f;
 	uint32_t m_currentFrame = 0;
+	std::vector<Model> m_models;
+
 	// Descriptor sets
+	DescriptorSetLayout m_oitDSetLayout;
+	std::vector<DescriptorSet> m_oitDSets;
+	std::vector<Buffer> m_oitSampleTexelBuffers;
+	std::vector<BufferView> m_oitSampleTexelBufferViews;
+	std::vector<Image> m_oitSampleCountImages;
+	std::vector<ImageView> m_oitSampleCountImageViews;
+	std::vector<Image> m_oitInUseImages;
+	std::vector<ImageView> m_oitInUseImageViews;
+	Buffer             m_oitViewportBuffer; //ok
+
 	DescriptorSetLayout m_dSetLayout;
 	std::vector<DescriptorSet> m_dSets;
 	
 	DescriptorSetLayout m_modelDSetLayout;
-	std::vector<Texture> m_modelTextures;
-	std::vector<std::vector<Buffer>> m_vecModelBuffers;
 	std::vector<std::vector<DescriptorSet>> m_vecModelDSets;
+	std::vector<std::vector<Buffer>> m_vecModelBuffers;
+	std::vector<Texture> m_modelTextures;
 	
 	DescriptorSetLayout m_cameraDSetLayout;
-	std::vector<Buffer> m_cameraBuffers;
 	std::vector<DescriptorSet> m_cameraDSets;
+	std::vector<Buffer> m_cameraBuffers;
+
 	// Vertex inputs
 	VertexInputLayout m_gbufferVertLayout;
 	std::vector<Buffer> m_gbufferVertBuffers;
@@ -76,6 +98,8 @@ private:
 	std::vector<ImageView> m_gbufferAlbedoImageViews;
 	std::vector<Framebuffer> m_gbufferFramebuffers;
 
+	RenderPass m_oitRenderPass;
+
 	RenderPass m_renderPass;
 	std::vector<Image> m_swapchainImages;
 	std::vector<ImageView> m_swapchainImageViews;
@@ -83,6 +107,9 @@ private:
 	//pipelines
 	GraphicsPipeline m_gbufferPipeline;
 	
+	GraphicsPipeline m_oitPipeline;
+	ComputePipeline  m_oitSortPipeline;
+
 	GraphicsPipeline m_gPipeline;
 	// semaphores
 	std::vector<VkSemaphore>	   m_swapchainImageAvailabilities;
@@ -91,20 +118,35 @@ private:
 private:
 	void _Init();
 	void _Uninit();
-	void _InitVertexInputs();
-	void _UninitVertexInputs();
-	void _InitSampler();
-	void _UninitSampler();
-	void _InitDescriptorSetLayouts();
-	void _UninitDescriptorSetLayouts();
-	void _InitDescriptorSets();
-	void _UninitDescriptorSets();
+
 	void _InitRenderPass();
 	void _UninitRenderPass();
-	void _InitImageViewsAndFramebuffers();
-	void _UninitImageViewsAndFramebuffers();
+
+	void _InitDescriptorSetLayouts();
+	void _UninitDescriptorSetLayouts();
+	
+	void _InitSampler();
+	void _UninitSampler();
+
+	void _InitBuffers();
+	void _UninitBuffers();
+
+	void _InitImagesAndViews();
+	void _UninitImagesAndViews();
+	
+	void _InitFramebuffers();
+	void _UninitFramebuffers();
+
+	void _InitDescriptorSets();
+	void _UninitDescriptorSets();
+	
+	void _InitVertexInputs();
+	void _UninitVertexInputs();
+	
 	void _InitPipelines();
 	void _UninitPipelines();
+	
+	void _FillDeviceMemoryWithZero();
 	
 	void _MainLoop();
 	void _UpdateUniformBuffer();
