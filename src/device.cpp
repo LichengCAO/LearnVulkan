@@ -183,6 +183,7 @@ void MyDevice::_SelectPhysicalDevice()
 		.samplerAnisotropy = VK_TRUE
 	};
 	requiredFeatures.sampleRateShading = VK_TRUE;
+	requiredFeatures.fragmentStoresAndAtomics = VK_TRUE;
 	auto vecRequiredExtensions = _GetPhysicalDeviceRequiredExtensions();
 
 	physicalDeviceSelector.set_surface(vkSurface);

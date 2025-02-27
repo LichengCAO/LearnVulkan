@@ -62,7 +62,12 @@ private:
 	std::vector<ImageView> m_oitSampleCountImageViews;
 	std::vector<Image> m_oitInUseImages;
 	std::vector<ImageView> m_oitInUseImageViews;
-	Buffer             m_oitViewportBuffer; //ok
+	Buffer             m_oitViewportBuffer;
+
+	DescriptorSetLayout m_oitOutputDSetLayout;
+	std::vector<DescriptorSet> m_oitOutputDSets;
+	std::vector<Image> m_oitOutputImages;
+	std::vector<ImageView> m_oitOutputImageViews;
 
 	DescriptorSetLayout m_dSetLayout;
 	std::vector<DescriptorSet> m_dSets;
@@ -80,6 +85,10 @@ private:
 	VertexInputLayout m_gbufferVertLayout;
 	std::vector<Buffer> m_gbufferVertBuffers;
 	std::vector<Buffer> m_gbufferIndexBuffers;
+
+	VertexInputLayout m_transparentVertLayout;
+	std::vector<Buffer> m_transparentVertBuffers;
+	std::vector<Buffer> m_transparentIndexBuffers;
 	
 	VertexInputLayout m_vertLayout;
 	Buffer m_vertBuffer;
@@ -99,6 +108,7 @@ private:
 	std::vector<Framebuffer> m_gbufferFramebuffers;
 
 	RenderPass m_oitRenderPass;
+	std::vector<Framebuffer> m_oitFramebuffers; // read only depth buffer
 
 	RenderPass m_renderPass;
 	std::vector<Image> m_swapchainImages;
@@ -151,6 +161,11 @@ private:
 	void _MainLoop();
 	void _UpdateUniformBuffer();
 	void _DrawFrame();
+
+	void _ResizeWindow();
+
+	VkImageMemoryBarrier _NewImageBarreir(const ImageView* pImageView, VkImageLayout oldLayout, VkImageLayout newLayout) const;
+	void _PipelineBarrier(VkCommandBuffer cmdBuffer, const std::vector<VkMemoryBarrier>& memoryBarriers, const std::vector<VkImageMemoryBarrier>& imageMemoryBarriers) const;
 
 public:
 	void Run();

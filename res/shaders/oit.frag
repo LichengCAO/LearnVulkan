@@ -6,13 +6,12 @@
 
 layout(location = 0) in vec4 inColor;
 
-layout(set = 0, binding = 1) uniform sampler2D uSampler;
-layout(set = 1, binding = 0, rgba32ui) uniform coherent uimageBuffer sampleDataImage; // sample data
-layout(set = 1, binding = 1, r32ui) uniform coherent uimage2D sampleCountImage; // sample count
-layout(set = 1, binding = 2, r32ui) uniform coherent uimage2D inUseImage; // flow control
+layout(set = 2, binding = 0, rgba32ui) uniform coherent uimageBuffer sampleDataImage; // sample data
+layout(set = 2, binding = 1, r32ui) uniform coherent uimage2D sampleCountImage; // sample count
+layout(set = 2, binding = 2, r32ui) uniform coherent uimage2D inUseImage; // flow control
 // layout(set = 1, binding = 3, r32ui) uniform coherent uimage2D imgDepth;
 // layout(set = 1, binding = 3) uniform ivec3 viewport; -> not allowed for vulkan
-layout(set = 1, binding = 3) uniform ViewportInformation
+layout(set = 2, binding = 3) uniform ViewportInformation
 {
     ivec3 extent; // width, height, width * height
 } viewportInfo;

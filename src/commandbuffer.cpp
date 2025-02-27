@@ -102,7 +102,7 @@ void CommandSubmission::StartOneTimeCommands(const std::vector<WaitInformation>&
 void CommandSubmission::StartRenderPass(const RenderPass* pRenderPass, const Framebuffer* pFramebuffer)
 {
 	std::vector<VkClearValue> clearValues;
-	CHECK_TRUE(pRenderPass->attachments.size() > 0, "No attachment in render pass!");
+	// CHECK_TRUE(pRenderPass->attachments.size() > 0, "No attachment in render pass!"); // the attachment-less renderpass is allowed in vulkan
 	for (int i = 0; i < pRenderPass->attachments.size(); ++i)
 	{
 		// Note that the order of clearValues should be identical to the order of your attachments.
@@ -112,7 +112,7 @@ void CommandSubmission::StartRenderPass(const RenderPass* pRenderPass, const Fra
 	
 	VkRenderPassBeginInfo renderPassInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
 	renderPassInfo.renderPass = pRenderPass->vkRenderPass;
-	renderPassInfo.framebuffer = pFramebuffer->vkFramebuffer;
+	if (pRenderPass != nullptr) renderPassInfo.framebuffer = pFramebuffer->vkFramebuffer;
 	renderPassInfo.renderArea.offset = { 0,0 };
 	renderPassInfo.renderArea.extent = { imageInfo.width, imageInfo.height };
 	renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size()); 

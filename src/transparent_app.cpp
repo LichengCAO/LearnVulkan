@@ -86,64 +86,97 @@ void TransparentApp::_Uninit()
 void TransparentApp::_InitRenderPass()
 {
 	// Setup render pass
-	AttachmentInformation albedoInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::GBUFFER_ALBEDO);
-	AttachmentInformation posInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::GBUFFER_POSITION);
-	AttachmentInformation normalInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::GBUFFER_NORMAL);
-	AttachmentInformation depthInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::DEPTH);
-	m_gbufferRenderPass.AddAttachment(albedoInfo);
-	m_gbufferRenderPass.AddAttachment(posInfo);
-	m_gbufferRenderPass.AddAttachment(normalInfo);
-	//m_gbufferRenderPass.AddAttachment(depthInfo);
-	SubpassInformation gSubpassInfo{};
-	gSubpassInfo.AddColorAttachment(0);
-	gSubpassInfo.AddColorAttachment(1);
-	gSubpassInfo.AddColorAttachment(2);
-	//gSubpassInfo.SetDepthStencilAttachment(3);
-	m_gbufferRenderPass.AddSubpass(gSubpassInfo);
-	m_gbufferRenderPass.Init();
+	// oit
+	{
+		AttachmentInformation readOnlyDepthInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::DEPTH);
+		readOnlyDepthInfo.attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
+		readOnlyDepthInfo.attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		readOnlyDepthInfo.attachmentDescription.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+		readOnlyDepthInfo.attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+		m_oitRenderPass.AddAttachment(readOnlyDepthInfo);
+		SubpassInformation oitSubpassInfo{};
+		oitSubpassInfo.SetDepthStencilAttachment(0);
+		m_oitRenderPass.AddSubpass(oitSubpassInfo);
+		m_oitRenderPass.Init();
+	}
 
-	AttachmentInformation swapchainInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::SWAPCHAIN);
-	m_renderPass.AddAttachment(swapchainInfo);
-	SubpassInformation subpassInfo{};
-	subpassInfo.AddColorAttachment(0);
-	m_renderPass.AddSubpass(subpassInfo);
-	m_renderPass.Init();
+	// gbuffer
+	{
+		AttachmentInformation albedoInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::GBUFFER_ALBEDO);
+		AttachmentInformation posInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::GBUFFER_POSITION);
+		AttachmentInformation normalInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::GBUFFER_NORMAL);
+		AttachmentInformation depthInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::DEPTH);
+		m_gbufferRenderPass.AddAttachment(albedoInfo);
+		m_gbufferRenderPass.AddAttachment(posInfo);
+		m_gbufferRenderPass.AddAttachment(normalInfo);
+		//m_gbufferRenderPass.AddAttachment(depthInfo);
+		SubpassInformation gSubpassInfo{};
+		gSubpassInfo.AddColorAttachment(0);
+		gSubpassInfo.AddColorAttachment(1);
+		gSubpassInfo.AddColorAttachment(2);
+		//gSubpassInfo.SetDepthStencilAttachment(3);
+		m_gbufferRenderPass.AddSubpass(gSubpassInfo);
+		m_gbufferRenderPass.Init();
+	}
+
+	// final present
+	{
+		AttachmentInformation swapchainInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::SWAPCHAIN);
+		m_renderPass.AddAttachment(swapchainInfo);
+		SubpassInformation subpassInfo{};
+		subpassInfo.AddColorAttachment(0);
+		m_renderPass.AddSubpass(subpassInfo);
+		m_renderPass.Init();
+	}
+
 }
 void TransparentApp::_UninitRenderPass()
 {
 	m_renderPass.Uninit();
 	m_gbufferRenderPass.Uninit();
+	m_oitRenderPass.Uninit();
 }
 
 void TransparentApp::_InitDescriptorSetLayouts()
 {
-	// OIT related
+	// OIT front before sorting
 	{
 		DescriptorSetEntry binding0{}; // sample image
 		binding0.descriptorCount = 1;
 		binding0.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
-		binding0.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
+		binding0.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT | VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT;
 
 		DescriptorSetEntry binding1{}; // sample count
 		binding1.descriptorCount = 1;
 		binding1.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-		binding1.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		binding1.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT | VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT;
 
 		DescriptorSetEntry binding2{}; // in use
 		binding2.descriptorCount = 1;
 		binding2.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-		binding2.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		binding2.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
 
 		DescriptorSetEntry binding3{}; // viewport
 		binding3.descriptorCount = 1;
 		binding3.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		binding3.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		binding3.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT | VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT;
 
 		m_oitDSetLayout.AddBinding(binding0);
 		m_oitDSetLayout.AddBinding(binding1);
 		m_oitDSetLayout.AddBinding(binding2);
 		m_oitDSetLayout.AddBinding(binding3);
 		m_oitDSetLayout.Init();
+	}
+
+	// OIT post sorting
+	{
+		DescriptorSetEntry binding0{}; // output image
+		binding0.descriptorCount = 1;
+		binding0.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		binding0.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT | VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT;
+
+		m_oitOutputDSetLayout.AddBinding(binding0);
+		m_oitOutputDSetLayout.Init();
 	}
 
 	// model related
@@ -202,6 +235,7 @@ void TransparentApp::_UninitDescriptorSetLayouts()
 	m_dSetLayout.Uninit();
 	m_cameraDSetLayout.Uninit();
 	m_modelDSetLayout.Uninit();
+	m_oitOutputDSetLayout.Uninit();
 	m_oitDSetLayout.Uninit();
 }
 
@@ -252,7 +286,7 @@ void TransparentApp::_InitBuffers()
 		m_oitViewportBuffer.Init(oitViewportBufferInfo);
 
 		BufferInformation oitSampleTexelBufferInfo{};
-		oitSampleTexelBufferInfo.size = sizeof(glm::i32vec2) * width * height * 5/* OIT_LAYER */;
+		oitSampleTexelBufferInfo.size = sizeof(glm::uvec4) * width * height * 5/* OIT_LAYER */;
 		oitSampleTexelBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
 		oitSampleTexelBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
@@ -262,7 +296,7 @@ void TransparentApp::_InitBuffers()
 		{
 			m_oitSampleTexelBuffers.push_back(Buffer{});
 			m_oitSampleTexelBuffers[i].Init(oitSampleTexelBufferInfo);
-			m_oitSampleTexelBufferViews.push_back(m_oitSampleTexelBuffers[i].NewBufferView(VkFormat::VK_FORMAT_R32G32_UINT));
+			m_oitSampleTexelBufferViews.push_back(m_oitSampleTexelBuffers[i].NewBufferView(VkFormat::VK_FORMAT_R32G32B32A32_UINT));
 			m_oitSampleTexelBufferViews[i].Init();
 		}
 	}
@@ -356,6 +390,8 @@ void TransparentApp::_InitImagesAndViews()
 	m_oitSampleCountImageViews.reserve(n);
 	m_oitInUseImages.reserve(n);
 	m_oitInUseImageViews.reserve(n);
+	m_oitOutputImages.reserve(n);
+	m_oitOutputImageViews.reserve(n);
 	
 	// create model textures
 	std::vector<std::string> textures;
@@ -389,17 +425,26 @@ void TransparentApp::_InitImagesAndViews()
 	oitInUseImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 	ImageViewInformation oitInUseImageViewInfo{};
 	oitInUseImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
+
+	ImageInformation oitOutputImageInfo{};
+	oitOutputImageInfo.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
+	oitOutputImageInfo.width = width;
+	oitOutputImageInfo.height = height;
+	oitOutputImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_STORAGE_BIT;
+	oitOutputImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	ImageViewInformation oitOutputImageViewInfo{};
+	oitOutputImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
 	
-	std::vector<Image>* arrOITImages[] = { &m_oitSampleCountImages, &m_oitInUseImages };
-	std::vector<ImageView>* arrOITImageViews[] = { &m_oitSampleCountImageViews, &m_oitInUseImageViews };
-	ImageInformation* oitImageInfos[] = { &oitSampleCountImageInfo, &oitInUseImageInfo };
-	ImageViewInformation* oitViewInfos[] = { &oitSampleCountImageViewInfo, &oitInUseImageViewInfo };
+	std::vector<std::vector<Image>*> vecOITImages = { &m_oitSampleCountImages, &m_oitInUseImages, &m_oitOutputImages };
+	std::vector<std::vector<ImageView>*> vecOITImageViews = { &m_oitSampleCountImageViews, &m_oitInUseImageViews, &m_oitOutputImageViews };
+	std::vector<ImageInformation*> oitImageInfos = { &oitSampleCountImageInfo, &oitInUseImageInfo, &oitOutputImageInfo };
+	std::vector<ImageViewInformation*> oitViewInfos = { &oitSampleCountImageViewInfo, &oitInUseImageViewInfo, &oitOutputImageViewInfo };
 	for (int i = 0; i < n; ++i)
 	{
-		for (int j = 0; j < 2; ++j)
+		for (int j = 0; j < vecOITImages.size(); ++j)
 		{
-			std::vector<Image>& oitImages = *arrOITImages[j];
-			std::vector<ImageView>& oitViews = *arrOITImageViews[j];
+			std::vector<Image>& oitImages = *vecOITImages[j];
+			std::vector<ImageView>& oitViews = *vecOITImageViews[j];
 			ImageInformation& imageInfo = *oitImageInfos[j];
 			ImageViewInformation& viewInfo = *oitViewInfos[j];
 			oitImages.push_back(Image{});
@@ -499,8 +544,20 @@ void TransparentApp::_UninitImagesAndViews()
 		&m_gbufferPosImageViews,
 		&m_gbufferNormalImageViews,
 		&m_oitSampleCountImageViews,
-		&m_oitInUseImageViews
+		&m_oitInUseImageViews,
+		&m_oitOutputImageViews
 	};
+	std::vector<std::vector<Image>*> pImageVecsToUninit =
+	{
+		&m_depthImages,
+		&m_gbufferAlbedoImages,
+		&m_gbufferPosImages,
+		&m_gbufferNormalImages,
+		&m_oitSampleCountImages,
+		&m_oitInUseImages,
+		&m_oitOutputImages
+	};
+
 	for (auto pViewVec : pViewVecsToUninit)
 	{
 		std::vector<ImageView>& viewVec = *pViewVec;
@@ -510,16 +567,6 @@ void TransparentApp::_UninitImagesAndViews()
 		}
 		viewVec.clear();
 	}
-	
-	std::vector<std::vector<Image>*> pImageVecsToUninit = 
-	{ 
-		&m_depthImages,
-		&m_gbufferAlbedoImages,
-		&m_gbufferPosImages,
-		&m_gbufferNormalImages,
-		&m_oitSampleCountImages,
-		&m_oitInUseImages
-	};
 	for (auto pImageVec : pImageVecsToUninit)
 	{
 		std::vector<Image>& imageVec = *pImageVec;
@@ -529,7 +576,6 @@ void TransparentApp::_UninitImagesAndViews()
 		}
 		imageVec.clear();
 	}
-
 	for (auto& texture : m_modelTextures)
 	{
 		texture.Uninit();
@@ -542,6 +588,7 @@ void TransparentApp::_InitFramebuffers()
 	auto n = MAX_FRAME_COUNT;
 	m_framebuffers.reserve(m_swapchainImages.size());
 	m_gbufferFramebuffers.reserve(n);
+	m_oitFramebuffers.reserve(n);
 	
 	// Setup frame buffers
 	for (int i = 0; i < n; ++i)
@@ -555,6 +602,13 @@ void TransparentApp::_InitFramebuffers()
 		};
 		m_gbufferFramebuffers.push_back(m_gbufferRenderPass.NewFramebuffer(gbufferViews));
 		m_gbufferFramebuffers.back().Init();
+
+		std::vector<const ImageView*> oitDepthViews =
+		{
+			&m_depthImageViews[i]
+		};
+		m_oitFramebuffers.push_back(m_oitRenderPass.NewFramebuffer(oitDepthViews));
+		m_oitFramebuffers.back().Init();
 	}
 	for (int i = 0; i < m_swapchainImages.size(); ++i)
 	{
@@ -572,6 +626,7 @@ void TransparentApp::_UninitFramebuffers()
 	{
 		&m_framebuffers,
 		&m_gbufferFramebuffers,
+		&m_oitFramebuffers
 	};
 	for (auto pFramebufferVec : pFramebufferVecsToUninit)
 	{
@@ -610,6 +665,22 @@ void TransparentApp::_InitDescriptorSets()
 			m_oitDSets[i].DescriptorSetUpdate_WriteBinding(2, inUseImageInfo);
 			m_oitDSets[i].DescriptorSetUpdate_WriteBinding(3, &m_oitViewportBuffer);
 			m_oitDSets[i].FinishDescriptorSetUpdate();
+		}
+
+		m_oitOutputDSets.reserve(MAX_FRAME_COUNT);
+		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+		{
+			VkDescriptorImageInfo outputImageInfo{};
+			outputImageInfo.sampler = VK_NULL_HANDLE;						  // Typically not used for storage images
+			outputImageInfo.imageView = m_oitOutputImageViews[i].vkImageView; // VkImageView created from your image
+			outputImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;			  // Commonly used layout for storage images
+
+			m_oitOutputDSets.push_back(DescriptorSet{});
+			m_oitOutputDSets[i].SetLayout(&m_oitOutputDSetLayout);
+			m_oitOutputDSets[i].Init();
+			m_oitOutputDSets[i].StartDescriptorSetUpdate();
+			m_oitOutputDSets[i].DescriptorSetUpdate_WriteBinding(0, outputImageInfo);
+			m_oitOutputDSets[i].FinishDescriptorSetUpdate();
 		}
 	}
 
@@ -688,6 +759,7 @@ void TransparentApp::_UninitDescriptorSets()
 		dsets.clear();
 	}
 	m_vecModelDSets.clear();
+	m_oitOutputDSets.clear();
 	m_oitDSets.clear();
 }
 
@@ -878,12 +950,40 @@ void TransparentApp::_UninitVertexInputs()
 // TODO:
 void TransparentApp::_InitPipelines()
 {
+	SimpleShader oitFrontVertShader;
+	SimpleShader oitFrontFragShader;
+	oitFrontVertShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/oit.vert.spv");
+	oitFrontFragShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/oit.frag.spv");
+	oitFrontVertShader.Init();
+	oitFrontFragShader.Init();
+
+	m_oitPipeline.AddDescriptorSetLayout(&m_cameraDSetLayout);
+	m_oitPipeline.AddDescriptorSetLayout(&m_modelDSetLayout);
+	m_oitPipeline.AddDescriptorSetLayout(&m_oitDSetLayout);
+	m_oitPipeline.AddShader(&oitFrontFragShader);
+	m_oitPipeline.AddShader(&oitFrontVertShader);
+	m_oitPipeline.BindToSubpass(&m_oitRenderPass, 0);
+	m_oitPipeline.AddVertexInputLayout(&m_gbufferVertLayout);
+	m_oitPipeline.Init();
+
+	oitFrontVertShader.Uninit();
+	oitFrontFragShader.Uninit();
+
+	SimpleShader oitSortShader;
+	oitSortShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/oit.comp.spv");
+	oitSortShader.Init();
+
+	m_oitSortPipeline.AddDescriptorSetLayout(&m_oitDSetLayout);
+	m_oitSortPipeline.AddDescriptorSetLayout(&m_oitOutputDSetLayout);
+	m_oitSortPipeline.AddShader(&oitSortShader);
+	m_oitSortPipeline.Init();
+
+	oitSortShader.Uninit();
+
 	SimpleShader gbufferVertShader;
 	SimpleShader gbufferFragShader;
 	gbufferVertShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/gbuffer.vert.spv");
 	gbufferFragShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/gbuffer.frag.spv");
-	gbufferVertShader.stage = VK_SHADER_STAGE_VERTEX_BIT;
-	gbufferFragShader.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
 	gbufferVertShader.Init();
 	gbufferFragShader.Init();
 
@@ -902,8 +1002,6 @@ void TransparentApp::_InitPipelines()
 	SimpleShader fragShader;
 	vertShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/quad.vert.spv");
 	fragShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/quad.frag.spv");
-	vertShader.stage = VK_SHADER_STAGE_VERTEX_BIT;
-	fragShader.stage = VK_SHADER_STAGE_FRAGMENT_BIT;
 	vertShader.Init();
 	fragShader.Init();
 
@@ -921,6 +1019,8 @@ void TransparentApp::_UninitPipelines()
 {
 	m_gPipeline.Uninit();
 	m_gbufferPipeline.Uninit();
+	m_oitSortPipeline.Uninit();
+	m_oitPipeline.Uninit();
 }
 
 void TransparentApp::_MainLoop()
@@ -1003,12 +1103,7 @@ void TransparentApp::_DrawFrame()
 {
 	if (MyDevice::GetInstance().NeedRecreateSwapchain())
 	{
-		vkDeviceWaitIdle(MyDevice::GetInstance().vkDevice);
-		_UninitDescriptorSets();
-		_UninitImagesAndViews();
-		MyDevice::GetInstance().RecreateSwapchain();
-		_InitImagesAndViews();
-		_InitDescriptorSets();
+		_ResizeWindow();
 	}
 
 	auto& cmd = m_commandSubmissions[m_currentFrame];
@@ -1040,6 +1135,75 @@ void TransparentApp::_DrawFrame()
 	}
 	cmd.EndRenderPass();
 
+	// wait for previous depth done, and also the previous OIT texel buffers and image buffers to clean
+	{
+		// TODO: clean OIT texel buffers and image buffers
+		VkImageMemoryBarrier depthImageBarrier = 
+			_NewImageBarreir(
+				&m_depthImageViews[m_currentFrame],
+				VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
+				VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL
+			);
+		std::vector<VkImageMemoryBarrier> imageBarriers = { depthImageBarrier };
+		vkCmdPipelineBarrier(cmd.vkCommandBuffer,
+			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+			0,
+			0, nullptr,
+			0, nullptr,
+			static_cast<uint32_t>(imageBarriers.size()), imageBarriers.data()
+		);
+	}
+
+	cmd.StartRenderPass(&m_oitRenderPass, &m_oitFramebuffers[m_currentFrame]);
+	for (int i = 0; i < m_transparentVertBuffers.size(); ++i)
+	{
+		PipelineInput input;
+		VertexIndexInput indexInput;
+		VertexInput vertInput;
+		indexInput.pBuffer = &m_transparentIndexBuffers[i];
+		vertInput.pVertexInputLayout = &m_transparentVertLayout;
+		vertInput.pBuffer = &m_transparentVertBuffers[i];
+		input.pDescriptorSets = 
+		{ 
+			&m_cameraDSets[m_currentFrame],
+			&m_vecModelDSets[m_currentFrame][i],
+			&m_oitDSets[m_currentFrame] // we have synthcornization here, so i think it's ok
+		};
+		input.imageSize = MyDevice::GetInstance().GetSwapchainExtent();
+		input.pVertexIndexInput = &indexInput;
+		input.pVertexInputs = { &vertInput };
+
+		m_oitPipeline.Do(cmd.vkCommandBuffer, input); // the draw will be done unordered
+	}
+	cmd.EndRenderPass();
+
+	// wait for the oit sample buffer and sample count buffer be done
+	{
+		VkImageMemoryBarrier sampleCountImageBarrier =
+			_NewImageBarreir(
+				&m_oitSampleCountImageViews[m_currentFrame],
+				VK_IMAGE_LAYOUT_GENERAL,
+				VK_IMAGE_LAYOUT_GENERAL
+			);
+		VkMemoryBarrier sampleDataBarrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+		sampleDataBarrier.srcAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT;
+		sampleDataBarrier.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
+		
+		std::vector<VkImageMemoryBarrier> imageBarriers = { sampleCountImageBarrier };
+		std::vector<VkMemoryBarrier> memoryBarriers = { sampleDataBarrier };
+
+		vkCmdPipelineBarrier(cmd.vkCommandBuffer,
+			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			0,
+			static_cast<uint32_t>(memoryBarriers.size()), memoryBarriers.data(),
+			0, nullptr,
+			static_cast<uint32_t>(imageBarriers.size()), imageBarriers.data()
+		);
+
+	}
+
 	// use a memory barrier here to synchronize the order of the 2 render passes
 	// start another render pass if we want to do deferred shading or post process shader, loadOp = LOAD_OP_LOAD 
 	// from my understanding now, we can safely read the neighboring pixels in the next render pass, since the store operations will happen after a render pass end unlike subpass
@@ -1055,23 +1219,12 @@ void TransparentApp::_DrawFrame()
 		
 		for (int i = 0; i < pViewsToSync.size(); ++i)
 		{
-			VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-			const ImageView* pViewToSync = pViewsToSync[i];
-			ImageInformation imageInfo = pViewToSync->pImage->GetImageInformation();
-			ImageViewInformation viewInfo = pViewToSync->GetImageViewInformation();
-			barrier.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-			barrier.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-			barrier.image = pViewToSync->pImage->vkImage;
-			barrier.subresourceRange.aspectMask = viewInfo.aspectMask;
-			barrier.subresourceRange.baseMipLevel = viewInfo.baseMipLevel;
-			barrier.subresourceRange.levelCount = viewInfo.levelCount;
-			barrier.subresourceRange.baseArrayLayer = 0;
-			barrier.subresourceRange.layerCount = 1;
-			barrier.srcAccessMask = VkAccessFlagBits::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT; // when it could be read
-			barrier.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT; // when it need to be read
-
+			VkImageMemoryBarrier barrier = 
+				_NewImageBarreir(
+					pViewsToSync[i], 
+					VkImageLayout::VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 
+					VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+				);
 			imageBarriers.push_back(barrier);
 		}
 
@@ -1081,7 +1234,8 @@ void TransparentApp::_DrawFrame()
 		VkPipelineStageFlags dstStage = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 
 		vkCmdPipelineBarrier(cmd.vkCommandBuffer,
-			srcStage, dstStage,
+			srcStage, 
+			dstStage,
 			0, 
 			0, nullptr,
 			0, nullptr,
@@ -1113,6 +1267,58 @@ void TransparentApp::_DrawFrame()
 	m_currentFrame = (m_currentFrame + 1) % MAX_FRAME_COUNT;
 }
 
+void TransparentApp::_ResizeWindow()
+{
+	vkDeviceWaitIdle(MyDevice::GetInstance().vkDevice);
+	_UninitDescriptorSets();
+	_UninitImagesAndViews();
+	MyDevice::GetInstance().RecreateSwapchain();
+	_InitImagesAndViews();
+	_InitDescriptorSets();
+}
+
+VkImageMemoryBarrier TransparentApp::_NewImageBarreir(const ImageView* pImageView, VkImageLayout oldLayout, VkImageLayout newLayout) const
+{
+	static std::unordered_map<VkImageLayout, std::unordered_map<VkImageLayout, VkAccessFlags>> srcAccessMap;
+	static std::unordered_map<VkImageLayout, std::unordered_map<VkImageLayout, VkAccessFlags>> dstAccessMap;
+	{
+		srcAccessMap[VkImageLayout::VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL][VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL] = VkAccessFlagBits::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		dstAccessMap[VkImageLayout::VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL][VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL] = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
+
+		srcAccessMap[VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL][VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL] = VkAccessFlagBits::VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		dstAccessMap[VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL][VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL] = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
+
+		srcAccessMap[VkImageLayout::VK_IMAGE_LAYOUT_GENERAL][VkImageLayout::VK_IMAGE_LAYOUT_GENERAL] = VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT;
+		dstAccessMap[VkImageLayout::VK_IMAGE_LAYOUT_GENERAL][VkImageLayout::VK_IMAGE_LAYOUT_GENERAL] = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
+	}
+
+	VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+	auto viewInfo = pImageView->GetImageViewInformation();
+	barrier.oldLayout = oldLayout;
+	barrier.newLayout = newLayout;
+	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.image = pImageView->pImage->vkImage;
+	barrier.subresourceRange.aspectMask = viewInfo.aspectMask;
+	barrier.subresourceRange.baseMipLevel = viewInfo.baseMipLevel;
+	barrier.subresourceRange.levelCount = viewInfo.levelCount;
+	barrier.subresourceRange.baseArrayLayer = 0;
+	barrier.subresourceRange.layerCount = 1;
+
+	if (srcAccessMap.find(oldLayout) == srcAccessMap.end() || srcAccessMap[oldLayout].find(newLayout) == srcAccessMap[oldLayout].end())
+	{
+		std::runtime_error("No old layout and new layout preset!");
+	}
+	if (dstAccessMap.find(oldLayout) == dstAccessMap.end() || dstAccessMap[oldLayout].find(newLayout) == dstAccessMap[oldLayout].end())
+	{
+		std::runtime_error("No old layout and new layout preset!");
+	}
+	barrier.srcAccessMask = srcAccessMap[oldLayout][newLayout]; // when it could be read
+	barrier.dstAccessMask = dstAccessMap[oldLayout][newLayout]; // when it need to be read
+
+	return barrier;
+}
+
 void TransparentApp::Run()
 {
 	_Init();
@@ -1120,6 +1326,8 @@ void TransparentApp::Run()
 	_Uninit();
 }
 
+// TODO:
 void TransparentApp::_FillDeviceMemoryWithZero()
 {
+
 }
