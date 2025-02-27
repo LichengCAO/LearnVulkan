@@ -3,50 +3,58 @@
 // Dimensionality: uimageBuffer is 1D, while uimage2D is 2D.
 // Use Cases: Choose based on whether your application requires handling data with a natural 2D layout (uimage2D) or a linear 1D layout (uimageBuffer).
 #define OIT_LAYERS 5
+
+layout(location = 0) in vec4 inColor;
+
 layout(set = 0, binding = 1) uniform sampler2D uSampler;
-layout(set = 1, binding = 0, rg32ui) uniform coherent uimageBuffer sampleDataImage; // sample data
+layout(set = 1, binding = 0, rgba32ui) uniform coherent uimageBuffer sampleDataImage; // sample data
 layout(set = 1, binding = 1, r32ui) uniform coherent uimage2D sampleCountImage; // sample count
 layout(set = 1, binding = 2, r32ui) uniform coherent uimage2D inUseImage; // flow control
 // layout(set = 1, binding = 3, r32ui) uniform coherent uimage2D imgDepth;
-layout(set = 1, binding = 3) uniform ivec3 viewport; // width, height, width * height 
+// layout(set = 1, binding = 3) uniform ivec3 viewport; -> not allowed for vulkan
+layout(set = 1, binding = 3) uniform ViewportInformation
+{
+    ivec3 extent; // width, height, width * height
+} viewportInfo;
 
 void main()
 {
     // packSnorm4x8: round(clamp(c, -1.0, 1.0) * 127.0)
+    ivec2 coord = ivec2(gl_FragCoord.xy);
     uvec4 storeValue = uvec4(packUnorm4x8(inColor), floatBitsToUint(gl_FragCoord.z), 0, 0);
-    const uint texelBufferCoord = viewport.x * OIT_LAYERS * gl_FragCoord.y + OIT_LAYERS * gl_FragCoord.x;
+    const int texelBufferCoord = viewportInfo.extent.x * OIT_LAYERS * coord.y + OIT_LAYERS * coord.x;
     bool done = false;
     while(!done)
     {
-        uint old = imageAtomicExchange(inUseImage, gl_FragCoord.xy, 1u);
+        uint old = imageAtomicExchange(inUseImage, coord, 1u);
         if (old == 0u)
         {
-            const uint oldCount = imageLoad(sampleCountImage, gl_FragCoord.xy).r;
-            imageStore(sampleCountImage, gl_FragCoord.xy, uvec4(oldCount + 1));
+            const uint oldCount = imageLoad(sampleCountImage, coord).r;
+            imageStore(sampleCountImage, coord, uvec4(oldCount + 1));
 
             // leave bubble sort at shading pass
             if(oldCount < OIT_LAYERS)
             {
-                imageStore(sampleDataImage, texelBufferCoord + oldCount, storeValue);
+                imageStore(sampleDataImage, texelBufferCoord + int(oldCount), storeValue);
             }
             else
             {
                 // Find the furthest element
                 int  furthest = -1;
-                uvec4 sample = storeValue;
+                uvec4 sample1 = storeValue;
                 int  furthest2 = 0;
                 uvec4 sample2 = uvec4(0, 0, 0, 0);
                 for(int i = 0; i < OIT_LAYERS; ++i)
                 {
                     uvec4 newSample = imageLoad(sampleDataImage, texelBufferCoord + i);
                     uint testDepth = newSample.g;
-                    uint maxDepth = sample.g;
+                    uint maxDepth = sample1.g;
                     uint maxDepth2 = sample2.g;
                     if(testDepth > maxDepth)
                     {
-                        sample2 = sample;
+                        sample2 = sample1;
                         furthest2 = furthest;
-                        sample = newSample;
+                        sample1 = newSample;
                         furthest = i;
                     }
                     else if (testDepth > maxDepth2)
@@ -57,10 +65,10 @@ void main()
                 }
                 //TODO: mix sample and sample2 to storeValue
                 storeValue.g = sample2.g;
-                vec4 farColor = unpackUnorm4x8(sample.r);
+                vec4 farColor = unpackUnorm4x8(sample1.r);
                 vec4 nearColor = unpackUnorm4x8(sample2.r);
                 nearColor.rgb = nearColor.rgb + nearColor.a * farColor.rgb;
-                nearColor.a = saturate(nearColor.a * farColor.a);
+                nearColor.a = clamp(nearColor.a * farColor.a, 0.0f, 1.0f);
                 storeValue.r = packUnorm4x8(nearColor);
                 if (furthest == -1)
                 {
@@ -72,7 +80,7 @@ void main()
                 }
 
             }
-            imageAtomicExchange(inUseImage, gl_FragCoord.xy, 0u);
+            imageAtomicExchange(inUseImage, coord, 0u);
             done = true;
         }
     }
