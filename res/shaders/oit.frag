@@ -13,7 +13,7 @@ layout(set = 2, binding = 2, r32ui) uniform coherent uimage2D inUseImage; // flo
 // layout(set = 1, binding = 3) uniform ivec3 viewport; -> not allowed for vulkan
 layout(set = 2, binding = 3) uniform ViewportInformation
 {
-    ivec3 extent; // width, height, width * height
+    ivec4 extent; // width, height, width * height
 } viewportInfo;
 
 void main()

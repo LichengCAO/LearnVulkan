@@ -7,7 +7,7 @@ layout(set = 0, binding = 0, rgba32ui) uniform readonly uimageBuffer sampleDataI
 layout(set = 0, binding = 1, r32ui) uniform readonly uimage2D sampleCountImage;
 layout(set = 0, binding = 3) uniform ViewportInformation
 {
-    ivec3 extent; // width, height, width * height
+    ivec4 extent; // width, height, width * height
 } viewportInfo;
 
 layout(set = 1, binding = 0, rgba32f) uniform writeonly image2D imgOutput;

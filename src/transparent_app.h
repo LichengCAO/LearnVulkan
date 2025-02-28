@@ -19,6 +19,10 @@ struct ModelTransform
 	alignas(16) glm::mat4 model;
 	alignas(16) glm::mat4 modelInvTranspose;
 };
+struct ViewportInformation
+{
+	glm::ivec4 extent{};
+};
 struct Vertex
 {
 	alignas(16) glm::vec3 pos{};
@@ -52,6 +56,7 @@ private:
 	float frameTime = 0.0f;
 	uint32_t m_currentFrame = 0;
 	std::vector<Model> m_models;
+	std::vector<Model> m_transModels;
 
 	// Descriptor sets
 	DescriptorSetLayout m_oitDSetLayout;
@@ -75,6 +80,8 @@ private:
 	DescriptorSetLayout m_modelDSetLayout;
 	std::vector<std::vector<DescriptorSet>> m_vecModelDSets;
 	std::vector<std::vector<Buffer>> m_vecModelBuffers;
+	std::vector<std::vector<DescriptorSet>> m_vecTransModelDSets;
+	std::vector<std::vector<Buffer>> m_vecTransModelBuffers;
 	std::vector<Texture> m_modelTextures;
 	
 	DescriptorSetLayout m_cameraDSetLayout;
@@ -164,8 +171,17 @@ private:
 
 	void _ResizeWindow();
 
-	VkImageMemoryBarrier _NewImageBarreir(const ImageView* pImageView, VkImageLayout oldLayout, VkImageLayout newLayout) const;
-	void _PipelineBarrier(VkCommandBuffer cmdBuffer, const std::vector<VkMemoryBarrier>& memoryBarriers, const std::vector<VkImageMemoryBarrier>& imageMemoryBarriers) const;
+	struct ImageBarrierInformation
+	{
+		const ImageView* pImageView = nullptr;
+		VkImageLayout oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
+		VkImageLayout newLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
+		VkAccessFlags srcAccessMask = VkAccessFlagBits::VK_ACCESS_NONE;
+		VkAccessFlags dstAccessMask = VkAccessFlagBits::VK_ACCESS_NONE;
+	};
+	VkImageMemoryBarrier _NewImageBarreir(const ImageBarrierInformation& _info) const;
+
+	void _ReadObjFile(const std::string& objFile, std::vector<Vertex>& verts, std::vector<uint32_t>& indices) const;
 
 public:
 	void Run();

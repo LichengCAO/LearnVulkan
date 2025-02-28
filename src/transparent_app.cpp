@@ -13,11 +13,13 @@ void TransparentApp::_Init()
 	room.texturePath = "E:/GitStorage/LearnVulkan/res/models/viking_room/viking_room.png";
 	wahoo.objFilePath = "E:/GitStorage/LearnVulkan/res/models/wahoo/wahoo.obj";
 	wahoo.texturePath = "E:/GitStorage/LearnVulkan/res/models/wahoo/wahoo.bmp";
+	sphere.objFilePath = "E:/GitStorage/LearnVulkan/res/models/sphere/sphere.obj";
+	sphere.texturePath = "E:/GitStorage/LearnVulkan/res/models/sphere/sphere.png";
 	wahoo.transform.SetScale({ 0.05, 0.05, 0.05 });
 	wahoo.transform.SetRotation({ 90, 0, 90 });
 	wahoo.transform.SetPosition({ 0.5, 0.0, 0.2 });
-	sphere.objFilePath = "E:/GitStorage/LearnVulkan/res/models/sphere/sphere.obj";
-	sphere.texturePath = "E:/GitStorage/LearnVulkan/res/models/sphere/sphere.png";
+	m_models = { wahoo, room };
+
 	std::default_random_engine            rnd(3625);  // Fixed seed
 	std::uniform_real_distribution<float> uniformDist;
 	for (int i = 0; i < 10; ++i)
@@ -29,9 +31,9 @@ void TransparentApp::_Init()
 		radius *= uniformDist(rnd) * 0.1f + 0.3f;
 		sphere.transform.SetPosition(center);
 		sphere.transform.SetScale(glm::vec3(radius));
-		m_models.push_back(sphere);
+		m_transModels.push_back(sphere);
 	}
-	//m_models = { wahoo, room, sphere };
+
 	_InitRenderPass();
 	_InitDescriptorSetLayouts();
 
@@ -224,9 +226,15 @@ void TransparentApp::_InitDescriptorSetLayouts()
 		binding2.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		binding2.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
 
+		DescriptorSetEntry binding3;
+		binding3.descriptorCount = 1;
+		binding3.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		binding3.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
+
 		m_dSetLayout.AddBinding(binding0);
 		m_dSetLayout.AddBinding(binding1);
 		m_dSetLayout.AddBinding(binding2);
+		m_dSetLayout.AddBinding(binding3);
 		m_dSetLayout.Init();
 	}
 }
@@ -287,8 +295,17 @@ void TransparentApp::_InitBuffers()
 
 		BufferInformation oitSampleTexelBufferInfo{};
 		oitSampleTexelBufferInfo.size = sizeof(glm::uvec4) * width * height * 5/* OIT_LAYER */;
-		oitSampleTexelBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT;
+		oitSampleTexelBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT; // we need to clear it first
 		oitSampleTexelBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+
+		BufferInformation unifViewportBufferInfo{};
+		unifViewportBufferInfo.size = sizeof(ViewportInformation);
+		unifViewportBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+		unifViewportBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		m_oitViewportBuffer.Init(unifViewportBufferInfo);
+		ViewportInformation info{};
+		info.extent = glm::ivec4(width, height, width * height, 0);
+		m_oitViewportBuffer.CopyFromHost(&info);
 
 		m_oitSampleTexelBuffers.reserve(MAX_FRAME_COUNT);
 		m_oitSampleTexelBufferViews.reserve(MAX_FRAME_COUNT);
@@ -317,6 +334,18 @@ void TransparentApp::_InitBuffers()
 			{
 				m_vecModelBuffers[i].push_back(Buffer{});
 				m_vecModelBuffers[i].back().Init(modelBufferInfo);
+			}
+		}
+		m_vecTransModelBuffers.reserve(MAX_FRAME_COUNT);
+		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+		{
+			int n = m_transModels.size();
+			m_vecTransModelBuffers.push_back(std::vector<Buffer>{});
+			m_vecTransModelBuffers[i].reserve(n);
+			for (int j = 0; j < n; ++j)
+			{
+				m_vecTransModelBuffers[i].push_back(Buffer{});
+				m_vecTransModelBuffers[i][j].Init(modelBufferInfo);
 			}
 		}
 	}
@@ -354,6 +383,15 @@ void TransparentApp::_UninitBuffers()
 		buffers.clear();
 	}
 	m_vecModelBuffers.clear();
+	for (auto& buffers : m_vecTransModelBuffers)
+	{
+		for (auto& buffer : buffers)
+		{
+			buffer.Uninit();
+		}
+		buffers.clear();
+	}
+	m_vecTransModelBuffers.clear();
 
 	// oit
 	for (auto& view : m_oitSampleTexelBufferViews)
@@ -412,7 +450,7 @@ void TransparentApp::_InitImagesAndViews()
 	oitSampleCountImageInfo.format = VkFormat::VK_FORMAT_R32_UINT;
 	oitSampleCountImageInfo.width = width;
 	oitSampleCountImageInfo.height = height;
-	oitSampleCountImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_STORAGE_BIT;
+	oitSampleCountImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_STORAGE_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT;// | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
 	oitSampleCountImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 	ImageViewInformation oitSampleCountImageViewInfo{};
 	oitSampleCountImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
@@ -421,7 +459,7 @@ void TransparentApp::_InitImagesAndViews()
 	oitInUseImageInfo.format = VkFormat::VK_FORMAT_R32_UINT;
 	oitInUseImageInfo.width = width;
 	oitInUseImageInfo.height = height;
-	oitInUseImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_STORAGE_BIT;
+	oitInUseImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_STORAGE_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT;// | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
 	oitInUseImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 	ImageViewInformation oitInUseImageViewInfo{};
 	oitInUseImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
@@ -430,7 +468,7 @@ void TransparentApp::_InitImagesAndViews()
 	oitOutputImageInfo.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
 	oitOutputImageInfo.width = width;
 	oitOutputImageInfo.height = height;
-	oitOutputImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_STORAGE_BIT;
+	oitOutputImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_STORAGE_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
 	oitOutputImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 	ImageViewInformation oitOutputImageViewInfo{};
 	oitOutputImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
@@ -451,11 +489,11 @@ void TransparentApp::_InitImagesAndViews()
 			Image& oitImage = oitImages.back();
 			oitImage.SetImageInformation(imageInfo);
 			oitImage.Init();
+			oitImage.TransitionLayout(VK_IMAGE_LAYOUT_GENERAL);
 			oitViews.push_back(oitImage.NewImageView(viewInfo));
 			oitViews.back().Init();
 		}
 	}
-
 
 	// Create depth image and view
 	ImageInformation depthImageInfo;
@@ -703,6 +741,23 @@ void TransparentApp::_InitDescriptorSets()
 				m_vecModelDSets[i][j].FinishDescriptorSetUpdate();
 			}
 		}
+
+		m_vecTransModelDSets.reserve(MAX_FRAME_COUNT);
+		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+		{
+			int n = m_transModels.size();
+			m_vecTransModelDSets.push_back(std::vector<DescriptorSet>{});
+			m_vecTransModelDSets[i].reserve(n);
+			for (int j = 0; j < n; ++j)
+			{
+				m_vecTransModelDSets[i].push_back(DescriptorSet{});
+				m_vecTransModelDSets[i][j].SetLayout(&m_modelDSetLayout);
+				m_vecTransModelDSets[i][j].Init();
+				m_vecTransModelDSets[i][j].StartDescriptorSetUpdate();
+				m_vecTransModelDSets[i][j].DescriptorSetUpdate_WriteBinding(0, &m_vecTransModelBuffers[i][j]);
+				m_vecTransModelDSets[i][j].FinishDescriptorSetUpdate();
+			}
+		}
 	}
 
 	// camera descriptor set
@@ -739,6 +794,11 @@ void TransparentApp::_InitDescriptorSets()
 			imageInfo2.imageView = m_gbufferNormalImageViews[i].vkImageView;
 			imageInfo2.sampler = m_vkSampler;
 
+			VkDescriptorImageInfo imageInfo3;
+			imageInfo3.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			imageInfo3.imageView = m_oitOutputImageViews[i].vkImageView;
+			imageInfo3.sampler = m_vkSampler;
+
 			m_dSets.push_back(DescriptorSet{});
 			m_dSets.back().SetLayout(&m_dSetLayout);
 			m_dSets.back().Init();
@@ -746,6 +806,7 @@ void TransparentApp::_InitDescriptorSets()
 			m_dSets.back().DescriptorSetUpdate_WriteBinding(0, imageInfo0);
 			m_dSets.back().DescriptorSetUpdate_WriteBinding(1, imageInfo1);
 			m_dSets.back().DescriptorSetUpdate_WriteBinding(2, imageInfo2);
+			m_dSets.back().DescriptorSetUpdate_WriteBinding(3, imageInfo3);
 			m_dSets.back().FinishDescriptorSetUpdate();
 		}
 	}
@@ -759,6 +820,11 @@ void TransparentApp::_UninitDescriptorSets()
 		dsets.clear();
 	}
 	m_vecModelDSets.clear();
+	for (auto& dsets : m_vecTransModelDSets)
+	{
+		dsets.clear();
+	}
+	m_vecTransModelDSets.clear();
 	m_oitOutputDSets.clear();
 	m_oitDSets.clear();
 }
@@ -798,45 +864,7 @@ void TransparentApp::_InitVertexInputs()
 		{
 			std::vector<Vertex> vertices;
 			std::vector<uint32_t> indices;
-			tinyobj::attrib_t attrib;
-			std::vector<tinyobj::shape_t> shapes;
-			std::vector<tinyobj::material_t> materials;
-			std::string warn, err;
-			CHECK_TRUE(tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, models[i].c_str()), warn + err);
-			std::unordered_map<Vertex, uint32_t> uniqueVertices{};
-
-			glm::vec4 color(uniformDist(rnd), uniformDist(rnd), uniformDist(rnd), uniformDist(rnd));
-			color.x *= color.x;
-			color.y *= color.y;
-			color.z *= color.z;
-			for (const auto& shape : shapes)
-			{
-				for (const auto& index : shape.mesh.indices)
-				{
-					Vertex vertex{};
-					vertex.pos = {
-						attrib.vertices[3 * index.vertex_index + 0],
-						attrib.vertices[3 * index.vertex_index + 1],
-						attrib.vertices[3 * index.vertex_index + 2]
-					};
-					vertex.uv = {
-						attrib.texcoords[2 * index.texcoord_index + 0],
-						1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
-					};
-					//vertex.normal = {
-					//	attrib.normals[3 * index.normal_index + 0],
-					//	attrib.normals[3 * index.normal_index + 1],
-					//	attrib.normals[3 * index.normal_index + 2],
-					//};
-					vertex.normal = glm::vec3(color);
-					if (uniqueVertices.count(vertex) == 0)
-					{
-						uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
-						vertices.push_back(vertex);
-					}
-					indices.push_back(uniqueVertices[vertex]);
-				}
-			}
+			_ReadObjFile(models[i], vertices, indices);
 			// Upload to device
 			m_gbufferVertBuffers.push_back(Buffer{});
 			m_gbufferIndexBuffers.push_back(Buffer{});
@@ -852,6 +880,88 @@ void TransparentApp::_InitVertexInputs()
 			stagingBuffer.CopyFromHost(vertices.data());
 
 			localBufferInfo.size = sizeof(Vertex) * vertices.size();
+			localBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+			localBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+			vertBuffer.Init(localBufferInfo);
+			vertBuffer.CopyFromBuffer(stagingBuffer);
+
+			stagingBuffer.Uninit();
+			stagingBufferInfo.size = sizeof(uint32_t) * indices.size();
+			stagingBuffer.Init(stagingBufferInfo);
+			stagingBuffer.CopyFromHost(indices.data());
+
+			localBufferInfo.size = sizeof(uint32_t) * indices.size();;
+			localBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+			localBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+			indexBuffer.Init(localBufferInfo);
+			indexBuffer.CopyFromBuffer(stagingBuffer);
+
+			stagingBuffer.Uninit();
+		}
+	}
+	
+	struct TransparentVertex
+	{
+		alignas(16) glm::vec3 pos;
+		alignas(16) glm::vec3 normal;
+		alignas(16) glm::vec4 color;
+	};
+	{
+		VertexInputEntry location0;
+		location0.format = VkFormat::VK_FORMAT_R32G32B32_SFLOAT;
+		location0.offset = offsetof(TransparentVertex, pos);
+		VertexInputEntry location1;
+		location1.format = VkFormat::VK_FORMAT_R32G32B32_SFLOAT;
+		location1.offset = offsetof(TransparentVertex, normal);
+		VertexInputEntry location2;
+		location2.format = VkFormat::VK_FORMAT_R32G32_SFLOAT;
+		location2.offset = offsetof(TransparentVertex, color);
+
+		m_transparentVertLayout.AddLocation(location0);
+		m_transparentVertLayout.AddLocation(location1);
+		m_transparentVertLayout.AddLocation(location2);
+		m_transparentVertLayout.stride = sizeof(TransparentVertex);
+		m_transparentVertLayout.inputRate = VkVertexInputRate::VK_VERTEX_INPUT_RATE_VERTEX;
+
+		std::vector<std::string> objFiles;
+		for (auto& model : m_transModels)
+		{
+			objFiles.push_back(model.objFilePath);
+		}
+		m_transparentVertBuffers.reserve(objFiles.size());
+		m_transparentIndexBuffers.reserve(objFiles.size());
+		
+		std::uniform_real_distribution<float> uniformDist;
+		std::default_random_engine            rnd(3625);  // Fixed seed
+		for (auto& objFile : objFiles)
+		{
+			std::vector<Vertex> verts{};
+			std::vector<uint32_t> indices{};
+			glm::vec4 color(uniformDist(rnd), uniformDist(rnd), uniformDist(rnd), uniformDist(rnd));
+			color.x *= color.x;
+			color.y *= color.y;
+			color.z *= color.z;
+			_ReadObjFile(objFile, verts, indices);
+			std::vector<TransparentVertex> vertices{};
+			vertices.reserve(verts.size());
+			for (int i = 0; i < verts.size(); ++i)
+			{
+				vertices.push_back({verts[i].pos, verts[i].normal, color});
+			}
+			m_transparentVertBuffers.push_back(Buffer{});
+			m_transparentIndexBuffers.push_back(Buffer{});
+			BufferInformation localBufferInfo;
+			BufferInformation stagingBufferInfo;
+			Buffer stagingBuffer;
+			Buffer& vertBuffer = m_transparentVertBuffers.back();
+			Buffer& indexBuffer = m_transparentIndexBuffers.back();
+			stagingBufferInfo.size = sizeof(TransparentVertex) * vertices.size();
+			stagingBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+			stagingBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+			stagingBuffer.Init(stagingBufferInfo);
+			stagingBuffer.CopyFromHost(vertices.data());
+
+			localBufferInfo.size = sizeof(TransparentVertex) * vertices.size();
 			localBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 			localBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 			vertBuffer.Init(localBufferInfo);
@@ -947,7 +1057,7 @@ void TransparentApp::_UninitVertexInputs()
 	m_vertBuffer.Uninit();
 	m_indexBuffer.Uninit();
 }
-// TODO:
+
 void TransparentApp::_InitPipelines()
 {
 	SimpleShader oitFrontVertShader;
@@ -1117,6 +1227,7 @@ void TransparentApp::_DrawFrame()
 	waitInfo.waitStage = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	cmd.StartCommands({ waitInfo });
 	
+	// draw opaque objects
 	cmd.StartRenderPass(&m_gbufferRenderPass, &m_gbufferFramebuffers[m_currentFrame]);
 	for (int i = 0; i < m_gbufferVertBuffers.size(); ++i)
 	{
@@ -1135,19 +1246,23 @@ void TransparentApp::_DrawFrame()
 	}
 	cmd.EndRenderPass();
 
-	// wait for previous depth done, and also the previous OIT texel buffers and image buffers to clean
+	// wait the transfer the oit image buffers back to general first
 	{
-		// TODO: clean OIT texel buffers and image buffers
-		VkImageMemoryBarrier depthImageBarrier = 
-			_NewImageBarreir(
-				&m_depthImageViews[m_currentFrame],
-				VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL,
-				VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL
-			);
-		std::vector<VkImageMemoryBarrier> imageBarriers = { depthImageBarrier };
+		ImageBarrierInformation info{};
+		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
+		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_GENERAL;
+		info.pImageView = &m_oitSampleCountImageViews[m_currentFrame];
+		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_NONE;
+		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_WRITE_BIT;
+		VkImageMemoryBarrier sampleCountImageBarrier = _NewImageBarreir(info);
+
+		info.pImageView = &m_oitInUseImageViews[m_currentFrame];
+		VkImageMemoryBarrier inUseImageBarrier = _NewImageBarreir(info);
+		
+		std::vector<VkImageMemoryBarrier> imageBarriers = { sampleCountImageBarrier, inUseImageBarrier };
 		vkCmdPipelineBarrier(cmd.vkCommandBuffer,
-			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT,
 			0,
 			0, nullptr,
 			0, nullptr,
@@ -1155,6 +1270,78 @@ void TransparentApp::_DrawFrame()
 		);
 	}
 
+	// clean storage images after layout transfer
+	{
+		VkClearColorValue clearColor32Ruint{ .uint32 = {0u} };
+		VkImageSubresourceRange subresourceRange = {};
+		subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;  // Specify the aspect, e.g., color
+		subresourceRange.baseMipLevel = 0;                        // Start at the first mip level
+		subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;    // Apply to all mip levels
+		subresourceRange.baseArrayLayer = 0;                      // Start at the first array layer
+		subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;  // Apply to all array layers
+		vkCmdClearColorImage(
+			cmd.vkCommandBuffer,
+			m_oitSampleCountImages[m_currentFrame].vkImage,
+			VK_IMAGE_LAYOUT_GENERAL,
+			&clearColor32Ruint,
+			1,
+			&subresourceRange
+		);
+		vkCmdClearColorImage(
+			cmd.vkCommandBuffer,
+			m_oitInUseImages[m_currentFrame].vkImage,
+			VK_IMAGE_LAYOUT_GENERAL,
+			&clearColor32Ruint,
+			1,
+			&subresourceRange
+		);
+		vkCmdFillBuffer(
+			cmd.vkCommandBuffer,
+			m_oitSampleTexelBuffers[m_currentFrame].vkBuffer,
+			0,
+			m_oitSampleTexelBuffers[m_currentFrame].GetBufferInformation().size,
+			0
+		);
+	}
+
+	// wait for previous depth draw done, and previous OIT texel buffers and image buffers to clean
+	{
+		VkMemoryBarrier sampleDataBarrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+		sampleDataBarrier.srcAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_WRITE_BIT;
+		sampleDataBarrier.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT | VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT;
+		
+		ImageBarrierInformation info{};
+		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_GENERAL;
+		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_GENERAL;
+		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_WRITE_BIT;
+		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT | VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT;
+		
+		info.pImageView = &m_oitSampleCountImageViews[m_currentFrame];
+		VkImageMemoryBarrier sampleCountImageBarrier = _NewImageBarreir(info);
+		
+		info.pImageView = &m_oitInUseImageViews[m_currentFrame];
+		VkImageMemoryBarrier inUseImageBarrier =_NewImageBarreir(info);
+
+		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+		info.pImageView = &m_depthImageViews[m_currentFrame];
+		VkImageMemoryBarrier depthImageBarrier = _NewImageBarreir(info);
+
+		std::vector<VkImageMemoryBarrier> imageBarriers = { sampleCountImageBarrier, inUseImageBarrier, depthImageBarrier };
+		std::vector<VkMemoryBarrier> memoryBarriers = { sampleDataBarrier };
+		vkCmdPipelineBarrier(cmd.vkCommandBuffer,
+			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			0,
+			static_cast<uint32_t>(memoryBarriers.size()), memoryBarriers.data(),
+			0, nullptr,
+			static_cast<uint32_t>(imageBarriers.size()), imageBarriers.data()
+		);
+	}
+
+	// draw transparent objects, write to sample data
 	cmd.StartRenderPass(&m_oitRenderPass, &m_oitFramebuffers[m_currentFrame]);
 	for (int i = 0; i < m_transparentVertBuffers.size(); ++i)
 	{
@@ -1167,7 +1354,7 @@ void TransparentApp::_DrawFrame()
 		input.pDescriptorSets = 
 		{ 
 			&m_cameraDSets[m_currentFrame],
-			&m_vecModelDSets[m_currentFrame][i],
+			&m_vecTransModelDSets[m_currentFrame][i],
 			&m_oitDSets[m_currentFrame] // we have synthcornization here, so i think it's ok
 		};
 		input.imageSize = MyDevice::GetInstance().GetSwapchainExtent();
@@ -1178,71 +1365,131 @@ void TransparentApp::_DrawFrame()
 	}
 	cmd.EndRenderPass();
 
-	// wait for the oit sample buffer and sample count buffer be done
+	// wait the oit output image transfer back to general first
 	{
-		VkImageMemoryBarrier sampleCountImageBarrier =
-			_NewImageBarreir(
-				&m_oitSampleCountImageViews[m_currentFrame],
-				VK_IMAGE_LAYOUT_GENERAL,
-				VK_IMAGE_LAYOUT_GENERAL
-			);
+		ImageBarrierInformation info{};
+		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
+		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_GENERAL;
+		info.pImageView = &m_oitOutputImageViews[m_currentFrame];
+		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_NONE;
+		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_WRITE_BIT;
+		VkImageMemoryBarrier oitOutputImageBarrier = _NewImageBarreir(info);
+
+		std::vector<VkImageMemoryBarrier> imageBarriers = { oitOutputImageBarrier };
+		vkCmdPipelineBarrier(cmd.vkCommandBuffer,
+			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT,
+			0,
+			0, nullptr,
+			0, nullptr,
+			static_cast<uint32_t>(imageBarriers.size()), imageBarriers.data()
+		);
+	}
+
+	// clean oit output image
+	{
+		VkClearColorValue clearColor32Ruint{ .uint32 = {0u} };
+		VkImageSubresourceRange subresourceRange = {};
+		subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;  // Specify the aspect, e.g., color
+		subresourceRange.baseMipLevel = 0;                        // Start at the first mip level
+		subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;    // Apply to all mip levels
+		subresourceRange.baseArrayLayer = 0;                      // Start at the first array layer
+		subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;  // Apply to all array layers
+		vkCmdClearColorImage(
+			cmd.vkCommandBuffer,
+			m_oitOutputImages[m_currentFrame].vkImage,
+			VK_IMAGE_LAYOUT_GENERAL,
+			&clearColor32Ruint,
+			1,
+			&subresourceRange
+		);
+	}
+
+	// wait for the oit sample buffer and sample count buffer to be done, oit output image to be cleared
+	{
+		ImageBarrierInformation info{};
+		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_GENERAL;
+		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_GENERAL;
+		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT;
+		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
+
+		info.pImageView = &m_oitSampleCountImageViews[m_currentFrame];
+		VkImageMemoryBarrier sampleCountImageBarrier = _NewImageBarreir(info);
+
+		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_WRITE_BIT;
+		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT;
+		info.pImageView = &m_oitOutputImageViews[m_currentFrame];
+		VkImageMemoryBarrier oitOutputImageBarrier = _NewImageBarreir(info);
+
 		VkMemoryBarrier sampleDataBarrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
 		sampleDataBarrier.srcAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT;
 		sampleDataBarrier.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
 		
-		std::vector<VkImageMemoryBarrier> imageBarriers = { sampleCountImageBarrier };
+		std::vector<VkImageMemoryBarrier> imageBarriers = { sampleCountImageBarrier, oitOutputImageBarrier };
 		std::vector<VkMemoryBarrier> memoryBarriers = { sampleDataBarrier };
 
 		vkCmdPipelineBarrier(cmd.vkCommandBuffer,
-			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
 			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 			0,
 			static_cast<uint32_t>(memoryBarriers.size()), memoryBarriers.data(),
 			0, nullptr,
 			static_cast<uint32_t>(imageBarriers.size()), imageBarriers.data()
 		);
-
 	}
 
-	// use a memory barrier here to synchronize the order of the 2 render passes
-	// start another render pass if we want to do deferred shading or post process shader, loadOp = LOAD_OP_LOAD 
-	// from my understanding now, we can safely read the neighboring pixels in the next render pass, since the store operations will happen after a render pass end unlike subpass
+	// sort transparent and write to OIT output
 	{
-		std::vector<const ImageView*> pViewsToSync = 
-		{ 
+		VkExtent2D extent2d = MyDevice::GetInstance().GetSwapchainExtent();
+		PipelineInput pipelineInput{};
+		pipelineInput.groupCountX = (extent2d.width * extent2d.height + 255)/ 256;
+		pipelineInput.groupCountY = 1;
+		pipelineInput.groupCountZ = 1;
+		pipelineInput.pDescriptorSets = { &m_oitDSets[m_currentFrame], &m_oitOutputDSets[m_currentFrame] };
+		m_oitSortPipeline.Do(cmd.vkCommandBuffer, pipelineInput);
+	}
+	
+	// wait for sort to be done and opaque color draw done
+	{
+		std::vector<const ImageView*> pViewsToSync =
+		{
 			m_gbufferFramebuffers[m_currentFrame].attachments[0], //albedo
 			m_gbufferFramebuffers[m_currentFrame].attachments[1], //pos
 			m_gbufferFramebuffers[m_currentFrame].attachments[2]  //normal
 		};
 		std::vector<VkImageMemoryBarrier> imageBarriers;
-		imageBarriers.reserve(pViewsToSync.size());
-		
+
+		ImageBarrierInformation info{};
+		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
 		for (int i = 0; i < pViewsToSync.size(); ++i)
 		{
-			VkImageMemoryBarrier barrier = 
-				_NewImageBarreir(
-					pViewsToSync[i], 
-					VkImageLayout::VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 
-					VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-				);
+			info.pImageView = pViewsToSync[i];
+			VkImageMemoryBarrier barrier = _NewImageBarreir(info);
 			imageBarriers.push_back(barrier);
 		}
 
-		//Keep your srcStageMask as early as possible in the pipeline. make resource be available(valid)
-		//Keep your dstStageMask as late as possible in the pipeline. make resource be visible(validate resource)
-		VkPipelineStageFlags srcStage = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		VkPipelineStageFlags dstStage = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_GENERAL;
+		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT;
+		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
+		info.pImageView = &m_oitOutputImageViews[m_currentFrame];
+		VkImageMemoryBarrier oitOutputImageBarrier = _NewImageBarreir(info);
+		imageBarriers.push_back(oitOutputImageBarrier);
 
 		vkCmdPipelineBarrier(cmd.vkCommandBuffer,
-			srcStage, 
-			dstStage,
-			0, 
+			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			0,
 			0, nullptr,
 			0, nullptr,
 			static_cast<uint32_t>(imageBarriers.size()), imageBarriers.data()
-			);
+		);
 	}
 
+	// draw final result to the swapchain
 	cmd.StartRenderPass(&m_renderPass, &m_framebuffers[imageIndex.value()]);
 	{
 		PipelineInput input;
@@ -1259,64 +1506,131 @@ void TransparentApp::_DrawFrame()
 		m_gPipeline.Do(cmd.vkCommandBuffer, input);
 	}
 	cmd.EndRenderPass();
+	
+	{
+		// use a memory barrier here to synchronize the order of the 2 render passes
+		// start another render pass if we want to do deferred shading or post process shader, loadOp = LOAD_OP_LOAD 
+		// from my understanding now, we can safely read the neighboring pixels in the next render pass, 
+		// since the store operations will happen after a render pass end unlike subpass
+		std::vector<const ImageView*> pViewsToSync = { 
+			m_gbufferFramebuffers[m_currentFrame].attachments[0], //albedo
+			m_gbufferFramebuffers[m_currentFrame].attachments[1], //pos
+			m_gbufferFramebuffers[m_currentFrame].attachments[2]  //normal
+		};
+		std::vector<VkImageMemoryBarrier> imageBarriers;
+		
+		for (int i = 0; i < pViewsToSync.size(); ++i)
+		{
+			VkImageMemoryBarrier barrier = 
+				_NewImageBarreir(
+					pViewsToSync[i], 
+					VkImageLayout::VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 
+					VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+				);
+			imageBarriers.push_back(barrier);
+		}
+		VkPipelineStageFlags srcStage = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		VkPipelineStageFlags dstStage = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		vkCmdPipelineBarrier(cmd.vkCommandBuffer,
+			srcStage, //Keep your srcStageMask as early as possible in the pipeline. make resource be available(valid)
+			dstStage, //Keep your dstStageMask as late as possible in the pipeline. make resource be visible(validate resource)
+			0, 
+			0, nullptr,
+			0, nullptr,
+			static_cast<uint32_t>(imageBarriers.size()), imageBarriers.data()
+			);
+	}
+
+	//cmd.StartRenderPass(&m_renderPass, &m_framebuffers[imageIndex.value()]);
+	//{
+	//	PipelineInput input;
+	//	VertexIndexInput indexInput;
+	//	VertexInput vertInput;
+	//	indexInput.pBuffer = &m_indexBuffer;
+	//	vertInput.pVertexInputLayout = &m_vertLayout;
+	//	vertInput.pBuffer = &m_vertBuffer;
+	//	input.pDescriptorSets = { &m_dSets[m_currentFrame] };
+	//	input.imageSize = MyDevice::GetInstance().GetSwapchainExtent();
+	//	input.pVertexIndexInput = &indexInput;
+	//	input.pVertexInputs = { &vertInput };
+	//	m_gPipeline.Do(cmd.vkCommandBuffer, input);
+	//}
+	//cmd.EndRenderPass();
 
 	VkSemaphore renderpassFinish = cmd.SubmitCommands();
-
 	MyDevice::GetInstance().PresentSwapchainImage({ renderpassFinish }, imageIndex.value());
-	
 	m_currentFrame = (m_currentFrame + 1) % MAX_FRAME_COUNT;
 }
 
 void TransparentApp::_ResizeWindow()
 {
+	// TODO: recreate texel buffer as well
 	vkDeviceWaitIdle(MyDevice::GetInstance().vkDevice);
 	_UninitDescriptorSets();
+	_UninitFramebuffers();
 	_UninitImagesAndViews();
+	_UninitBuffers();
 	MyDevice::GetInstance().RecreateSwapchain();
+	_InitBuffers();
 	_InitImagesAndViews();
+	_InitFramebuffers();
 	_InitDescriptorSets();
 }
 
-VkImageMemoryBarrier TransparentApp::_NewImageBarreir(const ImageView* pImageView, VkImageLayout oldLayout, VkImageLayout newLayout) const
+VkImageMemoryBarrier TransparentApp::_NewImageBarreir(const ImageBarrierInformation& _info) const
 {
-	static std::unordered_map<VkImageLayout, std::unordered_map<VkImageLayout, VkAccessFlags>> srcAccessMap;
-	static std::unordered_map<VkImageLayout, std::unordered_map<VkImageLayout, VkAccessFlags>> dstAccessMap;
-	{
-		srcAccessMap[VkImageLayout::VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL][VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL] = VkAccessFlagBits::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		dstAccessMap[VkImageLayout::VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL][VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL] = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
-
-		srcAccessMap[VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL][VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL] = VkAccessFlagBits::VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-		dstAccessMap[VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL][VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL] = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
-
-		srcAccessMap[VkImageLayout::VK_IMAGE_LAYOUT_GENERAL][VkImageLayout::VK_IMAGE_LAYOUT_GENERAL] = VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT;
-		dstAccessMap[VkImageLayout::VK_IMAGE_LAYOUT_GENERAL][VkImageLayout::VK_IMAGE_LAYOUT_GENERAL] = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
-	}
-
 	VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-	auto viewInfo = pImageView->GetImageViewInformation();
-	barrier.oldLayout = oldLayout;
-	barrier.newLayout = newLayout;
+	auto viewInfo = _info.pImageView->GetImageViewInformation();
+	barrier.oldLayout = _info.oldLayout;
+	barrier.newLayout = _info.newLayout;
 	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.image = pImageView->pImage->vkImage;
+	barrier.image = _info.pImageView->pImage->vkImage;
 	barrier.subresourceRange.aspectMask = viewInfo.aspectMask;
 	barrier.subresourceRange.baseMipLevel = viewInfo.baseMipLevel;
 	barrier.subresourceRange.levelCount = viewInfo.levelCount;
 	barrier.subresourceRange.baseArrayLayer = 0;
 	barrier.subresourceRange.layerCount = 1;
-
-	if (srcAccessMap.find(oldLayout) == srcAccessMap.end() || srcAccessMap[oldLayout].find(newLayout) == srcAccessMap[oldLayout].end())
-	{
-		std::runtime_error("No old layout and new layout preset!");
-	}
-	if (dstAccessMap.find(oldLayout) == dstAccessMap.end() || dstAccessMap[oldLayout].find(newLayout) == dstAccessMap[oldLayout].end())
-	{
-		std::runtime_error("No old layout and new layout preset!");
-	}
-	barrier.srcAccessMask = srcAccessMap[oldLayout][newLayout]; // when it could be read
-	barrier.dstAccessMask = dstAccessMap[oldLayout][newLayout]; // when it need to be read
-
+	barrier.srcAccessMask = _info.srcAccessMask;
+	barrier.dstAccessMask = _info.dstAccessMask;
 	return barrier;
+}
+
+void TransparentApp::_ReadObjFile(const std::string& objFile, std::vector<Vertex>& vertices, std::vector<uint32_t>& indices) const
+{
+	tinyobj::attrib_t attrib;
+	std::vector<tinyobj::shape_t> shapes;
+	std::vector<tinyobj::material_t> materials;
+	std::string warn, err;
+	CHECK_TRUE(tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, objFile.c_str()), warn + err);
+	std::unordered_map<Vertex, uint32_t> uniqueVertices{};
+	for (const auto& shape : shapes)
+	{
+		for (const auto& index : shape.mesh.indices)
+		{
+			Vertex vertex{};
+			vertex.pos = {
+				attrib.vertices[3 * index.vertex_index + 0],
+				attrib.vertices[3 * index.vertex_index + 1],
+				attrib.vertices[3 * index.vertex_index + 2]
+			};
+			vertex.uv = {
+				attrib.texcoords[2 * index.texcoord_index + 0],
+				1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
+			};
+			vertex.normal = {
+				attrib.normals[3 * index.normal_index + 0],
+				attrib.normals[3 * index.normal_index + 1],
+				attrib.normals[3 * index.normal_index + 2],
+			};
+			if (uniqueVertices.count(vertex) == 0)
+			{
+				uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
+				vertices.push_back(vertex);
+			}
+			indices.push_back(uniqueVertices[vertex]);
+		}
+	}
 }
 
 void TransparentApp::Run()
