@@ -16,71 +16,74 @@ layout(set = 2, binding = 3) uniform ViewportInformation
     ivec4 extent; // width, height, width * height
 } viewportInfo;
 
+layout(location = 0) out vec4 outColor;
+
 void main()
 {
     // packSnorm4x8: round(clamp(c, -1.0, 1.0) * 127.0)
     ivec2 coord = ivec2(gl_FragCoord.xy);
     uvec4 storeValue = uvec4(packUnorm4x8(inColor), floatBitsToUint(gl_FragCoord.z), 0, 0);
     const int texelBufferCoord = viewportInfo.extent.x * OIT_LAYERS * coord.y + OIT_LAYERS * coord.x;
-    bool done = false;
-    while(!done)
-    {
-        uint old = imageAtomicExchange(inUseImage, coord, 1u);
-        if (old == 0u)
-        {
-            const uint oldCount = imageLoad(sampleCountImage, coord).r;
-            imageStore(sampleCountImage, coord, uvec4(oldCount + 1));
+    // bool done = false;
+    // while(!done)
+    // {
+    //     uint old = imageAtomicExchange(inUseImage, coord, 1u);
+    //     if (old == 0u)
+    //     {
+    //         const uint oldCount = imageLoad(sampleCountImage, coord).r;
+    //         imageStore(sampleCountImage, coord, uvec4(255));
 
-            // leave bubble sort at shading pass
-            if(oldCount < OIT_LAYERS)
-            {
-                imageStore(sampleDataImage, texelBufferCoord + int(oldCount), storeValue);
-            }
-            else
-            {
-                // Find the furthest element
-                int  furthest = -1;
-                uvec4 sample1 = storeValue;
-                int  furthest2 = 0;
-                uvec4 sample2 = uvec4(0, 0, 0, 0);
-                for(int i = 0; i < OIT_LAYERS; ++i)
-                {
-                    uvec4 newSample = imageLoad(sampleDataImage, texelBufferCoord + i);
-                    uint testDepth = newSample.g;
-                    uint maxDepth = sample1.g;
-                    uint maxDepth2 = sample2.g;
-                    if(testDepth > maxDepth)
-                    {
-                        sample2 = sample1;
-                        furthest2 = furthest;
-                        sample1 = newSample;
-                        furthest = i;
-                    }
-                    else if (testDepth > maxDepth2)
-                    {       
-                        sample2 = newSample;
-                        furthest2 = i;
-                    }
-                }
-                //TODO: mix sample and sample2 to storeValue
-                storeValue.g = sample2.g;
-                vec4 farColor = unpackUnorm4x8(sample1.r);
-                vec4 nearColor = unpackUnorm4x8(sample2.r);
-                nearColor.rgb = nearColor.rgb + nearColor.a * farColor.rgb;
-                nearColor.a = clamp(nearColor.a * farColor.a, 0.0f, 1.0f);
-                storeValue.r = packUnorm4x8(nearColor);
-                if (furthest == -1)
-                {
-                    imageStore(sampleDataImage, texelBufferCoord + furthest2, storeValue);
-                }
-                else
-                {
-                    imageStore(sampleDataImage, texelBufferCoord + furthest, storeValue);
-                }
+    //         // // leave bubble sort at shading pass
+    //         // if(oldCount < OIT_LAYERS)
+    //         // {
+    //         //     imageStore(sampleDataImage, texelBufferCoord + int(oldCount), storeValue);
+    //         // }
+    //         // else
+    //         // {
+    //         //     // Find the furthest element
+    //         //     int  furthest = -1;
+    //         //     uvec4 sample1 = storeValue;
+    //         //     int  furthest2 = 0;
+    //         //     uvec4 sample2 = uvec4(0, 0, 0, 0);
+    //         //     for(int i = 0; i < OIT_LAYERS; ++i)
+    //         //     {
+    //         //         uvec4 newSample = imageLoad(sampleDataImage, texelBufferCoord + i);
+    //         //         uint testDepth = newSample.g;
+    //         //         uint maxDepth = sample1.g;
+    //         //         uint maxDepth2 = sample2.g;
+    //         //         if(testDepth > maxDepth)
+    //         //         {
+    //         //             sample2 = sample1;
+    //         //             furthest2 = furthest;
+    //         //             sample1 = newSample;
+    //         //             furthest = i;
+    //         //         }
+    //         //         else if (testDepth > maxDepth2)
+    //         //         {       
+    //         //             sample2 = newSample;
+    //         //             furthest2 = i;
+    //         //         }
+    //         //     }
+    //         //     //TODO: mix sample and sample2 to storeValue
+    //         //     storeValue.g = sample2.g;
+    //         //     vec4 farColor = unpackUnorm4x8(sample1.r);
+    //         //     vec4 nearColor = unpackUnorm4x8(sample2.r);
+    //         //     nearColor.rgb = nearColor.rgb + nearColor.a * farColor.rgb;
+    //         //     nearColor.a = 1.0;//clamp(nearColor.a * farColor.a, 0.0f, 1.0f);
+    //         //     storeValue.r = packUnorm4x8(nearColor);
+    //         //     if (furthest == -1)
+    //         //     {
+    //         //         imageStore(sampleDataImage, texelBufferCoord + furthest2, storeValue);
+    //         //     }
+    //         //     else
+    //         //     {
+    //         //         imageStore(sampleDataImage, texelBufferCoord + furthest, storeValue);
+    //         //     }
 
-            }
-            imageAtomicExchange(inUseImage, coord, 0u);
-            done = true;
-        }
-    }
+    //         // }
+    //         imageAtomicExchange(inUseImage, coord, 0u);
+    //         done = true;
+    //     }
+    // }
+    outColor = vec4(1, 1, 1, 1);
 }

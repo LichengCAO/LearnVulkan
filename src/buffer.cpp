@@ -32,9 +32,8 @@ void Buffer::Init(BufferInformation info)
 		.sharingMode = info.sharingMode,
 	};
 	m_bufferInformation = info;
-
+	CHECK_TRUE(vkBuffer == VK_NULL_HANDLE, "VkBuffer is already created!");
 	VK_CHECK(vkCreateBuffer(MyDevice::GetInstance().vkDevice, &bufferInfo, nullptr, &vkBuffer), "Failed to create buffer!");
-
 	_AllocateMemory();
 }
 
@@ -45,7 +44,6 @@ void Buffer::Uninit()
 		vkDestroyBuffer(MyDevice::GetInstance().vkDevice, vkBuffer, nullptr);
 		vkBuffer = VK_NULL_HANDLE;
 	}
-	
 	_FreeMemory();
 }
 
@@ -141,6 +139,7 @@ void BufferView::Init()
 	createInfo.format = m_format;
 	createInfo.offset = 0;
 	createInfo.range = pBuffer->GetBufferInformation().size;
+	CHECK_TRUE(vkBufferView == VK_NULL_HANDLE, "VkBufferView is already created!");
 	VK_CHECK(vkCreateBufferView(MyDevice::GetInstance().vkDevice, &createInfo, nullptr, &vkBufferView), "Failed to create buffer view!");
 }
 

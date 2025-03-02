@@ -54,7 +54,7 @@ void Image::Init()
 	imgInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	imgInfo.samples = m_imageInformation.samples;
 	imgInfo.flags = 0;
-
+	CHECK_TRUE(vkImage == VK_NULL_HANDLE, "VkImage is already created!");
 	VK_CHECK(vkCreateImage(MyDevice::GetInstance().vkDevice, &imgInfo, nullptr, &vkImage), "Failed to crate image!");
 
 	_AllocateMemory();
@@ -257,6 +257,7 @@ void ImageView::Init()
 		.layerCount = 1
 	}
 	};
+	CHECK_TRUE(vkImageView == VK_NULL_HANDLE, "VkImageView is already created!");
 	VK_CHECK(vkCreateImageView(MyDevice::GetInstance().vkDevice, &viewInfo, nullptr, &vkImageView), "Failed to create image view!");
 }
 
@@ -345,6 +346,7 @@ void Texture::Init()
 	// samplerInfo.maxAnisotropy = properties.limits.maxSamplerAnisotropy;
 	samplerInfo.anisotropyEnable = VK_FALSE;
 	samplerInfo.maxAnisotropy = 1.0f;
+	CHECK_TRUE(vkSampler == VK_NULL_HANDLE, "VkSampler is already created!");
 	VK_CHECK(vkCreateSampler(MyDevice::GetInstance().vkDevice, &samplerInfo, nullptr, &vkSampler), "Failed to create texture sampler!");
 }
 

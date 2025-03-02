@@ -108,13 +108,15 @@ void CommandSubmission::StartRenderPass(const RenderPass* pRenderPass, const Fra
 		// Note that the order of clearValues should be identical to the order of your attachments.
 		clearValues.push_back(pRenderPass->attachments[i].clearValue);
 	}
-	ImageInformation imageInfo = pFramebuffer->attachments[0]->pImage->GetImageInformation();
-	
 	VkRenderPassBeginInfo renderPassInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
 	renderPassInfo.renderPass = pRenderPass->vkRenderPass;
-	if (pRenderPass != nullptr) renderPassInfo.framebuffer = pFramebuffer->vkFramebuffer;
 	renderPassInfo.renderArea.offset = { 0,0 };
-	renderPassInfo.renderArea.extent = { imageInfo.width, imageInfo.height };
+	if (pFramebuffer != nullptr) renderPassInfo.framebuffer = pFramebuffer->vkFramebuffer;
+	if (pFramebuffer != nullptr && pRenderPass->attachments.size() > 0)
+	{
+		ImageInformation imageInfo = pFramebuffer->attachments[0]->pImage->GetImageInformation();
+		renderPassInfo.renderArea.extent = { imageInfo.width, imageInfo.height };
+	}
 	renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size()); 
 	renderPassInfo.pClearValues = clearValues.data(); // should have same length as attachments, although index of those who don't clear on load will be ignored
 

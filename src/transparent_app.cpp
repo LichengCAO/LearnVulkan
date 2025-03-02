@@ -18,7 +18,7 @@ void TransparentApp::_Init()
 	wahoo.transform.SetScale({ 0.05, 0.05, 0.05 });
 	wahoo.transform.SetRotation({ 90, 0, 90 });
 	wahoo.transform.SetPosition({ 0.5, 0.0, 0.2 });
-	m_models = { wahoo, room };
+	m_models = { wahoo, room};
 
 	std::default_random_engine            rnd(3625);  // Fixed seed
 	std::uniform_real_distribution<float> uniformDist;
@@ -90,14 +90,17 @@ void TransparentApp::_InitRenderPass()
 	// Setup render pass
 	// oit
 	{
+		AttachmentInformation colorOutputInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::GBUFFER_ALBEDO);
 		AttachmentInformation readOnlyDepthInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::DEPTH);
 		readOnlyDepthInfo.attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 		readOnlyDepthInfo.attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		readOnlyDepthInfo.attachmentDescription.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 		readOnlyDepthInfo.attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-		m_oitRenderPass.AddAttachment(readOnlyDepthInfo);
+		m_oitRenderPass.AddAttachment(colorOutputInfo);
+		//m_oitRenderPass.AddAttachment(readOnlyDepthInfo);
 		SubpassInformation oitSubpassInfo{};
-		oitSubpassInfo.SetDepthStencilAttachment(0);
+		//oitSubpassInfo.SetDepthStencilAttachment(1);
+		oitSubpassInfo.AddColorAttachment(0);
 		m_oitRenderPass.AddSubpass(oitSubpassInfo);
 		m_oitRenderPass.Init();
 	}
@@ -111,12 +114,12 @@ void TransparentApp::_InitRenderPass()
 		m_gbufferRenderPass.AddAttachment(albedoInfo);
 		m_gbufferRenderPass.AddAttachment(posInfo);
 		m_gbufferRenderPass.AddAttachment(normalInfo);
-		//m_gbufferRenderPass.AddAttachment(depthInfo);
+		m_gbufferRenderPass.AddAttachment(depthInfo);
 		SubpassInformation gSubpassInfo{};
 		gSubpassInfo.AddColorAttachment(0);
 		gSubpassInfo.AddColorAttachment(1);
 		gSubpassInfo.AddColorAttachment(2);
-		//gSubpassInfo.SetDepthStencilAttachment(3);
+		gSubpassInfo.SetDepthStencilAttachment(3);
 		m_gbufferRenderPass.AddSubpass(gSubpassInfo);
 		m_gbufferRenderPass.Init();
 	}
@@ -298,11 +301,6 @@ void TransparentApp::_InitBuffers()
 		oitSampleTexelBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT; // we need to clear it first
 		oitSampleTexelBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
-		BufferInformation unifViewportBufferInfo{};
-		unifViewportBufferInfo.size = sizeof(ViewportInformation);
-		unifViewportBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-		unifViewportBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-		m_oitViewportBuffer.Init(unifViewportBufferInfo);
 		ViewportInformation info{};
 		info.extent = glm::ivec4(width, height, width * height, 0);
 		m_oitViewportBuffer.CopyFromHost(&info);
@@ -430,6 +428,8 @@ void TransparentApp::_InitImagesAndViews()
 	m_oitInUseImageViews.reserve(n);
 	m_oitOutputImages.reserve(n);
 	m_oitOutputImageViews.reserve(n);
+	m_oitFrontOutputImages.reserve(n);
+	m_oitFrontOutputImageViews.reserve(n);
 	
 	// create model textures
 	std::vector<std::string> textures;
@@ -465,18 +465,27 @@ void TransparentApp::_InitImagesAndViews()
 	oitInUseImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
 
 	ImageInformation oitOutputImageInfo{};
-	oitOutputImageInfo.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
+	oitOutputImageInfo.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT; //VkFormat::VK_FORMAT_R32G32B32A32_UINT ?
 	oitOutputImageInfo.width = width;
 	oitOutputImageInfo.height = height;
 	oitOutputImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_STORAGE_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
 	oitOutputImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 	ImageViewInformation oitOutputImageViewInfo{};
 	oitOutputImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
+
+	ImageInformation oitFrontOutputImageInfo{};
+	oitFrontOutputImageInfo.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
+	oitFrontOutputImageInfo.width = width;
+	oitFrontOutputImageInfo.height = height;
+	oitFrontOutputImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+	oitFrontOutputImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	ImageViewInformation oitFrontOutputImageViewInfo{};
+	oitFrontOutputImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
 	
-	std::vector<std::vector<Image>*> vecOITImages = { &m_oitSampleCountImages, &m_oitInUseImages, &m_oitOutputImages };
-	std::vector<std::vector<ImageView>*> vecOITImageViews = { &m_oitSampleCountImageViews, &m_oitInUseImageViews, &m_oitOutputImageViews };
-	std::vector<ImageInformation*> oitImageInfos = { &oitSampleCountImageInfo, &oitInUseImageInfo, &oitOutputImageInfo };
-	std::vector<ImageViewInformation*> oitViewInfos = { &oitSampleCountImageViewInfo, &oitInUseImageViewInfo, &oitOutputImageViewInfo };
+	std::vector<std::vector<Image>*> vecOITImages = { &m_oitSampleCountImages, &m_oitInUseImages, &m_oitOutputImages, &m_oitFrontOutputImages };
+	std::vector<std::vector<ImageView>*> vecOITImageViews = { &m_oitSampleCountImageViews, &m_oitInUseImageViews, &m_oitOutputImageViews, &m_oitFrontOutputImageViews };
+	std::vector<ImageInformation*> oitImageInfos = { &oitSampleCountImageInfo, &oitInUseImageInfo, &oitOutputImageInfo, &oitFrontOutputImageInfo };
+	std::vector<ImageViewInformation*> oitViewInfos = { &oitSampleCountImageViewInfo, &oitInUseImageViewInfo, &oitOutputImageViewInfo, &oitFrontOutputImageViewInfo };
 	for (int i = 0; i < n; ++i)
 	{
 		for (int j = 0; j < vecOITImages.size(); ++j)
@@ -583,7 +592,8 @@ void TransparentApp::_UninitImagesAndViews()
 		&m_gbufferNormalImageViews,
 		&m_oitSampleCountImageViews,
 		&m_oitInUseImageViews,
-		&m_oitOutputImageViews
+		&m_oitOutputImageViews,
+		&m_oitFrontOutputImageViews
 	};
 	std::vector<std::vector<Image>*> pImageVecsToUninit =
 	{
@@ -593,7 +603,8 @@ void TransparentApp::_UninitImagesAndViews()
 		&m_gbufferNormalImages,
 		&m_oitSampleCountImages,
 		&m_oitInUseImages,
-		&m_oitOutputImages
+		&m_oitOutputImages,
+		&m_oitFrontOutputImages
 	};
 
 	for (auto pViewVec : pViewVecsToUninit)
@@ -636,14 +647,15 @@ void TransparentApp::_InitFramebuffers()
 			&m_gbufferAlbedoImageViews[i],
 			&m_gbufferPosImageViews[i],
 			&m_gbufferNormalImageViews[i],
-			//&m_depthImageViews[i]
+			&m_depthImageViews[i]
 		};
 		m_gbufferFramebuffers.push_back(m_gbufferRenderPass.NewFramebuffer(gbufferViews));
 		m_gbufferFramebuffers.back().Init();
 
 		std::vector<const ImageView*> oitDepthViews =
 		{
-			&m_depthImageViews[i]
+			&m_oitFrontOutputImageViews[i],
+			//&m_depthImageViews[i]
 		};
 		m_oitFramebuffers.push_back(m_oitRenderPass.NewFramebuffer(oitDepthViews));
 		m_oitFramebuffers.back().Init();
@@ -737,7 +749,7 @@ void TransparentApp::_InitDescriptorSets()
 				m_vecModelDSets[i][j].Init();
 				m_vecModelDSets[i][j].StartDescriptorSetUpdate();
 				m_vecModelDSets[i][j].DescriptorSetUpdate_WriteBinding(0, &m_vecModelBuffers[i][j]);
-				m_vecModelDSets[i][j].DescriptorSetUpdate_WriteBinding(1, m_modelTextures[j].GetVkDescriptorImageInfo());
+				//m_vecModelDSets[i][j].DescriptorSetUpdate_WriteBinding(1, m_modelTextures[j].GetVkDescriptorImageInfo());
 				m_vecModelDSets[i][j].FinishDescriptorSetUpdate();
 			}
 		}
@@ -1054,6 +1066,17 @@ void TransparentApp::_UninitVertexInputs()
 	}
 	m_gbufferIndexBuffers.clear();
 
+	for (auto& vertBuffer : m_transparentVertBuffers)
+	{
+		vertBuffer.Uninit();
+	}
+	m_transparentVertBuffers.clear();
+	for (auto& indexBuffer : m_transparentIndexBuffers)
+	{
+		indexBuffer.Uninit();
+	}
+	m_transparentIndexBuffers.clear();
+
 	m_vertBuffer.Uninit();
 	m_indexBuffer.Uninit();
 }
@@ -1246,7 +1269,7 @@ void TransparentApp::_DrawFrame()
 	}
 	cmd.EndRenderPass();
 
-	// wait the transfer the oit image buffers back to general first
+	// wait the oit image buffers transfer back to general first
 	{
 		ImageBarrierInformation info{};
 		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
@@ -1262,7 +1285,7 @@ void TransparentApp::_DrawFrame()
 		std::vector<VkImageMemoryBarrier> imageBarriers = { sampleCountImageBarrier, inUseImageBarrier };
 		vkCmdPipelineBarrier(cmd.vkCommandBuffer,
 			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT,
+			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT,  
 			0,
 			0, nullptr,
 			0, nullptr,
@@ -1323,9 +1346,9 @@ void TransparentApp::_DrawFrame()
 		VkImageMemoryBarrier inUseImageBarrier =_NewImageBarreir(info);
 
 		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL; // VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;//
 		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VkAccessFlagBits::VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
 		info.pImageView = &m_depthImageViews[m_currentFrame];
 		VkImageMemoryBarrier depthImageBarrier = _NewImageBarreir(info);
 
@@ -1426,7 +1449,7 @@ void TransparentApp::_DrawFrame()
 		sampleDataBarrier.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
 		
 		std::vector<VkImageMemoryBarrier> imageBarriers = { sampleCountImageBarrier, oitOutputImageBarrier };
-		std::vector<VkMemoryBarrier> memoryBarriers = { sampleDataBarrier };
+		std::vector<VkMemoryBarrier> memoryBarriers = { sampleDataBarrier }; 
 
 		vkCmdPipelineBarrier(cmd.vkCommandBuffer,
 			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
@@ -1507,39 +1530,39 @@ void TransparentApp::_DrawFrame()
 	}
 	cmd.EndRenderPass();
 	
-	{
-		// use a memory barrier here to synchronize the order of the 2 render passes
-		// start another render pass if we want to do deferred shading or post process shader, loadOp = LOAD_OP_LOAD 
-		// from my understanding now, we can safely read the neighboring pixels in the next render pass, 
-		// since the store operations will happen after a render pass end unlike subpass
-		std::vector<const ImageView*> pViewsToSync = { 
-			m_gbufferFramebuffers[m_currentFrame].attachments[0], //albedo
-			m_gbufferFramebuffers[m_currentFrame].attachments[1], //pos
-			m_gbufferFramebuffers[m_currentFrame].attachments[2]  //normal
-		};
-		std::vector<VkImageMemoryBarrier> imageBarriers;
-		
-		for (int i = 0; i < pViewsToSync.size(); ++i)
-		{
-			VkImageMemoryBarrier barrier = 
-				_NewImageBarreir(
-					pViewsToSync[i], 
-					VkImageLayout::VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 
-					VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
-				);
-			imageBarriers.push_back(barrier);
-		}
-		VkPipelineStageFlags srcStage = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-		VkPipelineStageFlags dstStage = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-		vkCmdPipelineBarrier(cmd.vkCommandBuffer,
-			srcStage, //Keep your srcStageMask as early as possible in the pipeline. make resource be available(valid)
-			dstStage, //Keep your dstStageMask as late as possible in the pipeline. make resource be visible(validate resource)
-			0, 
-			0, nullptr,
-			0, nullptr,
-			static_cast<uint32_t>(imageBarriers.size()), imageBarriers.data()
-			);
-	}
+	//{
+	//	// use a memory barrier here to synchronize the order of the 2 render passes
+	//	// start another render pass if we want to do deferred shading or post process shader, loadOp = LOAD_OP_LOAD 
+	//	// from my understanding now, we can safely read the neighboring pixels in the next render pass, 
+	//	// since the store operations will happen after a render pass end unlike subpass
+	//	std::vector<const ImageView*> pViewsToSync = { 
+	//		m_gbufferFramebuffers[m_currentFrame].attachments[0], //albedo
+	//		m_gbufferFramebuffers[m_currentFrame].attachments[1], //pos
+	//		m_gbufferFramebuffers[m_currentFrame].attachments[2]  //normal
+	//	};
+	//	std::vector<VkImageMemoryBarrier> imageBarriers;
+	//	
+	//	for (int i = 0; i < pViewsToSync.size(); ++i)
+	//	{
+	//		VkImageMemoryBarrier barrier = 
+	//			_NewImageBarreir(
+	//				pViewsToSync[i], 
+	//				VkImageLayout::VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL, 
+	//				VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL
+	//			);
+	//		imageBarriers.push_back(barrier);
+	//	}
+	//	VkPipelineStageFlags srcStage = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	//	VkPipelineStageFlags dstStage = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	//	vkCmdPipelineBarrier(cmd.vkCommandBuffer,
+	//		srcStage, //Keep your srcStageMask as early as possible in the pipeline. make resource be available(valid)
+	//		dstStage, //Keep your dstStageMask as late as possible in the pipeline. make resource be visible(validate resource)
+	//		0, 
+	//		0, nullptr,
+	//		0, nullptr,
+	//		static_cast<uint32_t>(imageBarriers.size()), imageBarriers.data()
+	//		);
+	//}
 
 	//cmd.StartRenderPass(&m_renderPass, &m_framebuffers[imageIndex.value()]);
 	//{

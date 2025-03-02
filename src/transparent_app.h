@@ -67,6 +67,8 @@ private:
 	std::vector<ImageView> m_oitSampleCountImageViews;
 	std::vector<Image> m_oitInUseImages;
 	std::vector<ImageView> m_oitInUseImageViews;
+	std::vector<Image> m_oitFrontOutputImages;
+	std::vector<ImageView> m_oitFrontOutputImageViews;
 	Buffer             m_oitViewportBuffer;
 
 	DescriptorSetLayout m_oitOutputDSetLayout;

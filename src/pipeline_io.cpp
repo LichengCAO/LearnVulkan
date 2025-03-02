@@ -89,7 +89,7 @@ void DescriptorSet::Init()
 	{
 		throw std::runtime_error("No descriptor layout set!");
 	}
-
+	CHECK_TRUE(vkDescriptorSet == VK_NULL_HANDLE, "VkDescriptorSet is already created!");
 	MyDevice::GetInstance().descriptorAllocator.Allocate(&vkDescriptorSet, m_pLayout->vkDescriptorSetLayout);
 }
 
@@ -130,7 +130,7 @@ void DescriptorSetLayout::Init()
 		.bindingCount = static_cast<uint32_t>(layoutBindings.size()),
 		.pBindings = layoutBindings.data(),
 	};
-
+	CHECK_TRUE(vkDescriptorSetLayout == VK_NULL_HANDLE, "VkDescriptorSetLayout is already created!");
 	VK_CHECK(vkCreateDescriptorSetLayout(MyDevice::GetInstance().vkDevice, &createInfo, nullptr, &vkDescriptorSetLayout), "Failed to create descriptor set layout!");
 }
 void DescriptorSetLayout::Uninit()
@@ -235,7 +235,7 @@ void RenderPass::Init()
 	renderPassInfo.pSubpasses = vkSubpasses.data();
 	renderPassInfo.dependencyCount = static_cast<uint32_t>(m_vkSubpassDependencies.size());
 	renderPassInfo.pDependencies = m_vkSubpassDependencies.data();
-
+	CHECK_TRUE(vkRenderPass == VK_NULL_HANDLE, "VkRenderPass is already created!");
 	VK_CHECK(vkCreateRenderPass(MyDevice::GetInstance().vkDevice, &renderPassInfo, nullptr, &vkRenderPass), "Failed to create render pass!");
 }
 void RenderPass::Uninit()
@@ -283,7 +283,7 @@ void Framebuffer::Init()
 	framebufferInfo.width = attachments[0]->pImage->GetImageInformation().width;
 	framebufferInfo.height = attachments[0]->pImage->GetImageInformation().height;
 	framebufferInfo.layers = 1;
-
+	CHECK_TRUE(vkFramebuffer == VK_NULL_HANDLE, "VkFramebuffer is already created!");
 	VK_CHECK(vkCreateFramebuffer(MyDevice::GetInstance().vkDevice, &framebufferInfo, nullptr, &vkFramebuffer), "Failed to create framebuffer!");
 }
 void Framebuffer::Uninit()
