@@ -432,9 +432,16 @@ void SubpassInformation::AddColorAttachment(uint32_t _binding)
 {
 	colorAttachments.push_back({ _binding, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
 }
-void SubpassInformation::SetDepthStencilAttachment(uint32_t _binding)
+void SubpassInformation::SetDepthStencilAttachment(uint32_t _binding, bool _readOnly)
 {
-	optDepthStencilAttachment = { _binding, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
+	if (_readOnly)
+	{
+		optDepthStencilAttachment = { _binding, VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL };
+	}
+	else
+	{
+		optDepthStencilAttachment = { _binding, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
+	}
 }
 void SubpassInformation::AddResolveAttachment(uint32_t _binding)
 {
@@ -484,7 +491,7 @@ AttachmentInformation AttachmentInformation::GetPresetInformation(AttachmentPres
 		vkAttachment.stencilLoadOp = VkAttachmentLoadOp::VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		vkAttachment.stencilStoreOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		vkAttachment.initialLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
-		vkAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		vkAttachment.finalLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		info.clearValue = VkClearValue{};
 		info.clearValue.color = { 0.0f, 0.0f, 0.0f, 1.0f };
 		break;
@@ -498,7 +505,7 @@ AttachmentInformation AttachmentInformation::GetPresetInformation(AttachmentPres
 		vkAttachment.stencilLoadOp = VkAttachmentLoadOp::VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		vkAttachment.stencilStoreOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		vkAttachment.initialLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
-		vkAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		vkAttachment.finalLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		info.clearValue = VkClearValue{};
 		info.clearValue.color = { 0.0f, 0.0f, 0.0f, 1.0f };
 		break;
@@ -512,7 +519,7 @@ AttachmentInformation AttachmentInformation::GetPresetInformation(AttachmentPres
 		vkAttachment.stencilLoadOp = VkAttachmentLoadOp::VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		vkAttachment.stencilStoreOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		vkAttachment.initialLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
-		vkAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		vkAttachment.finalLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		info.clearValue = VkClearValue{};
 		info.clearValue.color = { 0.0f, 0.0f, 0.0f, 1.0f };
 		break;
@@ -526,7 +533,7 @@ AttachmentInformation AttachmentInformation::GetPresetInformation(AttachmentPres
 		vkAttachment.stencilLoadOp = VkAttachmentLoadOp::VK_ATTACHMENT_LOAD_OP_DONT_CARE;
 		vkAttachment.stencilStoreOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		vkAttachment.initialLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
-		vkAttachment.finalLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		vkAttachment.finalLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		info.clearValue = VkClearValue{};
 		info.clearValue.color = { 0.0f, 0.0f, 0.0f, 1.0f };
 		break;

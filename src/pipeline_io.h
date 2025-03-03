@@ -136,7 +136,7 @@ struct SubpassInformation
 	std::vector<VkAttachmentReference> resolveAttachments;
 
 	void AddColorAttachment(uint32_t _binding);
-	void SetDepthStencilAttachment(uint32_t _binding);
+	void SetDepthStencilAttachment(uint32_t _binding, bool _readOnly = false);
 	void AddResolveAttachment(uint32_t _binding);
 };
 class RenderPass;

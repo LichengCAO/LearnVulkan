@@ -11,7 +11,7 @@ layout(location = 2) out vec4 outNormal;
 
 void main()
 {
-    outAlbedo = vec4(inNormal * 0.5f + vec3(0.5f, 0.5f, 0.5f), 1.0f);//texture(texSampler, inUV);
+    outAlbedo = texture(texSampler, inUV);
     outNormal = vec4(inNormal * 0.5f + vec3(0.5f, 0.5f, 0.5f), 1.0f);
     outPos = vec4(inPos, 1.0f);
 }
