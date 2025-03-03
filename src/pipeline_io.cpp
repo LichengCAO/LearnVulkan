@@ -434,6 +434,9 @@ void SubpassInformation::AddColorAttachment(uint32_t _binding)
 }
 void SubpassInformation::SetDepthStencilAttachment(uint32_t _binding, bool _readOnly)
 {
+	// ATTACHMENT here means writable
+	// VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL -> depth is readonly, stencil is writable
+	// VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL -> depth is writable, stencil is readonly
 	if (_readOnly)
 	{
 		optDepthStencilAttachment = { _binding, VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL };

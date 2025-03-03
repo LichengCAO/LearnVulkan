@@ -120,7 +120,7 @@ void Image::TransitionLayout(VkImageLayout newLayout)
 		}
 	}
 	barrier.subresourceRange.baseMipLevel = 0;
-	barrier.subresourceRange.levelCount = 1;
+	barrier.subresourceRange.levelCount = m_imageInformation.mipLevels;
 	barrier.subresourceRange.baseArrayLayer = 0;
 	barrier.subresourceRange.layerCount = 1;
 
@@ -226,6 +226,10 @@ ImageView Image::NewImageView(const ImageViewInformation& imageViewInfo)
 	CHECK_TRUE(vkImage != VK_NULL_HANDLE, "Image is not initialized!");
 	ImageView val{};
 	val.m_viewInformation = imageViewInfo;
+	if (imageViewInfo.levelCount == 0)
+	{
+		val.m_viewInformation.levelCount = m_imageInformation.mipLevels;
+	}
 	val.pImage = this;
 
 	return val;

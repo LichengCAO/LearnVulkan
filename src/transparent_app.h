@@ -165,8 +165,6 @@ private:
 	void _InitPipelines();
 	void _UninitPipelines();
 	
-	void _FillDeviceMemoryWithZero();
-	
 	void _MainLoop();
 	void _UpdateUniformBuffer();
 	void _DrawFrame();

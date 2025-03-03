@@ -6,7 +6,7 @@ class Image;
 struct ImageViewInformation
 {
 	uint32_t baseMipLevel = 0;
-	uint32_t levelCount = 1;
+	uint32_t levelCount = 0;
 	VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_2D;
 	VkImageAspectFlags aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
 };

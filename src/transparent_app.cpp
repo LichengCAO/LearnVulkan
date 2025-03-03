@@ -1633,9 +1633,3 @@ void TransparentApp::Run()
 	_MainLoop();
 	_Uninit();
 }
-
-// TODO:
-void TransparentApp::_FillDeviceMemoryWithZero()
-{
-
-}
