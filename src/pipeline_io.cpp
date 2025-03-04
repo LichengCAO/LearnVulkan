@@ -541,6 +541,20 @@ AttachmentInformation AttachmentInformation::GetPresetInformation(AttachmentPres
 		info.clearValue.color = { 0.0f, 0.0f, 0.0f, 1.0f };
 		break;
 	}
+	case AttachmentPreset::GBUFFER_DEPTH:
+	{
+		vkAttachment.format = VkFormat::VK_FORMAT_R32_SFLOAT;
+		vkAttachment.samples = VkSampleCountFlagBits::VK_SAMPLE_COUNT_1_BIT;
+		vkAttachment.loadOp = VkAttachmentLoadOp::VK_ATTACHMENT_LOAD_OP_CLEAR;
+		vkAttachment.storeOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_STORE;
+		vkAttachment.stencilLoadOp = VkAttachmentLoadOp::VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		vkAttachment.stencilStoreOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		vkAttachment.initialLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
+		vkAttachment.finalLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		info.clearValue = VkClearValue{};
+		info.clearValue.color = { 0.0f, 0.0f, 0.0f, 1.0f };
+		break;
+	}
 	default:
 	{
 		CHECK_TRUE(false, "No such attachment preset!");

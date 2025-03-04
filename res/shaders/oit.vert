@@ -15,10 +15,12 @@ layout(set = 1, binding = 0) uniform ModelTransform
 } modelTransform;
 
 layout(location = 0) out vec4 outColor;
+layout(location = 1) out float vDepth;
 
 void main()
 {
-    vec4 posW = modelTransform.model * vec4(inPos, 1.0f);
-    gl_Position = cameraInfo.proj * cameraInfo.view * posW;
+    vec4 viewPos = cameraInfo.view * modelTransform.model * vec4(inPos, 1.0f);
+    gl_Position = cameraInfo.proj * viewPos;
+    vDepth = viewPos.z;
     outColor = inColor;
 }

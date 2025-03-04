@@ -23,6 +23,12 @@ struct ViewportInformation
 {
 	glm::ivec4 extent{};
 };
+struct CameraViewInformation
+{
+	alignas(16) glm::vec4 normalView; // inverse transpose of view matrix
+	alignas(4)  float invTanHalfFOV;
+	alignas(4)  float screenRatioXY;
+};
 struct Vertex
 {
 	alignas(16) glm::vec3 pos{};
@@ -55,11 +61,12 @@ private:
 	double lastTime = 0.0;
 	float frameTime = 0.0f;
 	uint32_t m_currentFrame = 0;
+	PersCamera m_camera{400, 300, glm::vec3(2,2,2), glm::vec3(0,0,0), glm::vec3(0,0,1)};
 	std::vector<Model> m_models;
 	std::vector<Model> m_transModels;
 
 	// Descriptor sets
-	DescriptorSetLayout m_oitDSetLayout;
+	DescriptorSetLayout m_oitSampleDSetLayout;
 	std::vector<DescriptorSet> m_oitDSets;
 	std::vector<Buffer> m_oitSampleTexelBuffers;
 	std::vector<BufferView> m_oitSampleTexelBufferViews;
@@ -67,17 +74,12 @@ private:
 	std::vector<ImageView> m_oitSampleCountImageViews;
 	std::vector<Image> m_oitInUseImages;
 	std::vector<ImageView> m_oitInUseImageViews;
-	std::vector<Image> m_oitFrontOutputImages;
-	std::vector<ImageView> m_oitFrontOutputImageViews;
 	Buffer             m_oitViewportBuffer;
 
-	DescriptorSetLayout m_oitOutputDSetLayout;
-	std::vector<DescriptorSet> m_oitOutputDSets;
-	std::vector<Image> m_oitOutputImages;
-	std::vector<ImageView> m_oitOutputImageViews;
-
-	DescriptorSetLayout m_dSetLayout;
-	std::vector<DescriptorSet> m_dSets;
+	DescriptorSetLayout m_oitColorDSetLayout;
+	std::vector<DescriptorSet> m_oitColorDSets;
+	std::vector<Image> m_oitColorImages;
+	std::vector<ImageView> m_oitColorImageViews;
 	
 	DescriptorSetLayout m_modelDSetLayout;
 	std::vector<std::vector<DescriptorSet>> m_vecModelDSets;
@@ -90,20 +92,32 @@ private:
 	std::vector<DescriptorSet> m_cameraDSets;
 	std::vector<Buffer> m_cameraBuffers;
 
+	DescriptorSetLayout m_distortDSetLayout;
+	std::vector<DescriptorSet> m_distortDSets;
+	std::vector<Buffer> m_distortBuffers; // TODO: store CameraViewInformation
+
+	DescriptorSetLayout m_gbufferDSetLayout;
+	std::vector<DescriptorSet> m_gbufferDSets;
+
+	DescriptorSetLayout m_transOutputDSetLayout;
+	std::vector<DescriptorSet> m_transOutputDSets;
+
 	// Vertex inputs
 	VertexInputLayout m_gbufferVertLayout;
 	std::vector<Buffer> m_gbufferVertBuffers;
 	std::vector<Buffer> m_gbufferIndexBuffers;
 
-	VertexInputLayout m_transparentVertLayout;
-	std::vector<Buffer> m_transparentVertBuffers;
-	std::vector<Buffer> m_transparentIndexBuffers;
+	VertexInputLayout m_transModelVertLayout;
+	std::vector<Buffer> m_transModelVertBuffers;
+	std::vector<Buffer> m_transModelIndexBuffers;
 	
-	VertexInputLayout m_vertLayout;
-	Buffer m_vertBuffer;
-	Buffer m_indexBuffer;
+	VertexInputLayout m_quadVertLayout;
+	Buffer m_quadVertBuffer;
+	Buffer m_quadIndexBuffer;
+	
 	// Samplers
 	VkSampler m_vkSampler = VK_NULL_HANDLE;
+	
 	// Renderpass
 	RenderPass m_gbufferRenderPass;
 	std::vector<Image> m_depthImages;
@@ -114,10 +128,17 @@ private:
 	std::vector<ImageView> m_gbufferNormalImageViews;
 	std::vector<Image> m_gbufferAlbedoImages;
 	std::vector<ImageView> m_gbufferAlbedoImageViews;
+	std::vector<Image> m_gbufferDepthImages;
+	std::vector<ImageView> m_gbufferDepthImageViews;
 	std::vector<Framebuffer> m_gbufferFramebuffers;
 
 	RenderPass m_oitRenderPass;
 	std::vector<Framebuffer> m_oitFramebuffers; // read only depth buffer
+
+	RenderPass m_distortRenderPass;
+	std::vector<Image> m_distortImages;
+	std::vector<ImageView> m_distortImageViews;
+	std::vector<Framebuffer> m_distortFramebuffers; // TODO:
 
 	RenderPass m_renderPass;
 	std::vector<Image> m_swapchainImages;
@@ -129,11 +150,12 @@ private:
 	GraphicsPipeline m_oitPipeline;
 	ComputePipeline  m_oitSortPipeline;
 
+	GraphicsPipeline m_distortPipeline; // TODO:
+
 	GraphicsPipeline m_gPipeline;
 	// semaphores
 	std::vector<VkSemaphore>	   m_swapchainImageAvailabilities;
 	std::vector<CommandSubmission> m_commandSubmissions;
-	PersCamera m_camera{400, 300, glm::vec3(2,2,2), glm::vec3(0,0,0), glm::vec3(0,0,1)};
 private:
 	void _Init();
 	void _Uninit();

@@ -58,7 +58,6 @@ void TransparentApp::_Init()
 		m_commandSubmissions.push_back(CommandSubmission{});
 		m_commandSubmissions.back().Init();
 	}
-	_FillDeviceMemoryWithZero();
 }
 void TransparentApp::_Uninit()
 {
@@ -87,22 +86,42 @@ void TransparentApp::_Uninit()
 
 void TransparentApp::_InitRenderPass()
 {
-	// Setup render pass
 	// oit
 	{
-		AttachmentInformation colorOutputInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::GBUFFER_ALBEDO);
+		// TODO: make it attachment less some day
 		AttachmentInformation readOnlyDepthInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::DEPTH);
 		readOnlyDepthInfo.attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 		readOnlyDepthInfo.attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		readOnlyDepthInfo.attachmentDescription.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 		readOnlyDepthInfo.attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-		m_oitRenderPass.AddAttachment(colorOutputInfo);
 		m_oitRenderPass.AddAttachment(readOnlyDepthInfo);
 		SubpassInformation oitSubpassInfo{};
-		oitSubpassInfo.SetDepthStencilAttachment(1, true);
-		oitSubpassInfo.AddColorAttachment(0);
+		oitSubpassInfo.SetDepthStencilAttachment(0, true);
 		m_oitRenderPass.AddSubpass(oitSubpassInfo);
 		m_oitRenderPass.Init();
+	}
+
+	// distort
+	{
+		AttachmentInformation uvDistortInfo{};
+		VkAttachmentDescription info{};
+		VkClearValue clearColor{};
+		info.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
+		info.samples = VkSampleCountFlagBits::VK_SAMPLE_COUNT_1_BIT;
+		info.loadOp = VkAttachmentLoadOp::VK_ATTACHMENT_LOAD_OP_CLEAR;
+		info.storeOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_STORE;
+		info.stencilLoadOp = VkAttachmentLoadOp::VK_ATTACHMENT_LOAD_OP_DONT_CARE;
+		info.stencilStoreOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_DONT_CARE;
+		info.initialLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
+		info.finalLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		clearColor.color = { 0.0f, 0.0f, 0.0f, 0.0f };
+		uvDistortInfo.attachmentDescription = info;
+		uvDistortInfo.clearValue = clearColor;
+		m_distortRenderPass.AddAttachment(uvDistortInfo);
+		SubpassInformation distortSubpassInfo{};
+		distortSubpassInfo.AddColorAttachment(0);
+		m_distortRenderPass.AddSubpass(distortSubpassInfo);
+		m_distortRenderPass.Init();
 	}
 
 	// gbuffer
@@ -110,17 +129,19 @@ void TransparentApp::_InitRenderPass()
 		AttachmentInformation albedoInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::GBUFFER_ALBEDO);
 		AttachmentInformation posInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::GBUFFER_POSITION);
 		AttachmentInformation normalInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::GBUFFER_NORMAL);
+		AttachmentInformation gDepthInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::GBUFFER_DEPTH);
 		AttachmentInformation depthInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::DEPTH);
-		depthInfo.attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_STORE; // we need to read it from other shader
 		m_gbufferRenderPass.AddAttachment(albedoInfo);
 		m_gbufferRenderPass.AddAttachment(posInfo);
 		m_gbufferRenderPass.AddAttachment(normalInfo);
+		m_gbufferRenderPass.AddAttachment(gDepthInfo);
 		m_gbufferRenderPass.AddAttachment(depthInfo);
 		SubpassInformation gSubpassInfo{};
 		gSubpassInfo.AddColorAttachment(0);
 		gSubpassInfo.AddColorAttachment(1);
 		gSubpassInfo.AddColorAttachment(2);
-		gSubpassInfo.SetDepthStencilAttachment(3);
+		gSubpassInfo.AddColorAttachment(3);
+		gSubpassInfo.SetDepthStencilAttachment(4);
 		m_gbufferRenderPass.AddSubpass(gSubpassInfo);
 		m_gbufferRenderPass.Init();
 	}
@@ -140,12 +161,13 @@ void TransparentApp::_UninitRenderPass()
 {
 	m_renderPass.Uninit();
 	m_gbufferRenderPass.Uninit();
+	m_distortRenderPass.Uninit();
 	m_oitRenderPass.Uninit();
 }
 
 void TransparentApp::_InitDescriptorSetLayouts()
 {
-	// OIT front before sorting
+	// OIT front device write read
 	{
 		DescriptorSetEntry binding0{}; // sample image
 		binding0.descriptorCount = 1;
@@ -167,25 +189,25 @@ void TransparentApp::_InitDescriptorSetLayouts()
 		binding3.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 		binding3.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT | VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT;
 
-		m_oitDSetLayout.AddBinding(binding0);
-		m_oitDSetLayout.AddBinding(binding1);
-		m_oitDSetLayout.AddBinding(binding2);
-		m_oitDSetLayout.AddBinding(binding3);
-		m_oitDSetLayout.Init();
+		m_oitSampleDSetLayout.AddBinding(binding0);
+		m_oitSampleDSetLayout.AddBinding(binding1);
+		m_oitSampleDSetLayout.AddBinding(binding2);
+		m_oitSampleDSetLayout.AddBinding(binding3);
+		m_oitSampleDSetLayout.Init();
 	}
 
-	// OIT post sorting
+	// OIT sorting device write
 	{
 		DescriptorSetEntry binding0{}; // output image
 		binding0.descriptorCount = 1;
 		binding0.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
 		binding0.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT | VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT;
 
-		m_oitOutputDSetLayout.AddBinding(binding0);
-		m_oitOutputDSetLayout.Init();
+		m_oitColorDSetLayout.AddBinding(binding0);
+		m_oitColorDSetLayout.Init();
 	}
 
-	// model related
+	// model related host write device read
 	{
 		DescriptorSetEntry binding0;
 		binding0.descriptorCount = 1;
@@ -202,7 +224,7 @@ void TransparentApp::_InitDescriptorSetLayouts()
 		m_modelDSetLayout.Init();
 	}
 
-	//camera
+	//camera host write device read
 	{
 		DescriptorSetEntry binding0;
 		binding0.descriptorCount = 1;
@@ -213,48 +235,72 @@ void TransparentApp::_InitDescriptorSetLayouts()
 		m_cameraDSetLayout.Init();
 	}
 
-	// post process, gbuffer stored
+	// gbuffer device read
 	{
-		DescriptorSetEntry binding0;
+		DescriptorSetEntry binding0; // albedo
 		binding0.descriptorCount = 1;
 		binding0.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		binding0.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
 
-		DescriptorSetEntry binding1;
+		DescriptorSetEntry binding1; // position
 		binding1.descriptorCount = 1;
 		binding1.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		binding1.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
 
-		DescriptorSetEntry binding2;
+		DescriptorSetEntry binding2; // normal
 		binding2.descriptorCount = 1;
 		binding2.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		binding2.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
 
-		DescriptorSetEntry binding3;
+		DescriptorSetEntry binding3; // depth
 		binding3.descriptorCount = 1;
 		binding3.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
 		binding3.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
 
-		DescriptorSetEntry binding4;
-		binding4.descriptorCount = 1;
-		binding4.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		binding4.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
+		m_gbufferDSetLayout.AddBinding(binding0);
+		m_gbufferDSetLayout.AddBinding(binding1);
+		m_gbufferDSetLayout.AddBinding(binding2);
+		m_gbufferDSetLayout.AddBinding(binding3);
+		m_gbufferDSetLayout.Init();
+	}
 
-		m_dSetLayout.AddBinding(binding0);
-		m_dSetLayout.AddBinding(binding1);
-		m_dSetLayout.AddBinding(binding2);
-		m_dSetLayout.AddBinding(binding3);
-		m_dSetLayout.AddBinding(binding4);
-		m_dSetLayout.Init();
+	// distort host write device read
+	{
+		DescriptorSetEntry binding0; // camera view information
+		binding0.descriptorCount = 1;
+		binding0.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		binding0.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_VERTEX_BIT | VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		m_distortDSetLayout.AddBinding(binding0);
+		m_distortDSetLayout.Init();
+	}
+
+	// transparent device read
+	{
+		DescriptorSetEntry binding0; // oit
+		binding0.descriptorCount = 1;
+		binding0.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		binding0.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		DescriptorSetEntry binding1; // distort uv
+		binding1.descriptorCount = 1;
+		binding1.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		binding1.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		m_transOutputDSetLayout.AddBinding(binding0);
+		m_transOutputDSetLayout.AddBinding(binding1);
+		m_transOutputDSetLayout.Init();
 	}
 }
 void TransparentApp::_UninitDescriptorSetLayouts()
 {
-	m_dSetLayout.Uninit();
+	m_transOutputDSetLayout.Uninit();
+	m_distortDSetLayout.Uninit();
+	m_gbufferDSetLayout.Uninit();
 	m_cameraDSetLayout.Uninit();
 	m_modelDSetLayout.Uninit();
-	m_oitOutputDSetLayout.Uninit();
-	m_oitDSetLayout.Uninit();
+	m_oitColorDSetLayout.Uninit();
+	m_oitSampleDSetLayout.Uninit();
 }
 
 void TransparentApp::_InitSampler()
@@ -368,9 +414,30 @@ void TransparentApp::_InitBuffers()
 			m_cameraBuffers.back().Init(bufferInfo);
 		}
 	}
+
+	// distort camera view info
+	{
+		BufferInformation bufferInfo;
+		bufferInfo.size = sizeof(CameraViewInformation);
+		bufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+		bufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		m_distortBuffers.reserve(MAX_FRAME_COUNT);
+		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+		{
+			m_distortBuffers.push_back(Buffer{});
+			m_distortBuffers[i].Init(bufferInfo);
+		}
+	}
 }
 void TransparentApp::_UninitBuffers()
 {
+	// distort
+	for (auto& buffer : m_distortBuffers)
+	{
+		buffer.Uninit();
+	}
+	m_distortBuffers.clear();
+
 	// camera
 	for (auto& buffer : m_cameraBuffers)
 	{
@@ -429,163 +496,257 @@ void TransparentApp::_InitImagesAndViews()
 	m_gbufferNormalImageViews.reserve(n);
 	m_gbufferAlbedoImages.reserve(n);
 	m_gbufferAlbedoImageViews.reserve(n);
+	m_gbufferDepthImages.reserve(n);
+	m_gbufferDepthImageViews.reserve(n);
 	m_oitSampleCountImages.reserve(n);
 	m_oitSampleCountImageViews.reserve(n);
 	m_oitInUseImages.reserve(n);
 	m_oitInUseImageViews.reserve(n);
-	m_oitOutputImages.reserve(n);
-	m_oitOutputImageViews.reserve(n);
-	m_oitFrontOutputImages.reserve(n);
-	m_oitFrontOutputImageViews.reserve(n);
+	m_oitColorImages.reserve(n);
+	m_oitColorImageViews.reserve(n);
+	m_distortImages.reserve(n);
+	m_distortImageViews.reserve(n);
 	
-	// create model textures
-	std::vector<std::string> textures;
-	for (int i = 0; i < m_models.size(); ++i)
+	// model textures
 	{
-		textures.push_back(m_models[i].texturePath);
-	}
-	m_modelTextures.reserve(textures.size());
-	for (int i = 0; i < textures.size(); ++i)
-	{
-		m_modelTextures.push_back(Texture{});
-		m_modelTextures[i].SetFilePath(textures[i]);
-		m_modelTextures[i].Init();
-	}
-
-	// Create OIT images	
-	ImageInformation oitSampleCountImageInfo{};
-	oitSampleCountImageInfo.format = VkFormat::VK_FORMAT_R32_UINT;
-	oitSampleCountImageInfo.width = width;
-	oitSampleCountImageInfo.height = height;
-	oitSampleCountImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_STORAGE_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT;// | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
-	oitSampleCountImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-	ImageViewInformation oitSampleCountImageViewInfo{};
-	oitSampleCountImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
-	
-	ImageInformation oitInUseImageInfo{};
-	oitInUseImageInfo.format = VkFormat::VK_FORMAT_R32_UINT;
-	oitInUseImageInfo.width = width;
-	oitInUseImageInfo.height = height;
-	oitInUseImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_STORAGE_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT;// | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
-	oitInUseImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-	ImageViewInformation oitInUseImageViewInfo{};
-	oitInUseImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
-
-	ImageInformation oitOutputImageInfo{};
-	oitOutputImageInfo.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
-	oitOutputImageInfo.width = width;
-	oitOutputImageInfo.height = height;
-	oitOutputImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_STORAGE_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
-	oitOutputImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-	ImageViewInformation oitOutputImageViewInfo{};
-	oitOutputImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
-
-	ImageInformation oitFrontOutputImageInfo{};
-	oitFrontOutputImageInfo.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
-	oitFrontOutputImageInfo.width = width;
-	oitFrontOutputImageInfo.height = height;
-	oitFrontOutputImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
-	oitFrontOutputImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-	ImageViewInformation oitFrontOutputImageViewInfo{};
-	oitFrontOutputImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
-	
-	std::vector<std::vector<Image>*> vecOITImages = { &m_oitSampleCountImages, &m_oitInUseImages, &m_oitOutputImages, &m_oitFrontOutputImages };
-	std::vector<std::vector<ImageView>*> vecOITImageViews = { &m_oitSampleCountImageViews, &m_oitInUseImageViews, &m_oitOutputImageViews, &m_oitFrontOutputImageViews };
-	std::vector<ImageInformation*> oitImageInfos = { &oitSampleCountImageInfo, &oitInUseImageInfo, &oitOutputImageInfo, &oitFrontOutputImageInfo };
-	std::vector<ImageViewInformation*> oitViewInfos = { &oitSampleCountImageViewInfo, &oitInUseImageViewInfo, &oitOutputImageViewInfo, &oitFrontOutputImageViewInfo };
-	for (int i = 0; i < n; ++i)
-	{
-		for (int j = 0; j < vecOITImages.size(); ++j)
+		std::vector<std::string> textures;
+		for (int i = 0; i < m_models.size(); ++i)
 		{
-			std::vector<Image>& oitImages = *vecOITImages[j];
-			std::vector<ImageView>& oitViews = *vecOITImageViews[j];
-			ImageInformation& imageInfo = *oitImageInfos[j];
-			ImageViewInformation& viewInfo = *oitViewInfos[j];
-			oitImages.push_back(Image{});
-			Image& oitImage = oitImages.back();
-			oitImage.SetImageInformation(imageInfo);
-			oitImage.Init();
-			oitImage.TransitionLayout(VK_IMAGE_LAYOUT_GENERAL);
-			oitViews.push_back(oitImage.NewImageView(viewInfo));
-			oitViews.back().Init();
+			textures.push_back(m_models[i].texturePath);
+		}
+		m_modelTextures.reserve(textures.size());
+		for (int i = 0; i < textures.size(); ++i)
+		{
+			m_modelTextures.push_back(Texture{});
+			m_modelTextures[i].SetFilePath(textures[i]);
+			m_modelTextures[i].Init();
 		}
 	}
 
-	// Create depth image and view
-	ImageInformation depthImageInfo;
-	depthImageInfo.width = width;
-	depthImageInfo.height = height;
-	depthImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
-	depthImageInfo.format = MyDevice::GetInstance().GetDepthFormat();
-	depthImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-	ImageViewInformation depthImageViewInfo;
-	depthImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_DEPTH_BIT;
-	for (int i = 0; i < n; ++i)
+	// OIT images
 	{
-		m_depthImages.push_back(Image{});
-		Image& depthImage = m_depthImages.back();
-		depthImage.SetImageInformation(depthImageInfo);
-		depthImage.Init();
-		m_depthImageViews.push_back(depthImage.NewImageView(depthImageViewInfo));
-		m_depthImageViews.back().Init();
-	}
+		ImageInformation oitSampleCountImageInfo{};
+		oitSampleCountImageInfo.format = VkFormat::VK_FORMAT_R32_UINT;
+		oitSampleCountImageInfo.width = width;
+		oitSampleCountImageInfo.height = height;
+		oitSampleCountImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_STORAGE_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT;// | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
+		oitSampleCountImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		ImageViewInformation oitSampleCountImageViewInfo{};
+		oitSampleCountImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
 
-	// Create gbuffer images and views
-	ImageInformation gbufferAlbedoImageInfo;
-	gbufferAlbedoImageInfo.width = width;
-	gbufferAlbedoImageInfo.height = height;
-	gbufferAlbedoImageInfo.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
-	gbufferAlbedoImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-	gbufferAlbedoImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
-	ImageViewInformation gbufferAlbedoImageViewInfo;
-	gbufferAlbedoImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
+		ImageInformation oitInUseImageInfo{};
+		oitInUseImageInfo.format = VkFormat::VK_FORMAT_R32_UINT;
+		oitInUseImageInfo.width = width;
+		oitInUseImageInfo.height = height;
+		oitInUseImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_STORAGE_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT;// | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
+		oitInUseImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		ImageViewInformation oitInUseImageViewInfo{};
+		oitInUseImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
 
-	ImageInformation gbufferPosImageInfo;
-	gbufferPosImageInfo.width = width;
-	gbufferPosImageInfo.height = height;
-	gbufferPosImageInfo.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
-	gbufferPosImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-	gbufferPosImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
-	ImageViewInformation gbufferPosImageViewInfo;
-	gbufferPosImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
+		ImageInformation oitOutputImageInfo{};
+		oitOutputImageInfo.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
+		oitOutputImageInfo.width = width;
+		oitOutputImageInfo.height = height;
+		oitOutputImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_STORAGE_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
+		oitOutputImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		ImageViewInformation oitOutputImageViewInfo{};
+		oitOutputImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
 
-	ImageInformation gbufferNormalImageInfo;
-	gbufferNormalImageInfo.width = width;
-	gbufferNormalImageInfo.height = height;
-	gbufferNormalImageInfo.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
-	gbufferNormalImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-	gbufferNormalImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
-	ImageViewInformation gbufferNormalImageViewInfo;
-	gbufferNormalImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
-
-	std::vector<Image>* arrGbufferImages[] = {&m_gbufferAlbedoImages, &m_gbufferPosImages, &m_gbufferNormalImages};
-	std::vector<ImageView>* arrGbufferImageViews[] = { &m_gbufferAlbedoImageViews, &m_gbufferPosImageViews, &m_gbufferNormalImageViews };
-	ImageInformation* gbufferImageInfos[] = { &gbufferAlbedoImageInfo, &gbufferPosImageInfo, &gbufferNormalImageInfo };
-	ImageViewInformation* gbufferViewInfos[] = { &gbufferAlbedoImageViewInfo, &gbufferPosImageViewInfo, &gbufferNormalImageViewInfo };
-	for (int i = 0; i < n; ++i)
-	{
-		for (int j = 0; j < 3; ++j)
+		std::vector<std::vector<Image>*> vecOITImages = {
+			&m_oitSampleCountImages,
+			&m_oitInUseImages,
+			&m_oitColorImages,
+		};
+		std::vector<std::vector<ImageView>*> vecOITImageViews = {
+			&m_oitSampleCountImageViews,
+			&m_oitInUseImageViews,
+			&m_oitColorImageViews,
+		};
+		std::vector<ImageInformation*> oitImageInfos = {
+			&oitSampleCountImageInfo,
+			&oitInUseImageInfo,
+			&oitOutputImageInfo
+		};
+		std::vector<ImageViewInformation*> oitViewInfos = {
+			&oitSampleCountImageViewInfo,
+			&oitInUseImageViewInfo,
+			&oitOutputImageViewInfo
+		};
+		for (int i = 0; i < n; ++i)
 		{
-			std::vector<Image>& gbufferImages = *arrGbufferImages[j];
-			std::vector<ImageView>& gbufferViews = *arrGbufferImageViews[j];
-			ImageInformation& imageInfo = *gbufferImageInfos[j];
-			ImageViewInformation& viewInfo = *gbufferViewInfos[j];
-			gbufferImages.push_back(Image{});
-			Image& gbufferImage = gbufferImages.back();
-			gbufferImage.SetImageInformation(imageInfo);
-			gbufferImage.Init();
-			gbufferViews.push_back(gbufferImage.NewImageView(viewInfo));
-			gbufferViews.back().Init();
+			for (int j = 0; j < vecOITImages.size(); ++j)
+			{
+				std::vector<Image>& oitImages = *vecOITImages[j];
+				std::vector<ImageView>& oitViews = *vecOITImageViews[j];
+				ImageInformation& imageInfo = *oitImageInfos[j];
+				ImageViewInformation& viewInfo = *oitViewInfos[j];
+				oitImages.push_back(Image{});
+				Image& oitImage = oitImages.back();
+				oitImage.SetImageInformation(imageInfo);
+				oitImage.Init();
+				oitImage.TransitionLayout(VK_IMAGE_LAYOUT_GENERAL);
+				oitViews.push_back(oitImage.NewImageView(viewInfo));
+				oitViews.back().Init();
+			}
 		}
 	}
 
-	// create swapchain view
-	ImageViewInformation swapchainImageViewInfo;
-	swapchainImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
-	for (int i = 0; i < m_swapchainImages.size(); ++i)
+	// depth image and view
 	{
-		m_swapchainImageViews.push_back(m_swapchainImages[i].NewImageView(swapchainImageViewInfo));
-		m_swapchainImageViews.back().Init();
+		ImageInformation depthImageInfo;
+		depthImageInfo.width = width;
+		depthImageInfo.height = height;
+		depthImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
+		depthImageInfo.format = MyDevice::GetInstance().GetDepthFormat();
+		depthImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		ImageViewInformation depthImageViewInfo;
+		depthImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_DEPTH_BIT;
+		for (int i = 0; i < n; ++i)
+		{
+			m_depthImages.push_back(Image{});
+			Image& depthImage = m_depthImages.back();
+			depthImage.SetImageInformation(depthImageInfo);
+			depthImage.Init();
+			m_depthImageViews.push_back(depthImage.NewImageView(depthImageViewInfo));
+			m_depthImageViews.back().Init();
+		}
+	}
+
+	// gbuffer images and views
+	{
+		ImageInformation gbufferAlbedoImageInfo;
+		gbufferAlbedoImageInfo.width = width;
+		gbufferAlbedoImageInfo.height = height;
+		gbufferAlbedoImageInfo.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
+		gbufferAlbedoImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		gbufferAlbedoImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
+		ImageViewInformation gbufferAlbedoImageViewInfo;
+		gbufferAlbedoImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
+
+		ImageInformation gbufferPosImageInfo;
+		gbufferPosImageInfo.width = width;
+		gbufferPosImageInfo.height = height;
+		gbufferPosImageInfo.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
+		gbufferPosImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		gbufferPosImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
+		ImageViewInformation gbufferPosImageViewInfo;
+		gbufferPosImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
+
+		ImageInformation gbufferNormalImageInfo;
+		gbufferNormalImageInfo.width = width;
+		gbufferNormalImageInfo.height = height;
+		gbufferNormalImageInfo.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
+		gbufferNormalImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		gbufferNormalImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
+		ImageViewInformation gbufferNormalImageViewInfo;
+		gbufferNormalImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
+
+		ImageInformation gbufferDepthImageInfo;
+		gbufferDepthImageInfo.width = width;
+		gbufferDepthImageInfo.height = height;
+		gbufferDepthImageInfo.format = VkFormat::VK_FORMAT_R32_SFLOAT;
+		gbufferDepthImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		gbufferDepthImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
+		ImageViewInformation gbufferDepthImageViewInfo;
+		gbufferDepthImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
+
+		std::vector<std::vector<Image>*> vecGbufferImages = {
+			&m_gbufferAlbedoImages,
+			&m_gbufferPosImages,
+			&m_gbufferNormalImages,
+			&m_gbufferDepthImages
+		};
+		std::vector<std::vector<ImageView>*> vecGbufferImageViews = {
+			&m_gbufferAlbedoImageViews,
+			&m_gbufferPosImageViews,
+			&m_gbufferNormalImageViews,
+			&m_gbufferDepthImageViews
+		};
+		std::vector<ImageInformation*> gbufferImageInfos = {
+			&gbufferAlbedoImageInfo,
+			&gbufferPosImageInfo,
+			&gbufferNormalImageInfo,
+			&gbufferDepthImageInfo
+		};
+		std::vector<ImageViewInformation*> gbufferViewInfos = {
+			&gbufferAlbedoImageViewInfo,
+			&gbufferPosImageViewInfo,
+			&gbufferNormalImageViewInfo,
+			&gbufferDepthImageViewInfo
+		};
+		for (int i = 0; i < n; ++i)
+		{
+			for (int j = 0; j < vecGbufferImages.size(); ++j)
+			{
+				std::vector<Image>& gbufferImages = *vecGbufferImages[j];
+				std::vector<ImageView>& gbufferViews = *vecGbufferImageViews[j];
+				ImageInformation& imageInfo = *gbufferImageInfos[j];
+				ImageViewInformation& viewInfo = *gbufferViewInfos[j];
+				gbufferImages.push_back(Image{});
+				Image& gbufferImage = gbufferImages.back();
+				gbufferImage.SetImageInformation(imageInfo);
+				gbufferImage.Init();
+				gbufferViews.push_back(gbufferImage.NewImageView(viewInfo));
+				gbufferViews.back().Init();
+			}
+		}
+	}
+
+	// swapchain view
+	{
+		ImageViewInformation swapchainImageViewInfo;
+		swapchainImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
+		for (int i = 0; i < m_swapchainImages.size(); ++i)
+		{
+			m_swapchainImageViews.push_back(m_swapchainImages[i].NewImageView(swapchainImageViewInfo));
+			m_swapchainImageViews.back().Init();
+		}
+	}
+
+	// distort image and view
+	{
+		ImageInformation distortUVImageInfo{};
+		distortUVImageInfo.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
+		distortUVImageInfo.width = width;
+		distortUVImageInfo.height = height;
+		distortUVImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
+		distortUVImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		ImageViewInformation distortUVImageViewInfo{};
+		distortUVImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
+
+		std::vector<std::vector<Image>*> vecDistortImages = 
+		{
+			&m_distortImages
+		};
+		std::vector<std::vector<ImageView>*> vecDistortImageViews = 
+		{
+			&m_distortImageViews
+		};
+		std::vector<ImageInformation*> distortImageInfos = 
+		{
+			&distortUVImageInfo,
+		};
+		std::vector<ImageViewInformation*> distortViewInfos = 
+		{
+			&distortUVImageViewInfo,
+		};
+		for (int i = 0; i < n; ++i)
+		{
+			for (int j = 0; j < vecDistortImages.size(); ++j)
+			{
+				std::vector<Image>& images = *vecDistortImages[j];
+				std::vector<ImageView>& views = *vecDistortImageViews[j];
+				ImageInformation& imageInfo = *distortImageInfos[j];
+				ImageViewInformation& viewInfo = *distortViewInfos[j];
+				images.push_back(Image{});
+				Image& oitImage = images.back();
+				oitImage.SetImageInformation(imageInfo);
+				oitImage.Init();
+				oitImage.TransitionLayout(VK_IMAGE_LAYOUT_GENERAL);
+				views.push_back(oitImage.NewImageView(viewInfo));
+				views.back().Init();
+			}
+		}
 	}
 }
 void TransparentApp::_UninitImagesAndViews()
@@ -597,10 +758,11 @@ void TransparentApp::_UninitImagesAndViews()
 		&m_gbufferAlbedoImageViews,
 		&m_gbufferPosImageViews,
 		&m_gbufferNormalImageViews,
+		&m_gbufferDepthImageViews,
 		&m_oitSampleCountImageViews,
 		&m_oitInUseImageViews,
-		&m_oitOutputImageViews,
-		&m_oitFrontOutputImageViews
+		&m_oitColorImageViews,
+		&m_distortImageViews,
 	};
 	std::vector<std::vector<Image>*> pImageVecsToUninit =
 	{
@@ -608,10 +770,11 @@ void TransparentApp::_UninitImagesAndViews()
 		&m_gbufferAlbedoImages,
 		&m_gbufferPosImages,
 		&m_gbufferNormalImages,
+		&m_gbufferDepthImages,
 		&m_oitSampleCountImages,
 		&m_oitInUseImages,
-		&m_oitOutputImages,
-		&m_oitFrontOutputImages
+		&m_oitColorImages,
+		&m_distortImages
 	};
 
 	for (auto pViewVec : pViewVecsToUninit)
@@ -645,6 +808,7 @@ void TransparentApp::_InitFramebuffers()
 	m_framebuffers.reserve(m_swapchainImages.size());
 	m_gbufferFramebuffers.reserve(n);
 	m_oitFramebuffers.reserve(n);
+	m_distortFramebuffers.reserve(n);
 	
 	// Setup frame buffers
 	for (int i = 0; i < n; ++i)
@@ -654,18 +818,25 @@ void TransparentApp::_InitFramebuffers()
 			&m_gbufferAlbedoImageViews[i],
 			&m_gbufferPosImageViews[i],
 			&m_gbufferNormalImageViews[i],
+			&m_gbufferDepthImageViews[i],
 			&m_depthImageViews[i]
 		};
 		m_gbufferFramebuffers.push_back(m_gbufferRenderPass.NewFramebuffer(gbufferViews));
 		m_gbufferFramebuffers.back().Init();
 
-		std::vector<const ImageView*> oitDepthViews =
+		std::vector<const ImageView*> oitDepthViews = 
 		{
-			&m_oitFrontOutputImageViews[i],
 			&m_depthImageViews[i]
 		};
 		m_oitFramebuffers.push_back(m_oitRenderPass.NewFramebuffer(oitDepthViews));
 		m_oitFramebuffers.back().Init();
+
+		std::vector<const ImageView*> distortViews =
+		{
+			&m_distortImageViews[i],
+		};
+		m_distortFramebuffers.push_back(m_distortRenderPass.NewFramebuffer(distortViews));
+		m_distortFramebuffers[i].Init();
 	}
 	for (int i = 0; i < m_swapchainImages.size(); ++i)
 	{
@@ -683,7 +854,8 @@ void TransparentApp::_UninitFramebuffers()
 	{
 		&m_framebuffers,
 		&m_gbufferFramebuffers,
-		&m_oitFramebuffers
+		&m_oitFramebuffers,
+		&m_distortFramebuffers
 	};
 	for (auto pFramebufferVec : pFramebufferVecsToUninit)
 	{
@@ -714,7 +886,7 @@ void TransparentApp::_InitDescriptorSets()
 			inUseImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;			  // Commonly used layout for storage images
 
 			m_oitDSets.push_back(DescriptorSet{});
-			m_oitDSets[i].SetLayout(&m_oitDSetLayout);
+			m_oitDSets[i].SetLayout(&m_oitSampleDSetLayout);
 			m_oitDSets[i].Init();
 			m_oitDSets[i].StartDescriptorSetUpdate();
 			m_oitDSets[i].DescriptorSetUpdate_WriteBinding(0, &m_oitSampleTexelBufferViews[i]);
@@ -724,20 +896,34 @@ void TransparentApp::_InitDescriptorSets()
 			m_oitDSets[i].FinishDescriptorSetUpdate();
 		}
 
-		m_oitOutputDSets.reserve(MAX_FRAME_COUNT);
+		m_oitColorDSets.reserve(MAX_FRAME_COUNT);
 		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 		{
 			VkDescriptorImageInfo outputImageInfo{};
 			outputImageInfo.sampler = VK_NULL_HANDLE;						  // Typically not used for storage images
-			outputImageInfo.imageView = m_oitOutputImageViews[i].vkImageView; // VkImageView created from your image
+			outputImageInfo.imageView = m_oitColorImageViews[i].vkImageView; // VkImageView created from your image
 			outputImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;			  // Commonly used layout for storage images
 
-			m_oitOutputDSets.push_back(DescriptorSet{});
-			m_oitOutputDSets[i].SetLayout(&m_oitOutputDSetLayout);
-			m_oitOutputDSets[i].Init();
-			m_oitOutputDSets[i].StartDescriptorSetUpdate();
-			m_oitOutputDSets[i].DescriptorSetUpdate_WriteBinding(0, outputImageInfo);
-			m_oitOutputDSets[i].FinishDescriptorSetUpdate();
+			m_oitColorDSets.push_back(DescriptorSet{});
+			m_oitColorDSets[i].SetLayout(&m_oitColorDSetLayout);
+			m_oitColorDSets[i].Init();
+			m_oitColorDSets[i].StartDescriptorSetUpdate();
+			m_oitColorDSets[i].DescriptorSetUpdate_WriteBinding(0, outputImageInfo);
+			m_oitColorDSets[i].FinishDescriptorSetUpdate();
+		}
+	}
+
+	// distort descriptor set
+	{
+		m_distortDSets.reserve(MAX_FRAME_COUNT);
+		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+		{
+			m_distortDSets.push_back(DescriptorSet{});
+			m_distortDSets[i].SetLayout(&m_distortDSetLayout);
+			m_distortDSets[i].Init();
+			m_distortDSets[i].StartDescriptorSetUpdate();
+			m_distortDSets[i].DescriptorSetUpdate_WriteBinding(0, &m_distortBuffers[i]);
+			m_distortDSets[i].FinishDescriptorSetUpdate();
 		}
 	}
 
@@ -815,30 +1001,56 @@ void TransparentApp::_InitDescriptorSets()
 
 			VkDescriptorImageInfo imageInfo3;
 			imageInfo3.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			imageInfo3.imageView = m_oitOutputImageViews[i].vkImageView;
+			imageInfo3.imageView = m_gbufferDepthImageViews[i].vkImageView;
 			imageInfo3.sampler = m_vkSampler;
 
 			VkDescriptorImageInfo imageInfo4;
-			imageInfo4.imageLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+			imageInfo4.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			imageInfo4.imageView = m_depthImageViews[i].vkImageView;
 			imageInfo4.sampler = m_vkSampler;
 
-			m_dSets.push_back(DescriptorSet{});
-			m_dSets.back().SetLayout(&m_dSetLayout);
-			m_dSets.back().Init();
-			m_dSets.back().StartDescriptorSetUpdate();
-			m_dSets.back().DescriptorSetUpdate_WriteBinding(0, imageInfo0);
-			m_dSets.back().DescriptorSetUpdate_WriteBinding(1, imageInfo1);
-			m_dSets.back().DescriptorSetUpdate_WriteBinding(2, imageInfo2);
-			m_dSets.back().DescriptorSetUpdate_WriteBinding(3, imageInfo3);
-			m_dSets.back().DescriptorSetUpdate_WriteBinding(4, imageInfo4);
-			m_dSets.back().FinishDescriptorSetUpdate();
+			m_gbufferDSets.push_back(DescriptorSet{});
+			m_gbufferDSets.back().SetLayout(&m_gbufferDSetLayout);
+			m_gbufferDSets.back().Init();
+			m_gbufferDSets.back().StartDescriptorSetUpdate();
+			m_gbufferDSets.back().DescriptorSetUpdate_WriteBinding(0, imageInfo0);
+			m_gbufferDSets.back().DescriptorSetUpdate_WriteBinding(1, imageInfo1);
+			m_gbufferDSets.back().DescriptorSetUpdate_WriteBinding(2, imageInfo2);
+			m_gbufferDSets.back().DescriptorSetUpdate_WriteBinding(3, imageInfo3);
+			m_gbufferDSets.back().DescriptorSetUpdate_WriteBinding(4, imageInfo4);
+			m_gbufferDSets.back().FinishDescriptorSetUpdate();
+		}
+	}
+
+	// transparent
+	{
+		m_transOutputDSets.reserve(MAX_FRAME_COUNT);
+		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+		{
+			VkDescriptorImageInfo oitOutputImageInfo{};
+			oitOutputImageInfo.sampler = m_vkSampler;						    // Typically not used for storage images
+			oitOutputImageInfo.imageView = m_oitColorImageViews[i].vkImageView; // VkImageView created from your image
+			oitOutputImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+			VkDescriptorImageInfo distortOutputImageInfo{};
+			distortOutputImageInfo.sampler = m_vkSampler;						  // Typically not used for storage images
+			distortOutputImageInfo.imageView = m_distortImageViews[i].vkImageView; // VkImageView created from your image
+			distortOutputImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+			m_transOutputDSets.push_back(DescriptorSet{});
+			m_transOutputDSets[i].SetLayout(&m_transOutputDSetLayout);
+			m_transOutputDSets[i].Init();
+			m_transOutputDSets[i].StartDescriptorSetUpdate();
+			m_transOutputDSets[i].DescriptorSetUpdate_WriteBinding(0, oitOutputImageInfo);
+			m_transOutputDSets[i].DescriptorSetUpdate_WriteBinding(1, distortOutputImageInfo);
+			m_transOutputDSets[i].FinishDescriptorSetUpdate();
 		}
 	}
 }
 void TransparentApp::_UninitDescriptorSets()
 {
-	m_dSets.clear();
+	m_transOutputDSets.clear();
+	m_gbufferDSets.clear();
 	m_cameraDSets.clear();
 	for (auto& dsets : m_vecModelDSets)
 	{
@@ -850,7 +1062,8 @@ void TransparentApp::_UninitDescriptorSets()
 		dsets.clear();
 	}
 	m_vecTransModelDSets.clear();
-	m_oitOutputDSets.clear();
+	m_distortDSets.clear();
+	m_oitColorDSets.clear();
 	m_oitDSets.clear();
 }
 
@@ -940,19 +1153,19 @@ void TransparentApp::_InitVertexInputs()
 		location2.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
 		location2.offset = offsetof(TransparentVertex, color);
 
-		m_transparentVertLayout.AddLocation(location0);
-		m_transparentVertLayout.AddLocation(location1);
-		m_transparentVertLayout.AddLocation(location2);
-		m_transparentVertLayout.stride = sizeof(TransparentVertex);
-		m_transparentVertLayout.inputRate = VkVertexInputRate::VK_VERTEX_INPUT_RATE_VERTEX;
+		m_transModelVertLayout.AddLocation(location0);
+		m_transModelVertLayout.AddLocation(location1);
+		m_transModelVertLayout.AddLocation(location2);
+		m_transModelVertLayout.stride = sizeof(TransparentVertex);
+		m_transModelVertLayout.inputRate = VkVertexInputRate::VK_VERTEX_INPUT_RATE_VERTEX;
 
 		std::vector<std::string> objFiles;
 		for (auto& model : m_transModels)
 		{
 			objFiles.push_back(model.objFilePath);
 		}
-		m_transparentVertBuffers.reserve(objFiles.size());
-		m_transparentIndexBuffers.reserve(objFiles.size());
+		m_transModelVertBuffers.reserve(objFiles.size());
+		m_transModelIndexBuffers.reserve(objFiles.size());
 		
 		std::uniform_real_distribution<float> uniformDist;
 		std::default_random_engine            rnd(3625);  // Fixed seed
@@ -971,13 +1184,13 @@ void TransparentApp::_InitVertexInputs()
 			{
 				vertices.push_back({verts[i].pos, verts[i].normal, color});
 			}
-			m_transparentVertBuffers.push_back(Buffer{});
-			m_transparentIndexBuffers.push_back(Buffer{});
+			m_transModelVertBuffers.push_back(Buffer{});
+			m_transModelIndexBuffers.push_back(Buffer{});
 			BufferInformation localBufferInfo;
 			BufferInformation stagingBufferInfo;
 			Buffer stagingBuffer;
-			Buffer& vertBuffer = m_transparentVertBuffers.back();
-			Buffer& indexBuffer = m_transparentIndexBuffers.back();
+			Buffer& vertBuffer = m_transModelVertBuffers.back();
+			Buffer& indexBuffer = m_transModelIndexBuffers.back();
 			stagingBufferInfo.size = sizeof(TransparentVertex) * vertices.size();
 			stagingBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 			stagingBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
@@ -1019,10 +1232,10 @@ void TransparentApp::_InitVertexInputs()
 			VertexInputEntry location1;
 			location1.format = VkFormat::VK_FORMAT_R32G32_SFLOAT;
 			location1.offset = offsetof(QuadVertex, uv);
-			m_vertLayout.AddLocation(location0);
-			m_vertLayout.AddLocation(location1);
-			m_vertLayout.stride = sizeof(QuadVertex);
-			m_vertLayout.inputRate = VkVertexInputRate::VK_VERTEX_INPUT_RATE_VERTEX;
+			m_quadVertLayout.AddLocation(location0);
+			m_quadVertLayout.AddLocation(location1);
+			m_quadVertLayout.stride = sizeof(QuadVertex);
+			m_quadVertLayout.inputRate = VkVertexInputRate::VK_VERTEX_INPUT_RATE_VERTEX;
 		}
 
 		std::vector<QuadVertex> vertices = 
@@ -1036,8 +1249,8 @@ void TransparentApp::_InitVertexInputs()
 		BufferInformation localBufferInfo;
 		BufferInformation stagingBufferInfo;
 		Buffer stagingBuffer;
-		Buffer& vertBuffer = m_vertBuffer;
-		Buffer& indexBuffer = m_indexBuffer;
+		Buffer& vertBuffer = m_quadVertBuffer;
+		Buffer& indexBuffer = m_quadIndexBuffer;
 		stagingBufferInfo.size = sizeof(QuadVertex) * vertices.size();
 		stagingBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 		stagingBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
@@ -1077,19 +1290,19 @@ void TransparentApp::_UninitVertexInputs()
 	}
 	m_gbufferIndexBuffers.clear();
 
-	for (auto& vertBuffer : m_transparentVertBuffers)
+	for (auto& vertBuffer : m_transModelVertBuffers)
 	{
 		vertBuffer.Uninit();
 	}
-	m_transparentVertBuffers.clear();
-	for (auto& indexBuffer : m_transparentIndexBuffers)
+	m_transModelVertBuffers.clear();
+	for (auto& indexBuffer : m_transModelIndexBuffers)
 	{
 		indexBuffer.Uninit();
 	}
-	m_transparentIndexBuffers.clear();
+	m_transModelIndexBuffers.clear();
 
-	m_vertBuffer.Uninit();
-	m_indexBuffer.Uninit();
+	m_quadVertBuffer.Uninit();
+	m_quadIndexBuffer.Uninit();
 }
 
 void TransparentApp::_InitPipelines()
@@ -1103,12 +1316,12 @@ void TransparentApp::_InitPipelines()
 
 	m_oitPipeline.AddDescriptorSetLayout(&m_cameraDSetLayout);
 	m_oitPipeline.AddDescriptorSetLayout(&m_modelDSetLayout);
-	m_oitPipeline.AddDescriptorSetLayout(&m_oitDSetLayout);
-	m_oitPipeline.AddDescriptorSetLayout(&m_dSetLayout); // to read depth image
+	m_oitPipeline.AddDescriptorSetLayout(&m_oitSampleDSetLayout);
+	m_oitPipeline.AddDescriptorSetLayout(&m_gbufferDSetLayout); // to read depth image
 	m_oitPipeline.AddShader(&oitFrontFragShader);
 	m_oitPipeline.AddShader(&oitFrontVertShader);
 	m_oitPipeline.BindToSubpass(&m_oitRenderPass, 0);
-	m_oitPipeline.AddVertexInputLayout(&m_transparentVertLayout);
+	m_oitPipeline.AddVertexInputLayout(&m_transModelVertLayout);
 	m_oitPipeline.Init();
 
 	oitFrontVertShader.Uninit();
@@ -1118,8 +1331,8 @@ void TransparentApp::_InitPipelines()
 	oitSortShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/oit.comp.spv");
 	oitSortShader.Init();
 
-	m_oitSortPipeline.AddDescriptorSetLayout(&m_oitDSetLayout);
-	m_oitSortPipeline.AddDescriptorSetLayout(&m_oitOutputDSetLayout);
+	m_oitSortPipeline.AddDescriptorSetLayout(&m_oitSampleDSetLayout);
+	m_oitSortPipeline.AddDescriptorSetLayout(&m_oitColorDSetLayout);
 	m_oitSortPipeline.AddShader(&oitSortShader);
 	m_oitSortPipeline.Init();
 
@@ -1150,11 +1363,12 @@ void TransparentApp::_InitPipelines()
 	vertShader.Init();
 	fragShader.Init();
 
-	m_gPipeline.AddDescriptorSetLayout(&m_dSetLayout);
+	m_gPipeline.AddDescriptorSetLayout(&m_gbufferDSetLayout);
+	m_gPipeline.AddDescriptorSetLayout(&m_transOutputDSetLayout);
 	m_gPipeline.AddShader(&vertShader);
 	m_gPipeline.AddShader(&fragShader);
 	m_gPipeline.BindToSubpass(&m_renderPass, 0);
-	m_gPipeline.AddVertexInputLayout(&m_vertLayout);
+	m_gPipeline.AddVertexInputLayout(&m_quadVertLayout);
 	m_gPipeline.Init();
 
 	vertShader.Uninit();
@@ -1365,18 +1579,26 @@ void TransparentApp::_DrawFrame()
 		info.pImageView = &m_oitInUseImageViews[m_currentFrame];
 		VkImageMemoryBarrier inUseImageBarrier =_NewImageBarreir(info);
 
-		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
-		info.pImageView = &m_depthImageViews[m_currentFrame];
+		//info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
+		//info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+		//info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		//info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
+		//info.pImageView = &m_depthImageViews[m_currentFrame];
+		//VkImageMemoryBarrier depthImageBarrier = _NewImageBarreir(info);
+		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
+		info.pImageView = &m_gbufferDepthImageViews[m_currentFrame];
 		VkImageMemoryBarrier depthImageBarrier = _NewImageBarreir(info);
 
 		std::vector<VkImageMemoryBarrier> imageBarriers = { sampleCountImageBarrier, inUseImageBarrier, depthImageBarrier };
 		std::vector<VkMemoryBarrier> memoryBarriers = { sampleDataBarrier };
 		vkCmdPipelineBarrier(cmd.vkCommandBuffer,
-			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
-			VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			//VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+			//VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 			0,
 			static_cast<uint32_t>(memoryBarriers.size()), memoryBarriers.data(),
 			0, nullptr,
@@ -1386,20 +1608,20 @@ void TransparentApp::_DrawFrame()
 
 	// draw transparent objects, write to sample data
 	cmd.StartRenderPass(&m_oitRenderPass, &m_oitFramebuffers[m_currentFrame]);
-	for (int i = 0; i < m_transparentVertBuffers.size(); ++i)
+	for (int i = 0; i < m_transModelVertBuffers.size(); ++i)
 	{
 		PipelineInput input;
 		VertexIndexInput indexInput;
 		VertexInput vertInput;
-		indexInput.pBuffer = &m_transparentIndexBuffers[i];
-		vertInput.pVertexInputLayout = &m_transparentVertLayout;
-		vertInput.pBuffer = &m_transparentVertBuffers[i];
+		indexInput.pBuffer = &m_transModelIndexBuffers[i];
+		vertInput.pVertexInputLayout = &m_transModelVertLayout;
+		vertInput.pBuffer = &m_transModelVertBuffers[i];
 		input.pDescriptorSets = 
 		{ 
 			&m_cameraDSets[m_currentFrame],
 			&m_vecTransModelDSets[m_currentFrame][i],
 			&m_oitDSets[m_currentFrame], // we have synthcronization here, so i think it's ok
-			&m_dSets[m_currentFrame]
+			&m_gbufferDSets[m_currentFrame]
 		};
 		input.imageSize = MyDevice::GetInstance().GetSwapchainExtent();
 		input.pVertexIndexInput = &indexInput;
@@ -1414,7 +1636,7 @@ void TransparentApp::_DrawFrame()
 		ImageBarrierInformation info{};
 		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
 		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_GENERAL;
-		info.pImageView = &m_oitOutputImageViews[m_currentFrame];
+		info.pImageView = &m_oitColorImageViews[m_currentFrame];
 		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_NONE;
 		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_WRITE_BIT;
 		VkImageMemoryBarrier oitOutputImageBarrier = _NewImageBarreir(info);
@@ -1441,7 +1663,7 @@ void TransparentApp::_DrawFrame()
 		subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;  // Apply to all array layers
 		vkCmdClearColorImage(
 			cmd.vkCommandBuffer,
-			m_oitOutputImages[m_currentFrame].vkImage,
+			m_oitColorImages[m_currentFrame].vkImage,
 			VK_IMAGE_LAYOUT_GENERAL,
 			&clearColor32Ruint,
 			1,
@@ -1462,7 +1684,7 @@ void TransparentApp::_DrawFrame()
 
 		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_WRITE_BIT;
 		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT;
-		info.pImageView = &m_oitOutputImageViews[m_currentFrame];
+		info.pImageView = &m_oitColorImageViews[m_currentFrame];
 		VkImageMemoryBarrier oitOutputImageBarrier = _NewImageBarreir(info);
 
 		VkMemoryBarrier sampleDataBarrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
@@ -1489,7 +1711,7 @@ void TransparentApp::_DrawFrame()
 		pipelineInput.groupCountX = (extent2d.width * extent2d.height + 255)/ 256;
 		pipelineInput.groupCountY = 1;
 		pipelineInput.groupCountZ = 1;
-		pipelineInput.pDescriptorSets = { &m_oitDSets[m_currentFrame], &m_oitOutputDSets[m_currentFrame] };
+		pipelineInput.pDescriptorSets = { &m_oitDSets[m_currentFrame], &m_oitColorDSets[m_currentFrame] };
 		m_oitSortPipeline.Do(cmd.vkCommandBuffer, pipelineInput);
 	}
 	
@@ -1504,22 +1726,22 @@ void TransparentApp::_DrawFrame()
 		std::vector<VkImageMemoryBarrier> imageBarriers;
 
 		ImageBarrierInformation info{};
-		//info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		//info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		//info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		//info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
-		//for (int i = 0; i < pViewsToSync.size(); ++i)
-		//{
-		//	info.pImageView = pViewsToSync[i];
-		//	VkImageMemoryBarrier barrier = _NewImageBarreir(info);
-		//	imageBarriers.push_back(barrier);
-		//}
+		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
+		for (int i = 0; i < pViewsToSync.size(); ++i)
+		{
+			info.pImageView = pViewsToSync[i];
+			VkImageMemoryBarrier barrier = _NewImageBarreir(info);
+			imageBarriers.push_back(barrier);
+		}
 
 		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_GENERAL;
 		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT;
 		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
-		info.pImageView = &m_oitOutputImageViews[m_currentFrame];
+		info.pImageView = &m_oitColorImageViews[m_currentFrame];
 		VkImageMemoryBarrier oitOutputImageBarrier = _NewImageBarreir(info);
 		imageBarriers.push_back(oitOutputImageBarrier);
 
@@ -1539,10 +1761,10 @@ void TransparentApp::_DrawFrame()
 		PipelineInput input;
 		VertexIndexInput indexInput;
 		VertexInput vertInput;
-		indexInput.pBuffer = &m_indexBuffer;
-		vertInput.pVertexInputLayout = &m_vertLayout;
-		vertInput.pBuffer = &m_vertBuffer;
-		input.pDescriptorSets = { &m_dSets[m_currentFrame] };
+		indexInput.pBuffer = &m_quadIndexBuffer;
+		vertInput.pVertexInputLayout = &m_quadVertLayout;
+		vertInput.pBuffer = &m_quadVertBuffer;
+		input.pDescriptorSets = { &m_gbufferDSets[m_currentFrame], &m_transOutputDSets[m_currentFrame] };
 		input.imageSize = MyDevice::GetInstance().GetSwapchainExtent();
 		input.pVertexIndexInput = &indexInput;
 		input.pVertexInputs = { &vertInput };
