@@ -543,7 +543,7 @@ AttachmentInformation AttachmentInformation::GetPresetInformation(AttachmentPres
 	}
 	case AttachmentPreset::GBUFFER_DEPTH:
 	{
-		vkAttachment.format = VkFormat::VK_FORMAT_R32_SFLOAT;
+		vkAttachment.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;// positive depth (larger farer), depth attachment value, 0, 1.0 
 		vkAttachment.samples = VkSampleCountFlagBits::VK_SAMPLE_COUNT_1_BIT;
 		vkAttachment.loadOp = VkAttachmentLoadOp::VK_ATTACHMENT_LOAD_OP_CLEAR;
 		vkAttachment.storeOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_STORE;
@@ -552,7 +552,7 @@ AttachmentInformation AttachmentInformation::GetPresetInformation(AttachmentPres
 		vkAttachment.initialLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
 		vkAttachment.finalLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		info.clearValue = VkClearValue{};
-		info.clearValue.color = { 0.0f, 0.0f, 0.0f, 1.0f };
+		info.clearValue.color = { 10000.0f, 1.0f, 0.0f, 1.0f };
 		break;
 	}
 	default:

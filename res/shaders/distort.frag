@@ -32,9 +32,8 @@ vec2 ComputeBufferUVDistortion(
 	in float InvTanHalfFov, // 1 / tan(0.5 * fovy)
 	in float ScreenRatioXY) // screen width / height
 {
-	vec2 ViewportUVDistortion = viewNormal.xy * (MaterialIOR - AIR_IOR);
+	vec2 ViewportUVDistortion = - viewNormal.xy * (MaterialIOR - AIR_IOR);
 	vec2 BufferUVDistortion = ViewportUVDistortion;// * FullResolutionDistortionPixelSize;
-
 	// InvTanHalfFov only apply a correction for the distortion to be the same in screen space space whatever the FoV is (to make it consistent accross player setup).
 	// However without taking depth into account, the distortion will actually be stronger the further away the camera is from the distortion surface.
 	// So when zoomed-in the distortion will be higher than expected.
@@ -46,7 +45,7 @@ vec2 ComputeBufferUVDistortion(
 	const float OffsetFudgeFactor = 0.00023;
 	BufferUVDistortion *= 100.0f/SceneDepth * vec2(OffsetFudgeFactor, -OffsetFudgeFactor) * FovFix;
 
-	return BufferUVDistortion;
+	return BufferUVDistortion;// * vec2(1.0f, -1.0f);//BufferUVDistortion;
 }
 
 void PostProcessUVDistortion(
@@ -61,7 +60,7 @@ void PostProcessUVDistortion(
 	float Z = DistortSceneDepth;
 	float ZCompare = SceneDepth; // screen pos.w
 	float InvWidth = 1.0f / max(1.0f, Range);
-	BufferUVDistortion *= saturate((Z - ZCompare) * InvWidth + Bias);
+	BufferUVDistortion *= clamp((Z - ZCompare) * InvWidth + Bias, 0.0f, 1.0f);
 
 	//Scale up for better precision in low/subtle refractions at the expense of artefacts at higher refraction.
 	// static const half DistortionScaleBias = 4.0f;
@@ -71,7 +70,7 @@ void PostProcessUVDistortion(
 void main()
 {
 	// material distortion offset
-	vec3 Normal = normalize(vNormal); // world
+	vec3 Normal = normalize(vViewNormal); // world
 	float MaterialIOR = 1.5f;
 	float SceneDepth = vScreenPos.w;
 	float RefractionDepthBias = 0.0;
@@ -80,18 +79,14 @@ void main()
 	vec2 ScreenUV = NDC * vec2(0.5f, 0.5f) + vec2(0.5f, 0.5f);
 
 	// Compute UV distortion
-	vec2 BufferUVDistortion = ComputeBufferUVDistortion(Normal, MaterialIOR, SceneDepth, InvTanHalfFov, ScreenRatioXY);
+	vec2 BufferUVDistortion = ComputeBufferUVDistortion(Normal, MaterialIOR, SceneDepth, cameraView.InvTanHalfFov, cameraView.ScreenRatioXY);
 
 	// Sample depth at distortion offset
 	float DistortSceneDepth = GetSceneDepth(ScreenUV + BufferUVDistortion);
 
 	// Post process UV distortion according to depth
-	PostProcessUVDistortion(SceneDepth, DistortSceneDepth, BufferUVDistortion, RefractionDepthBias);
-
-	// store positive and negative offsets separately
-	vec2 PosOffset = max(BufferUVDistortion,0);
-	vec2 NegOffset = abs(min(BufferUVDistortion,0));
+	//PostProcessUVDistortion(SceneDepth, DistortSceneDepth, RefractionDepthBias, BufferUVDistortion);
 
 	// output positives in R|G channels and negatives in B|A channels
-	OutColor = vec4(PosOffset.x, PosOffset.y, NegOffset.x, NegOffset.y);
+	outColor = vec4(BufferUVDistortion, 0.0, 1.0);
 }

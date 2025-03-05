@@ -14,20 +14,21 @@ struct CameraBuffer
 	alignas(16) glm::mat4 view;
 	alignas(16) glm::mat4 proj;
 };
-struct ModelTransform
-{
-	alignas(16) glm::mat4 model;
-	alignas(16) glm::mat4 modelInvTranspose;
-};
+
 struct ViewportInformation
 {
 	glm::ivec4 extent{};
 };
 struct CameraViewInformation
 {
-	alignas(16) glm::vec4 normalView; // inverse transpose of view matrix
+	alignas(16) glm::mat4 normalView; // inverse transpose of view matrix
 	alignas(4)  float invTanHalfFOV;
 	alignas(4)  float screenRatioXY;
+};
+struct ModelTransform
+{
+	alignas(16) glm::mat4 model;
+	alignas(16) glm::mat4 modelInvTranspose;
 };
 struct Vertex
 {
@@ -94,7 +95,7 @@ private:
 
 	DescriptorSetLayout m_distortDSetLayout;
 	std::vector<DescriptorSet> m_distortDSets;
-	std::vector<Buffer> m_distortBuffers; // TODO: store CameraViewInformation
+	std::vector<Buffer> m_distortBuffers;
 
 	DescriptorSetLayout m_gbufferDSetLayout;
 	std::vector<DescriptorSet> m_gbufferDSets;
@@ -133,12 +134,12 @@ private:
 	std::vector<Framebuffer> m_gbufferFramebuffers;
 
 	RenderPass m_oitRenderPass;
-	std::vector<Framebuffer> m_oitFramebuffers; // read only depth buffer
+	std::vector<Framebuffer> m_oitFramebuffers;
 
 	RenderPass m_distortRenderPass;
 	std::vector<Image> m_distortImages;
 	std::vector<ImageView> m_distortImageViews;
-	std::vector<Framebuffer> m_distortFramebuffers; // TODO:
+	std::vector<Framebuffer> m_distortFramebuffers;
 
 	RenderPass m_renderPass;
 	std::vector<Image> m_swapchainImages;
@@ -150,7 +151,7 @@ private:
 	GraphicsPipeline m_oitPipeline;
 	ComputePipeline  m_oitSortPipeline;
 
-	GraphicsPipeline m_distortPipeline; // TODO:
+	GraphicsPipeline m_distortPipeline;
 
 	GraphicsPipeline m_gPipeline;
 	// semaphores

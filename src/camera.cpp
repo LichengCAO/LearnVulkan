@@ -52,6 +52,11 @@ glm::mat4 Camera::GetViewMatrix()const
     return glm::lookAt(eye, ref, up);
 }
 
+glm::mat4 Camera::GetInverseTransposeViewMatrix() const
+{
+    return (glm::transpose(glm::inverse(GetViewMatrix())));
+}
+
 void Camera::Reset()
 {
     eye = glm::vec3(0, 0, 12);
@@ -167,6 +172,12 @@ void PersCamera::Reset() {
     ref = glm::vec3(0, 0, 0);
     world_up = glm::vec3(0, 1, 0);
     RecomputeAttributes();
+}
+
+float PersCamera::GetInverseTangentHalfFOVy() const
+{
+    float tan_fovy = glm::tan(glm::radians(fovy) / 2);
+    return 1.0f/ tan_fovy;
 }
 
 OrthoCamera::OrthoCamera() 

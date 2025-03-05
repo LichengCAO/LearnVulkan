@@ -27,6 +27,6 @@ layout(location = 1) out vec4 vScreenPos;
 void main()
 {
     vScreenPos = cameraInfo.proj * cameraInfo.view * modelTransform.model * vec4(hPos, 1.0f);
-    vViewNormal = vec3(normalize(cameraView.normalView * modelTransform.normalModel * vec4(hNormal, 0.0f)));
+    vViewNormal = vec3(normalize(cameraView.normalView * normalize(modelTransform.normalModel * vec4(hNormal, 0.0f))));
     gl_Position = vScreenPos;
 }

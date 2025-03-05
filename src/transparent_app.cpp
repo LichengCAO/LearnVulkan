@@ -22,7 +22,7 @@ void TransparentApp::_Init()
 
 	std::default_random_engine            rnd(3625);  // Fixed seed
 	std::uniform_real_distribution<float> uniformDist;
-	for (int i = 0; i < 50; ++i)
+	for (int i = 0; i < 10; ++i)
 	{
 		glm::vec3 center(uniformDist(rnd), uniformDist(rnd), uniformDist(rnd));
 		center = (center - glm::vec3(0.5)) * 2.f;
@@ -117,9 +117,18 @@ void TransparentApp::_InitRenderPass()
 		clearColor.color = { 0.0f, 0.0f, 0.0f, 0.0f };
 		uvDistortInfo.attachmentDescription = info;
 		uvDistortInfo.clearValue = clearColor;
+
+		AttachmentInformation depthInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::DEPTH);
+		depthInfo.attachmentDescription.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+		depthInfo.attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+		depthInfo.attachmentDescription.loadOp = VkAttachmentLoadOp::VK_ATTACHMENT_LOAD_OP_LOAD;
+		depthInfo.attachmentDescription.storeOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_DONT_CARE;
+
 		m_distortRenderPass.AddAttachment(uvDistortInfo);
+		m_distortRenderPass.AddAttachment(depthInfo);
 		SubpassInformation distortSubpassInfo{};
 		distortSubpassInfo.AddColorAttachment(0);
+		distortSubpassInfo.SetDepthStencilAttachment(1, true);
 		m_distortRenderPass.AddSubpass(distortSubpassInfo);
 		m_distortRenderPass.Init();
 	}
@@ -131,6 +140,8 @@ void TransparentApp::_InitRenderPass()
 		AttachmentInformation normalInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::GBUFFER_NORMAL);
 		AttachmentInformation gDepthInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::GBUFFER_DEPTH);
 		AttachmentInformation depthInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::DEPTH);
+		depthInfo.attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+		depthInfo.attachmentDescription.storeOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_STORE;
 		m_gbufferRenderPass.AddAttachment(albedoInfo);
 		m_gbufferRenderPass.AddAttachment(posInfo);
 		m_gbufferRenderPass.AddAttachment(normalInfo);
@@ -644,7 +655,7 @@ void TransparentApp::_InitImagesAndViews()
 		ImageInformation gbufferDepthImageInfo;
 		gbufferDepthImageInfo.width = width;
 		gbufferDepthImageInfo.height = height;
-		gbufferDepthImageInfo.format = VkFormat::VK_FORMAT_R32_SFLOAT;
+		gbufferDepthImageInfo.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
 		gbufferDepthImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		gbufferDepthImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
 		ImageViewInformation gbufferDepthImageViewInfo;
@@ -834,6 +845,7 @@ void TransparentApp::_InitFramebuffers()
 		std::vector<const ImageView*> distortViews =
 		{
 			&m_distortImageViews[i],
+			&m_depthImageViews[i]
 		};
 		m_distortFramebuffers.push_back(m_distortRenderPass.NewFramebuffer(distortViews));
 		m_distortFramebuffers[i].Init();
@@ -1004,10 +1016,10 @@ void TransparentApp::_InitDescriptorSets()
 			imageInfo3.imageView = m_gbufferDepthImageViews[i].vkImageView;
 			imageInfo3.sampler = m_vkSampler;
 
-			VkDescriptorImageInfo imageInfo4;
-			imageInfo4.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			imageInfo4.imageView = m_depthImageViews[i].vkImageView;
-			imageInfo4.sampler = m_vkSampler;
+			//VkDescriptorImageInfo imageInfo4;
+			//imageInfo4.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			//imageInfo4.imageView = m_depthImageViews[i].vkImageView;
+			//imageInfo4.sampler = m_vkSampler;
 
 			m_gbufferDSets.push_back(DescriptorSet{});
 			m_gbufferDSets.back().SetLayout(&m_gbufferDSetLayout);
@@ -1017,7 +1029,6 @@ void TransparentApp::_InitDescriptorSets()
 			m_gbufferDSets.back().DescriptorSetUpdate_WriteBinding(1, imageInfo1);
 			m_gbufferDSets.back().DescriptorSetUpdate_WriteBinding(2, imageInfo2);
 			m_gbufferDSets.back().DescriptorSetUpdate_WriteBinding(3, imageInfo3);
-			m_gbufferDSets.back().DescriptorSetUpdate_WriteBinding(4, imageInfo4);
 			m_gbufferDSets.back().FinishDescriptorSetUpdate();
 		}
 	}
@@ -1338,6 +1349,26 @@ void TransparentApp::_InitPipelines()
 
 	oitSortShader.Uninit();
 
+	SimpleShader distortVertShader;
+	SimpleShader distortFragShader;
+	distortVertShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/distort.vert.spv");
+	distortFragShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/distort.frag.spv");
+	distortVertShader.Init();
+	distortFragShader.Init();
+
+	m_distortPipeline.AddDescriptorSetLayout(&m_cameraDSetLayout);
+	m_distortPipeline.AddDescriptorSetLayout(&m_modelDSetLayout);
+	m_distortPipeline.AddDescriptorSetLayout(&m_distortDSetLayout);
+	m_distortPipeline.AddDescriptorSetLayout(&m_gbufferDSetLayout);
+	m_distortPipeline.AddShader(&distortVertShader);
+	m_distortPipeline.AddShader(&distortFragShader);
+	m_distortPipeline.BindToSubpass(&m_distortRenderPass, 0);
+	m_distortPipeline.AddVertexInputLayout(&m_transModelVertLayout);
+	m_distortPipeline.Init();
+
+	distortVertShader.Uninit();
+	distortFragShader.Uninit();
+
 	SimpleShader gbufferVertShader;
 	SimpleShader gbufferFragShader;
 	gbufferVertShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/gbuffer.vert.spv");
@@ -1378,6 +1409,7 @@ void TransparentApp::_UninitPipelines()
 {
 	m_gPipeline.Uninit();
 	m_gbufferPipeline.Uninit();
+	m_distortPipeline.Uninit();
 	m_oitSortPipeline.Uninit();
 	m_oitPipeline.Uninit();
 }
@@ -1436,20 +1468,11 @@ void TransparentApp::_UpdateUniformBuffer()
 	ubo.view = m_camera.GetViewMatrix();
 	m_cameraBuffers[m_currentFrame].CopyFromHost(&ubo);
 
-	ModelTransform roomTransform{};
-	ModelTransform wahooTransform{};
-	Transform roomT{};
-	Transform wahooT{};
-
-	wahooT.SetScale({ 0.05, 0.05, 0.05 });
-	wahooT.SetRotation({ 90, 0, 0 });
-	wahooT.SetPosition({ 0, 0, 0.5 });
-
-	roomTransform.model = roomT.GetModelMatrix();
-	roomTransform.modelInvTranspose = roomT.GetModelInverseTransposeMatrix();
-	wahooTransform.model = wahooT.GetModelMatrix();
-	wahooTransform.modelInvTranspose = wahooT.GetModelInverseTransposeMatrix();
-
+	//struct ModelTransform
+	//{
+	//	alignas(16) glm::mat4 model;
+	//	alignas(16) glm::mat4 modelInvTranspose;
+	//};
 	for (int i = 0; i < m_models.size(); ++i)
 	{
 		ModelTransform modelTransform{};
@@ -1457,7 +1480,6 @@ void TransparentApp::_UpdateUniformBuffer()
 		modelTransform.modelInvTranspose = m_models[i].transform.GetModelInverseTransposeMatrix();
 		m_vecModelBuffers[m_currentFrame][i].CopyFromHost(&modelTransform);
 	}
-
 	for (int i = 0; i < m_transModels.size(); ++i)
 	{
 		ModelTransform modelTransform{};
@@ -1465,6 +1487,18 @@ void TransparentApp::_UpdateUniformBuffer()
 		modelTransform.modelInvTranspose = m_transModels[i].transform.GetModelInverseTransposeMatrix();
 		m_vecTransModelBuffers[m_currentFrame][i].CopyFromHost(&modelTransform);
 	}
+
+	//struct CameraViewInformation
+	//{
+	//	alignas(16) glm::mat4 normalView; // inverse transpose of view matrix
+	//	alignas(4)  float invTanHalfFOV;
+	//	alignas(4)  float screenRatioXY;
+	//};
+	CameraViewInformation cameraViewInfo{};
+	cameraViewInfo.normalView = m_camera.GetInverseTransposeViewMatrix();
+	cameraViewInfo.invTanHalfFOV = m_camera.GetInverseTangentHalfFOVy();
+	cameraViewInfo.screenRatioXY = m_camera.aspect;
+	m_distortBuffers[m_currentFrame].CopyFromHost(&cameraViewInfo);
 }
 void TransparentApp::_DrawFrame()
 {
@@ -1481,7 +1515,7 @@ void TransparentApp::_DrawFrame()
 	_UpdateUniformBuffer();
 	WaitInformation waitInfo{};
 	waitInfo.waitSamaphore = m_swapchainImageAvailabilities[m_currentFrame];
-	waitInfo.waitStage = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	waitInfo.waitStage = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_COMMANDS_BIT | VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;// VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	cmd.StartCommands({ waitInfo });
 	
 	// draw opaque objects
@@ -1519,7 +1553,7 @@ void TransparentApp::_DrawFrame()
 		std::vector<VkImageMemoryBarrier> imageBarriers = { sampleCountImageBarrier, inUseImageBarrier };
 		vkCmdPipelineBarrier(cmd.vkCommandBuffer,
 			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
-			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT,  
+			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT,
 			0,
 			0, nullptr,
 			0, nullptr,
@@ -1561,43 +1595,83 @@ void TransparentApp::_DrawFrame()
 		);
 	}
 
-	// wait for previous depth draw done, and previous OIT texel buffers and image buffers to clean
+	// wait for previous depth draw done
+	{	
+		ImageBarrierInformation info{};
+		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
+		info.pImageView = &m_depthImageViews[m_currentFrame];
+		VkImageMemoryBarrier depthAttachmentBarrier = _NewImageBarreir(info);
+
+		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
+		info.pImageView = &m_gbufferDepthImageViews[m_currentFrame];
+		VkImageMemoryBarrier gbufferDepthImageBarrier = _NewImageBarreir(info);
+
+		std::vector<VkImageMemoryBarrier> imageBarriers = { depthAttachmentBarrier, gbufferDepthImageBarrier };
+		vkCmdPipelineBarrier(cmd.vkCommandBuffer,
+			//VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+			//VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_COMMANDS_BIT | VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_COMMANDS_BIT | VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+			0,
+			0, nullptr,
+			0, nullptr,
+			static_cast<uint32_t>(imageBarriers.size()), imageBarriers.data()
+		);
+	}
+
+	// draw transparent objects, write to uv distort
+	cmd.StartRenderPass(&m_distortRenderPass, &m_distortFramebuffers[m_currentFrame]);
+	for (int i = 0; i < m_transModelVertBuffers.size(); ++i)
+	{
+		PipelineInput input;
+		VertexIndexInput indexInput;
+		VertexInput vertInput;
+		indexInput.pBuffer = &m_transModelIndexBuffers[i];
+		vertInput.pVertexInputLayout = &m_transModelVertLayout;
+		vertInput.pBuffer = &m_transModelVertBuffers[i];
+		input.pDescriptorSets =
+		{
+			&m_cameraDSets[m_currentFrame],
+			&m_vecTransModelDSets[m_currentFrame][i],
+			&m_distortDSets[m_currentFrame],
+			&m_gbufferDSets[m_currentFrame]
+		};
+		input.imageSize = MyDevice::GetInstance().GetSwapchainExtent();
+		input.pVertexIndexInput = &indexInput;
+		input.pVertexInputs = { &vertInput };
+
+		m_distortPipeline.Do(cmd.vkCommandBuffer, input); // the draw will be done unordered
+	}
+	cmd.EndRenderPass();
+
+	// wait for previous OIT texel buffers and image buffers to clean
 	{
 		VkMemoryBarrier sampleDataBarrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
 		sampleDataBarrier.srcAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_WRITE_BIT;
 		sampleDataBarrier.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT | VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT;
-		
+
 		ImageBarrierInformation info{};
 		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_GENERAL;
 		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_GENERAL;
 		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_WRITE_BIT;
 		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT | VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT;
-		
+
 		info.pImageView = &m_oitSampleCountImageViews[m_currentFrame];
 		VkImageMemoryBarrier sampleCountImageBarrier = _NewImageBarreir(info);
-		
+
 		info.pImageView = &m_oitInUseImageViews[m_currentFrame];
-		VkImageMemoryBarrier inUseImageBarrier =_NewImageBarreir(info);
+		VkImageMemoryBarrier inUseImageBarrier = _NewImageBarreir(info);
 
-		//info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL;
-		//info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-		//info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-		//info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
-		//info.pImageView = &m_depthImageViews[m_currentFrame];
-		//VkImageMemoryBarrier depthImageBarrier = _NewImageBarreir(info);
-		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
-		info.pImageView = &m_gbufferDepthImageViews[m_currentFrame];
-		VkImageMemoryBarrier depthImageBarrier = _NewImageBarreir(info);
-
-		std::vector<VkImageMemoryBarrier> imageBarriers = { sampleCountImageBarrier, inUseImageBarrier, depthImageBarrier };
+		std::vector<VkImageMemoryBarrier> imageBarriers = { sampleCountImageBarrier, inUseImageBarrier };
 		std::vector<VkMemoryBarrier> memoryBarriers = { sampleDataBarrier };
 		vkCmdPipelineBarrier(cmd.vkCommandBuffer,
-			//VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
-			//VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
+			VK_PIPELINE_STAGE_TRANSFER_BIT,
 			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
 			0,
 			static_cast<uint32_t>(memoryBarriers.size()), memoryBarriers.data(),
@@ -1715,18 +1789,19 @@ void TransparentApp::_DrawFrame()
 		m_oitSortPipeline.Do(cmd.vkCommandBuffer, pipelineInput);
 	}
 	
-	// wait for sort to be done and opaque color draw done
+	// wait for oit sort, opaque color draw, distort uv done
 	{
 		std::vector<const ImageView*> pViewsToSync =
 		{
 			m_gbufferFramebuffers[m_currentFrame].attachments[0], //albedo
 			m_gbufferFramebuffers[m_currentFrame].attachments[1], //pos
-			m_gbufferFramebuffers[m_currentFrame].attachments[2]  //normal
+			m_gbufferFramebuffers[m_currentFrame].attachments[2], //normal
+			&m_distortImageViews[m_currentFrame]
 		};
 		std::vector<VkImageMemoryBarrier> imageBarriers;
 
 		ImageBarrierInformation info{};
-		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
 		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
@@ -1746,8 +1821,10 @@ void TransparentApp::_DrawFrame()
 		imageBarriers.push_back(oitOutputImageBarrier);
 
 		vkCmdPipelineBarrier(cmd.vkCommandBuffer,
-			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			//VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			//VkPipelineStageFlagBits::VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_COMMANDS_BIT | VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
+			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_COMMANDS_BIT | VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
 			0,
 			0, nullptr,
 			0, nullptr,

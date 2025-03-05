@@ -22,6 +22,7 @@ public:
     float aspect;
     glm::mat4 GetViewProj()const;
     glm::mat4 GetViewMatrix()const;
+    glm::mat4 GetInverseTransposeViewMatrix() const;
     virtual glm::mat4 GetProjectionMatrix()const = 0;
     virtual void RecomputeAttributes();
 
@@ -60,6 +61,7 @@ public:
     virtual glm::mat4 GetProjectionMatrix()const override;
     virtual void RecomputeAttributes();
     virtual void Reset();
+    float GetInverseTangentHalfFOVy() const;
 };
 
 class OrthoCamera

@@ -5,7 +5,6 @@
 #define OIT_LAYERS 5
 
 layout(location = 0) in vec4 inColor;
-layout(location = 1) in float vDepth;
 
 layout(set = 2, binding = 0, rgba32ui) uniform coherent uimageBuffer sampleDataImage; // sample data
 layout(set = 2, binding = 1, r32ui) uniform coherent uimage2D sampleCountImage; // sample count
@@ -14,7 +13,7 @@ layout(set = 2, binding = 3) uniform ViewportInformation
 {
     ivec4 extent; // width, height, width * height
 } viewportInfo;
-layout(set = 3, binding = 4) uniform sampler2D texDepth; // TODO:
+layout(set = 3, binding = 3) uniform sampler2D texDepth1;
 
 layout(location = 0) out vec4 outColor;
 
@@ -22,10 +21,10 @@ void main()
 {
     // packSnorm4x8: round(clamp(c, -1.0, 1.0) * 127.0)
     ivec2 coord = ivec2(gl_FragCoord.xy);
-    uvec4 storeValue = uvec4(packUnorm4x8(inColor), floatBitsToUint(vDepth), 0, 0);
+    uvec4 storeValue = uvec4(packUnorm4x8(inColor), floatBitsToUint(gl_FragCoord.z), 0, 0);
     const int texelBufferCoord = viewportInfo.extent.x * OIT_LAYERS * coord.y + OIT_LAYERS * coord.x;
     bool done = gl_SampleMaskIn[0] == 0; // if simply set to false, won't work, haven't figure out yet
-    bool passDepthTest = vDepth < texelFetch(texDepth, coord, 0 ).r;
+    bool passDepthTest = gl_FragCoord.z < texelFetch(texDepth1, coord, 0).g;
     while(passDepthTest && !done)
     // int  spin = 10000; // spin counter as safety measure, not required
     // while(!done && spin-- > 0)
@@ -51,9 +50,9 @@ void main()
                 for(int i = 0; i < OIT_LAYERS; ++i)
                 {
                     uvec4 newSample = imageLoad(sampleDataImage, texelBufferCoord + i);
-                    float testDepth = uintBitsToFloat(newSample.g);
-                    float maxDepth  = uintBitsToFloat(sample1.g);
-                    float maxDepth2 = uintBitsToFloat(sample2.g);
+                    uint testDepth = newSample.g;
+                    uint maxDepth  = sample1.g;
+                    uint maxDepth2 = sample2.g;
                     if(testDepth > maxDepth)
                     {
                         sample2 = sample1;

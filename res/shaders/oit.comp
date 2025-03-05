@@ -38,8 +38,8 @@ void main()
         // Last i elements are already sorted
         for (int j = 0; j < sampleCount - i - 1; ++j) 
         {
-            uint  frontDepth = arrSamples[j].g;
-            uint  postDepth = arrSamples[j + 1].g;
+            uint frontDepth = arrSamples[j].g;
+            uint postDepth = arrSamples[j + 1].g;
             bool needSwap = frontDepth < postDepth;
             if (needSwap) 
             {

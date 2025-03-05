@@ -25,8 +25,6 @@ endforeach()
 
 # add to the folder ~ in IDE explorer
 source_group("ShaderSources" FILES ${SHADER_SOURCES})
-#message("Shaders: ${SHADER_SOURCES}")
-#message("Images: ${IMAGES}")
 message(${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders)
 foreach(SHADER ${SHADER_SOURCES})
     set(SHADER_DIR ${CMAKE_RUNTIME_OUTPUT_DIRECTORY}/shaders)
