@@ -625,14 +625,19 @@ void TransparentApp::_InitImagesAndViews()
 
 	// gbuffer images and views
 	{
+		m_mipLevel = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
 		ImageInformation gbufferAlbedoImageInfo;
+		gbufferAlbedoImageInfo.mipLevels = m_mipLevel;
 		gbufferAlbedoImageInfo.width = width;
 		gbufferAlbedoImageInfo.height = height;
 		gbufferAlbedoImageInfo.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
 		gbufferAlbedoImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		gbufferAlbedoImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
+		gbufferAlbedoImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT
+			| VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 		ImageViewInformation gbufferAlbedoImageViewInfo;
 		gbufferAlbedoImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
+		gbufferAlbedoImageViewInfo.baseMipLevel = 0;// only view the 0 level 
+		gbufferAlbedoImageViewInfo.levelCount = 1;	
 
 		ImageInformation gbufferPosImageInfo;
 		gbufferPosImageInfo.width = width;
@@ -1539,89 +1544,62 @@ void TransparentApp::_DrawFrame()
 
 	// wait the oit image buffers transfer back to general first
 	{
-		ImageBarrierInformation info{};
-		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
-		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_GENERAL;
-		info.pImageView = &m_oitSampleCountImageViews[m_currentFrame];
-		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_NONE;
-		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_WRITE_BIT;
-		VkImageMemoryBarrier sampleCountImageBarrier = _NewImageBarreir(info);
+		ImageBarrierInformation sampleCountInfo{};
+		sampleCountInfo.pImageView = &m_oitSampleCountImageViews[m_currentFrame];
+		sampleCountInfo.oldLayout = cmd.GetImageLayout(&m_oitSampleCountImageViews[m_currentFrame]);
+		sampleCountInfo.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_GENERAL;
+		sampleCountInfo.srcAccessMask = VkAccessFlagBits::VK_ACCESS_NONE;
+		sampleCountInfo.dstAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_WRITE_BIT;
 
-		info.pImageView = &m_oitInUseImageViews[m_currentFrame];
-		VkImageMemoryBarrier inUseImageBarrier = _NewImageBarreir(info);
+		ImageBarrierInformation inUseInfo{};
+		inUseInfo.pImageView = &m_oitInUseImageViews[m_currentFrame];
+		inUseInfo.oldLayout = cmd.GetImageLayout(&m_oitInUseImageViews[m_currentFrame]);
+		inUseInfo.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_GENERAL;
+		inUseInfo.srcAccessMask = VkAccessFlagBits::VK_ACCESS_NONE;
+		inUseInfo.dstAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_WRITE_BIT;
 		
-		std::vector<VkImageMemoryBarrier> imageBarriers = { sampleCountImageBarrier, inUseImageBarrier };
-		vkCmdPipelineBarrier(cmd.vkCommandBuffer,
+		std::vector<ImageBarrierInformation> imageBarriers = {sampleCountInfo, inUseInfo};
+		std::vector<VkMemoryBarrier> memoryBarriers{};
+		cmd.AddPipelineBarrier(
 			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
 			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT,
-			0,
-			0, nullptr,
-			0, nullptr,
-			static_cast<uint32_t>(imageBarriers.size()), imageBarriers.data()
+			memoryBarriers,
+			imageBarriers
 		);
 	}
 
 	// clean storage images after layout transfer
 	{
 		VkClearColorValue clearColor32Ruint{ .uint32 = {0u} };
-		VkImageSubresourceRange subresourceRange = {};
-		subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;  // Specify the aspect, e.g., color
-		subresourceRange.baseMipLevel = 0;                        // Start at the first mip level
-		subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;    // Apply to all mip levels
-		subresourceRange.baseArrayLayer = 0;                      // Start at the first array layer
-		subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;  // Apply to all array layers
-		vkCmdClearColorImage(
-			cmd.vkCommandBuffer,
-			m_oitSampleCountImages[m_currentFrame].vkImage,
-			VK_IMAGE_LAYOUT_GENERAL,
-			&clearColor32Ruint,
-			1,
-			&subresourceRange
-		);
-		vkCmdClearColorImage(
-			cmd.vkCommandBuffer,
-			m_oitInUseImages[m_currentFrame].vkImage,
-			VK_IMAGE_LAYOUT_GENERAL,
-			&clearColor32Ruint,
-			1,
-			&subresourceRange
-		);
-		vkCmdFillBuffer(
-			cmd.vkCommandBuffer,
-			m_oitSampleTexelBuffers[m_currentFrame].vkBuffer,
-			0,
-			m_oitSampleTexelBuffers[m_currentFrame].GetBufferInformation().size,
-			0
-		);
+		cmd.FillImageView(&m_oitSampleCountImageViews[m_currentFrame], clearColor32Ruint);
+		cmd.FillImageView(&m_oitInUseImageViews[m_currentFrame], clearColor32Ruint);
+		cmd.FillBuffer(&m_oitSampleTexelBuffers[m_currentFrame], 0);
 	}
 
 	// wait for previous depth draw done
 	{	
-		ImageBarrierInformation info{};
-		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
-		info.pImageView = &m_depthImageViews[m_currentFrame];
-		VkImageMemoryBarrier depthAttachmentBarrier = _NewImageBarreir(info);
+		ImageBarrierInformation depthInfo{};
+		depthInfo.pImageView = &m_depthImageViews[m_currentFrame];
+		depthInfo.oldLayout = cmd.GetImageLayout(&m_depthImageViews[m_currentFrame]);
+		depthInfo.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
+		depthInfo.srcAccessMask = VkAccessFlagBits::VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
+		depthInfo.dstAccessMask = VkAccessFlagBits::VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT;
 
-		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
-		info.pImageView = &m_gbufferDepthImageViews[m_currentFrame];
-		VkImageMemoryBarrier gbufferDepthImageBarrier = _NewImageBarreir(info);
+		ImageBarrierInformation gDepthInfo{};
+		gDepthInfo.pImageView = &m_gbufferDepthImageViews[m_currentFrame];
+		gDepthInfo.oldLayout = cmd.GetImageLayout(&m_gbufferDepthImageViews[m_currentFrame]);
+		gDepthInfo.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		gDepthInfo.srcAccessMask = VkAccessFlagBits::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		gDepthInfo.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
 
-		std::vector<VkImageMemoryBarrier> imageBarriers = { depthAttachmentBarrier, gbufferDepthImageBarrier };
-		vkCmdPipelineBarrier(cmd.vkCommandBuffer,
-			//VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-			//VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
-			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_COMMANDS_BIT | VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
-			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_COMMANDS_BIT | VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
-			0,
-			0, nullptr,
-			0, nullptr,
-			static_cast<uint32_t>(imageBarriers.size()), imageBarriers.data()
+		std::vector<ImageBarrierInformation> imageBarriers = { depthInfo, gDepthInfo };
+		std::vector<VkMemoryBarrier> memoryBarriers{};
+
+		cmd.AddPipelineBarrier(
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT | VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT,
+			memoryBarriers,
+			imageBarriers
 		);
 	}
 
@@ -1656,27 +1634,28 @@ void TransparentApp::_DrawFrame()
 		sampleDataBarrier.srcAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_WRITE_BIT;
 		sampleDataBarrier.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT | VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT;
 
-		ImageBarrierInformation info{};
-		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_GENERAL;
-		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_GENERAL;
-		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_WRITE_BIT;
-		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT | VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT;
+		ImageBarrierInformation sampleCountInfo{};
+		sampleCountInfo.pImageView = &m_oitSampleCountImageViews[m_currentFrame];
+		sampleCountInfo.oldLayout = cmd.GetImageLayout(&m_oitSampleCountImageViews[m_currentFrame]);
+		sampleCountInfo.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_GENERAL;
+		sampleCountInfo.srcAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_WRITE_BIT;
+		sampleCountInfo.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT | VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT;
 
-		info.pImageView = &m_oitSampleCountImageViews[m_currentFrame];
-		VkImageMemoryBarrier sampleCountImageBarrier = _NewImageBarreir(info);
+		ImageBarrierInformation inUseInfo{};
+		inUseInfo.pImageView = &m_oitInUseImageViews[m_currentFrame];
+		inUseInfo.oldLayout = cmd.GetImageLayout(&m_oitInUseImageViews[m_currentFrame]);
+		inUseInfo.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_GENERAL;
+		inUseInfo.srcAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_WRITE_BIT;
+		inUseInfo.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT | VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT;
 
-		info.pImageView = &m_oitInUseImageViews[m_currentFrame];
-		VkImageMemoryBarrier inUseImageBarrier = _NewImageBarreir(info);
-
-		std::vector<VkImageMemoryBarrier> imageBarriers = { sampleCountImageBarrier, inUseImageBarrier };
+		std::vector<ImageBarrierInformation> imageBarriers = { sampleCountInfo, inUseInfo };
 		std::vector<VkMemoryBarrier> memoryBarriers = { sampleDataBarrier };
-		vkCmdPipelineBarrier(cmd.vkCommandBuffer,
+
+		cmd.AddPipelineBarrier(
 			VK_PIPELINE_STAGE_TRANSFER_BIT,
 			VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-			0,
-			static_cast<uint32_t>(memoryBarriers.size()), memoryBarriers.data(),
-			0, nullptr,
-			static_cast<uint32_t>(imageBarriers.size()), imageBarriers.data()
+			memoryBarriers,
+			imageBarriers
 		);
 	}
 
@@ -1708,73 +1687,57 @@ void TransparentApp::_DrawFrame()
 	// wait the oit output image transfer back to general first
 	{
 		ImageBarrierInformation info{};
-		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
-		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_GENERAL;
 		info.pImageView = &m_oitColorImageViews[m_currentFrame];
+		info.oldLayout = cmd.GetImageLayout(info.pImageView = &m_oitColorImageViews[m_currentFrame]);
+		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_GENERAL;
 		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_NONE;
 		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_WRITE_BIT;
-		VkImageMemoryBarrier oitOutputImageBarrier = _NewImageBarreir(info);
 
-		std::vector<VkImageMemoryBarrier> imageBarriers = { oitOutputImageBarrier };
-		vkCmdPipelineBarrier(cmd.vkCommandBuffer,
+		std::vector<ImageBarrierInformation> imageBarriers = { info };
+		std::vector<VkMemoryBarrier> memoryBarriers{};
+
+		cmd.AddPipelineBarrier(
 			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
 			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT,
-			0,
-			0, nullptr,
-			0, nullptr,
-			static_cast<uint32_t>(imageBarriers.size()), imageBarriers.data()
+			memoryBarriers,
+			imageBarriers
 		);
 	}
 
 	// clean oit output image
 	{
 		VkClearColorValue clearColor32Ruint{ .uint32 = {0u} };
-		VkImageSubresourceRange subresourceRange = {};
-		subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;  // Specify the aspect, e.g., color
-		subresourceRange.baseMipLevel = 0;                        // Start at the first mip level
-		subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;    // Apply to all mip levels
-		subresourceRange.baseArrayLayer = 0;                      // Start at the first array layer
-		subresourceRange.layerCount = VK_REMAINING_ARRAY_LAYERS;  // Apply to all array layers
-		vkCmdClearColorImage(
-			cmd.vkCommandBuffer,
-			m_oitColorImages[m_currentFrame].vkImage,
-			VK_IMAGE_LAYOUT_GENERAL,
-			&clearColor32Ruint,
-			1,
-			&subresourceRange
-		);
+		cmd.FillImageView(&m_oitColorImageViews[m_currentFrame], clearColor32Ruint);
 	}
 
 	// wait for the oit sample buffer and sample count buffer to be done, oit output image to be cleared
 	{
-		ImageBarrierInformation info{};
-		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_GENERAL;
-		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_GENERAL;
-		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT;
-		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
+		ImageBarrierInformation sampleCountInfo{};
+		sampleCountInfo.pImageView = &m_oitSampleCountImageViews[m_currentFrame];
+		sampleCountInfo.oldLayout = cmd.GetImageLayout(&m_oitSampleCountImageViews[m_currentFrame]);
+		sampleCountInfo.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_GENERAL;
+		sampleCountInfo.srcAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT;
+		sampleCountInfo.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
 
-		info.pImageView = &m_oitSampleCountImageViews[m_currentFrame];
-		VkImageMemoryBarrier sampleCountImageBarrier = _NewImageBarreir(info);
-
-		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_WRITE_BIT;
-		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT;
-		info.pImageView = &m_oitColorImageViews[m_currentFrame];
-		VkImageMemoryBarrier oitOutputImageBarrier = _NewImageBarreir(info);
+		ImageBarrierInformation oitColorInfo{};
+		oitColorInfo.pImageView = &m_oitColorImageViews[m_currentFrame];
+		oitColorInfo.oldLayout = cmd.GetImageLayout(&m_oitColorImageViews[m_currentFrame]);
+		oitColorInfo.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_GENERAL;
+		oitColorInfo.srcAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_WRITE_BIT;
+		oitColorInfo.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT;
 
 		VkMemoryBarrier sampleDataBarrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
 		sampleDataBarrier.srcAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT;
 		sampleDataBarrier.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
 		
-		std::vector<VkImageMemoryBarrier> imageBarriers = { sampleCountImageBarrier, oitOutputImageBarrier };
+		std::vector<ImageBarrierInformation> imageBarriers = { sampleCountInfo, oitColorInfo };
 		std::vector<VkMemoryBarrier> memoryBarriers = { sampleDataBarrier }; 
 
-		vkCmdPipelineBarrier(cmd.vkCommandBuffer,
+		cmd.AddPipelineBarrier(
 			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
 			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-			0,
-			static_cast<uint32_t>(memoryBarriers.size()), memoryBarriers.data(),
-			0, nullptr,
-			static_cast<uint32_t>(imageBarriers.size()), imageBarriers.data()
+			memoryBarriers,
+			imageBarriers
 		);
 	}
 
@@ -1791,45 +1754,160 @@ void TransparentApp::_DrawFrame()
 	
 	// wait for oit sort, opaque color draw, distort uv done
 	{
+		std::vector<ImageBarrierInformation> imageBarriers{};
+		std::vector<VkMemoryBarrier> memoryBarriers{};
+
 		std::vector<const ImageView*> pViewsToSync =
 		{
-			m_gbufferFramebuffers[m_currentFrame].attachments[0], //albedo
+			// m_gbufferFramebuffers[m_currentFrame].attachments[0], //albedo
 			m_gbufferFramebuffers[m_currentFrame].attachments[1], //pos
 			m_gbufferFramebuffers[m_currentFrame].attachments[2], //normal
 			&m_distortImageViews[m_currentFrame]
 		};
-		std::vector<VkImageMemoryBarrier> imageBarriers;
 
-		ImageBarrierInformation info{};
-		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
-		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
 		for (int i = 0; i < pViewsToSync.size(); ++i)
 		{
+			ImageBarrierInformation info{};
 			info.pImageView = pViewsToSync[i];
-			VkImageMemoryBarrier barrier = _NewImageBarreir(info);
-			imageBarriers.push_back(barrier);
+			info.oldLayout = cmd.GetImageLayout(pViewsToSync[i]);
+			info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+			info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
+
+			imageBarriers.push_back(info);
 		}
 
-		info.oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_GENERAL;
-		info.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		info.srcAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT;
-		info.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
-		info.pImageView = &m_oitColorImageViews[m_currentFrame];
-		VkImageMemoryBarrier oitOutputImageBarrier = _NewImageBarreir(info);
-		imageBarriers.push_back(oitOutputImageBarrier);
+		// transfer the albedo gbuffer image to transfer_dst first to make mipmaps
+		ImageBarrierInformation gbufferAlbedoInfo{};
+		gbufferAlbedoInfo.pImageView = &m_gbufferAlbedoImageViews[m_currentFrame];
+		gbufferAlbedoInfo.oldLayout = cmd.GetImageLayout(&m_gbufferAlbedoImageViews[m_currentFrame]);
+		gbufferAlbedoInfo.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		gbufferAlbedoInfo.srcAccessMask = VkAccessFlagBits::VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT;
+		gbufferAlbedoInfo.dstAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_WRITE_BIT;
+		imageBarriers.push_back(gbufferAlbedoInfo);
 
-		vkCmdPipelineBarrier(cmd.vkCommandBuffer,
-			//VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
-			//VkPipelineStageFlagBits::VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
-			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_COMMANDS_BIT | VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
-			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_COMMANDS_BIT | VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT,
-			0,
-			0, nullptr,
-			0, nullptr,
-			static_cast<uint32_t>(imageBarriers.size()), imageBarriers.data()
+		ImageBarrierInformation oitColorInfo{};
+		oitColorInfo.pImageView = &m_oitColorImageViews[m_currentFrame];
+		oitColorInfo.oldLayout = cmd.GetImageLayout(&m_oitColorImageViews[m_currentFrame]);
+		oitColorInfo.newLayout = VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		oitColorInfo.srcAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT;
+		oitColorInfo.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
+		imageBarriers.push_back(oitColorInfo);
+
+		cmd.AddPipelineBarrier(
+			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT,
+			VkPipelineStageFlagBits::VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT,
+			memoryBarriers,
+			imageBarriers
 		);
+	}
+
+	// transfer the rest mipmap level of gbufferalbedo to transfer dst first
+	{
+		if (m_mipLevel > 1)
+		{
+			VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+			barrier.image = m_gbufferAlbedoImages[m_currentFrame].vkImage;
+			barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+			barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			barrier.subresourceRange.baseArrayLayer = 0;
+			barrier.subresourceRange.layerCount = 1;
+			barrier.subresourceRange.levelCount = VK_REMAINING_MIP_LEVELS;
+			barrier.subresourceRange.baseMipLevel = 1;
+			barrier.oldLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+			barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+			barrier.srcAccessMask = VK_ACCESS_NONE;
+			barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+
+			vkCmdPipelineBarrier(
+				cmd.vkCommandBuffer,
+				VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+				VkPipelineStageFlagBits::VK_PIPELINE_STAGE_TRANSFER_BIT,
+				0,
+				0, nullptr,
+				0, nullptr,
+				1, &barrier
+			);
+		}
+	}
+
+	// generate gbuffer mipmaps
+	{
+		VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+		barrier.image = m_gbufferAlbedoImages[m_currentFrame].vkImage;
+		barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		barrier.subresourceRange.baseArrayLayer = 0;
+		barrier.subresourceRange.layerCount = 1;
+		barrier.subresourceRange.levelCount = 1;
+
+		int32_t mipWidth = m_gbufferAlbedoImages[m_currentFrame].GetImageInformation().width;
+		int32_t mipHeight = m_gbufferAlbedoImages[m_currentFrame].GetImageInformation().height;
+
+		for (uint32_t i = 1; i < m_mipLevel; i++) {
+			barrier.subresourceRange.baseMipLevel = i - 1;
+			barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+			barrier.newLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+			barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+			barrier.dstAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+
+			// transfer to src first
+			vkCmdPipelineBarrier(cmd.vkCommandBuffer,
+				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT, 0,
+				0, nullptr,
+				0, nullptr,
+				1, &barrier);
+
+			VkImageBlit blit{};
+			blit.srcOffsets[0] = { 0, 0, 0 };
+			blit.srcOffsets[1] = { mipWidth, mipHeight, 1 };
+			blit.srcSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			blit.srcSubresource.mipLevel = i - 1;
+			blit.srcSubresource.baseArrayLayer = 0;
+			blit.srcSubresource.layerCount = 1;
+			blit.dstOffsets[0] = { 0, 0, 0 };
+			blit.dstOffsets[1] = { mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1, 1 };
+			blit.dstSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+			blit.dstSubresource.mipLevel = i;
+			blit.dstSubresource.baseArrayLayer = 0;
+			blit.dstSubresource.layerCount = 1;
+
+			vkCmdBlitImage(cmd.vkCommandBuffer,
+				m_gbufferAlbedoImages[m_currentFrame].vkImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				m_gbufferAlbedoImages[m_currentFrame].vkImage, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+				1, &blit,
+				VK_FILTER_LINEAR);
+
+			barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL;
+			barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			barrier.srcAccessMask = VK_ACCESS_TRANSFER_READ_BIT;
+			barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+			// transfer self to read only
+			vkCmdPipelineBarrier(cmd.vkCommandBuffer,
+				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
+				0, nullptr,
+				0, nullptr,
+				1, &barrier);
+
+			if (mipWidth > 1) mipWidth /= 2;
+			if (mipHeight > 1) mipHeight /= 2;
+		}
+
+		barrier.subresourceRange.baseMipLevel = m_mipLevel - 1;
+		barrier.oldLayout = VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL;
+		barrier.newLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+		barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
+		barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
+
+		// transfer last to read only
+		vkCmdPipelineBarrier(cmd.vkCommandBuffer,
+			VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, 0,
+			0, nullptr,
+			0, nullptr,
+			1, &barrier);
 	}
 
 	// draw final result to the swapchain
@@ -1857,7 +1935,6 @@ void TransparentApp::_DrawFrame()
 
 void TransparentApp::_ResizeWindow()
 {
-	// TODO: recreate texel buffer as well
 	vkDeviceWaitIdle(MyDevice::GetInstance().vkDevice);
 	_UninitDescriptorSets();
 	_UninitFramebuffers();
@@ -1868,25 +1945,6 @@ void TransparentApp::_ResizeWindow()
 	_InitImagesAndViews();
 	_InitFramebuffers();
 	_InitDescriptorSets();
-}
-
-VkImageMemoryBarrier TransparentApp::_NewImageBarreir(const ImageBarrierInformation& _info) const
-{
-	VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-	auto viewInfo = _info.pImageView->GetImageViewInformation();
-	barrier.oldLayout = _info.oldLayout;
-	barrier.newLayout = _info.newLayout;
-	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.image = _info.pImageView->pImage->vkImage;
-	barrier.subresourceRange.aspectMask = viewInfo.aspectMask;
-	barrier.subresourceRange.baseMipLevel = viewInfo.baseMipLevel;
-	barrier.subresourceRange.levelCount = viewInfo.levelCount;
-	barrier.subresourceRange.baseArrayLayer = 0;
-	barrier.subresourceRange.layerCount = 1;
-	barrier.srcAccessMask = _info.srcAccessMask;
-	barrier.dstAccessMask = _info.dstAccessMask;
-	return barrier;
 }
 
 void TransparentApp::_ReadObjFile(const std::string& objFile, std::vector<Vertex>& vertices, std::vector<uint32_t>& indices) const

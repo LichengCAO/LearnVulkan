@@ -61,6 +61,7 @@ class TransparentApp
 private:
 	double lastTime = 0.0;
 	float frameTime = 0.0f;
+	uint32_t m_mipLevel = 0;
 	uint32_t m_currentFrame = 0;
 	PersCamera m_camera{400, 300, glm::vec3(2,2,2), glm::vec3(0,0,0), glm::vec3(0,0,1)};
 	std::vector<Model> m_models;
@@ -193,16 +194,6 @@ private:
 	void _DrawFrame();
 
 	void _ResizeWindow();
-
-	struct ImageBarrierInformation
-	{
-		const ImageView* pImageView = nullptr;
-		VkImageLayout oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
-		VkImageLayout newLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
-		VkAccessFlags srcAccessMask = VkAccessFlagBits::VK_ACCESS_NONE;
-		VkAccessFlags dstAccessMask = VkAccessFlagBits::VK_ACCESS_NONE;
-	};
-	VkImageMemoryBarrier _NewImageBarreir(const ImageBarrierInformation& _info) const;
 
 	void _ReadObjFile(const std::string& objFile, std::vector<Vertex>& verts, std::vector<uint32_t>& indices) const;
 

@@ -6,6 +6,14 @@ struct WaitInformation
 	VkSemaphore          waitSamaphore = VK_NULL_HANDLE;
 	VkPipelineStageFlags waitStage = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 };
+struct ImageBarrierInformation
+{
+	const ImageView* pImageView = nullptr;
+	VkImageLayout oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
+	VkImageLayout newLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
+	VkAccessFlags srcAccessMask = VkAccessFlagBits::VK_ACCESS_NONE;
+	VkAccessFlags dstAccessMask = VkAccessFlagBits::VK_ACCESS_NONE;
+};
 class CommandSubmission
 {
 private:
@@ -13,9 +21,15 @@ private:
 	std::vector<VkSemaphore> m_vkWaitSemaphores;
 	std::vector<VkPipelineStageFlags> m_vkWaitStages;
 	std::optional<uint32_t> m_optQueueFamilyIndex;
+	std::unordered_map<const ImageView*, VkImageLayout> m_mapImageLayout;
 	VkQueue m_vkQueue = VK_NULL_HANDLE;
 	bool m_isRecording = false;
+	bool m_isInRenderpass = false;
+	const RenderPass* m_pCurRenderpass = nullptr;
+	const Framebuffer* m_pCurFramebuffer = nullptr;
+
 	void _CreateSynchronizeObjects();
+	VkImageMemoryBarrier _NewImageBarrier(const ImageBarrierInformation& _info) const;
 public:
 	VkCommandBuffer vkCommandBuffer = VK_NULL_HANDLE;
 	VkFence vkFence = VK_NULL_HANDLE;
@@ -31,4 +45,13 @@ public:
 	void EndRenderPass();
 	void StartOneTimeCommands(const std::vector<WaitInformation>& _waitInfos);
 	VkSemaphore SubmitCommands();
+
+	void AddPipelineBarrier(
+		VkPipelineStageFlags srcStageMask,
+		VkPipelineStageFlags dstStageMask,
+		const std::vector<VkMemoryBarrier>& memoryBarriers, 
+		const std::vector<ImageBarrierInformation>& imageBarriers);
+	void FillImageView(const ImageView* pImageView, VkClearColorValue clearValue) const;
+	void FillBuffer(const Buffer* pBuffer, uint32_t _data) const;
+	VkImageLayout GetImageLayout(const ImageView* pImageView) const;
 };
