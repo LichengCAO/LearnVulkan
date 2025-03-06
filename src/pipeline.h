@@ -44,7 +44,7 @@ public:
 	void AddVertexInputLayout(const VertexInputLayout* pVertLayout);
 	void AddDescriptorSetLayout(const DescriptorSetLayout* pSetLayout);
 	void BindToSubpass(const RenderPass* pRenderPass, uint32_t subpass);
-	
+	void SetColorAttachmentAsAdd(int idx);
 	void Init();
 	void Uninit();
 

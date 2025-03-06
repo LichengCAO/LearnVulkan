@@ -62,8 +62,8 @@ void main()
     for (int i = 0; i < sampleCount; ++i)
     {
         vec4 currentColor = unpackUnorm4x8(arrSamples[i].r);
-        colorSum.rgb = currentColor.rgb + currentColor.a * colorSum.rgb;
-        colorSum.a = clamp(currentColor.a * colorSum.a, 0.0f, 1.0f);
+        colorSum.rgb = currentColor.rgb * currentColor.a + (1.0 - currentColor.a) * colorSum.rgb;
+        colorSum.a = clamp( 1.0f - (1.0f - currentColor.a) * (1.0 - colorSum.a), 0.0f, 1.0f);
     }
 
     imageStore(imgOutput, coord, colorSum);

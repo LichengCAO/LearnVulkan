@@ -22,7 +22,7 @@ void TransparentApp::_Init()
 
 	std::default_random_engine            rnd(3625);  // Fixed seed
 	std::uniform_real_distribution<float> uniformDist;
-	for (int i = 0; i < 10; ++i)
+	for (int i = 0; i < 30; ++i)
 	{
 		glm::vec3 center(uniformDist(rnd), uniformDist(rnd), uniformDist(rnd));
 		center = (center - glm::vec3(0.5)) * 2.f;
@@ -32,15 +32,18 @@ void TransparentApp::_Init()
 		sphere.transform.SetPosition(center);
 		sphere.transform.SetScale(glm::vec3(radius));
 		m_transModels.push_back(sphere);
+		SimpleMaterial material{};
+		material.roughness = glm::fract(glm::abs(uniformDist(rnd)));
+		m_transMaterials.push_back(material);
 	}
 
 	_InitRenderPass();
 	_InitDescriptorSetLayouts();
 
-	_InitSampler();
 	_InitBuffers();
 	_InitImagesAndViews();
 	_InitFramebuffers();
+	_InitSampler();
 	
 	_InitDescriptorSets();
 	_InitVertexInputs();
@@ -302,9 +305,21 @@ void TransparentApp::_InitDescriptorSetLayouts()
 		m_transOutputDSetLayout.AddBinding(binding1);
 		m_transOutputDSetLayout.Init();
 	}
+
+	// material host write device read
+	{
+		DescriptorSetEntry binding0{};
+		binding0.descriptorCount = 1;
+		binding0.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		binding0.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+
+		m_materialDSetLayout.AddBinding(binding0);
+		m_materialDSetLayout.Init();
+	}
 }
 void TransparentApp::_UninitDescriptorSetLayouts()
 {
+	m_materialDSetLayout.Uninit();
 	m_transOutputDSetLayout.Uninit();
 	m_distortDSetLayout.Uninit();
 	m_gbufferDSetLayout.Uninit();
@@ -338,11 +353,15 @@ void TransparentApp::_InitSampler()
 	samplerInfo.anisotropyEnable = VK_FALSE;
 	samplerInfo.maxAnisotropy = 1.0f;
 	VK_CHECK(vkCreateSampler(MyDevice::GetInstance().vkDevice, &samplerInfo, nullptr, &m_vkSampler), "Failed to create app sampler!");
+	samplerInfo.maxLod = static_cast<float>(m_mipLevel);
+	VK_CHECK(vkCreateSampler(MyDevice::GetInstance().vkDevice, &samplerInfo, nullptr, &m_vkLodSampler), "Failed to create app lod sampler!");
 }
 void TransparentApp::_UninitSampler()
 {
 	vkDestroySampler(MyDevice::GetInstance().vkDevice, m_vkSampler, nullptr);
+	vkDestroySampler(MyDevice::GetInstance().vkDevice, m_vkLodSampler, nullptr);
 	m_vkSampler = VK_NULL_HANDLE;
+	m_vkLodSampler = VK_NULL_HANDLE;
 }
 
 void TransparentApp::_InitBuffers()
@@ -412,6 +431,26 @@ void TransparentApp::_InitBuffers()
 		}
 	}
 
+	// material
+	{
+		BufferInformation materialBufferInfo;
+		materialBufferInfo.size = sizeof(SimpleMaterial);
+		materialBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+		materialBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		m_vecMaterialBuffers.reserve(MAX_FRAME_COUNT);
+		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+		{
+			int n = m_transModels.size();
+			m_vecMaterialBuffers.push_back(std::vector<Buffer>{});
+			m_vecMaterialBuffers[i].reserve(n);
+			for (int j = 0; j < n; ++j)
+			{
+				m_vecMaterialBuffers[i].push_back(Buffer{});
+				m_vecMaterialBuffers[i].back().Init(materialBufferInfo);
+			}
+		}
+	}
+
 	// camera
 	{
 		BufferInformation bufferInfo;
@@ -476,6 +515,17 @@ void TransparentApp::_UninitBuffers()
 	}
 	m_vecTransModelBuffers.clear();
 
+	// material
+	for (auto& buffers : m_vecMaterialBuffers)
+	{
+		for (auto& buffer : buffers)
+		{
+			buffer.Uninit();
+		}
+		buffers.clear();
+	}
+	m_vecMaterialBuffers.clear();
+
 	// oit
 	for (auto& view : m_oitSampleTexelBufferViews)
 	{
@@ -507,6 +557,7 @@ void TransparentApp::_InitImagesAndViews()
 	m_gbufferNormalImageViews.reserve(n);
 	m_gbufferAlbedoImages.reserve(n);
 	m_gbufferAlbedoImageViews.reserve(n);
+	m_gbufferReadAlbedoImageViews.reserve(n);
 	m_gbufferDepthImages.reserve(n);
 	m_gbufferDepthImageViews.reserve(n);
 	m_oitSampleCountImages.reserve(n);
@@ -637,7 +688,10 @@ void TransparentApp::_InitImagesAndViews()
 		ImageViewInformation gbufferAlbedoImageViewInfo;
 		gbufferAlbedoImageViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
 		gbufferAlbedoImageViewInfo.baseMipLevel = 0;// only view the 0 level 
-		gbufferAlbedoImageViewInfo.levelCount = 1;	
+		gbufferAlbedoImageViewInfo.levelCount = 1;
+		ImageViewInformation gbufferReadAlbedoImageViewInfo;
+		gbufferReadAlbedoImageViewInfo = gbufferAlbedoImageViewInfo;
+		gbufferReadAlbedoImageViewInfo.levelCount = m_mipLevel;
 
 		ImageInformation gbufferPosImageInfo;
 		gbufferPosImageInfo.width = width;
@@ -676,7 +730,7 @@ void TransparentApp::_InitImagesAndViews()
 			&m_gbufferAlbedoImageViews,
 			&m_gbufferPosImageViews,
 			&m_gbufferNormalImageViews,
-			&m_gbufferDepthImageViews
+			&m_gbufferDepthImageViews,
 		};
 		std::vector<ImageInformation*> gbufferImageInfos = {
 			&gbufferAlbedoImageInfo,
@@ -705,6 +759,11 @@ void TransparentApp::_InitImagesAndViews()
 				gbufferViews.push_back(gbufferImage.NewImageView(viewInfo));
 				gbufferViews.back().Init();
 			}
+		}
+		for (int i = 0; i < n; ++i)
+		{
+			m_gbufferReadAlbedoImageViews.push_back(m_gbufferAlbedoImages[i].NewImageView(gbufferReadAlbedoImageViewInfo));
+			m_gbufferReadAlbedoImageViews[i].Init();
 		}
 	}
 
@@ -779,6 +838,7 @@ void TransparentApp::_UninitImagesAndViews()
 		&m_oitInUseImageViews,
 		&m_oitColorImageViews,
 		&m_distortImageViews,
+		&m_gbufferReadAlbedoImageViews
 	};
 	std::vector<std::vector<Image>*> pImageVecsToUninit =
 	{
@@ -982,6 +1042,26 @@ void TransparentApp::_InitDescriptorSets()
 		}
 	}
 
+	// material descriptor set
+	{
+		m_vecMaterialDSets.reserve(MAX_FRAME_COUNT);
+		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+		{
+			int n = m_transModels.size();
+			m_vecMaterialDSets.push_back(std::vector<DescriptorSet>{});
+			m_vecMaterialDSets[i].reserve(n);
+			for (int j = 0; j < n; ++j)
+			{
+				m_vecMaterialDSets[i].push_back(DescriptorSet{});
+				m_vecMaterialDSets[i][j].SetLayout(&m_materialDSetLayout);
+				m_vecMaterialDSets[i][j].Init();
+				m_vecMaterialDSets[i][j].StartDescriptorSetUpdate();
+				m_vecMaterialDSets[i][j].DescriptorSetUpdate_WriteBinding(0, &m_vecMaterialBuffers[i][j]);
+				m_vecMaterialDSets[i][j].FinishDescriptorSetUpdate();
+			}
+		}
+	}
+
 	// camera descriptor set
 	{
 		// Setup descriptor sets 
@@ -1003,8 +1083,8 @@ void TransparentApp::_InitDescriptorSets()
 		{
 			VkDescriptorImageInfo imageInfo0;
 			imageInfo0.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-			imageInfo0.imageView = m_gbufferAlbedoImageViews[i].vkImageView;
-			imageInfo0.sampler = m_vkSampler;
+			imageInfo0.imageView = m_gbufferReadAlbedoImageViews[i].vkImageView;
+			imageInfo0.sampler = m_vkLodSampler;
 
 			VkDescriptorImageInfo imageInfo1;
 			imageInfo1.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
@@ -1078,6 +1158,11 @@ void TransparentApp::_UninitDescriptorSets()
 		dsets.clear();
 	}
 	m_vecTransModelDSets.clear();
+	for (auto& dsets : m_vecMaterialDSets)
+	{
+		dsets.clear();
+	}
+	m_vecMaterialDSets.clear();
 	m_distortDSets.clear();
 	m_oitColorDSets.clear();
 	m_oitDSets.clear();
@@ -1192,7 +1277,8 @@ void TransparentApp::_InitVertexInputs()
 			glm::vec4 color(uniformDist(rnd), uniformDist(rnd), uniformDist(rnd), uniformDist(rnd));
 			color.x *= color.x;
 			color.y *= color.y;
-			color.z = 0.5f;
+			color.z *= color.z;
+			color.a *= 1.5f;
 			_ReadObjFile(objFile, verts, indices);
 			std::vector<TransparentVertex> vertices{};
 			vertices.reserve(verts.size());
@@ -1365,9 +1451,11 @@ void TransparentApp::_InitPipelines()
 	m_distortPipeline.AddDescriptorSetLayout(&m_modelDSetLayout);
 	m_distortPipeline.AddDescriptorSetLayout(&m_distortDSetLayout);
 	m_distortPipeline.AddDescriptorSetLayout(&m_gbufferDSetLayout);
+	m_distortPipeline.AddDescriptorSetLayout(&m_materialDSetLayout); // to read from material
 	m_distortPipeline.AddShader(&distortVertShader);
 	m_distortPipeline.AddShader(&distortFragShader);
 	m_distortPipeline.BindToSubpass(&m_distortRenderPass, 0);
+	m_distortPipeline.SetColorAttachmentAsAdd(0);
 	m_distortPipeline.AddVertexInputLayout(&m_transModelVertLayout);
 	m_distortPipeline.Init();
 
@@ -1491,6 +1579,7 @@ void TransparentApp::_UpdateUniformBuffer()
 		modelTransform.model = m_transModels[i].transform.GetModelMatrix();
 		modelTransform.modelInvTranspose = m_transModels[i].transform.GetModelInverseTransposeMatrix();
 		m_vecTransModelBuffers[m_currentFrame][i].CopyFromHost(&modelTransform);
+		m_vecMaterialBuffers[m_currentFrame][i].CopyFromHost(&m_transMaterials[i]);
 	}
 
 	//struct CameraViewInformation
@@ -1618,7 +1707,8 @@ void TransparentApp::_DrawFrame()
 			&m_cameraDSets[m_currentFrame],
 			&m_vecTransModelDSets[m_currentFrame][i],
 			&m_distortDSets[m_currentFrame],
-			&m_gbufferDSets[m_currentFrame]
+			&m_gbufferDSets[m_currentFrame],
+			&m_vecMaterialDSets[m_currentFrame][i]
 		};
 		input.imageSize = MyDevice::GetInstance().GetSwapchainExtent();
 		input.pVertexIndexInput = &indexInput;

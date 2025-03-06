@@ -15,6 +15,11 @@ layout(set = 2, binding = 0) uniform CameraViewInformation
 // layout(set = 3, binding = 2) uniform sampler2D texNormal;
 layout(set = 3, binding = 3) uniform sampler2D texDepth;
 
+layout(set = 4, binding = 0) uniform SimpleMaterial
+{
+	float roughness;	
+} material;
+
 layout(location = 0) out vec4 outColor;
 
 #define AIR_IOR 1.0f
@@ -65,6 +70,16 @@ void PostProcessUVDistortion(
 	//Scale up for better precision in low/subtle refractions at the expense of artefacts at higher refraction.
 	// static const half DistortionScaleBias = 4.0f;
 	// BufferUVDistortion *= DistortionScaleBias;
+
+	// if (DistortSceneDepth < SceneDepth)
+	// {
+	// 	BufferUVDistortion = vec2(0.0f, 0.0f);
+	// }
+}
+
+float RoughnessToVariance(in float roughness)
+{
+	return roughness;
 }
 
 void main()
@@ -85,8 +100,7 @@ void main()
 	float DistortSceneDepth = GetSceneDepth(ScreenUV + BufferUVDistortion);
 
 	// Post process UV distortion according to depth
-	//PostProcessUVDistortion(SceneDepth, DistortSceneDepth, RefractionDepthBias, BufferUVDistortion);
+	PostProcessUVDistortion(SceneDepth, DistortSceneDepth, RefractionDepthBias, BufferUVDistortion);
 
-	// output positives in R|G channels and negatives in B|A channels
-	outColor = vec4(BufferUVDistortion, 0.0, 1.0);
+	outColor = vec4(BufferUVDistortion, RoughnessToVariance(material.roughness), 1.0);
 }

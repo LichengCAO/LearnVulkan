@@ -55,6 +55,10 @@ struct Model
 	std::string texturePath;
 	Transform   transform{};
 };
+struct SimpleMaterial
+{
+	float roughness = 0;
+};
 
 class TransparentApp
 {
@@ -66,6 +70,7 @@ private:
 	PersCamera m_camera{400, 300, glm::vec3(2,2,2), glm::vec3(0,0,0), glm::vec3(0,0,1)};
 	std::vector<Model> m_models;
 	std::vector<Model> m_transModels;
+	std::vector<SimpleMaterial> m_transMaterials;
 
 	// Descriptor sets
 	DescriptorSetLayout m_oitSampleDSetLayout;
@@ -89,6 +94,10 @@ private:
 	std::vector<std::vector<DescriptorSet>> m_vecTransModelDSets;
 	std::vector<std::vector<Buffer>> m_vecTransModelBuffers;
 	std::vector<Texture> m_modelTextures;
+
+	DescriptorSetLayout m_materialDSetLayout;
+	std::vector<std::vector<DescriptorSet>> m_vecMaterialDSets;
+	std::vector<std::vector<Buffer>> m_vecMaterialBuffers;
 	
 	DescriptorSetLayout m_cameraDSetLayout;
 	std::vector<DescriptorSet> m_cameraDSets;
@@ -119,6 +128,7 @@ private:
 	
 	// Samplers
 	VkSampler m_vkSampler = VK_NULL_HANDLE;
+	VkSampler m_vkLodSampler = VK_NULL_HANDLE;
 	
 	// Renderpass
 	RenderPass m_gbufferRenderPass;
@@ -130,6 +140,7 @@ private:
 	std::vector<ImageView> m_gbufferNormalImageViews;
 	std::vector<Image> m_gbufferAlbedoImages;
 	std::vector<ImageView> m_gbufferAlbedoImageViews;
+	std::vector<ImageView> m_gbufferReadAlbedoImageViews; // to make sure the sampler can see all miplevels
 	std::vector<Image> m_gbufferDepthImages;
 	std::vector<ImageView> m_gbufferDepthImageViews;
 	std::vector<Framebuffer> m_gbufferFramebuffers;

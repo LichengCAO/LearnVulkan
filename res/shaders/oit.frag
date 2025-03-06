@@ -69,8 +69,8 @@ void main()
                 storeValue.g = sample2.g;
                 vec4 farColor = unpackUnorm4x8(sample1.r);
                 vec4 nearColor = unpackUnorm4x8(sample2.r);
-                nearColor.rgb = nearColor.rgb + nearColor.a * farColor.rgb;
-                nearColor.a = clamp(nearColor.a * farColor.a, 0.0f, 1.0f);
+                nearColor.rgb = nearColor.rgb * nearColor.a + (1.0f - nearColor.a) * farColor.rgb;
+                nearColor.a = clamp(1.0f - (1.0f - nearColor.a) * (1.0f - farColor.a), 0.0f, 1.0f);
                 storeValue.r = packUnorm4x8(nearColor);
                 if (furthest == -1)
                 {
