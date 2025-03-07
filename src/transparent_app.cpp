@@ -243,7 +243,7 @@ void TransparentApp::_InitDescriptorSetLayouts()
 		DescriptorSetEntry binding0;
 		binding0.descriptorCount = 1;
 		binding0.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		binding0.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
+		binding0.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
 
 		m_cameraDSetLayout.AddBinding(binding0);
 		m_cameraDSetLayout.Init();
@@ -1559,6 +1559,7 @@ void TransparentApp::_UpdateUniformBuffer()
 	ubo.proj = m_camera.GetProjectionMatrix();
 	ubo.proj[1][1] *= -1;
 	ubo.view = m_camera.GetViewMatrix();
+	ubo.eye = glm::vec4(m_camera.eye, 1.0f);
 	m_cameraBuffers[m_currentFrame].CopyFromHost(&ubo);
 
 	//struct ModelTransform

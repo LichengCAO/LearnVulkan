@@ -2,7 +2,15 @@
 
 layout(location = 0) in vec3 vViewNormal;
 layout(location = 1) in vec4 vScreenPos;
+layout(location = 2) in vec3 vNormalWorld;
+layout(location = 3) in vec3 vPosWorld;
 
+layout(set = 0, binding = 0) uniform CameraInformation
+{
+    mat4 view;
+    mat4 proj;
+    vec4 eye;
+} cameraInfo;
 layout(set = 2, binding = 0) uniform CameraViewInformation
 {
 	mat4 normalView; // inverse transpose of view matrix
@@ -28,6 +36,20 @@ float GetSceneDepth(in vec2 uv)
 {
 	uv = clamp(uv, vec2(0.0f, 0.0f), vec2(1.0f, 1.0f));
 	return texture(texDepth, uv).r;
+}
+
+vec2 ComputeUVDistortion(
+	in float refractionMaterialDepth,
+	in float SceneDepth,
+	in float materialIOR,
+	in vec3 N, // world
+	in vec3 wi // world
+)
+{
+	vec3 wo = normalize(refract(wi, N, 1.0f / materialIOR));
+	float cosTheta = clamp(dot(N, wi), 0.0f, 1.0f);
+	vec4 vWo = cameraView.normalView * vec4(wo, 0.0f);
+	return vWo.xy * 100.f / SceneDepth * 0.00023f * cosTheta;
 }
 
 vec2 ComputeBufferUVDistortion(
@@ -70,11 +92,6 @@ void PostProcessUVDistortion(
 	//Scale up for better precision in low/subtle refractions at the expense of artefacts at higher refraction.
 	// static const half DistortionScaleBias = 4.0f;
 	// BufferUVDistortion *= DistortionScaleBias;
-
-	// if (DistortSceneDepth < SceneDepth)
-	// {
-	// 	BufferUVDistortion = vec2(0.0f, 0.0f);
-	// }
 }
 
 float RoughnessToVariance(in float roughness)
@@ -86,7 +103,7 @@ void main()
 {
 	// material distortion offset
 	vec3 Normal = normalize(vViewNormal); // world
-	float MaterialIOR = 1.5f;
+	float MaterialIOR = 1.33f;
 	float SceneDepth = vScreenPos.w;
 	float RefractionDepthBias = 0.0;
 	// Prevent silhouettes from geometry that is in front of distortion from being seen in the distortion 
@@ -96,11 +113,15 @@ void main()
 	// Compute UV distortion
 	vec2 BufferUVDistortion = ComputeBufferUVDistortion(Normal, MaterialIOR, SceneDepth, cameraView.InvTanHalfFov, cameraView.ScreenRatioXY);
 
+	vec3 wi = normalize(cameraInfo.eye.rgb - vPosWorld);
+
+	BufferUVDistortion = ComputeUVDistortion(1.0, SceneDepth, MaterialIOR, normalize(vNormalWorld), wi);
+
 	// Sample depth at distortion offset
 	float DistortSceneDepth = GetSceneDepth(ScreenUV + BufferUVDistortion);
 
 	// Post process UV distortion according to depth
-	PostProcessUVDistortion(SceneDepth, DistortSceneDepth, RefractionDepthBias, BufferUVDistortion);
+	//PostProcessUVDistortion(SceneDepth, DistortSceneDepth, RefractionDepthBias, BufferUVDistortion);
 
 	outColor = vec4(BufferUVDistortion, RoughnessToVariance(material.roughness), 1.0);
 }

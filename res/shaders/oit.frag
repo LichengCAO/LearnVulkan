@@ -5,7 +5,15 @@
 #define OIT_LAYERS 5
 
 layout(location = 0) in vec4 inColor;
+layout(location = 1) in vec3 vPosWorld;
+layout(location = 2) in vec3 vNormalWorld;
 
+layout(set = 0, binding = 0) uniform CameraInformation
+{
+    mat4 view;
+    mat4 proj;
+    vec4 eye;
+} cameraInfo;
 layout(set = 2, binding = 0, rgba32ui) uniform coherent uimageBuffer sampleDataImage; // sample data
 layout(set = 2, binding = 1, r32ui) uniform coherent uimage2D sampleCountImage; // sample count
 layout(set = 2, binding = 2, r32ui) uniform coherent uimage2D inUseImage; // flow control
@@ -17,11 +25,25 @@ layout(set = 3, binding = 3) uniform sampler2D texDepth1;
 
 layout(location = 0) out vec4 outColor;
 
+float FresnelTerm(in float IOR, in vec3 N, in vec3 wi)
+{
+    float R0 = (1.0f - IOR) / (1.0f + IOR);
+    R0 = R0 * R0;
+    float oneMinusCosTheta = 1.0 - dot(N, wi);
+    float oneMinusCosTheta2 = oneMinusCosTheta * oneMinusCosTheta;
+    return R0 + (1.0f - R0) * oneMinusCosTheta * oneMinusCosTheta2 * oneMinusCosTheta2;
+}
+
 void main()
 {
     // packSnorm4x8: round(clamp(c, -1.0, 1.0) * 127.0)
     ivec2 coord = ivec2(gl_FragCoord.xy);
-    uvec4 storeValue = uvec4(packUnorm4x8(inColor), floatBitsToUint(gl_FragCoord.z), 0, 0);
+    vec3 wi = normalize(cameraInfo.eye.rgb - vPosWorld);
+    vec3 N = normalize(vNormalWorld);
+    float fresnel = FresnelTerm(1.33f, N, wi);
+    vec4 scaledColor = inColor;
+    scaledColor.a = fresnel;
+    uvec4 storeValue = uvec4(packUnorm4x8(scaledColor), floatBitsToUint(gl_FragCoord.z), 0, 0);
     const int texelBufferCoord = viewportInfo.extent.x * OIT_LAYERS * coord.y + OIT_LAYERS * coord.x;
     bool done = gl_SampleMaskIn[0] == 0; // if simply set to false, won't work, haven't figure out yet
     bool passDepthTest = gl_FragCoord.z < texelFetch(texDepth1, coord, 0).g;

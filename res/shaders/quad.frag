@@ -12,7 +12,7 @@ layout(location = 0) out vec4 outColor;
 #define MAX_MIP_LEVEL 9.0f
 
 void main(){
-    vec2 uv = clamp(texture(texDistortUV, inTexCoord).rg + inTexCoord, vec2(0, 0), vec2(1, 1));
+    vec2 uv = clamp(texture(texDistortUV, inTexCoord).rg + inTexCoord, vec2(0, 0), vec2(1.0f, 1.0f));
     float variance = texture(texDistortUV, inTexCoord).b;
     float mipLevel = variance * 2.0f;//log(variance) / log(2);
     mipLevel = min(mipLevel, MAX_MIP_LEVEL);

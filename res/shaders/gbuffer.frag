@@ -13,7 +13,7 @@ layout(location = 3) out vec4 outDepth;
 void main()
 {
     outAlbedo = texture(texSampler, inUV);
-    outNormal = vec4(normalize(inNormal) * 0.5f + vec3(0.5f, 0.5f, 0.5f), 1.0f);
+    outNormal = vec4(normalize(inNormal), 1.0f);
     outPos = vec4(inPos, 1.0f);
     outDepth = vec4(1.0f / gl_FragCoord.w, gl_FragCoord.z, 0.0, 1.0);
 }
