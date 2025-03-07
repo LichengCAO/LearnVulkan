@@ -38,28 +38,35 @@ float GetSceneDepth(in vec2 uv)
 	return texture(texDepth, uv).r;
 }
 
+vec3 TransformDirectionFromWorldToView(in vec3 dir)
+{
+	return (cameraInfo.view * vec4(dir, 0.0f)).rgb;
+}
+
 vec2 ComputeUVDistortion(
 	in float refractionMaterialDepth,
 	in float SceneDepth,
 	in float materialIOR,
 	in vec3 N, // world
-	in vec3 wi // world
+	in vec3 I // world
 )
 {
-	vec3 wo = normalize(refract(wi, N, 1.0f / materialIOR));
-	float cosTheta = clamp(dot(N, wi), 0.0f, 1.0f);
-	vec4 vWo = cameraView.normalView * vec4(wo, 0.0f);
-	return vWo.xy * 100.f / SceneDepth * 0.00023f * cosTheta;
+	vec3 wo = normalize(refract(I, N, 1.0f / materialIOR));
+	float cosTheta = clamp(dot(N, I), 0.0f, 1.0f);
+	vec3 vWo = TransformDirectionFromWorldToView(wo);
+	const float OffsetFudgeFactor = 0.00023;
+	return vWo.xy * 100.f / SceneDepth * vec2(OffsetFudgeFactor, -OffsetFudgeFactor);// * cosTheta;
 }
 
 vec2 ComputeBufferUVDistortion(
-	in vec3 viewNormal, // normal in view space
+	in vec3 Normal, // normal in view space
 	in float MaterialIOR,
 	in float SceneDepth, 	// 
 	in float InvTanHalfFov, // 1 / tan(0.5 * fovy)
 	in float ScreenRatioXY) // screen width / height
 {
-	vec2 ViewportUVDistortion = - viewNormal.xy * (MaterialIOR - AIR_IOR);
+
+	vec2 ViewportUVDistortion = -TransformDirectionFromWorldToView(Normal).xy * (MaterialIOR - AIR_IOR); // UE use the positive one which I think is wrong...
 	vec2 BufferUVDistortion = ViewportUVDistortion;// * FullResolutionDistortionPixelSize;
 	// InvTanHalfFov only apply a correction for the distortion to be the same in screen space space whatever the FoV is (to make it consistent accross player setup).
 	// However without taking depth into account, the distortion will actually be stronger the further away the camera is from the distortion surface.
@@ -70,9 +77,9 @@ vec2 ComputeBufferUVDistortion(
 	vec2 FovFix = vec2(InvTanHalfFov/ ScreenRatioXY , InvTanHalfFov);
 	//A fudge factor scale to bring values close to what they would have been under usual circumstances prior to this change.
 	const float OffsetFudgeFactor = 0.00023;
-	BufferUVDistortion *= 100.0f/SceneDepth * vec2(OffsetFudgeFactor, -OffsetFudgeFactor) * FovFix;
+	BufferUVDistortion *= 100.0f / SceneDepth * vec2(OffsetFudgeFactor, -OffsetFudgeFactor) * FovFix;
 
-	return BufferUVDistortion;// * vec2(1.0f, -1.0f);//BufferUVDistortion;
+	return BufferUVDistortion;
 }
 
 void PostProcessUVDistortion(
@@ -109,13 +116,11 @@ void main()
 	// Prevent silhouettes from geometry that is in front of distortion from being seen in the distortion 
 	vec2 NDC = vScreenPos.xy / vScreenPos.w;
 	vec2 ScreenUV = NDC * vec2(0.5f, 0.5f) + vec2(0.5f, 0.5f);
+	vec3 I = normalize(cameraInfo.eye.rgb - vPosWorld);
 
 	// Compute UV distortion
-	vec2 BufferUVDistortion = ComputeBufferUVDistortion(Normal, MaterialIOR, SceneDepth, cameraView.InvTanHalfFov, cameraView.ScreenRatioXY);
-
-	vec3 wi = normalize(cameraInfo.eye.rgb - vPosWorld);
-
-	BufferUVDistortion = ComputeUVDistortion(1.0, SceneDepth, MaterialIOR, normalize(vNormalWorld), wi);
+	vec2 BufferUVDistortion = ComputeBufferUVDistortion(normalize(vNormalWorld), MaterialIOR, SceneDepth, cameraView.InvTanHalfFov, cameraView.ScreenRatioXY);
+	//vec2 BufferUVDistortion = ComputeUVDistortion(1.0, SceneDepth, MaterialIOR, normalize(vNormalWorld), I);
 
 	// Sample depth at distortion offset
 	float DistortSceneDepth = GetSceneDepth(ScreenUV + BufferUVDistortion);
