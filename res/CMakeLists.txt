@@ -34,7 +34,7 @@ foreach(SHADER ${SHADER_SOURCES})
         $ENV{VK_SDK_PATH}/Bin/glslangValidator.exe -V ${SHADER} -o ${SHADER_DIR}/${fname}.spv -g
         SOURCES ${SHADER}
     )
-    message(${SHADER_DIR}/${fname}.spv)
+    # message(${SHADER_DIR}/${fname}.spv)
     # add to the folder CompliedSPV in IDE explorer
     funcAddToFolder(${fname}.spv "CompliedSPV")
     add_dependencies(${CMAKE_PROJECT_NAME} ${fname}.spv)

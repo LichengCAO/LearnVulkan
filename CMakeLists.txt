@@ -26,7 +26,11 @@ configure_file (
     "${PROJECT_SOURCE_DIR}/src/config.h.in"
     "${PROJECT_SOURCE_DIR}/src/config.h"
 )
-
+string (REPLACE "\\" "/" VULKAN_SDK $ENV{VULKAN_SDK})
+file(GLOB VK_HEADERS
+   "${VULKAN_SDK}/Include/vulkan/*.hpp"
+   "${VULKAN_SDK}/Include/vulkan/*.h"
+)
 file(GLOB SOURCES
      "src/*.cpp"
 )
@@ -37,7 +41,8 @@ file(GLOB HEADERS
 
 source_group("Sources" FILES ${SOURCES})
 source_group("Headers" FILES ${HEADERS})
-add_executable(${CMAKE_PROJECT_NAME} ${SOURCES} ${HEADERS})
+source_group("Vulkan Headers" FILES ${VK_HEADERS})
+add_executable(${CMAKE_PROJECT_NAME} ${SOURCES} ${HEADERS} ${VK_HEADERS})
 
 add_subdirectory(external)
 add_subdirectory(res)
