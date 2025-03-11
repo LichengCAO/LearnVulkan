@@ -110,7 +110,7 @@ void main()
 {
 	// material distortion offset
 	vec3 Normal = normalize(vViewNormal); // world
-	float MaterialIOR = 1.33f;
+	float MaterialIOR = 1.51f;
 	float SceneDepth = vScreenPos.w;
 	float RefractionDepthBias = 0.0;
 	// Prevent silhouettes from geometry that is in front of distortion from being seen in the distortion 
@@ -126,7 +126,7 @@ void main()
 	float DistortSceneDepth = GetSceneDepth(ScreenUV + BufferUVDistortion);
 
 	// Post process UV distortion according to depth
-	//PostProcessUVDistortion(SceneDepth, DistortSceneDepth, RefractionDepthBias, BufferUVDistortion);
+	// PostProcessUVDistortion(SceneDepth, DistortSceneDepth, RefractionDepthBias, BufferUVDistortion);
 
 	outColor = vec4(BufferUVDistortion, RoughnessToVariance(material.roughness), 1.0);
 }

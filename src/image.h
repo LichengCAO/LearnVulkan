@@ -3,11 +3,20 @@
 
 class Buffer;
 class Image;
+enum class ImageType
+{
+	IMAGE_TYPE_1D,
+	IMAGE_TYPE_2D,
+	IMAGE_TYPE_3D,
+	IMAGE_TYPE_CUBE
+};
 struct ImageViewInformation
 {
 	uint32_t baseMipLevel = 0;
-	uint32_t levelCount = 0;
-	VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_2D;
+	uint32_t levelCount = VK_REMAINING_MIP_LEVELS;
+	uint32_t baseArrayLayer = 0;
+	uint32_t layerCount = VK_REMAINING_ARRAY_LAYERS;
+	ImageType type = ImageType::IMAGE_TYPE_2D;
 	VkImageAspectFlags aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
 };
 class ImageView

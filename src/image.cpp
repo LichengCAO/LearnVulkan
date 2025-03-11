@@ -226,10 +226,20 @@ ImageView Image::NewImageView(const ImageViewInformation& imageViewInfo)
 	CHECK_TRUE(vkImage != VK_NULL_HANDLE, "Image is not initialized!");
 	ImageView val{};
 	val.m_viewInformation = imageViewInfo;
-	if (imageViewInfo.levelCount == 0)
+	
+	if (imageViewInfo.levelCount == VK_REMAINING_MIP_LEVELS)
 	{
-		val.m_viewInformation.levelCount = m_imageInformation.mipLevels;
+		CHECK_TRUE(m_imageInformation.mipLevels > imageViewInfo.baseMipLevel, "Wrong base mip level!");
+		val.m_viewInformation.levelCount = m_imageInformation.mipLevels - imageViewInfo.baseMipLevel;
 	}
+	if (imageViewInfo.layerCount == VK_REMAINING_ARRAY_LAYERS)
+	{
+		CHECK_TRUE(m_imageInformation.arrayLayers > imageViewInfo.baseArrayLayer, "Wrong base array layer!");
+		val.m_viewInformation.layerCount = m_imageInformation.arrayLayers - imageViewInfo.baseArrayLayer;
+	}
+	CHECK_TRUE((val.m_viewInformation.baseArrayLayer + val.m_viewInformation.layerCount) <= m_imageInformation.arrayLayers, "Image doesn't have these layers!");
+	CHECK_TRUE((val.m_viewInformation.baseMipLevel + val.m_viewInformation.levelCount) <= m_imageInformation.mipLevels, "Image doesn't have these mipmap levels!");
+
 	val.pImage = this;
 
 	return val;
@@ -248,17 +258,61 @@ ImageView::~ImageView()
 void ImageView::Init()
 {
 	CHECK_TRUE(pImage != nullptr, "No image!");
+	CHECK_TRUE(m_viewInformation.layerCount != 0, "No layer count!");
+	VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_MAX_ENUM;
+	if (m_viewInformation.layerCount == 1)
+	{
+		switch (m_viewInformation.type)
+		{
+		case ImageType::IMAGE_TYPE_1D:
+			viewType = VK_IMAGE_VIEW_TYPE_1D;
+			break;
+		case ImageType::IMAGE_TYPE_2D:
+			viewType = VK_IMAGE_VIEW_TYPE_2D;
+			break;
+		case ImageType::IMAGE_TYPE_3D:
+			viewType = VK_IMAGE_VIEW_TYPE_3D;
+			break;
+		case ImageType::IMAGE_TYPE_CUBE:
+			viewType = VK_IMAGE_VIEW_TYPE_CUBE;
+			break;
+		default:
+			CHECK_TRUE(false, "Unhandled image type!");
+			break;
+		}
+	}
+	else
+	{
+		switch (m_viewInformation.type)
+		{
+		case ImageType::IMAGE_TYPE_1D:
+			viewType = VK_IMAGE_VIEW_TYPE_1D_ARRAY;
+			break;
+		case ImageType::IMAGE_TYPE_2D:
+			viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+			break;
+		case ImageType::IMAGE_TYPE_3D:
+			CHECK_TRUE(false, "No 3D image array!");
+			break;
+		case ImageType::IMAGE_TYPE_CUBE:
+			viewType = VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
+			break;
+		default:
+			CHECK_TRUE(false, "Unhandled image type!");
+			break;
+		}
+	}
 	VkImageViewCreateInfo viewInfo = {
 	.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 	.image = pImage->vkImage,
-	.viewType = m_viewInformation.viewType,
+	.viewType = viewType,
 	.format = pImage->GetImageInformation().format,
 	.subresourceRange = {
 		.aspectMask = m_viewInformation.aspectMask,
 		.baseMipLevel = m_viewInformation.baseMipLevel,
 		.levelCount = m_viewInformation.levelCount,
-		.baseArrayLayer = 0,
-		.layerCount = 1
+		.baseArrayLayer = m_viewInformation.baseArrayLayer,
+		.layerCount = m_viewInformation.layerCount
 	}
 	};
 	CHECK_TRUE(vkImageView == VK_NULL_HANDLE, "VkImageView is already created!");

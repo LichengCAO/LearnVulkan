@@ -22,7 +22,7 @@ void TransparentApp::_Init()
 
 	std::default_random_engine            rnd(3625);  // Fixed seed
 	std::uniform_real_distribution<float> uniformDist;
-	for (int i = 0; i < 30; ++i)
+	for (int i = 0; i < 50; ++i)
 	{
 		glm::vec3 center(uniformDist(rnd), uniformDist(rnd), uniformDist(rnd));
 		center = (center - glm::vec3(0.5)) * 2.f;
@@ -33,7 +33,7 @@ void TransparentApp::_Init()
 		sphere.transform.SetScale(glm::vec3(radius));
 		m_transModels.push_back(sphere);
 		SimpleMaterial material{};
-		material.roughness = glm::fract(glm::abs(uniformDist(rnd)));
+		material.roughness = 0.10f;// glm::fract(glm::abs(uniformDist(rnd)));
 		m_transMaterials.push_back(material);
 	}
 
@@ -160,6 +160,16 @@ void TransparentApp::_InitRenderPass()
 		m_gbufferRenderPass.Init();
 	}
 
+	// light pass
+	{
+		AttachmentInformation lightInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::GBUFFER_ALBEDO);
+		m_lightRenderPass.AddAttachment(lightInfo);
+		SubpassInformation subpassInfo{};
+		subpassInfo.AddColorAttachment(0);
+		m_lightRenderPass.AddSubpass(subpassInfo);
+		m_lightRenderPass.Init();
+	}
+
 	// final present
 	{
 		AttachmentInformation swapchainInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::SWAPCHAIN);
@@ -169,11 +179,11 @@ void TransparentApp::_InitRenderPass()
 		m_renderPass.AddSubpass(subpassInfo);
 		m_renderPass.Init();
 	}
-
 }
 void TransparentApp::_UninitRenderPass()
 {
 	m_renderPass.Uninit();
+	m_lightRenderPass.Uninit();
 	m_gbufferRenderPass.Uninit();
 	m_distortRenderPass.Uninit();
 	m_oitRenderPass.Uninit();
@@ -316,9 +326,33 @@ void TransparentApp::_InitDescriptorSetLayouts()
 		m_materialDSetLayout.AddBinding(binding0);
 		m_materialDSetLayout.Init();
 	}
+
+	// blur device write and read
+	{
+		DescriptorSetEntry binding0{}; // blur information
+		binding0.descriptorCount = 1;
+		binding0.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
+		binding0.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+		DescriptorSetEntry binding1{}; // read only image
+		binding1.descriptorCount = 1;
+		binding1.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		binding1.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+		DescriptorSetEntry binding2{}; // write only image
+		binding2.descriptorCount = 1;
+		binding2.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
+		binding2.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
+
+		m_blurDSetLayout.AddBinding(binding0);
+		m_blurDSetLayout.AddBinding(binding1);
+		m_blurDSetLayout.AddBinding(binding2);
+		m_blurDSetLayout.Init();
+	}
 }
 void TransparentApp::_UninitDescriptorSetLayouts()
 {
+	m_blurDSetLayout.Uninit();
 	m_materialDSetLayout.Uninit();
 	m_transOutputDSetLayout.Uninit();
 	m_distortDSetLayout.Uninit();
@@ -335,9 +369,9 @@ void TransparentApp::_InitSampler()
 	VkSamplerCreateInfo samplerInfo{ VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
 	samplerInfo.magFilter = VK_FILTER_LINEAR;
 	samplerInfo.minFilter = VK_FILTER_LINEAR;
-	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_REPEAT;
-	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+	samplerInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	samplerInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
+	samplerInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE;
 	samplerInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
 	samplerInfo.unnormalizedCoordinates = VK_FALSE;
 	samplerInfo.compareEnable = VK_FALSE;
@@ -478,6 +512,20 @@ void TransparentApp::_InitBuffers()
 			m_distortBuffers[i].Init(bufferInfo);
 		}
 	}
+
+	// blur
+	{
+		BufferInformation bufferInfo;
+		bufferInfo.size = sizeof(GaussianBlufInformation);
+		bufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+		bufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+		m_blurBuffers.reserve(MAX_FRAME_COUNT);
+		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+		{
+			m_blurBuffers.push_back(Buffer{});
+			m_blurBuffers[i].Init(bufferInfo);
+		}
+	}
 }
 void TransparentApp::_UninitBuffers()
 {
@@ -538,6 +586,13 @@ void TransparentApp::_UninitBuffers()
 	}
 	m_oitSampleTexelBuffers.clear();
 	m_oitViewportBuffer.Uninit();
+
+	// blur
+	for (auto& buffer : m_blurBuffers)
+	{
+		buffer.Uninit();
+	}
+	m_blurBuffers.clear();
 }
 
 void TransparentApp::_InitImagesAndViews()
@@ -548,26 +603,31 @@ void TransparentApp::_InitImagesAndViews()
 	uint32_t height = MyDevice::GetInstance().GetSwapchainExtent().height;
 	
 	auto n = MAX_FRAME_COUNT;
-	m_swapchainImageViews.reserve(m_swapchainImages.size());
-	m_depthImages.reserve(n);
-	m_depthImageViews.reserve(n);
-	m_gbufferPosImages.reserve(n);
-	m_gbufferPosImageViews.reserve(n);
-	m_gbufferNormalImages.reserve(n);
-	m_gbufferNormalImageViews.reserve(n);
-	m_gbufferAlbedoImages.reserve(n);
-	m_gbufferAlbedoImageViews.reserve(n);
-	m_gbufferReadAlbedoImageViews.reserve(n);
-	m_gbufferDepthImages.reserve(n);
-	m_gbufferDepthImageViews.reserve(n);
-	m_oitSampleCountImages.reserve(n);
-	m_oitSampleCountImageViews.reserve(n);
-	m_oitInUseImages.reserve(n);
-	m_oitInUseImageViews.reserve(n);
-	m_oitColorImages.reserve(n);
-	m_oitColorImageViews.reserve(n);
-	m_distortImages.reserve(n);
-	m_distortImageViews.reserve(n);
+	{
+		m_swapchainImageViews.reserve(m_swapchainImages.size());
+		m_depthImages.reserve(n);
+		m_depthImageViews.reserve(n);
+		m_gbufferPosImages.reserve(n);
+		m_gbufferPosImageViews.reserve(n);
+		m_gbufferNormalImages.reserve(n);
+		m_gbufferNormalImageViews.reserve(n);
+		m_gbufferAlbedoImages.reserve(n);
+		m_gbufferAlbedoImageViews.reserve(n);
+		m_gbufferReadAlbedoImageViews.reserve(n);
+		m_gbufferDepthImages.reserve(n);
+		m_gbufferDepthImageViews.reserve(n);
+		m_oitSampleCountImages.reserve(n);
+		m_oitSampleCountImageViews.reserve(n);
+		m_oitInUseImages.reserve(n);
+		m_oitInUseImageViews.reserve(n);
+		m_oitColorImages.reserve(n);
+		m_oitColorImageViews.reserve(n);
+		m_distortImages.reserve(n);
+		m_distortImageViews.reserve(n);
+		m_lightImages.reserve(n);
+		m_lightImageView.reserve(n);
+		m_lightFramebufferView.reserve(n);
+	}
 	
 	// model textures
 	{
@@ -823,6 +883,41 @@ void TransparentApp::_InitImagesAndViews()
 			}
 		}
 	}
+
+	// light image and view for post rendering and blur
+	{
+		ImageInformation lightImageInfo{};
+		lightImageInfo.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
+		lightImageInfo.width = width;
+		lightImageInfo.height = height;
+		lightImageInfo.usage = 
+			VkImageUsageFlagBits::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | 
+			VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT | 
+			VkImageUsageFlagBits::VK_IMAGE_USAGE_STORAGE_BIT;
+		lightImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		lightImageInfo.arrayLayers = m_blurLayers;
+		
+		ImageViewInformation layer0ViewInfo{};
+		layer0ViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
+		layer0ViewInfo.baseArrayLayer = 0;
+		layer0ViewInfo.layerCount = 1;
+		
+		ImageViewInformation allLayerViewInfo{};
+		allLayerViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
+		allLayerViewInfo.baseArrayLayer = 0;
+		allLayerViewInfo.layerCount = m_blurLayers;
+
+		for (int i = 0; i < n; ++i)
+		{
+			m_lightImages.push_back(Image{});
+			m_lightImages[i].SetImageInformation(lightImageInfo);
+			m_lightImages[i].Init();
+			m_lightFramebufferView.push_back(m_lightImages[i].NewImageView(layer0ViewInfo));
+			m_lightFramebufferView[i].Init();
+			m_lightImageView.push_back(m_lightImages[i].NewImageView(allLayerViewInfo));
+			m_lightImageView[i].Init();
+		}
+	}
 }
 void TransparentApp::_UninitImagesAndViews()
 {
@@ -838,7 +933,9 @@ void TransparentApp::_UninitImagesAndViews()
 		&m_oitInUseImageViews,
 		&m_oitColorImageViews,
 		&m_distortImageViews,
-		&m_gbufferReadAlbedoImageViews
+		&m_gbufferReadAlbedoImageViews,
+		&m_lightImageView,
+		&m_lightFramebufferView,
 	};
 	std::vector<std::vector<Image>*> pImageVecsToUninit =
 	{
@@ -850,7 +947,8 @@ void TransparentApp::_UninitImagesAndViews()
 		&m_oitSampleCountImages,
 		&m_oitInUseImages,
 		&m_oitColorImages,
-		&m_distortImages
+		&m_distortImages,
+		&m_lightImages
 	};
 
 	for (auto pViewVec : pViewVecsToUninit)
@@ -885,6 +983,7 @@ void TransparentApp::_InitFramebuffers()
 	m_gbufferFramebuffers.reserve(n);
 	m_oitFramebuffers.reserve(n);
 	m_distortFramebuffers.reserve(n);
+	m_lightFramebuffers.reserve(n);
 	
 	// Setup frame buffers
 	for (int i = 0; i < n; ++i)
@@ -914,6 +1013,13 @@ void TransparentApp::_InitFramebuffers()
 		};
 		m_distortFramebuffers.push_back(m_distortRenderPass.NewFramebuffer(distortViews));
 		m_distortFramebuffers[i].Init();
+
+		std::vector<const ImageView*> lightViews =
+		{
+			&m_lightFramebufferView[i],
+		};
+		m_lightFramebuffers.push_back(m_lightRenderPass.NewFramebuffer(lightViews));
+		m_lightFramebuffers[i].Init();
 	}
 	for (int i = 0; i < m_swapchainImages.size(); ++i)
 	{
@@ -932,7 +1038,8 @@ void TransparentApp::_UninitFramebuffers()
 		&m_framebuffers,
 		&m_gbufferFramebuffers,
 		&m_oitFramebuffers,
-		&m_distortFramebuffers
+		&m_distortFramebuffers,
+		&m_lightFramebuffers
 	};
 	for (auto pFramebufferVec : pFramebufferVecsToUninit)
 	{
@@ -1142,9 +1249,36 @@ void TransparentApp::_InitDescriptorSets()
 			m_transOutputDSets[i].FinishDescriptorSetUpdate();
 		}
 	}
+
+	// blur descriptor set
+	{
+		m_blurDSets.reserve(MAX_FRAME_COUNT);
+		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+		{
+			VkDescriptorImageInfo blurInputImageInfo{};
+			blurInputImageInfo.sampler = m_vkSampler;
+			blurInputImageInfo.imageView = m_lightImageView[i].vkImageView;
+			blurInputImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+			VkDescriptorImageInfo blurOutputImageInfo{};
+			blurOutputImageInfo.sampler = m_vkSampler;
+			blurOutputImageInfo.imageView = m_lightImageView[i].vkImageView;
+			blurOutputImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+			m_blurDSets.push_back(DescriptorSet{});
+			m_blurDSets[i].SetLayout(&m_blurDSetLayout);
+			m_blurDSets[i].Init();
+			m_blurDSets[i].StartDescriptorSetUpdate();
+			m_blurDSets[i].DescriptorSetUpdate_WriteBinding(0, &m_blurBuffers[i]);
+			m_blurDSets[i].DescriptorSetUpdate_WriteBinding(1, blurInputImageInfo);
+			m_blurDSets[i].DescriptorSetUpdate_WriteBinding(2, blurOutputImageInfo);
+			m_blurDSets[i].FinishDescriptorSetUpdate();
+		}
+	}
 }
 void TransparentApp::_UninitDescriptorSets()
 {
+	m_blurDSets.clear();
 	m_transOutputDSets.clear();
 	m_gbufferDSets.clear();
 	m_cameraDSets.clear();
@@ -1497,6 +1631,14 @@ void TransparentApp::_InitPipelines()
 
 	vertShader.Uninit();
 	fragShader.Uninit();
+
+	//TODO:
+	m_lightPipeline.AddDescriptorSetLayout(&m_gbufferDSetLayout);
+	m_lightPipeline.BindToSubpass(&m_lightRenderPass, 0);
+	m_lightPipeline.AddVertexInputLayout(&m_quadVertLayout);
+	//m_lightPipeline.Init();
+	m_blurPipeline.AddDescriptorSetLayout(&m_blurDSetLayout);
+	//m_blurPipeline.Init();
 }
 void TransparentApp::_UninitPipelines()
 {

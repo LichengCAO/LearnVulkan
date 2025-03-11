@@ -5,8 +5,8 @@
 #include <algorithm>
 #include "image.h"
 #include "pipeline_io.h"
-
 #include <iomanip>
+
 MyDevice* MyDevice::s_pInstance = nullptr;
 
 std::vector<const char*> MyDevice::_GetInstanceRequiredExtensions() const

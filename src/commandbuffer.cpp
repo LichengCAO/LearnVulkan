@@ -101,6 +101,11 @@ void CommandSubmission::StartCommands(const std::vector<WaitInformation>& _waitI
 	m_mapImageLayout.clear();
 }
 
+std::optional<uint32_t> CommandSubmission::GetQueueFamilyIndex() const
+{
+	return m_optQueueFamilyIndex;
+}
+
 void CommandSubmission::StartOneTimeCommands(const std::vector<WaitInformation>& _waitInfos)
 {
 	CHECK_TRUE(vkCommandBuffer != VK_NULL_HANDLE, "Command buffer is not initialized!");
@@ -148,6 +153,11 @@ void CommandSubmission::StartRenderPass(const RenderPass* pRenderPass, const Fra
 	renderPassInfo.pClearValues = clearValues.data(); // should have same length as attachments, although index of those who don't clear on load will be ignored
 
 	vkCmdBeginRenderPass(vkCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+}
+
+VkQueue CommandSubmission::GetVkQueue() const
+{
+	return m_vkQueue;
 }
 
 void CommandSubmission::EndRenderPass()

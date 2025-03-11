@@ -35,6 +35,8 @@ public:
 	VkFence vkFence = VK_NULL_HANDLE;
 
 	void SetQueueFamilyIndex(uint32_t _queueFamilyIndex);
+	std::optional<uint32_t> GetQueueFamilyIndex() const;
+	VkQueue GetVkQueue() const;
 
 	void Init();
 	void Uninit();

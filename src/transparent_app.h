@@ -60,6 +60,12 @@ struct SimpleMaterial
 {
 	float roughness = 0;
 };
+struct GaussianBlufInformation
+{
+	uint32_t pass = 0;
+	uint32_t readId = 0;
+	uint32_t writeId = 0;
+};
 
 class TransparentApp
 {
@@ -67,6 +73,7 @@ private:
 	double lastTime = 0.0;
 	float frameTime = 0.0f;
 	uint32_t m_mipLevel = 0;
+	uint32_t m_blurLayers = 5;
 	uint32_t m_currentFrame = 0;
 	PersCamera m_camera{400, 300, glm::vec3(2,2,2), glm::vec3(0,0,0), glm::vec3(0,0,1)};
 	std::vector<Model> m_models;
@@ -114,6 +121,10 @@ private:
 	DescriptorSetLayout m_transOutputDSetLayout;
 	std::vector<DescriptorSet> m_transOutputDSets;
 
+	DescriptorSetLayout m_blurDSetLayout;
+	std::vector<DescriptorSet> m_blurDSets;
+	std::vector<Buffer> m_blurBuffers; // store GaussianBlufInformation
+
 	// Vertex inputs
 	VertexInputLayout m_gbufferVertLayout;
 	std::vector<Buffer> m_gbufferVertBuffers;
@@ -154,6 +165,12 @@ private:
 	std::vector<ImageView> m_distortImageViews;
 	std::vector<Framebuffer> m_distortFramebuffers;
 
+	RenderPass m_lightRenderPass;
+	std::vector<Image> m_lightImages;
+	std::vector<ImageView> m_lightFramebufferView;
+	std::vector<ImageView> m_lightImageView;
+	std::vector<Framebuffer> m_lightFramebuffers;
+
 	RenderPass m_renderPass;
 	std::vector<Image> m_swapchainImages;
 	std::vector<ImageView> m_swapchainImageViews;
@@ -165,6 +182,9 @@ private:
 	ComputePipeline  m_oitSortPipeline;
 
 	GraphicsPipeline m_distortPipeline;
+
+	GraphicsPipeline m_lightPipeline;
+	ComputePipeline  m_blurPipeline;
 
 	GraphicsPipeline m_gPipeline;
 	// semaphores
@@ -200,6 +220,8 @@ private:
 	
 	void _InitPipelines();
 	void _UninitPipelines();
+
+	void _InitImGui();
 	
 	void _MainLoop();
 	void _UpdateUniformBuffer();

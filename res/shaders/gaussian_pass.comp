@@ -1,0 +1,34 @@
+layout(set = 0, binding = 0, rgba32f) uniform readonly image2D imgInput;
+layout(set = 0, binding = 1, rgba32f) uniform writeonly image2D imgOutput;
+
+void main()
+{
+    uint index = gl_GlobalInvocationID.x; 
+    if (index >= viewportInfo.extent.z) return;
+    vec2 coord = vec2(index % viewportInfo.extent.x, index / viewportInfo.extent.x);
+    vec2 resolution = extent.xy;
+
+    // code from https://www.shadertoy.com/view/ctcBWM
+    vec2 uv = coord/resolution;
+    vec2 fragSize = vec2(1)/resolution;
+    
+    vec3 col = texture(imgInput, uv).rgb  * weight[0]; // center pixel
+    if (passOne)
+    {
+        for(int i = 1; i < blurRad; ++i)
+        {
+            col += texture(imgInput, uv + vec2(fragSize.x * float(i), 0.0)).rgb * weight[i];
+            col += texture(imgInput, uv - vec2(fragSize.x * float(i), 0.0)).rgb * weight[i];
+        }
+    }
+    else 
+    {
+        for(int i = 1; i < blurRad; ++i)
+        {
+            col += texture(imgInput, uv + vec2(0.0, fragSize.y * float(i))).rgb * weight[i];
+            col += texture(imgInput, uv - vec2(0.0, fragSize.y * float(i))).rgb * weight[i];
+        }
+    }
+
+    imageStore(imgOutput, ivec2(coord), col);
+}

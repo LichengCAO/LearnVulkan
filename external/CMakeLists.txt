@@ -2,6 +2,7 @@ find_package(Vulkan REQUIRED)
 set(GLM_INCLUDE_DIR "./glm")
 set(GLFW_INCLUDE_DIR "./glfw/include")
 set(TINY_OBJ_INCLUDE_DIR "./tinyobj")
+
 set(INCLUDE_DIRS 
     ${GLM_INCLUDE_DIR}
     ${GLFW_INCLUDE_DIR}
