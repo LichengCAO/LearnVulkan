@@ -41,6 +41,7 @@ public:
 	~GraphicsPipeline();
 
 	void AddShader(const SimpleShader* simpleShader);
+	void AddShader(const VkPipelineShaderStageCreateInfo& shaderInfo);
 	void AddVertexInputLayout(const VertexInputLayout* pVertLayout);
 	void AddDescriptorSetLayout(const DescriptorSetLayout* pSetLayout);
 	void BindToSubpass(const RenderPass* pRenderPass, uint32_t subpass);
@@ -63,6 +64,7 @@ public:
 	~ComputePipeline();
 
 	void AddShader(const SimpleShader* simpleShader);
+	void AddShader(const VkPipelineShaderStageCreateInfo& shaderInfo);
 	void AddDescriptorSetLayout(const DescriptorSetLayout* pSetLayout);
 
 	void Init();

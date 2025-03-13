@@ -41,7 +41,7 @@ void SimpleShader::SetSPVFile(const std::string& file)
 		bool isFound = file.find(stageStrings[i]) != std::string::npos;
 		if (isFound)
 		{
-			stage = stages[i];
+			vkShaderStage = stages[i];
 			stageSet = true;
 			break;
 		}
@@ -71,11 +71,11 @@ void SimpleShader::Uninit()
 	}
 }
 
-VkPipelineShaderStageCreateInfo SimpleShader::GetShaderStageInfo() const
+VkPipelineShaderStageCreateInfo SimpleShader::GetShaderStageInfo(const std::string& entry) const
 {
 	VkPipelineShaderStageCreateInfo shaderStageInfo{ VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
-	shaderStageInfo.stage = stage;
+	shaderStageInfo.vkShaderStage = vkShaderStage;
 	shaderStageInfo.module = vkShaderModule;
-	shaderStageInfo.pName = name.c_str();
+	shaderStageInfo.pName = entry.c_str();
 	return shaderStageInfo;
 }

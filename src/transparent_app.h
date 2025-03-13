@@ -62,8 +62,6 @@ struct SimpleMaterial
 };
 struct GaussianBlurInformation
 {
-	uint32_t readId = 0;
-	uint32_t writeId = 0;
 	uint32_t blurRad = 0;
 };
 struct GaussianKernels
@@ -127,7 +125,8 @@ private:
 	std::vector<DescriptorSet> m_transOutputDSets;
 
 	DescriptorSetLayout m_blurDSetLayout;
-	std::vector<DescriptorSet> m_blurDSets;
+	std::vector<std::vector<DescriptorSet>> m_blurLayeredDSetsX;
+	std::vector<std::vector<DescriptorSet>> m_blurLayeredDSetsY;
 	std::vector<Buffer> m_blurBuffers;   // store GaussianBlufInformation
 	std::vector<Buffer> m_kernelBuffers; // kernels[]
 
@@ -173,8 +172,8 @@ private:
 
 	RenderPass m_lightRenderPass;
 	std::vector<Image> m_lightImages;
-	std::vector<ImageView> m_lightFramebufferView;
-	std::vector<ImageView> m_lightImageView;
+	//std::vector<ImageView> m_lightFramebufferView;
+	std::vector<std::vector<ImageView>> m_lightImageLayerViews; // view for each layer
 	std::vector<Framebuffer> m_lightFramebuffers;
 
 	RenderPass m_renderPass;
@@ -190,7 +189,8 @@ private:
 	GraphicsPipeline m_distortPipeline;
 
 	GraphicsPipeline m_lightPipeline;
-	ComputePipeline  m_blurPipeline;
+	ComputePipeline  m_blurPipelineX;
+	ComputePipeline  m_blurPipelineY;
 
 	GraphicsPipeline m_gPipeline;
 	// semaphores

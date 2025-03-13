@@ -63,6 +63,12 @@ void GraphicsPipeline::AddShader(const SimpleShader* simpleShader)
 	m_shaderStageInfos.push_back(stageInfo);
 }
 
+void GraphicsPipeline::AddShader(const VkPipelineShaderStageCreateInfo& shaderInfo)
+{
+	assert(vkPipeline == VK_NULL_HANDLE);
+	m_shaderStageInfos.push_back(shaderInfo);
+}
+
 void GraphicsPipeline::AddVertexInputLayout(const VertexInputLayout* pVertLayout)
 {
 	assert(vkPipeline == VK_NULL_HANDLE);
@@ -276,6 +282,12 @@ void ComputePipeline::AddShader(const SimpleShader* simpleShader)
 	m_shaderStageInfo = simpleShader->GetShaderStageInfo();
 }
 
+void ComputePipeline::AddShader(const VkPipelineShaderStageCreateInfo& shaderInfo)
+{
+	assert(vkPipeline == VK_NULL_HANDLE);
+	m_shaderStageInfo = shaderInfo;
+}
+
 void ComputePipeline::AddDescriptorSetLayout(const DescriptorSetLayout* pSetLayout)
 {
 	assert(vkPipeline == VK_NULL_HANDLE);
@@ -291,7 +303,7 @@ void ComputePipeline::Init()
 	VK_CHECK(vkCreatePipelineLayout(MyDevice::GetInstance().vkDevice, &pipelineLayoutInfo, nullptr, &vkPipelineLayout), "Failed to create pipeline layout!");
 
 	VkComputePipelineCreateInfo pipelineInfo{ VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
-	pipelineInfo.stage = m_shaderStageInfo;
+	pipelineInfo.vkShaderStage = m_shaderStageInfo;
 	pipelineInfo.layout = vkPipelineLayout;
 	CHECK_TRUE(vkPipeline == VK_NULL_HANDLE, "VkPipeline is already created!");
 	VK_CHECK(vkCreateComputePipelines(MyDevice::GetInstance().vkDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &vkPipeline), "Failed to create compute pipeline!");

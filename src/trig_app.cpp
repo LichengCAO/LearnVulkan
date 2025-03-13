@@ -751,14 +751,14 @@ void HelloTriangleApplication::createGraphicsPipeline()
 
 	VkPipelineShaderStageCreateInfo vertShaderStageInfo{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-		.stage = VK_SHADER_STAGE_VERTEX_BIT,
+		.vkShaderStage = VK_SHADER_STAGE_VERTEX_BIT,
 		.module = vertShaderModule,
 		.pName = "main", // entry point function in shader
 	};
 
 	VkPipelineShaderStageCreateInfo fragShaderStageInfo{
 	.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-	.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
+	.vkShaderStage = VK_SHADER_STAGE_FRAGMENT_BIT,
 	.module = fragShaderModule,
 	.pName = "main", // entry point function in shader
 	};
@@ -2095,7 +2095,7 @@ void HelloTriangleApplication::createComputePipeline()
 
 	VkPipelineShaderStageCreateInfo compShaderStageInfo{
 	.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-	.stage = VK_SHADER_STAGE_COMPUTE_BIT,
+	.vkShaderStage = VK_SHADER_STAGE_COMPUTE_BIT,
 	.module = compShaderModule,
 	.pName = "main", // entry point function in shader
 	};
@@ -2111,7 +2111,7 @@ void HelloTriangleApplication::createComputePipeline()
 
 	VkComputePipelineCreateInfo pipelineInfo{
 		.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-		.stage = compShaderStageInfo,
+		.vkShaderStage = compShaderStageInfo,
 		.layout = m_vkComputePipelineLayout,
 	};
 

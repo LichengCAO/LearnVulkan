@@ -9,11 +9,10 @@ private:
 
 public:
 	VkShaderModule vkShaderModule = VK_NULL_HANDLE;
-	VkShaderStageFlagBits stage = static_cast<VkShaderStageFlagBits>(0);
-	std::string name = "main";
+	VkShaderStageFlagBits vkShaderStage = static_cast<VkShaderStageFlagBits>(0);
 	~SimpleShader();
 	void SetSPVFile(const std::string& file);
 	void Init();
 	void Uninit();
-	VkPipelineShaderStageCreateInfo GetShaderStageInfo() const;
+	VkPipelineShaderStageCreateInfo GetShaderStageInfo(const std::string& entry = "main") const;
 };

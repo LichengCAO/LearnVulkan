@@ -1,15 +1,13 @@
 #version 450
 #extension GL_EXT_nonuniform_qualifier : require
-layout(set = 0, binding = 0) uniform sampler2DArray imgInput;
-layout(set = 0, binding = 1, rgba32f) uniform writeonly image2DArray imgOutput;
+layout(set = 0, binding = 0) uniform sampler2D imgInput;
+layout(set = 0, binding = 1, rgba32f) uniform writeonly image2D imgOutput;
 layout(set = 0, binding = 2) uniform ViewportInformation
 {
     ivec4 extent; // width, height, width * height
 } viewportInfo;
 layout(set = 0, binding = 3) uniform GaussianBlurInformation
 {
-	uint readId;
-	uint writeId;
     uint blurRad;
 } blurInfo;
 layout(set = 0, binding = 4) uniform GaussianKernel
@@ -17,39 +15,43 @@ layout(set = 0, binding = 4) uniform GaussianKernel
     float kernels[16];
 } gaussianKernels[];
 
-void main()
+// code from https://www.shadertoy.com/view/ctcBWM
+void passX()
 {
     uint index = gl_GlobalInvocationID.x; 
     if (index >= viewportInfo.extent.z) return;
     vec2 coord = vec2(index % viewportInfo.extent.x, index / viewportInfo.extent.x);
     vec2 resolution = viewportInfo.extent.xy;
-
-    // code from https://www.shadertoy.com/view/ctcBWM
     vec2 uv = coord/resolution;
     vec2 fragSize = vec2(1)/resolution;
     
-    vec3 col = texture(imgInput, vec3(uv, blurInfo.readId)).rgb  * gaussianKernels[0].kernels[0]; // center pixel
-    bool blurX = blurInfo.writeId > blurInfo.readId; // we save the last layer to use as tmp image
-    if (blurX)
+    vec3 col = texture(imgInput, uv).rgb  * gaussianKernels[0].kernels[0]; // center pixel
+    for(int i = 1; i < blurInfo.blurRad; ++i)
     {
-        for(int i = 1; i < blurInfo.blurRad; ++i)
-        {
-            int x = i / 16;
-            int y = i % 16;
-            col += texture(imgInput, vec3(uv + vec2(fragSize.x * float(i), 0.0), blurInfo.readId)).rgb * (gaussianKernels[x].kernels[y]);
-            col += texture(imgInput, vec3(uv - vec2(fragSize.x * float(i), 0.0), blurInfo.readId)).rgb * (gaussianKernels[x].kernels[y]);
-        }
+        int x = i / 16;
+        int y = i % 16;
+        col += texture(imgInput, uv + vec2(fragSize.x * float(i), 0.0)).rgb * (gaussianKernels[x].kernels[y]);
+        col += texture(imgInput, uv - vec2(fragSize.x * float(i), 0.0)).rgb * (gaussianKernels[x].kernels[y]);
     }
-    else 
-    {
-        for(int i = 1; i < blurInfo.blurRad; ++i)
-        {
-            int x = i / 16;
-            int y = i % 16;
-            col += texture(imgInput, vec3(uv + vec2(0.0, fragSize.y * float(i)), blurInfo.readId)).rgb * (gaussianKernels[x].kernels[y]);
-            col += texture(imgInput, vec3(uv - vec2(0.0, fragSize.y * float(i)), blurInfo.readId)).rgb * (gaussianKernels[x].kernels[y]);
-        }
-    }
+    imageStore(imgOutput, ivec2(coord), vec4(col, 1.0f));
+}
 
-    imageStore(imgOutput, ivec3(ivec2(coord), blurInfo.writeId), vec4(col, 1.0f));
+void passY()
+{
+    uint index = gl_GlobalInvocationID.x; 
+    if (index >= viewportInfo.extent.z) return;
+    vec2 coord = vec2(index % viewportInfo.extent.x, index / viewportInfo.extent.x);
+    vec2 resolution = viewportInfo.extent.xy;
+    vec2 uv = coord/resolution;
+    vec2 fragSize = vec2(1)/resolution;
+    
+    vec3 col = texture(imgInput, uv).rgb  * gaussianKernels[0].kernels[0]; // center pixel
+    for(int i = 1; i < blurInfo.blurRad; ++i)
+    {
+        int x = i / 16;
+        int y = i % 16;
+        col += texture(imgInput, uv + vec2(0.0, fragSize.y * float(i))).rgb * (gaussianKernels[x].kernels[y]);
+        col += texture(imgInput, uv - vec2(0.0, fragSize.y * float(i))).rgb * (gaussianKernels[x].kernels[y]);
+    }
+    imageStore(imgOutput, ivec2(coord), vec4(col, 1.0f));
 }

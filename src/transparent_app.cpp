@@ -653,8 +653,7 @@ void TransparentApp::_InitImagesAndViews()
 		m_distortImages.reserve(n);
 		m_distortImageViews.reserve(n);
 		m_lightImages.reserve(n);
-		m_lightImageView.reserve(n);
-		m_lightFramebufferView.reserve(n);
+		m_lightImageLayerViews.reserve(n);
 	}
 	
 	// model textures
@@ -925,25 +924,24 @@ void TransparentApp::_InitImagesAndViews()
 		lightImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		lightImageInfo.arrayLayers = m_blurLayers + 1;
 		
-		ImageViewInformation layer0ViewInfo{};
-		layer0ViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
-		layer0ViewInfo.baseArrayLayer = 0;
-		layer0ViewInfo.layerCount = 1;
-		
-		ImageViewInformation allLayerViewInfo{};
-		allLayerViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
-		allLayerViewInfo.baseArrayLayer = 0;
-		allLayerViewInfo.layerCount = m_blurLayers + 1; // last layer is the layer holding tmp value
+		ImageViewInformation layerViewInfo{};
+		layerViewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
+		layerViewInfo.layerCount = 1;
 
 		for (int i = 0; i < n; ++i)
 		{
 			m_lightImages.push_back(Image{});
 			m_lightImages[i].SetImageInformation(lightImageInfo);
 			m_lightImages[i].Init();
-			m_lightFramebufferView.push_back(m_lightImages[i].NewImageView(layer0ViewInfo));
-			m_lightFramebufferView[i].Init();
-			m_lightImageView.push_back(m_lightImages[i].NewImageView(allLayerViewInfo));
-			m_lightImageView[i].Init();
+			
+			m_lightImageLayerViews.push_back({});
+			m_lightImageLayerViews[i].reserve(m_blurLayers + 1); // one extra layer to store xpass result
+			for (int j = 0; j <= m_blurLayers; ++j)
+			{
+				layerViewInfo.baseArrayLayer = static_cast<uint32_t>(j);
+				m_lightImageLayerViews[i].push_back(m_lightImages[i].NewImageView(layerViewInfo));
+				m_lightImageLayerViews[i][j].Init();
+			}
 		}
 	}
 }
@@ -962,8 +960,6 @@ void TransparentApp::_UninitImagesAndViews()
 		&m_oitColorImageViews,
 		&m_distortImageViews,
 		&m_gbufferReadAlbedoImageViews,
-		&m_lightImageView,
-		&m_lightFramebufferView,
 	};
 	std::vector<std::vector<Image>*> pImageVecsToUninit =
 	{
@@ -1002,6 +998,15 @@ void TransparentApp::_UninitImagesAndViews()
 		texture.Uninit();
 	}
 	m_modelTextures.clear();
+	for (auto& imageViews : m_lightImageLayerViews)
+	{
+		for (auto& imageView : imageViews)
+		{
+			imageView.Uninit();
+		}
+		imageViews.clear();
+	}
+	m_lightImageLayerViews.clear();
 }
 
 void TransparentApp::_InitFramebuffers()
@@ -1044,7 +1049,7 @@ void TransparentApp::_InitFramebuffers()
 
 		std::vector<const ImageView*> lightViews =
 		{
-			&m_lightFramebufferView[i],
+			&m_lightImageLayerViews[i][0],
 		};
 		m_lightFramebuffers.push_back(m_lightRenderPass.NewFramebuffer(lightViews));
 		m_lightFramebuffers[i].Init();
@@ -1280,47 +1285,86 @@ void TransparentApp::_InitDescriptorSets()
 
 	// blur descriptor set
 	{
-		m_blurDSets.reserve(MAX_FRAME_COUNT);
+		m_blurLayeredDSetsX.reserve(MAX_FRAME_COUNT);
+		m_blurLayeredDSetsY.reserve(MAX_FRAME_COUNT);
 		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 		{
-			VkDescriptorImageInfo blurInputImageInfo{};
-			blurInputImageInfo.sampler = m_vkSampler;
-			blurInputImageInfo.imageView = m_lightImageView[i].vkImageView;
-			blurInputImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-
-			VkDescriptorImageInfo blurOutputImageInfo{};
-			blurOutputImageInfo.sampler = m_vkSampler;
-			blurOutputImageInfo.imageView = m_lightImageView[i].vkImageView;
-			blurOutputImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-
 			std::vector<VkDescriptorBufferInfo> kernelInfos{};
-			int maxJ = (m_blurRadius + 15)/ 16;
+			int maxJ = (m_blurRadius + 15) / 16;
 			kernelInfos.reserve(maxJ);
 			for (int j = 0; j < maxJ; ++j)
 			{
 				VkDescriptorBufferInfo info{};
 				info.buffer = m_kernelBuffers[i].vkBuffer;
 				info.offset = 16 * j * sizeof(float);
-				info.range = (j == (maxJ - 1)) ? (m_blurRadius%16) * sizeof(float) : 16 * sizeof(float);
+				info.range = (j == (maxJ - 1)) ? (m_blurRadius % 16) * sizeof(float) : 16 * sizeof(float);
 				kernelInfos.push_back(info);
 			}
 
-			m_blurDSets.push_back(DescriptorSet{});
-			m_blurDSets[i].SetLayout(&m_blurDSetLayout);
-			m_blurDSets[i].Init();
-			m_blurDSets[i].StartDescriptorSetUpdate();
-			m_blurDSets[i].DescriptorSetUpdate_WriteBinding(0, blurInputImageInfo);
-			m_blurDSets[i].DescriptorSetUpdate_WriteBinding(1, blurOutputImageInfo);
-			m_blurDSets[i].DescriptorSetUpdate_WriteBinding(2, &m_oitViewportBuffer);
-			m_blurDSets[i].DescriptorSetUpdate_WriteBinding(3, &m_blurBuffers[i]);
-			m_blurDSets[i].DescriptorSetUpdate_WriteBinding(4, kernelInfos);
-			m_blurDSets[i].FinishDescriptorSetUpdate();
+			m_blurLayeredDSetsX.push_back({});
+			m_blurLayeredDSetsY.push_back({});
+			m_blurLayeredDSetsX[i].reserve(m_blurRadius - 1);
+			m_blurLayeredDSetsY[i].reserve(m_blurRadius - 1);
+			for (int j = 0; j < m_blurRadius - 1; ++j)
+			{
+				VkDescriptorImageInfo blurInputImageInfoX{};
+				blurInputImageInfoX.sampler = m_vkSampler;
+				blurInputImageInfoX.imageView = m_lightImageLayerViews[i][j].vkImageView;
+				blurInputImageInfoX.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+				VkDescriptorImageInfo blurOutputImageInfoX{};
+				blurOutputImageInfoX.sampler = m_vkSampler;
+				blurOutputImageInfoX.imageView = m_lightImageLayerViews[i][m_blurRadius].vkImageView;
+				blurOutputImageInfoX.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+				m_blurLayeredDSetsX[i].push_back(DescriptorSet{});
+				m_blurLayeredDSetsX[i][j].SetLayout(&m_blurDSetLayout);
+				m_blurLayeredDSetsX[i][j].Init();
+				m_blurLayeredDSetsX[i][j].StartDescriptorSetUpdate();
+				m_blurLayeredDSetsX[i][j].DescriptorSetUpdate_WriteBinding(0, blurInputImageInfoX);
+				m_blurLayeredDSetsX[i][j].DescriptorSetUpdate_WriteBinding(1, blurOutputImageInfoX);
+				m_blurLayeredDSetsX[i][j].DescriptorSetUpdate_WriteBinding(2, &m_oitViewportBuffer);
+				m_blurLayeredDSetsX[i][j].DescriptorSetUpdate_WriteBinding(3, &m_blurBuffers[i]);
+				m_blurLayeredDSetsX[i][j].DescriptorSetUpdate_WriteBinding(4, kernelInfos);
+				m_blurLayeredDSetsX[i][j].FinishDescriptorSetUpdate();
+
+				VkDescriptorImageInfo blurInputImageInfoY{};
+				blurInputImageInfoY.sampler = m_vkSampler;
+				blurInputImageInfoY.imageView = m_lightImageLayerViews[i][m_blurRadius].vkImageView;
+				blurInputImageInfoY.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+
+				VkDescriptorImageInfo blurOutputImageInfoY{};
+				blurOutputImageInfoY.sampler = m_vkSampler;
+				blurOutputImageInfoY.imageView = m_lightImageLayerViews[i][j + 1].vkImageView;
+				blurOutputImageInfoY.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+
+				m_blurLayeredDSetsY[i].push_back(DescriptorSet{});
+				m_blurLayeredDSetsY[i][j].SetLayout(&m_blurDSetLayout);
+				m_blurLayeredDSetsY[i][j].Init();
+				m_blurLayeredDSetsY[i][j].StartDescriptorSetUpdate();
+				m_blurLayeredDSetsY[i][j].DescriptorSetUpdate_WriteBinding(0, blurInputImageInfoY);
+				m_blurLayeredDSetsY[i][j].DescriptorSetUpdate_WriteBinding(1, blurOutputImageInfoY);
+				m_blurLayeredDSetsY[i][j].DescriptorSetUpdate_WriteBinding(2, &m_oitViewportBuffer);
+				m_blurLayeredDSetsY[i][j].DescriptorSetUpdate_WriteBinding(3, &m_blurBuffers[i]);
+				m_blurLayeredDSetsY[i][j].DescriptorSetUpdate_WriteBinding(4, kernelInfos);
+				m_blurLayeredDSetsY[i][j].FinishDescriptorSetUpdate();
+			}
+
 		}
 	}
 }
 void TransparentApp::_UninitDescriptorSets()
 {
-	m_blurDSets.clear();
+	for (auto& dsets : m_blurLayeredDSetsX)
+	{
+		dsets.clear();
+	}
+	m_blurLayeredDSetsX.clear();
+	for (auto& dsets : m_blurLayeredDSetsY)
+	{
+		dsets.clear();
+	}
+	m_blurLayeredDSetsY.clear();
 	m_transOutputDSets.clear();
 	m_gbufferDSets.clear();
 	m_cameraDSets.clear();
@@ -1694,15 +1738,18 @@ void TransparentApp::_InitPipelines()
 	SimpleShader blurCompShader;
 	blurCompShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/gaussian.comp.spv");
 	blurCompShader.Init();
-	m_blurPipeline.AddDescriptorSetLayout(&m_blurDSetLayout);
-	m_blurPipeline.AddShader(&blurCompShader);
-	m_blurPipeline.Init();
-
+	m_blurPipelineX.AddDescriptorSetLayout(&m_blurDSetLayout);
+	m_blurPipelineX.AddShader(blurCompShader.GetShaderStageInfo("passX"));
+	m_blurPipelineX.Init();
+	m_blurPipelineY.AddDescriptorSetLayout(&m_blurDSetLayout);
+	m_blurPipelineY.AddShader(blurCompShader.GetShaderStageInfo("passY"));
+	m_blurPipelineY.Init();
 	blurCompShader.Uninit();
 }
 void TransparentApp::_UninitPipelines()
 {
-	m_blurPipeline.Uninit();
+	m_blurPipelineY.Uninit();
+	m_blurPipelineX.Uninit();
 	m_lightPipeline.Uninit();
 	m_gPipeline.Uninit();
 	m_gbufferPipeline.Uninit();
@@ -1805,8 +1852,6 @@ void TransparentApp::_UpdateUniformBuffer()
 
 	GaussianBlurInformation blurInfo{};
 	blurInfo.blurRad = m_blurRadius;
-	blurInfo.readId = static_cast<uint32_t>(0);
-	blurInfo.writeId = static_cast<uint32_t>(0);
 	m_blurBuffers[m_currentFrame].CopyFromHost(&blurInfo);
 }
 
@@ -2187,26 +2232,14 @@ void TransparentApp::_DrawFrame()
 			{ tmpBarrier }
 		);
 
-		// update uniform
-		cmd.FillBuffer(m_blurBuffers[m_currentFrame].vkBuffer, offsetof(GaussianBlurInformation, writeId), sizeof(uint32_t), m_blurRadius);
-		cmd.FillBuffer(m_blurBuffers[m_currentFrame].vkBuffer, offsetof(GaussianBlurInformation, readId), sizeof(uint32_t), static_cast<uint32_t>(i - 1));
-		VkMemoryBarrier memoryBarrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
-		memoryBarrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-		memoryBarrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-		cmd.AddPipelineBarrier(
-			VK_PIPELINE_STAGE_TRANSFER_BIT,
-			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			{ memoryBarrier }
-		);
-
 		// run compute shader
 		PipelineInput input{};
 		auto extent2d = MyDevice::GetInstance().GetSwapchainExtent();
-		input.pDescriptorSets = {&m_blurDSets[m_currentFrame]};
+		input.pDescriptorSets = {&m_blurLayeredDSetsX[m_currentFrame][i - 1]};
 		input.groupCountX = (extent2d.width * extent2d.height + 255) / 256;
 		input.groupCountY = 1;
 		input.groupCountZ = 1;
-		m_blurPipeline.Do(cmd.vkCommandBuffer, input);
+		m_blurPipelineX.Do(cmd.vkCommandBuffer, input);
 
 		// wait pass1 done, transfer tmp to readable, transfer layer image to writable
 		builder.SetArrayLayerRange(m_blurLayers);
@@ -2225,22 +2258,13 @@ void TransparentApp::_DrawFrame()
 			{ tmpBarrier, layerBarrier }
 		);
 
-		// update uniform
-		cmd.FillBuffer(m_blurBuffers[m_currentFrame].vkBuffer, offsetof(GaussianBlurInformation, readId), sizeof(uint32_t), m_blurRadius);
-		cmd.FillBuffer(m_blurBuffers[m_currentFrame].vkBuffer, offsetof(GaussianBlurInformation, writeId), sizeof(uint32_t), static_cast<uint32_t>(i));
-		cmd.AddPipelineBarrier(
-			VK_PIPELINE_STAGE_TRANSFER_BIT,
-			VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
-			{ memoryBarrier }
-		);
-
 		// run compute shader
 		PipelineInput input2{};
-		input2.pDescriptorSets = {&m_blurDSets[m_currentFrame]};
+		input2.pDescriptorSets = {&m_blurLayeredDSetsX[m_currentFrame][i - 1]};
 		input2.groupCountX = (extent2d.width * extent2d.height + 255) / 256;
 		input2.groupCountY = 1;
 		input2.groupCountZ = 1;
-		m_blurPipeline.Do(cmd.vkCommandBuffer, input2);
+		m_blurPipelineY.Do(cmd.vkCommandBuffer, input2);
 
 		// wait pass2 done, transfer layer image to readable
 		builder.SetArrayLayerRange(static_cast<uint32_t>(i));
