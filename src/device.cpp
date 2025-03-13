@@ -19,13 +19,18 @@ std::vector<const char*> MyDevice::_GetInstanceRequiredExtensions() const
 		requiredExtensions.emplace_back(glfwExtensions[i]);
 	}
 	requiredExtensions.emplace_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+	requiredExtensions.emplace_back(VK_KHR_GET_PHYSICAL_DEVICE_PROPERTIES_2_EXTENSION_NAME);
 	/*if (enableValidationLayer)*/ requiredExtensions.emplace_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 	return requiredExtensions;
 }
 
 std::vector<const char*> MyDevice::_GetPhysicalDeviceRequiredExtensions() const
 {
-	return {VK_KHR_SWAPCHAIN_EXTENSION_NAME};
+	return {VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+		VK_KHR_MAINTENANCE1_EXTENSION_NAME,
+		VK_KHR_MAINTENANCE3_EXTENSION_NAME,
+		VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME
+	};
 }
 
 QueueFamilyIndices MyDevice::_GetQueueFamilyIndices(VkPhysicalDevice physicalDevice) const
@@ -185,7 +190,6 @@ void MyDevice::_SelectPhysicalDevice()
 	requiredFeatures.sampleRateShading = VK_TRUE;
 	requiredFeatures.fragmentStoresAndAtomics = VK_TRUE;
 	auto vecRequiredExtensions = _GetPhysicalDeviceRequiredExtensions();
-
 	physicalDeviceSelector.set_surface(vkSurface);
 	physicalDeviceSelector.set_required_features(requiredFeatures);
 	physicalDeviceSelector.prefer_gpu_device_type();
@@ -207,6 +211,13 @@ void MyDevice::_SelectPhysicalDevice()
 void MyDevice::_CreateLogicalDevice()
 {
 	vkb::DeviceBuilder deviceBuilder{ m_physicalDevice };
+	VkPhysicalDeviceDescriptorIndexingFeaturesEXT physicalDeviceDescriptorIndexingFeatures{};
+	physicalDeviceDescriptorIndexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
+	physicalDeviceDescriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+	physicalDeviceDescriptorIndexingFeatures.runtimeDescriptorArray = VK_TRUE;
+	physicalDeviceDescriptorIndexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
+	deviceBuilder.add_pNext(&physicalDeviceDescriptorIndexingFeatures);
+
 	std::vector<vkb::CustomQueueDescription> queueDescription;
 	float priority = 1.0f;
 	queueFamilyIndices = _GetQueueFamilyIndices(vkPhysicalDevice);
@@ -499,4 +510,74 @@ void MyDevice::CursorPosCallBack(GLFWwindow* _pWindow, double _xPos, double _yPo
 	auto& userInput = mydevice->m_userInput;
 	userInput.xPos = _xPos;
 	userInput.yPos = _yPos;
+}
+
+void ImageLayoutManager::_CheckKey(
+	const ImageLayoutKey& key, 
+	int& maxI, 
+	int& maxJ, 
+	std::vector<std::vector<VkImageLayout>>const** pWholeLayout) const
+{
+	VkImage iKey = key.vkImage;
+	auto it = m_layoutMap.find(iKey);
+	CHECK_TRUE(it != m_layoutMap.end(), "No this VkImage in the manager!");
+	*pWholeLayout = &(it->second);
+	maxI = key.baseArrayLayer + key.layerCount;
+	maxJ = key.baseMipLevel + key.levelCount;
+	CHECK_TRUE((it->second).size() >= maxI, "Layer out of range!");
+	CHECK_TRUE((it->second)[0].size() >= maxJ, "Mipmap level out of range!");
+}
+
+VkImageLayout ImageLayoutManager::GetImageLayout(ImageLayoutKey key)
+{
+	int maxI = 0;
+	int maxJ = 0;
+	std::vector<std::vector<VkImageLayout>>const* pWholeLayout = nullptr;
+	_CheckKey(key, maxI, maxJ, &pWholeLayout);
+	VkImageLayout ret = (*pWholeLayout)[key.baseArrayLayer][key.baseMipLevel];
+	for (int i = key.baseArrayLayer; i < maxI; ++i)
+	{
+		if (ret = VK_IMAGE_LAYOUT_UNDEFINED) break;
+		for (int j = key.baseMipLevel; j < maxJ; ++j)
+		{
+			if (ret != (*pWholeLayout)[i][j])
+			{
+				ret = VK_IMAGE_LAYOUT_UNDEFINED;
+				break;
+			}
+		}
+	}
+	return ret;
+}
+
+void ImageLayoutManager::SetImageLayout(ImageLayoutKey key, VkImageLayout val)
+{
+	int maxI = 0;
+	int maxJ = 0;
+	std::vector<std::vector<VkImageLayout>>const* pWholeLayoutConst = nullptr;
+	_CheckKey(key, maxI, maxJ, &pWholeLayoutConst);
+	auto& wholeLayout = m_layoutMap.at(key.vkImage);
+	for (int i = key.baseArrayLayer; i < maxI; ++i)
+	{
+		for (int j = key.baseMipLevel; j < maxJ; ++j)
+		{
+			wholeLayout[i][j] = val;
+		}
+	}
+}
+
+void ImageLayoutManager::AddImage(Image* pImage)
+{
+	auto it = m_layoutMap.find(pImage->vkImage);
+	CHECK_TRUE(it == m_layoutMap.end(), "Already have this image!");
+	auto imageInfo = pImage->GetImageInformation();
+	m_layoutMap.insert({
+		pImage->vkImage,
+		std::vector<std::vector<VkImageLayout>>(imageInfo.arrayLayers, std::vector<VkImageLayout>(imageInfo.mipLevels, VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED))
+		});
+}
+
+void ImageLayoutManager::RemoveImage(Image* pImage)
+{
+	m_layoutMap.erase(pImage->vkImage);
 }

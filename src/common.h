@@ -11,6 +11,7 @@
 #include <memory>
 #include <iostream>
 #include <set>
+#include <array>
 #define VK_CHECK(vkcommand, failedMessage) \
 do{\
 if((vkcommand)!=VK_SUCCESS){\

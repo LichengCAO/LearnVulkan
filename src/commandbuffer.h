@@ -14,6 +14,21 @@ struct ImageBarrierInformation
 	VkAccessFlags srcAccessMask = VkAccessFlagBits::VK_ACCESS_NONE;
 	VkAccessFlags dstAccessMask = VkAccessFlagBits::VK_ACCESS_NONE;
 };
+class ImageBarrierBuilder
+{
+private:
+	const void* pNext = nullptr;
+	uint32_t                   m_srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	uint32_t                   m_dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	VkImageSubresourceRange    m_subresourceRange{};
+public:
+	ImageBarrierBuilder();
+	void Reset();
+	void SetMipLevelRange(uint32_t baseMipLevel, uint32_t levelCount = 1);
+	void SetArrayLayerRange(uint32_t baseArrayLayer, uint32_t layerCount = 1);
+	void SetAspect(VkImageAspectFlags aspectMask);
+	VkImageMemoryBarrier NewBarrier(VkImage _image, VkImageLayout _oldLayout, VkImageLayout _newLayout, VkAccessFlags _srcAccessMask, VkAccessFlags _dstAccessMask) const;
+};
 class CommandSubmission
 {
 private:
@@ -53,7 +68,23 @@ public:
 		VkPipelineStageFlags dstStageMask,
 		const std::vector<VkMemoryBarrier>& memoryBarriers, 
 		const std::vector<ImageBarrierInformation>& imageBarriers);
+	void AddPipelineBarrier(
+		VkPipelineStageFlags srcStageMask,
+		VkPipelineStageFlags dstStageMask,
+		const std::vector<VkImageMemoryBarrier>& imageBarriers);
+	void AddPipelineBarrier(
+		VkPipelineStageFlags srcStageMask,
+		VkPipelineStageFlags dstStageMask,
+		const std::vector<VkMemoryBarrier>& memoryBarriers);
+	void AddPipelineBarrier(
+		VkPipelineStageFlags srcStageMask,
+		VkPipelineStageFlags dstStageMask,
+		const std::vector<VkMemoryBarrier>& memoryBarriers, 
+		const std::vector<VkImageMemoryBarrier>& imageBarriers);
+
+
 	void FillImageView(const ImageView* pImageView, VkClearColorValue clearValue) const;
 	void FillBuffer(const Buffer* pBuffer, uint32_t _data) const;
+	void FillBuffer(VkBuffer vkBuffer, VkDeviceSize offset, VkDeviceSize size, uint32_t data) const;
 	VkImageLayout GetImageLayout(const ImageView* pImageView) const;
 };

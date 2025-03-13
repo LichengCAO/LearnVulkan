@@ -26,15 +26,11 @@ private:
 	enum class DescriptorType {BUFFER, IMAGE, TEXEL_BUFFER};
 	struct DescriptorSetUpdate
 	{
-		union DescriptorInfo
-		{
-			VkDescriptorBufferInfo bufferInfo;
-			VkDescriptorImageInfo  imageInfo;
-			VkBufferView           bufferView;
-		};
 		uint32_t        binding = 0;
-		DescriptorInfo  descriptorInfo{};
 		DescriptorType  descriptorType = DescriptorType::BUFFER;
+		std::vector<VkDescriptorBufferInfo> bufferInfos;
+		std::vector<VkDescriptorImageInfo>  imageInfos;
+		std::vector<VkBufferView>           bufferViews;
 	};
 
 private:
@@ -49,6 +45,7 @@ public:
 	void DescriptorSetUpdate_WriteBinding(int bindingId, const Buffer* pBuffer);
 	void DescriptorSetUpdate_WriteBinding(int bindingId, const VkDescriptorImageInfo& dImageInfo);
 	void DescriptorSetUpdate_WriteBinding(int bindingId, const BufferView* bufferView);
+	void DescriptorSetUpdate_WriteBinding(int bindingId, const std::vector<VkDescriptorBufferInfo>& bufferInfos);
 	void FinishDescriptorSetUpdate();
 	void Init();
 };

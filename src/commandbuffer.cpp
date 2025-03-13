@@ -230,6 +230,41 @@ void CommandSubmission::AddPipelineBarrier(
 		static_cast<uint32_t>(vkImageBarriers.size()), vkImageBarriers.data()
 	);
 }
+void CommandSubmission::AddPipelineBarrier(
+	VkPipelineStageFlags srcStageMask, 
+	VkPipelineStageFlags dstStageMask, 
+	const std::vector<VkImageMemoryBarrier>& imageBarriers)
+{
+	AddPipelineBarrier(srcStageMask, dstStageMask, {}, imageBarriers);
+}
+void CommandSubmission::AddPipelineBarrier(
+	VkPipelineStageFlags srcStageMask,
+	VkPipelineStageFlags dstStageMask,
+	const std::vector<VkMemoryBarrier>& memoryBarriers)
+{
+	std::vector<VkImageMemoryBarrier> imageBarriers{};
+	AddPipelineBarrier(srcStageMask, dstStageMask, memoryBarriers, imageBarriers);
+}
+void CommandSubmission::AddPipelineBarrier(
+	VkPipelineStageFlags srcStageMask,
+	VkPipelineStageFlags dstStageMask,
+	const std::vector<VkMemoryBarrier>& memoryBarriers,
+	const std::vector<VkImageMemoryBarrier>& imageBarriers)
+{
+	uint32_t memoryBarriersCount = static_cast<uint32_t>(memoryBarriers.size());
+	uint32_t imageBarriersCount = static_cast<uint32_t>(imageBarriers.size());
+	const VkMemoryBarrier* pMemoryBarriers = memoryBarriersCount == 0 ? nullptr : memoryBarriers.data();
+	const VkImageMemoryBarrier* pImageBarriers = imageBarriersCount == 0 ? nullptr : imageBarriers.data();
+	vkCmdPipelineBarrier(vkCommandBuffer,
+		srcStageMask,
+		dstStageMask,
+		0,
+		memoryBarriersCount, pMemoryBarriers,
+		0, nullptr,
+		imageBarriersCount, pImageBarriers
+	);
+}
+
 
 VkImageLayout CommandSubmission::GetImageLayout(const ImageView* pImageView) const
 {
@@ -240,7 +275,6 @@ VkImageLayout CommandSubmission::GetImageLayout(const ImageView* pImageView) con
 	}
 	return ret;
 }
-
 void CommandSubmission::FillImageView(const ImageView* pImageView, VkClearColorValue clearValue) const
 {
 	VkImageSubresourceRange subresourceRange = {};
@@ -248,8 +282,8 @@ void CommandSubmission::FillImageView(const ImageView* pImageView, VkClearColorV
 	subresourceRange.aspectMask = info.aspectMask;	   // Specify the aspect, e.g., color
 	subresourceRange.baseMipLevel = info.baseMipLevel; // Start at the first mip level
 	subresourceRange.levelCount = info.levelCount;	   // VK_REMAINING_MIP_LEVELS;    // Apply to all mip levels
-	subresourceRange.baseArrayLayer = 0;               // Start at the first array layer
-	subresourceRange.layerCount = 1;				   // VK_REMAINING_ARRAY_LAYERS;  // Apply to all array layers
+	subresourceRange.baseArrayLayer = info.baseArrayLayer; // Start at the first array layer
+	subresourceRange.layerCount = info.layerCount;     // VK_REMAINING_ARRAY_LAYERS;  // Apply to all array layers
 	vkCmdClearColorImage(
 		vkCommandBuffer,
 		pImageView->pImage->vkImage,
@@ -259,16 +293,13 @@ void CommandSubmission::FillImageView(const ImageView* pImageView, VkClearColorV
 		&subresourceRange
 	);
 }
-
 void CommandSubmission::FillBuffer(const Buffer* pBuffer, uint32_t data) const
 {
-	vkCmdFillBuffer(
-		vkCommandBuffer,
-		pBuffer->vkBuffer,
-		0,
-		pBuffer->GetBufferInformation().size,
-		data
-	);
+	FillBuffer(pBuffer->vkBuffer, 0, pBuffer->GetBufferInformation().size, data);
+}
+void CommandSubmission::FillBuffer(VkBuffer vkBuffer, VkDeviceSize offset, VkDeviceSize size, uint32_t data) const
+{
+	vkCmdFillBuffer(vkCommandBuffer, vkBuffer, offset, size, data);
 }
 
 void CommandSubmission::WaitTillAvailable()const
@@ -277,4 +308,44 @@ void CommandSubmission::WaitTillAvailable()const
 	{
 		vkWaitForFences(MyDevice::GetInstance().vkDevice, 1, &vkFence, VK_TRUE, UINT64_MAX);
 	}
+}
+
+ImageBarrierBuilder::ImageBarrierBuilder()
+{
+	Reset();
+}
+void ImageBarrierBuilder::Reset()
+{
+	m_subresourceRange.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
+	m_subresourceRange.baseArrayLayer = 0;
+	m_subresourceRange.baseMipLevel = 0;
+	m_subresourceRange.layerCount = 1;
+	m_subresourceRange.levelCount = 1;
+}
+void ImageBarrierBuilder::SetMipLevelRange(uint32_t baseMipLevel, uint32_t levelCount)
+{
+	m_subresourceRange.baseMipLevel = baseMipLevel;
+	m_subresourceRange.levelCount = levelCount;
+}
+void ImageBarrierBuilder::SetArrayLayerRange(uint32_t baseArrayLayer, uint32_t layerCount)
+{
+	m_subresourceRange.baseArrayLayer = baseArrayLayer;
+	m_subresourceRange.layerCount = layerCount;
+}
+void ImageBarrierBuilder::SetAspect(VkImageAspectFlags aspectMask)
+{
+	m_subresourceRange.aspectMask = aspectMask;
+}
+VkImageMemoryBarrier ImageBarrierBuilder::NewBarrier(VkImage _image, VkImageLayout _oldLayout, VkImageLayout _newLayout, VkAccessFlags _srcAccessMask, VkAccessFlags _dstAccessMask) const
+{
+	VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
+	barrier.oldLayout = _oldLayout;
+	barrier.newLayout = _newLayout;
+	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.image = _image;
+	barrier.subresourceRange = m_subresourceRange;
+	barrier.srcAccessMask = _srcAccessMask;
+	barrier.dstAccessMask = _dstAccessMask;
+	return barrier;
 }

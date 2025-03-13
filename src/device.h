@@ -19,6 +19,40 @@ struct UserInput
 };
 
 class Image;
+
+struct ImageLayoutKey
+{
+	VkImage vkImage = VK_NULL_HANDLE;
+	uint32_t baseArrayLayer = 0;
+	uint32_t layerCount = 1;
+	uint32_t baseMipLevel = 0;
+	uint32_t levelCount = 1;
+};
+
+class ImageLayoutManager
+{
+private:
+	struct ImageResourceHasher {
+		std::size_t operator()(const VkImage& resource) const {
+			std::size_t hash = 0;
+
+			// Hash the VkImage handle
+			hash ^= std::hash<VkImage>()(resource) + 0x9e3779b9 + (hash << 6) + (hash >> 2);
+
+			return hash;
+		}
+	};
+	std::unordered_map<VkImage, std::vector<std::vector<VkImageLayout>>, ImageResourceHasher> m_layoutMap;
+	void _CheckKey(
+		const ImageLayoutKey& key, int& maxI, int& maxJ, 
+		std::vector<std::vector<VkImageLayout>>const** pWholeLayout) const;
+public:
+	VkImageLayout GetImageLayout(ImageLayoutKey key);
+	void SetImageLayout(ImageLayoutKey key, VkImageLayout val);
+	void AddImage(Image* pImage);
+	void RemoveImage(Image* pImage);
+};
+
 class MyDevice
 {
 private:

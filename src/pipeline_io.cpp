@@ -21,10 +21,12 @@ void DescriptorSet::StartDescriptorSetUpdate()
 void DescriptorSet::DescriptorSetUpdate_WriteBinding(int bindingId, const Buffer* pBuffer)
 {
 	DescriptorSetUpdate newUpdate{};
+	VkDescriptorBufferInfo bufferInfo{};
+	bufferInfo.buffer = pBuffer->vkBuffer;
+	bufferInfo.offset = 0;
+	bufferInfo.range = pBuffer->GetBufferInformation().size;
 	newUpdate.binding = bindingId;
-	newUpdate.descriptorInfo.bufferInfo.buffer = pBuffer->vkBuffer;
-	newUpdate.descriptorInfo.bufferInfo.offset = 0;
-	newUpdate.descriptorInfo.bufferInfo.range = pBuffer->GetBufferInformation().size;
+	newUpdate.bufferInfos = { bufferInfo };
 	newUpdate.descriptorType = DescriptorType::BUFFER;
 	m_updates.push_back(newUpdate);
 }
@@ -32,16 +34,26 @@ void DescriptorSet::DescriptorSetUpdate_WriteBinding(int bindingId, const VkDesc
 {
 	DescriptorSetUpdate newUpdate{};
 	newUpdate.binding = bindingId;
-	newUpdate.descriptorInfo.imageInfo = dImageInfo;
+	newUpdate.imageInfos = { dImageInfo };
 	newUpdate.descriptorType = DescriptorType::IMAGE;
 	m_updates.push_back(newUpdate);
 }
 void DescriptorSet::DescriptorSetUpdate_WriteBinding(int bindingId, const BufferView* pBufferView)
 {
 	DescriptorSetUpdate newUpdate{};
+	VkBufferView bufferView{};
+	bufferView = pBufferView->vkBufferView;
 	newUpdate.binding = bindingId;
-	newUpdate.descriptorInfo.bufferView = pBufferView->vkBufferView;
+	newUpdate.bufferViews = { bufferView };
 	newUpdate.descriptorType = DescriptorType::TEXEL_BUFFER;
+	m_updates.push_back(newUpdate);
+}
+void DescriptorSet::DescriptorSetUpdate_WriteBinding(int bindingId, const std::vector<VkDescriptorBufferInfo>& bufferInfos)
+{
+	DescriptorSetUpdate newUpdate{};
+	newUpdate.binding = bindingId;
+	newUpdate.bufferInfos = bufferInfos;
+	newUpdate.descriptorType = DescriptorType::BUFFER;
 	m_updates.push_back(newUpdate);
 }
 void DescriptorSet::FinishDescriptorSetUpdate()
@@ -53,23 +65,26 @@ void DescriptorSet::FinishDescriptorSetUpdate()
 		wds.dstSet = vkDescriptorSet;
 		wds.dstBinding = eUpdate.binding;
 		wds.dstArrayElement = 0;
-		wds.descriptorCount = m_pLayout->bindings[eUpdate.binding].descriptorCount;
 		wds.descriptorType = m_pLayout->bindings[eUpdate.binding].descriptorType;
+		// wds.descriptorCount = m_pLayout->bindings[eUpdate.binding].descriptorCount;
 		switch (eUpdate.descriptorType)
 		{
 		case DescriptorType::BUFFER:
 		{
-			wds.pBufferInfo = reinterpret_cast<VkDescriptorBufferInfo*>(&eUpdate.descriptorInfo);
+			wds.descriptorCount = static_cast<uint32_t>(eUpdate.bufferInfos.size());
+			wds.pBufferInfo = eUpdate.bufferInfos.data();
 			break;
 		}
 		case DescriptorType::IMAGE:
 		{
-			wds.pImageInfo = reinterpret_cast<VkDescriptorImageInfo*>(&eUpdate.descriptorInfo);
+			wds.descriptorCount = static_cast<uint32_t>(eUpdate.imageInfos.size());
+			wds.pImageInfo = eUpdate.imageInfos.data();
 			break;
 		}
 		case DescriptorType::TEXEL_BUFFER:
 		{
-			wds.pTexelBufferView = reinterpret_cast<VkBufferView*>(&eUpdate.descriptorInfo);
+			wds.descriptorCount = static_cast<uint32_t>(eUpdate.bufferViews.size());
+			wds.pTexelBufferView = eUpdate.bufferViews.data();
 			break;
 		}
 		default:

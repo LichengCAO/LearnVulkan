@@ -60,11 +60,15 @@ struct SimpleMaterial
 {
 	float roughness = 0;
 };
-struct GaussianBlufInformation
+struct GaussianBlurInformation
 {
-	uint32_t pass = 0;
 	uint32_t readId = 0;
 	uint32_t writeId = 0;
+	uint32_t blurRad = 0;
+};
+struct GaussianKernels
+{
+	std::array<float, 16> kernels{};
 };
 
 class TransparentApp
@@ -75,6 +79,7 @@ private:
 	uint32_t m_mipLevel = 0;
 	uint32_t m_blurLayers = 5;
 	uint32_t m_currentFrame = 0;
+	uint32_t m_blurRadius = 7;
 	PersCamera m_camera{400, 300, glm::vec3(2,2,2), glm::vec3(0,0,0), glm::vec3(0,0,1)};
 	std::vector<Model> m_models;
 	std::vector<Model> m_transModels;
@@ -123,7 +128,8 @@ private:
 
 	DescriptorSetLayout m_blurDSetLayout;
 	std::vector<DescriptorSet> m_blurDSets;
-	std::vector<Buffer> m_blurBuffers; // store GaussianBlufInformation
+	std::vector<Buffer> m_blurBuffers;   // store GaussianBlufInformation
+	std::vector<Buffer> m_kernelBuffers; // kernels[]
 
 	// Vertex inputs
 	VertexInputLayout m_gbufferVertLayout;
