@@ -56,13 +56,6 @@ GraphicsPipeline::~GraphicsPipeline()
 	assert(vkPipelineLayout == VK_NULL_HANDLE);
 }
 
-void GraphicsPipeline::AddShader(const SimpleShader* simpleShader)
-{
-	assert(vkPipeline == VK_NULL_HANDLE);
-	auto stageInfo = simpleShader->GetShaderStageInfo();
-	m_shaderStageInfos.push_back(stageInfo);
-}
-
 void GraphicsPipeline::AddShader(const VkPipelineShaderStageCreateInfo& shaderInfo)
 {
 	assert(vkPipeline == VK_NULL_HANDLE);
@@ -274,12 +267,6 @@ ComputePipeline::~ComputePipeline()
 {
 	assert(vkPipeline == VK_NULL_HANDLE);
 	assert(vkPipelineLayout == VK_NULL_HANDLE);
-}
-
-void ComputePipeline::AddShader(const SimpleShader* simpleShader)
-{
-	assert(vkPipeline == VK_NULL_HANDLE);
-	m_shaderStageInfo = simpleShader->GetShaderStageInfo();
 }
 
 void ComputePipeline::AddShader(const VkPipelineShaderStageCreateInfo& shaderInfo)

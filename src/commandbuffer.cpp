@@ -12,25 +12,6 @@ void CommandSubmission::_CreateSynchronizeObjects()
 	VK_CHECK(vkCreateFence(MyDevice::GetInstance().vkDevice, &fenceInfo, nullptr, &vkFence), "Failed to create the availability fence!");
 }
 
-VkImageMemoryBarrier CommandSubmission::_NewImageBarrier(const ImageBarrierInformation& _info) const
-{
-	VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
-	auto viewInfo = _info.pImageView->GetImageViewInformation();
-	barrier.oldLayout = _info.oldLayout;
-	barrier.newLayout = _info.newLayout;
-	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.image = _info.pImageView->pImage->vkImage;
-	barrier.subresourceRange.aspectMask = viewInfo.aspectMask;
-	barrier.subresourceRange.baseMipLevel = viewInfo.baseMipLevel;
-	barrier.subresourceRange.levelCount = viewInfo.levelCount;
-	barrier.subresourceRange.baseArrayLayer = 0;
-	barrier.subresourceRange.layerCount = 1;
-	barrier.srcAccessMask = _info.srcAccessMask;
-	barrier.dstAccessMask = _info.dstAccessMask;
-	return barrier;
-}
-
 void CommandSubmission::SetQueueFamilyIndex(uint32_t _queueFamilyIndex)
 {
 	m_optQueueFamilyIndex = _queueFamilyIndex;
@@ -206,31 +187,6 @@ VkSemaphore CommandSubmission::SubmitCommands()
 }
 
 void CommandSubmission::AddPipelineBarrier(
-	VkPipelineStageFlags srcStageMask,
-	VkPipelineStageFlags dstStageMask,
-	const std::vector<VkMemoryBarrier>& memoryBarriers,  
-	const std::vector<ImageBarrierInformation>& imageBarriers)
-{
-	std::vector<VkImageMemoryBarrier> vkImageBarriers;
-	vkImageBarriers.reserve(imageBarriers.size());
-	for (int i = 0; i < imageBarriers.size(); ++i)
-	{
-		const ImageView* key = imageBarriers[i].pImageView;
-		VkImageLayout    val = imageBarriers[i].newLayout;
-		m_mapImageLayout[key] = val;
-		vkImageBarriers.push_back(_NewImageBarrier(imageBarriers[i]));
-	}
-	vkCmdPipelineBarrier(
-		vkCommandBuffer,
-		srcStageMask,
-		dstStageMask,
-		0,
-		static_cast<uint32_t>(memoryBarriers.size()), memoryBarriers.data(),
-		0, nullptr,
-		static_cast<uint32_t>(vkImageBarriers.size()), vkImageBarriers.data()
-	);
-}
-void CommandSubmission::AddPipelineBarrier(
 	VkPipelineStageFlags srcStageMask, 
 	VkPipelineStageFlags dstStageMask, 
 	const std::vector<VkImageMemoryBarrier>& imageBarriers)
@@ -264,7 +220,6 @@ void CommandSubmission::AddPipelineBarrier(
 		imageBarriersCount, pImageBarriers
 	);
 }
-
 
 VkImageLayout CommandSubmission::GetImageLayout(const ImageView* pImageView) const
 {
@@ -300,6 +255,19 @@ void CommandSubmission::FillBuffer(const Buffer* pBuffer, uint32_t data) const
 void CommandSubmission::FillBuffer(VkBuffer vkBuffer, VkDeviceSize offset, VkDeviceSize size, uint32_t data) const
 {
 	vkCmdFillBuffer(vkCommandBuffer, vkBuffer, offset, size, data);
+}
+void CommandSubmission::BlitImage(VkImage srcImage, VkImageLayout srcLayout, VkImage dstImage, VkImageLayout dstLayout, const std::vector<VkImageBlit>& regions, VkFilter filter) const
+{
+	vkCmdBlitImage(
+		vkCommandBuffer,
+		srcImage,
+		srcLayout,
+		dstImage,
+		dstLayout,
+		static_cast<uint32_t>(regions.size()),
+		regions.data(),
+		filter
+	);
 }
 
 void CommandSubmission::WaitTillAvailable()const
@@ -348,4 +316,61 @@ VkImageMemoryBarrier ImageBarrierBuilder::NewBarrier(VkImage _image, VkImageLayo
 	barrier.srcAccessMask = _srcAccessMask;
 	barrier.dstAccessMask = _dstAccessMask;
 	return barrier;
+}
+
+BlitRegionBuilder::BlitRegionBuilder()
+{
+	Reset();
+}
+
+void BlitRegionBuilder::Reset()
+{
+	m_srcSubresourceLayers.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	m_srcSubresourceLayers.baseArrayLayer = 0;
+	m_srcSubresourceLayers.layerCount = 1;
+
+	m_dstSubresourceLayers.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	m_dstSubresourceLayers.baseArrayLayer = 0;
+	m_dstSubresourceLayers.layerCount = 1;
+}
+
+void BlitRegionBuilder::SetSrcAspect(VkImageAspectFlags aspectMask)
+{
+	m_srcSubresourceLayers.aspectMask = aspectMask;
+}
+
+void BlitRegionBuilder::SetDstAspect(VkImageAspectFlags aspectMask)
+{
+	m_dstSubresourceLayers.aspectMask = aspectMask;
+}
+
+void BlitRegionBuilder::SetSrcArrayLayerRange(uint32_t baseArrayLayer, uint32_t layerCount)
+{
+	m_srcSubresourceLayers.baseArrayLayer = baseArrayLayer;
+	m_srcSubresourceLayers.layerCount = layerCount;
+}
+
+void BlitRegionBuilder::SetDstArrayLayerRange(uint32_t baseArrayLayer, uint32_t layerCount)
+{
+	m_dstSubresourceLayers.baseArrayLayer = baseArrayLayer;
+	m_dstSubresourceLayers.layerCount = layerCount;
+}
+
+VkImageBlit BlitRegionBuilder::NewBlit(VkOffset3D srcOffsetUL, VkOffset3D srcOffsetLR, uint32_t srcMipLevel, VkOffset3D dstOffsetUL, VkOffset3D dstOffsetLR, uint32_t dstMipLevel) const
+{
+	VkImageBlit blit{};
+	blit.srcOffsets[0] = srcOffsetUL;
+	blit.srcOffsets[1] = srcOffsetLR;
+	blit.dstOffsets[0] = dstOffsetUL;
+	blit.dstOffsets[1] = dstOffsetLR;
+	blit.srcSubresource = m_srcSubresourceLayers;
+	blit.srcSubresource.mipLevel = srcMipLevel;
+	blit.dstSubresource = m_dstSubresourceLayers;
+	blit.dstSubresource.mipLevel = dstMipLevel;
+	return blit;
+}
+
+VkImageBlit BlitRegionBuilder::NewBlit(VkOffset2D srcOffsetLR, uint32_t srcMipLevel, VkOffset2D dstOffsetLR, uint32_t dstMipLevel) const
+{
+	return NewBlit({ 0, 0, 0 }, { srcOffsetLR.x, srcOffsetLR.y, 1 }, srcMipLevel, { 0, 0, 0 }, { dstOffsetLR.x, dstOffsetLR.y, 1 }, dstMipLevel);
 }

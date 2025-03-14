@@ -71,11 +71,22 @@ void SimpleShader::Uninit()
 	}
 }
 
-VkPipelineShaderStageCreateInfo SimpleShader::GetShaderStageInfo(const std::string& entry) const
+VkPipelineShaderStageCreateInfo SimpleShader::GetShaderStageInfo(const std::string& entry)
 {
 	VkPipelineShaderStageCreateInfo shaderStageInfo{ VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO };
+	auto it = m_entries.find(entry);
+	if (it == m_entries.end())
+	{
+		m_entries.insert(entry);
+		it = m_entries.find(entry);
+	}
 	shaderStageInfo.vkShaderStage = vkShaderStage;
 	shaderStageInfo.module = vkShaderModule;
-	shaderStageInfo.pName = entry.c_str();
+	shaderStageInfo.pName = it->c_str();
 	return shaderStageInfo;
+}
+
+VkPipelineShaderStageCreateInfo SimpleShader::GetShaderStageInfo()
+{
+	return GetShaderStageInfo("main");
 }

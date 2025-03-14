@@ -6,14 +6,6 @@ struct WaitInformation
 	VkSemaphore          waitSamaphore = VK_NULL_HANDLE;
 	VkPipelineStageFlags waitStage = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 };
-struct ImageBarrierInformation
-{
-	const ImageView* pImageView = nullptr;
-	VkImageLayout oldLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
-	VkImageLayout newLayout = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
-	VkAccessFlags srcAccessMask = VkAccessFlagBits::VK_ACCESS_NONE;
-	VkAccessFlags dstAccessMask = VkAccessFlagBits::VK_ACCESS_NONE;
-};
 class ImageBarrierBuilder
 {
 private:
@@ -28,6 +20,20 @@ public:
 	void SetArrayLayerRange(uint32_t baseArrayLayer, uint32_t layerCount = 1);
 	void SetAspect(VkImageAspectFlags aspectMask);
 	VkImageMemoryBarrier NewBarrier(VkImage _image, VkImageLayout _oldLayout, VkImageLayout _newLayout, VkAccessFlags _srcAccessMask, VkAccessFlags _dstAccessMask) const;
+};
+class BlitRegionBuilder
+{
+	VkImageSubresourceLayers m_srcSubresourceLayers{};
+	VkImageSubresourceLayers m_dstSubresourceLayers{};
+public:
+	BlitRegionBuilder();
+	void Reset();
+	void SetSrcAspect(VkImageAspectFlags aspectMask);
+	void SetDstAspect(VkImageAspectFlags aspectMask);
+	void SetSrcArrayLayerRange(uint32_t baseArrayLayer, uint32_t layerCount = 1);
+	void SetDstArrayLayerRange(uint32_t baseArrayLayer, uint32_t layerCount = 1);
+	VkImageBlit NewBlit(VkOffset3D srcOffsetUL, VkOffset3D srcOffsetLR, uint32_t srcMipLevel, VkOffset3D dstOffsetUL, VkOffset3D dstOffsetLR, uint32_t dstMipLevel) const;
+	VkImageBlit NewBlit(VkOffset2D srcOffsetLR, uint32_t srcMipLevel, VkOffset2D dstOffsetLR, uint32_t dstMipLevel) const;
 };
 class CommandSubmission
 {
@@ -44,7 +50,6 @@ private:
 	const Framebuffer* m_pCurFramebuffer = nullptr;
 
 	void _CreateSynchronizeObjects();
-	VkImageMemoryBarrier _NewImageBarrier(const ImageBarrierInformation& _info) const;
 public:
 	VkCommandBuffer vkCommandBuffer = VK_NULL_HANDLE;
 	VkFence vkFence = VK_NULL_HANDLE;
@@ -66,11 +71,6 @@ public:
 	void AddPipelineBarrier(
 		VkPipelineStageFlags srcStageMask,
 		VkPipelineStageFlags dstStageMask,
-		const std::vector<VkMemoryBarrier>& memoryBarriers, 
-		const std::vector<ImageBarrierInformation>& imageBarriers);
-	void AddPipelineBarrier(
-		VkPipelineStageFlags srcStageMask,
-		VkPipelineStageFlags dstStageMask,
 		const std::vector<VkImageMemoryBarrier>& imageBarriers);
 	void AddPipelineBarrier(
 		VkPipelineStageFlags srcStageMask,
@@ -82,9 +82,12 @@ public:
 		const std::vector<VkMemoryBarrier>& memoryBarriers, 
 		const std::vector<VkImageMemoryBarrier>& imageBarriers);
 
-
 	void FillImageView(const ImageView* pImageView, VkClearColorValue clearValue) const;
 	void FillBuffer(const Buffer* pBuffer, uint32_t _data) const;
 	void FillBuffer(VkBuffer vkBuffer, VkDeviceSize offset, VkDeviceSize size, uint32_t data) const;
+	void BlitImage(
+		VkImage srcImage, VkImageLayout srcLayout,
+		VkImage dstImage, VkImageLayout dstLayout,
+		const std::vector<VkImageBlit>& regions, VkFilter filter = VK_FILTER_LINEAR) const;
 	VkImageLayout GetImageLayout(const ImageView* pImageView) const;
 };
