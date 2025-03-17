@@ -6,6 +6,7 @@ struct WaitInformation
 	VkSemaphore          waitSamaphore = VK_NULL_HANDLE;
 	VkPipelineStageFlags waitStage = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 };
+
 class ImageBarrierBuilder
 {
 private:
@@ -21,12 +22,13 @@ public:
 	void SetAspect(VkImageAspectFlags aspectMask);
 	VkImageMemoryBarrier NewBarrier(VkImage _image, VkImageLayout _oldLayout, VkImageLayout _newLayout, VkAccessFlags _srcAccessMask, VkAccessFlags _dstAccessMask) const;
 };
-class BlitRegionBuilder
+
+class ImageBlitBuilder
 {
 	VkImageSubresourceLayers m_srcSubresourceLayers{};
 	VkImageSubresourceLayers m_dstSubresourceLayers{};
 public:
-	BlitRegionBuilder();
+	ImageBlitBuilder();
 	void Reset();
 	void SetSrcAspect(VkImageAspectFlags aspectMask);
 	void SetDstAspect(VkImageAspectFlags aspectMask);
@@ -35,6 +37,7 @@ public:
 	VkImageBlit NewBlit(VkOffset3D srcOffsetUL, VkOffset3D srcOffsetLR, uint32_t srcMipLevel, VkOffset3D dstOffsetUL, VkOffset3D dstOffsetLR, uint32_t dstMipLevel) const;
 	VkImageBlit NewBlit(VkOffset2D srcOffsetLR, uint32_t srcMipLevel, VkOffset2D dstOffsetLR, uint32_t dstMipLevel) const;
 };
+
 class CommandSubmission
 {
 private:

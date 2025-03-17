@@ -10,32 +10,29 @@ layout(set = 0, binding = 3) uniform GaussianBlurInformation
 {
     uint blurRad;
 } blurInfo;
+
 layout(set = 0, binding = 4) uniform GaussianKernel
 {
-    float kernels[16];
+    // why use vec4 array instead of float array:
+    // float kernels[14]; using array, values will be aligned like vec4, GPU will see 0, 4, instead of 0, 1, ...
+    // if we pass an array into the buffer we will lost some values between
+
+    // why use vec4 array of length 4:
+    // min offset of descriptorBufferInfo is a mat4
+    vec4 kernalGroups[4]; 
 } gaussianKernels[];
 
-// code from https://www.shadertoy.com/view/ctcBWM
-void passX()
+
+layout (local_size_x = 256, local_size_y = 1, local_size_z = 1) in;
+
+vec4 GetKernelGroup(uint i)
 {
-    uint index = gl_GlobalInvocationID.x; 
-    if (index >= viewportInfo.extent.z) return;
-    vec2 coord = vec2(index % viewportInfo.extent.x, index / viewportInfo.extent.x);
-    vec2 resolution = viewportInfo.extent.xy;
-    vec2 uv = coord/resolution;
-    vec2 fragSize = vec2(1)/resolution;
-    
-    vec3 col = texture(imgInput, uv).rgb  * gaussianKernels[0].kernels[0]; // center pixel
-    for(int i = 1; i < blurInfo.blurRad; ++i)
-    {
-        int x = i / 16;
-        int y = i % 16;
-        col += texture(imgInput, uv + vec2(fragSize.x * float(i), 0.0)).rgb * (gaussianKernels[x].kernels[y]);
-        col += texture(imgInput, uv - vec2(fragSize.x * float(i), 0.0)).rgb * (gaussianKernels[x].kernels[y]);
-    }
-    imageStore(imgOutput, ivec2(coord), vec4(col, 1.0f));
+    uint gaussianKernelsId = i / 16;
+    uint kernalGroupsId = i % 16 / 4;
+    return gaussianKernels[gaussianKernelsId].kernalGroups[kernalGroupsId];
 }
 
+// code from https://www.shadertoy.com/view/ctcBWM
 void main()
 {
     uint index = gl_GlobalInvocationID.x; 
@@ -44,14 +41,55 @@ void main()
     vec2 resolution = viewportInfo.extent.xy;
     vec2 uv = coord/resolution;
     vec2 fragSize = vec2(1)/resolution;
-    
-    vec3 col = texture(imgInput, uv).rgb  * gaussianKernels[0].kernels[0]; // center pixel
-    for(int i = 1; i < blurInfo.blurRad; ++i)
+
+    vec3 col = -texture(imgInput, uv).rgb * gaussianKernels[0].kernalGroups[0].r; // we don't want to add (0, 0) twice  
+
+    const uint kernelLength = blurInfo.blurRad + 1;
+    const uint remainKernel = kernelLength % 4;
+    for (uint i = 0; i < kernelLength - 3; i += 4)
     {
-        int x = i / 16;
-        int y = i % 16;
-        col += texture(imgInput, uv + vec2(0.0, fragSize.y * float(i))).rgb * (gaussianKernels[x].kernels[y]);
-        col += texture(imgInput, uv - vec2(0.0, fragSize.y * float(i))).rgb * (gaussianKernels[x].kernels[y]);
+        vec4 kernelGroup = GetKernelGroup(i);
+        col += texture(imgInput, uv + vec2(0.0f, fragSize.y * float(i))).rgb * kernelGroup.r;
+        col += texture(imgInput, uv + vec2(0.0f, fragSize.y * float(i + 1))).rgb * kernelGroup.g;
+        col += texture(imgInput, uv + vec2(0.0f, fragSize.y * float(i + 2))).rgb * kernelGroup.b;
+        col += texture(imgInput, uv + vec2(0.0f, fragSize.y * float(i + 3))).rgb * kernelGroup.a;
+
+        col += texture(imgInput, uv - vec2(0.0f, fragSize.y * float(i))).rgb * kernelGroup.r;
+        col += texture(imgInput, uv - vec2(0.0f, fragSize.y * float(i + 1))).rgb * kernelGroup.g;
+        col += texture(imgInput, uv - vec2(0.0f, fragSize.y * float(i + 2))).rgb * kernelGroup.b;
+        col += texture(imgInput, uv - vec2(0.0f, fragSize.y * float(i + 3))).rgb * kernelGroup.a;
     }
-    imageStore(imgOutput, ivec2(coord), vec4(1.0f));
+
+    if (remainKernel == 1)
+    {
+        const uint offset = kernelLength / 4 * 4;
+        vec4 partKernelGroup = GetKernelGroup(offset);
+
+        col += texture(imgInput, uv + vec2(0.0f, fragSize.y * float(offset))).rgb * partKernelGroup.r;
+        col += texture(imgInput, uv - vec2(0.0f, fragSize.y * float(offset))).rgb * partKernelGroup.r;
+    }
+    else if (remainKernel == 2)
+    {
+        const uint offset = kernelLength / 4 * 4;
+        vec4 partKernelGroup = GetKernelGroup(offset);
+
+        col += texture(imgInput, uv + vec2(0.0f, fragSize.y * float(offset))).rgb * partKernelGroup.r;
+        col += texture(imgInput, uv - vec2(0.0f, fragSize.y * float(offset))).rgb * partKernelGroup.r;
+        col += texture(imgInput, uv + vec2(0.0f, fragSize.y * float(offset + 1))).rgb * partKernelGroup.g;
+        col += texture(imgInput, uv - vec2(0.0f, fragSize.y * float(offset + 1))).rgb * partKernelGroup.g;
+    }
+    else if (remainKernel == 3)
+    {
+        const uint offset = kernelLength / 4 * 4;
+        vec4 partKernelGroup = GetKernelGroup(offset);
+
+        col += texture(imgInput, uv + vec2(0.0f, fragSize.y * float(offset))).rgb * partKernelGroup.r;
+        col += texture(imgInput, uv - vec2(0.0f, fragSize.y * float(offset))).rgb * partKernelGroup.r;
+        col += texture(imgInput, uv + vec2(0.0f, fragSize.y * float(offset + 1))).rgb * partKernelGroup.g;
+        col += texture(imgInput, uv - vec2(0.0f, fragSize.y * float(offset + 1))).rgb * partKernelGroup.g;
+        col += texture(imgInput, uv + vec2(0.0f, fragSize.y * float(offset + 2))).rgb * partKernelGroup.b;
+        col += texture(imgInput, uv - vec2(0.0f, fragSize.y * float(offset + 2))).rgb * partKernelGroup.b;
+    }
+    
+    imageStore(imgOutput, ivec2(coord), vec4(col, 1.0f));
 }

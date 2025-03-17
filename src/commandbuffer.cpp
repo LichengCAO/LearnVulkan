@@ -318,12 +318,12 @@ VkImageMemoryBarrier ImageBarrierBuilder::NewBarrier(VkImage _image, VkImageLayo
 	return barrier;
 }
 
-BlitRegionBuilder::BlitRegionBuilder()
+ImageBlitBuilder::ImageBlitBuilder()
 {
 	Reset();
 }
 
-void BlitRegionBuilder::Reset()
+void ImageBlitBuilder::Reset()
 {
 	m_srcSubresourceLayers.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	m_srcSubresourceLayers.baseArrayLayer = 0;
@@ -334,29 +334,29 @@ void BlitRegionBuilder::Reset()
 	m_dstSubresourceLayers.layerCount = 1;
 }
 
-void BlitRegionBuilder::SetSrcAspect(VkImageAspectFlags aspectMask)
+void ImageBlitBuilder::SetSrcAspect(VkImageAspectFlags aspectMask)
 {
 	m_srcSubresourceLayers.aspectMask = aspectMask;
 }
 
-void BlitRegionBuilder::SetDstAspect(VkImageAspectFlags aspectMask)
+void ImageBlitBuilder::SetDstAspect(VkImageAspectFlags aspectMask)
 {
 	m_dstSubresourceLayers.aspectMask = aspectMask;
 }
 
-void BlitRegionBuilder::SetSrcArrayLayerRange(uint32_t baseArrayLayer, uint32_t layerCount)
+void ImageBlitBuilder::SetSrcArrayLayerRange(uint32_t baseArrayLayer, uint32_t layerCount)
 {
 	m_srcSubresourceLayers.baseArrayLayer = baseArrayLayer;
 	m_srcSubresourceLayers.layerCount = layerCount;
 }
 
-void BlitRegionBuilder::SetDstArrayLayerRange(uint32_t baseArrayLayer, uint32_t layerCount)
+void ImageBlitBuilder::SetDstArrayLayerRange(uint32_t baseArrayLayer, uint32_t layerCount)
 {
 	m_dstSubresourceLayers.baseArrayLayer = baseArrayLayer;
 	m_dstSubresourceLayers.layerCount = layerCount;
 }
 
-VkImageBlit BlitRegionBuilder::NewBlit(VkOffset3D srcOffsetUL, VkOffset3D srcOffsetLR, uint32_t srcMipLevel, VkOffset3D dstOffsetUL, VkOffset3D dstOffsetLR, uint32_t dstMipLevel) const
+VkImageBlit ImageBlitBuilder::NewBlit(VkOffset3D srcOffsetUL, VkOffset3D srcOffsetLR, uint32_t srcMipLevel, VkOffset3D dstOffsetUL, VkOffset3D dstOffsetLR, uint32_t dstMipLevel) const
 {
 	VkImageBlit blit{};
 	blit.srcOffsets[0] = srcOffsetUL;
@@ -370,7 +370,7 @@ VkImageBlit BlitRegionBuilder::NewBlit(VkOffset3D srcOffsetUL, VkOffset3D srcOff
 	return blit;
 }
 
-VkImageBlit BlitRegionBuilder::NewBlit(VkOffset2D srcOffsetLR, uint32_t srcMipLevel, VkOffset2D dstOffsetLR, uint32_t dstMipLevel) const
+VkImageBlit ImageBlitBuilder::NewBlit(VkOffset2D srcOffsetLR, uint32_t srcMipLevel, VkOffset2D dstOffsetLR, uint32_t dstMipLevel) const
 {
 	return NewBlit({ 0, 0, 0 }, { srcOffsetLR.x, srcOffsetLR.y, 1 }, srcMipLevel, { 0, 0, 0 }, { dstOffsetLR.x, dstOffsetLR.y, 1 }, dstMipLevel);
 }

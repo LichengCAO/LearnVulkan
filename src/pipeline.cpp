@@ -195,7 +195,7 @@ void GraphicsPipeline::Uninit()
 	m_pRenderPass = nullptr;
 }
 
-void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput& input)
+void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const GraphicsPipelineInput& input)
 {
 	// TODO: check m_subpass should match number of vkCmdNextSubpass calls after vkCmdBeginRenderPass
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
@@ -310,7 +310,7 @@ void ComputePipeline::Uninit()
 	}
 }
 
-void ComputePipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput& input)
+void ComputePipeline::Do(VkCommandBuffer commandBuffer, const ComputePipelineInput& input)
 {
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, vkPipeline);
 	std::vector<VkDescriptorSet> descriptorSets;

@@ -535,7 +535,7 @@ void TransparentApp::_InitBuffers()
 		bufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 
 		BufferInformation kernelBufferInfo;
-		kernelBufferInfo.size = m_blurRadius * sizeof(float);
+		kernelBufferInfo.size = (m_blurRadius + 1 + 15) / 16 * sizeof(GaussianKernels);
 		kernelBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 		kernelBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 
@@ -1290,14 +1290,15 @@ void TransparentApp::_InitDescriptorSets()
 		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 		{
 			std::vector<VkDescriptorBufferInfo> kernelInfos{};
-			int maxJ = (m_blurRadius + 15) / 16;
+			int kernelElementCnt = m_blurRadius + 1;
+			int maxJ = (kernelElementCnt + 15) / 16;
 			kernelInfos.reserve(maxJ);
 			for (int j = 0; j < maxJ; ++j)
 			{
 				VkDescriptorBufferInfo info{};
 				info.buffer = m_kernelBuffers[i].vkBuffer;
-				info.offset = 16 * j * sizeof(float);
-				info.range = (j == (maxJ - 1)) ? (m_blurRadius % 16) * sizeof(float) : 16 * sizeof(float);
+				info.offset = j * sizeof(float) * 16; // min offset is size of mat4
+				info.range = (j == (maxJ - 1)) ? (kernelElementCnt % 16) * sizeof(float) : 16 * sizeof(float);
 				kernelInfos.push_back(info);
 			}
 
@@ -1853,7 +1854,7 @@ void TransparentApp::_UpdateUniformBuffer()
 	m_distortBuffers[m_currentFrame].CopyFromHost(&cameraViewInfo);
 
 	std::vector<float> kernels = Get1DGaussian(m_blurRadius);
-	m_kernelBuffers[m_currentFrame].CopyFromHost(kernels.data());
+	m_kernelBuffers[m_currentFrame].CopyFromHost(kernels.data(), kernels.size() * sizeof(float));
 
 	GaussianBlurInformation blurInfo{};
 	blurInfo.blurRad = m_blurRadius;
@@ -1882,7 +1883,7 @@ void TransparentApp::_DrawFrame()
 	cmd.StartRenderPass(&m_gbufferRenderPass, &m_gbufferFramebuffers[m_currentFrame]);
 	for (int i = 0; i < m_gbufferVertBuffers.size(); ++i)
 	{
-		PipelineInput input;
+		GraphicsPipelineInput input;
 		VertexIndexInput indexInput;
 		VertexInput vertInput;
 		indexInput.pBuffer = &m_gbufferIndexBuffers[i];
@@ -1987,7 +1988,7 @@ void TransparentApp::_DrawFrame()
 	cmd.StartRenderPass(&m_distortRenderPass, &m_distortFramebuffers[m_currentFrame]);
 	for (int i = 0; i < m_transModelVertBuffers.size(); ++i)
 	{
-		PipelineInput input;
+		GraphicsPipelineInput input;
 		VertexIndexInput indexInput;
 		VertexInput vertInput;
 		indexInput.pBuffer = &m_transModelIndexBuffers[i];
@@ -2013,7 +2014,7 @@ void TransparentApp::_DrawFrame()
 	cmd.StartRenderPass(&m_oitRenderPass, &m_oitFramebuffers[m_currentFrame]);
 	for (int i = 0; i < m_transModelVertBuffers.size(); ++i)
 	{
-		PipelineInput input;
+		GraphicsPipelineInput input;
 		VertexIndexInput indexInput;
 		VertexInput vertInput;
 		indexInput.pBuffer = &m_transModelIndexBuffers[i];
@@ -2033,6 +2034,111 @@ void TransparentApp::_DrawFrame()
 		m_oitPipeline.Do(cmd.vkCommandBuffer, input); // the draw will be done unordered
 	}
 	cmd.EndRenderPass();
+
+	// do light pass
+	if (m_mipLevel > 1)
+	{
+		ImageBarrierBuilder imageBarrierBuilder{};
+		imageBarrierBuilder.SetMipLevelRange(1, ~0);
+		VkImageMemoryBarrier albedoMipBarrier = imageBarrierBuilder.NewBarrier(m_gbufferAlbedoImages[m_currentFrame].vkImage,
+			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			VK_ACCESS_NONE, VK_ACCESS_SHADER_READ_BIT);
+		cmd.AddPipelineBarrier(
+			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+			{ albedoMipBarrier }
+		);
+	}
+	cmd.StartRenderPass(&m_lightRenderPass, &m_lightFramebuffers[m_currentFrame]);
+	{
+		GraphicsPipelineInput input{};
+		VertexIndexInput indexInput{};
+		VertexInput vertInput{};
+		indexInput.indexType = VK_INDEX_TYPE_UINT32;
+		indexInput.pBuffer = &m_quadIndexBuffer;
+		vertInput.pBuffer = &m_quadVertBuffer;
+		vertInput.pVertexInputLayout = &m_quadVertLayout;
+		input.imageSize = MyDevice::GetInstance().GetSwapchainExtent();
+		input.pDescriptorSets = { &m_gbufferDSets[m_currentFrame] };
+		input.pVertexIndexInput = &indexInput;
+		input.pVertexInputs = { &vertInput };
+		m_lightPipeline.Do(cmd.vkCommandBuffer, input);
+	}
+	cmd.EndRenderPass();
+
+	// gaussian blur light image -> DONE
+	{
+		VkExtent2D imageSize = MyDevice::GetInstance().GetSwapchainExtent();
+		// transfer light output image layer 0 to SHADER_READONLY
+		ImageBarrierBuilder barrierBuilder{};
+		VkImageMemoryBarrier imageBarrier = barrierBuilder.NewBarrier(m_lightImages[m_currentFrame].vkImage, 
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT
+		);
+		cmd.AddPipelineBarrier(
+			VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+			{ imageBarrier }
+		);
+
+		for (int i = 1; i < m_blurLayers; ++i)
+		{
+			// transfer tmp to GENERAL to write to
+			barrierBuilder.Reset();
+			barrierBuilder.SetArrayLayerRange(m_blurLayers);
+			VkImageMemoryBarrier imageBarrierTmp = barrierBuilder.NewBarrier(m_lightImages[m_currentFrame].vkImage,
+				VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
+				VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_SHADER_WRITE_BIT
+				// read by last layer
+			);
+			cmd.AddPipelineBarrier(
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				{ imageBarrierTmp }
+			);
+
+			// do image blur X
+			ComputePipelineInput inputX{};
+			inputX.groupCountX = (imageSize.width * imageSize.height + 255) / 256;
+			inputX.groupCountY = 1;
+			inputX.groupCountZ = 1;
+			inputX.pDescriptorSets = { &m_blurLayeredDSetsX[m_currentFrame][i - 1] };
+			m_blurPipelineX.Do(cmd.vkCommandBuffer, inputX);
+
+			// transfer blurred tmp to SHDAER_READONLY, next layer to GENERAL
+			imageBarrierTmp = barrierBuilder.NewBarrier(m_lightImages[m_currentFrame].vkImage,
+				VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT
+			);
+			barrierBuilder.Reset();
+			barrierBuilder.SetArrayLayerRange(i);
+			VkImageMemoryBarrier imageBarrierI = barrierBuilder.NewBarrier(m_lightImages[m_currentFrame].vkImage,
+				VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
+				VK_ACCESS_NONE, VK_ACCESS_SHADER_WRITE_BIT
+			);
+			cmd.AddPipelineBarrier(
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT,
+				{ imageBarrierI, imageBarrierTmp }
+			);
+
+			// do image blur Y
+			ComputePipelineInput inputY{};
+			inputY.groupCountX = (imageSize.width * imageSize.height + 255) / 256;
+			inputY.groupCountY = 1;
+			inputY.groupCountZ = 1;
+			inputY.pDescriptorSets = { &m_blurLayeredDSetsY[m_currentFrame][i - 1] };
+			m_blurPipelineY.Do(cmd.vkCommandBuffer, inputY);
+
+			// transfer the final result to SHADER_READONLY
+			barrierBuilder.Reset();
+			barrierBuilder.SetArrayLayerRange(i);
+			imageBarrierI = barrierBuilder.NewBarrier(m_lightImages[m_currentFrame].vkImage,
+				VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT
+			);
+			cmd.AddPipelineBarrier(
+				VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT | VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				{ imageBarrierI }
+			);
+		}
+	}
 
 	// clean oit output image -> DONE
 	{
@@ -2083,7 +2189,7 @@ void TransparentApp::_DrawFrame()
 	// sort transparent and write to OIT output
 	{
 		VkExtent2D extent2d = MyDevice::GetInstance().GetSwapchainExtent();
-		PipelineInput pipelineInput{};
+		ComputePipelineInput pipelineInput{};
 		pipelineInput.groupCountX = (extent2d.width * extent2d.height + 255)/ 256;
 		pipelineInput.groupCountY = 1;
 		pipelineInput.groupCountZ = 1;
@@ -2143,7 +2249,7 @@ void TransparentApp::_DrawFrame()
 
 	// generate gbuffer mipmaps
 	{		
-		BlitRegionBuilder blitBuilder{};
+		ImageBlitBuilder blitBuilder{};
 		ImageBarrierBuilder barrierBuilder{};
 
 		int32_t mipWidth = m_gbufferAlbedoImages[m_currentFrame].GetImageInformation().width;
@@ -2182,7 +2288,7 @@ void TransparentApp::_DrawFrame()
 
 			// transfer self to read only
 			cmd.AddPipelineBarrier(
-				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT,
+				VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT | VK_PIPELINE_STAGE_TRANSFER_BIT,
 				{ transferBarrer2 }
 			);
 
@@ -2207,7 +2313,7 @@ void TransparentApp::_DrawFrame()
 	// draw final result to the swapchain
 	cmd.StartRenderPass(&m_renderPass, &m_framebuffers[imageIndex.value()]);
 	{
-		PipelineInput input;
+		GraphicsPipelineInput input;
 		VertexIndexInput indexInput;
 		VertexInput vertInput;
 		indexInput.pBuffer = &m_quadIndexBuffer;

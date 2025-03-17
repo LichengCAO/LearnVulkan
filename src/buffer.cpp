@@ -89,6 +89,17 @@ void Buffer::CopyFromHost(const void* src)
 	memcpy(m_mappedMemory, src, (size_t)m_bufferInformation.size);
 }
 
+void Buffer::CopyFromHost(const void* src, size_t size)
+{
+	CHECK_TRUE(vkDeviceMemory != VK_NULL_HANDLE, "Not allocate memory yet!");
+	if (m_mappedMemory == nullptr)
+	{
+		vkMapMemory(MyDevice::GetInstance().vkDevice, vkDeviceMemory, 0, m_bufferInformation.size, 0, &m_mappedMemory);
+	}
+	CHECK_TRUE(size <= static_cast<size_t>(m_bufferInformation.size), "Try to copy too much data from host!");
+	memcpy(m_mappedMemory, src, size);
+}
+
 void Buffer::CopyFromBuffer(const Buffer& otherBuffer)
 {
 	CHECK_TRUE(vkBuffer != VK_NULL_HANDLE, "This buffer is not initialized!");

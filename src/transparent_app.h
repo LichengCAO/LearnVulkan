@@ -227,8 +227,6 @@ private:
 	void _InitPipelines();
 	void _UninitPipelines();
 
-	void _InitImGui();
-	
 	void _MainLoop();
 	void _UpdateUniformBuffer();
 	void _DrawFrame();

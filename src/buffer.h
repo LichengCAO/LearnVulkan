@@ -27,6 +27,7 @@ public:
 	void Uninit();
 
 	void CopyFromHost(const void* src);
+	void CopyFromHost(const void* src, size_t size);
 	void CopyFromBuffer(const Buffer& otherBuffer);
 	void CopyFromBuffer(const Buffer* pOtherBuffer);
 
