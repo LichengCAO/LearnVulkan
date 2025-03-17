@@ -80,6 +80,12 @@ void GraphicsPipeline::AddDescriptorSetLayout(const DescriptorSetLayout* pSetLay
 	m_descriptorSetLayouts.push_back(pSetLayout->vkDescriptorSetLayout);
 }
 
+void GraphicsPipeline::AddDescriptorSetLayout(VkDescriptorSetLayout vkDSetLayout)
+{
+	assert(vkPipeline == VK_NULL_HANDLE);
+	m_descriptorSetLayouts.push_back(vkDSetLayout);
+}
+
 void GraphicsPipeline::BindToSubpass(const RenderPass* pRenderPass, uint32_t subpass)
 {
 	assert(vkPipeline == VK_NULL_HANDLE);

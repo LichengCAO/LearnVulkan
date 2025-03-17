@@ -10,6 +10,7 @@ struct DescriptorSetEntry // binding
 	VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
 	VkShaderStageFlags stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
 };
+class DescriptorSet;
 class DescriptorSetLayout
 {
 public:

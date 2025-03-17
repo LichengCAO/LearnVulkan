@@ -363,9 +363,20 @@ void TransparentApp::_InitDescriptorSetLayouts()
 		m_blurDSetLayout.AddBinding(binding4);
 		m_blurDSetLayout.Init();
 	}
+
+	// blur output device read
+	{
+		DescriptorSetEntry binding0{};
+		binding0.descriptorCount = 1;
+		binding0.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
+		binding0.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
+		m_blurOutputDSetLayout.AddBinding(binding0);
+		m_blurOutputDSetLayout.Init();
+	}
 }
 void TransparentApp::_UninitDescriptorSetLayouts()
 {
+	m_blurOutputDSetLayout.Uninit();
 	m_blurDSetLayout.Uninit();
 	m_materialDSetLayout.Uninit();
 	m_transOutputDSetLayout.Uninit();
@@ -654,6 +665,7 @@ void TransparentApp::_InitImagesAndViews()
 		m_distortImageViews.reserve(n);
 		m_lightImages.reserve(n);
 		m_lightImageLayerViews.reserve(n);
+		m_lightImageBlurViews.reserve(n);
 	}
 	
 	// model textures
@@ -944,6 +956,18 @@ void TransparentApp::_InitImagesAndViews()
 			}
 		}
 	}
+
+	// view for blurred image array
+	{
+		ImageViewInformation info{};
+		info.baseArrayLayer = 0;
+		info.layerCount = m_blurLayers;
+		for (int i = 0; i < n; ++i)
+		{
+			m_lightImageBlurViews.push_back(m_lightImages[i].NewImageView(info));
+			m_lightImageBlurViews[i].Init();
+		}
+	}
 }
 void TransparentApp::_UninitImagesAndViews()
 {
@@ -960,6 +984,7 @@ void TransparentApp::_UninitImagesAndViews()
 		&m_oitColorImageViews,
 		&m_distortImageViews,
 		&m_gbufferReadAlbedoImageViews,
+		&m_lightImageBlurViews,
 	};
 	std::vector<std::vector<Image>*> pImageVecsToUninit =
 	{
@@ -1353,9 +1378,28 @@ void TransparentApp::_InitDescriptorSets()
 
 		}
 	}
+
+	// blur output descriptor set
+	{
+		m_blurOutputDSets.reserve(MAX_FRAME_COUNT);
+		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+		{
+			VkDescriptorImageInfo blurOutputImageInfo{};
+			blurOutputImageInfo.sampler = m_vkSampler;
+			blurOutputImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+			blurOutputImageInfo.imageView = m_lightImageBlurViews[i].vkImageView;
+			m_blurOutputDSets.push_back(DescriptorSet{});
+			m_blurOutputDSets[i].SetLayout(&m_blurOutputDSetLayout);
+			m_blurOutputDSets[i].Init();
+			m_blurOutputDSets[i].StartDescriptorSetUpdate();
+			m_blurOutputDSets[i].DescriptorSetUpdate_WriteBinding(0, blurOutputImageInfo);
+			m_blurOutputDSets[i].FinishDescriptorSetUpdate();
+		}
+	}
 }
 void TransparentApp::_UninitDescriptorSets()
 {
+	m_blurOutputDSets.clear();
 	for (auto& dsets : m_blurLayeredDSetsX)
 	{
 		dsets.clear();
@@ -1708,7 +1752,8 @@ void TransparentApp::_InitPipelines()
 	vertShader.Init();
 	fragShader.Init();
 
-	m_gPipeline.AddDescriptorSetLayout(&m_gbufferDSetLayout);
+	//m_gPipeline.AddDescriptorSetLayout(&m_gbufferDSetLayout);
+	m_gPipeline.AddDescriptorSetLayout(&m_blurOutputDSetLayout);
 	m_gPipeline.AddDescriptorSetLayout(&m_transOutputDSetLayout);
 	m_gPipeline.AddShader(vertShader.GetShaderStageInfo());
 	m_gPipeline.AddShader(fragShader.GetShaderStageInfo());
@@ -2218,7 +2263,7 @@ void TransparentApp::_DrawFrame()
 		);
 	}
 
-	// transfer the rest mipmap level of gbufferalbedo to transfer dst first
+	// transfer the rest mipmap level of gbuffer albedo to transfer dst first
 	{
 		// transfer the albedo gbuffer image to transfer_dst first to make mipmaps
 		ImageBarrierBuilder barrierBuilder{};
@@ -2319,7 +2364,7 @@ void TransparentApp::_DrawFrame()
 		indexInput.pBuffer = &m_quadIndexBuffer;
 		vertInput.pVertexInputLayout = &m_quadVertLayout;
 		vertInput.pBuffer = &m_quadVertBuffer;
-		input.pDescriptorSets = { &m_gbufferDSets[m_currentFrame], &m_transOutputDSets[m_currentFrame] };
+		input.pDescriptorSets = { &m_blurOutputDSets[m_currentFrame], &m_transOutputDSets[m_currentFrame] };
 		input.imageSize = MyDevice::GetInstance().GetSwapchainExtent();
 		input.pVertexIndexInput = &indexInput;
 		input.pVertexInputs = { &vertInput };

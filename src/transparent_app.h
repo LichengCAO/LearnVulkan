@@ -130,6 +130,9 @@ private:
 	std::vector<Buffer> m_blurBuffers;   // store GaussianBlufInformation
 	std::vector<Buffer> m_kernelBuffers; // kernels[]
 
+	DescriptorSetLayout m_blurOutputDSetLayout;
+	std::vector<DescriptorSet> m_blurOutputDSets;
+
 	// Vertex inputs
 	VertexInputLayout m_gbufferVertLayout;
 	std::vector<Buffer> m_gbufferVertBuffers;
@@ -174,6 +177,7 @@ private:
 	std::vector<Image> m_lightImages;
 	//std::vector<ImageView> m_lightFramebufferView;
 	std::vector<std::vector<ImageView>> m_lightImageLayerViews; // view for each layer
+	std::vector<ImageView> m_lightImageBlurViews; // view for output blurred image array TODO:
 	std::vector<Framebuffer> m_lightFramebuffers;
 
 	RenderPass m_renderPass;
