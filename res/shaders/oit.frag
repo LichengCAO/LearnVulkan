@@ -42,7 +42,7 @@ void main()
     vec3 N = normalize(vNormalWorld);
     float fresnel = FresnelTerm(1.33f, N, wi);
     vec4 scaledColor = inColor;
-    scaledColor.a = fresnel;
+    scaledColor.a = clamp(fresnel + scaledColor.a, 0.0f, 1.0f);
     uvec4 storeValue = uvec4(packUnorm4x8(scaledColor), floatBitsToUint(gl_FragCoord.z), 0, 0);
     const int texelBufferCoord = viewportInfo.extent.x * OIT_LAYERS * coord.y + OIT_LAYERS * coord.x;
     bool done = gl_SampleMaskIn[0] == 0; // if simply set to false, won't work, haven't figure out yet

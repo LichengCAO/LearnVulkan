@@ -10,26 +10,38 @@ void TransparentApp::_Init()
 	Model room{};
 	Model wahoo{};
 	Model sphere{};
+	Model bunny{};
+	Model chessBoard{};
 	room.objFilePath = "E:/GitStorage/LearnVulkan/res/models/viking_room/viking_room.obj";
 	room.texturePath = "E:/GitStorage/LearnVulkan/res/models/viking_room/viking_room.png";
 	wahoo.objFilePath = "E:/GitStorage/LearnVulkan/res/models/wahoo/wahoo.obj";
 	wahoo.texturePath = "E:/GitStorage/LearnVulkan/res/models/wahoo/wahoo.bmp";
 	sphere.objFilePath = "E:/GitStorage/LearnVulkan/res/models/sphere/sphere.obj";
 	sphere.texturePath = "E:/GitStorage/LearnVulkan/res/models/sphere/sphere.png";
+	bunny.objFilePath = "E:/GitStorage/LearnVulkan/res/models/bunny/bunny.obj";
+	bunny.texturePath = "E:/GitStorage/LearnVulkan/res/models/bunny/bunny.png";
+	chessBoard.objFilePath = "E:/GitStorage/LearnVulkan/res/models/ChessBoard/ChessBoard.obj";
+	chessBoard.texturePath = "E:/GitStorage/LearnVulkan/res/models/ChessBoard/ChessBoard.JPG";
+	//chessBoard.texturePath = "E:/GitStorage/LearnVulkan/res/models/viking_room/viking_room.png";
 	wahoo.transform.SetScale({ 0.05, 0.05, 0.05 });
 	wahoo.transform.SetRotation({ 90, 0, 90 });
 	wahoo.transform.SetPosition({ 0.5, 0.0, 0.2 });
-	m_models = { wahoo, room};
+	chessBoard.transform.SetRotation({ 0, 90, 90 });
+	chessBoard.transform.SetScale({ 0.06, 0.06, 0.06 });
+	room.transform.SetScale({ 1.5, 1.5, 1.5 });
+	m_models = { room };
 
 	std::default_random_engine            rnd(3625);  // Fixed seed
 	std::uniform_real_distribution<float> uniformDist;
-	for (int i = 0; i < 50; ++i)
+	for (int i = 0; i < 1; ++i)
 	{
 		glm::vec3 center(uniformDist(rnd), uniformDist(rnd), uniformDist(rnd));
 		center = (center - glm::vec3(0.5)) * 2.f;
+		center = glm::vec3(0.0, 0.0, 0.8);
 		// Generate a random radius
-		float radius = 2.f * 0.9f / 16;
-		radius *= uniformDist(rnd) * 0.1f + 0.3f;
+		//float radius = 2.f * 0.9f / 16;
+		//radius *= uniformDist(rnd) * 0.1f + 0.3f;
+		float radius = 1.0f/12.0f;
 		sphere.transform.SetPosition(center);
 		sphere.transform.SetScale(glm::vec3(radius));
 		m_transModels.push_back(sphere);
@@ -37,6 +49,26 @@ void TransparentApp::_Init()
 		material.roughness = 0.10f;// glm::fract(glm::abs(uniformDist(rnd)));
 		m_transMaterials.push_back(material);
 	}
+	//SimpleMaterial material{};
+	//for (int i = 0; i < 6; ++i)
+	//{
+	//	bunny.transform.SetRotation({ -90, 180, -90 });
+	//	bunny.transform.SetScale({ 0.12, 0.12, 0.12 });
+	//	bunny.transform.SetPosition({ 0.5, -0.4 + i * 0.2, 0.5 });
+	//	material.roughness = (1.0f / 6.0f) * i;
+	//	m_transModels.push_back(bunny);
+	//	m_transMaterials.push_back(material);
+	//}
+
+	//for (int i = 0; i < 6; ++i)
+	//{
+	//	bunny.transform.SetRotation({ -90, 180, -90 + 60 * i });
+	//	bunny.transform.SetScale({ 0.12, 0.12, 0.12 });
+	//	bunny.transform.SetPosition({ 0.5, -0.4 + i * 0.2, 0.25 });
+	//	material.roughness = 0.25;
+	//	m_transModels.push_back(bunny);
+	//	m_transMaterials.push_back(material);
+	//}
 
 	_InitRenderPass();
 	_InitDescriptorSetLayouts();
@@ -1543,7 +1575,8 @@ void TransparentApp::_InitVertexInputs()
 			color.x *= color.x;
 			color.y *= color.y;
 			color.z *= color.z;
-			color.a *= 1.5f;
+			color.a = 0.05f;
+			color = glm::vec4(glm::vec3(0.0f, 0.0f, 1.0f), color.a);
 			_ReadObjFile(objFile, verts, indices);
 			std::vector<TransparentVertex> vertices{};
 			vertices.reserve(verts.size());
@@ -2410,15 +2443,22 @@ void TransparentApp::_ReadObjFile(const std::string& objFile, std::vector<Vertex
 				attrib.vertices[3 * index.vertex_index + 1],
 				attrib.vertices[3 * index.vertex_index + 2]
 			};
-			vertex.uv = {
-				attrib.texcoords[2 * index.texcoord_index + 0],
-				1.0f - attrib.texcoords[2 * index.texcoord_index + 1]
-			};
-			vertex.normal = {
-				attrib.normals[3 * index.normal_index + 0],
-				attrib.normals[3 * index.normal_index + 1],
-				attrib.normals[3 * index.normal_index + 2],
-			};
+			if (index.texcoord_index != -1)
+			{
+				vertex.uv = {
+					attrib.texcoords[2 * index.texcoord_index + 0],
+					1.0f - attrib.texcoords[2 * index.texcoord_index + 1] 
+				};
+			}
+			if (index.normal_index != -1)
+			{
+				vertex.normal = {
+					attrib.normals[3 * index.normal_index + 0],
+					attrib.normals[3 * index.normal_index + 1],
+					attrib.normals[3 * index.normal_index + 2],
+				};
+			}
+
 			if (uniqueVertices.count(vertex) == 0)
 			{
 				uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());

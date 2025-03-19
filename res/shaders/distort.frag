@@ -68,6 +68,7 @@ vec2 ComputeBufferUVDistortion(
 
 	vec2 ViewportUVDistortion = -TransformDirectionFromWorldToView(Normal).xy * (MaterialIOR - AIR_IOR); // UE use the positive one which I think is wrong...
 	vec2 BufferUVDistortion = ViewportUVDistortion;// * FullResolutionDistortionPixelSize;
+	BufferUVDistortion *= 1.f;
 	// InvTanHalfFov only apply a correction for the distortion to be the same in screen space space whatever the FoV is (to make it consistent accross player setup).
 	// However without taking depth into account, the distortion will actually be stronger the further away the camera is from the distortion surface.
 	// So when zoomed-in the distortion will be higher than expected.
@@ -103,7 +104,8 @@ void PostProcessUVDistortion(
 
 float RoughnessToVariance(in float roughness)
 {
-	return roughness;
+	float a11 = clamp(pow(roughness, 1.1f), 0.0f, 0.999f);
+	return a11 / (1.0f - a11);
 }
 
 void main()
@@ -112,7 +114,8 @@ void main()
 	vec3 Normal = normalize(vViewNormal); // world
 	float MaterialIOR = 1.51f;
 	float SceneDepth = vScreenPos.w;
-	float RefractionDepthBias = 0.0;
+	float RefractionDepthBias = 0.5;
+	float roughness = material.roughness;
 	// Prevent silhouettes from geometry that is in front of distortion from being seen in the distortion 
 	vec2 NDC = vScreenPos.xy / vScreenPos.w;
 	vec2 ScreenUV = NDC * vec2(0.5f, 0.5f) + vec2(0.5f, 0.5f);
@@ -126,7 +129,6 @@ void main()
 	float DistortSceneDepth = GetSceneDepth(ScreenUV + BufferUVDistortion);
 
 	// Post process UV distortion according to depth
-	// PostProcessUVDistortion(SceneDepth, DistortSceneDepth, RefractionDepthBias, BufferUVDistortion);
-
-	outColor = vec4(BufferUVDistortion, RoughnessToVariance(material.roughness), 1.0);
+	if (SceneDepth > DistortSceneDepth)BufferUVDistortion = vec2(0.0f);
+	outColor = vec4(BufferUVDistortion, RoughnessToVariance(roughness), 1.0);
 }
