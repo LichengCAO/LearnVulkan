@@ -33,42 +33,42 @@ void TransparentApp::_Init()
 
 	std::default_random_engine            rnd(3625);  // Fixed seed
 	std::uniform_real_distribution<float> uniformDist;
-	for (int i = 0; i < 1; ++i)
+	//for (int i = 0; i < 1; ++i)
+	//{
+	//	glm::vec3 center(uniformDist(rnd), uniformDist(rnd), uniformDist(rnd));
+	//	center = (center - glm::vec3(0.5)) * 2.f;
+	//	center = glm::vec3(0.0, 0.0, 0.8);
+	//	// Generate a random radius
+	//	//float radius = 2.f * 0.9f / 16;
+	//	//radius *= uniformDist(rnd) * 0.1f + 0.3f;
+	//	float radius = 1.0f/12.0f;
+	//	sphere.transform.SetPosition(center);
+	//	sphere.transform.SetScale(glm::vec3(radius));
+	//	m_transModels.push_back(sphere);
+	//	SimpleMaterial material{};
+	//	material.roughness = 0.10f;// glm::fract(glm::abs(uniformDist(rnd)));
+	//	m_transMaterials.push_back(material);
+	//}
+	SimpleMaterial material{};
+	for (int i = 0; i < 6; ++i)
 	{
-		glm::vec3 center(uniformDist(rnd), uniformDist(rnd), uniformDist(rnd));
-		center = (center - glm::vec3(0.5)) * 2.f;
-		center = glm::vec3(0.0, 0.0, 0.8);
-		// Generate a random radius
-		//float radius = 2.f * 0.9f / 16;
-		//radius *= uniformDist(rnd) * 0.1f + 0.3f;
-		float radius = 1.0f/12.0f;
-		sphere.transform.SetPosition(center);
-		sphere.transform.SetScale(glm::vec3(radius));
-		m_transModels.push_back(sphere);
-		SimpleMaterial material{};
-		material.roughness = 0.10f;// glm::fract(glm::abs(uniformDist(rnd)));
+		bunny.transform.SetRotation({ -90, 180, -90 });
+		bunny.transform.SetScale({ 0.12, 0.12, 0.12 });
+		bunny.transform.SetPosition({ 0.5, -0.4 + i * 0.2, 0.5 });
+		material.roughness = (1.0f / 6.0f) * i;
+		m_transModels.push_back(bunny);
 		m_transMaterials.push_back(material);
 	}
-	//SimpleMaterial material{};
-	//for (int i = 0; i < 6; ++i)
-	//{
-	//	bunny.transform.SetRotation({ -90, 180, -90 });
-	//	bunny.transform.SetScale({ 0.12, 0.12, 0.12 });
-	//	bunny.transform.SetPosition({ 0.5, -0.4 + i * 0.2, 0.5 });
-	//	material.roughness = (1.0f / 6.0f) * i;
-	//	m_transModels.push_back(bunny);
-	//	m_transMaterials.push_back(material);
-	//}
 
-	//for (int i = 0; i < 6; ++i)
-	//{
-	//	bunny.transform.SetRotation({ -90, 180, -90 + 60 * i });
-	//	bunny.transform.SetScale({ 0.12, 0.12, 0.12 });
-	//	bunny.transform.SetPosition({ 0.5, -0.4 + i * 0.2, 0.25 });
-	//	material.roughness = 0.25;
-	//	m_transModels.push_back(bunny);
-	//	m_transMaterials.push_back(material);
-	//}
+	for (int i = 0; i < 6; ++i)
+	{
+		bunny.transform.SetRotation({ -90, 180, -90 + 60 * i });
+		bunny.transform.SetScale({ 0.12, 0.12, 0.12 });
+		bunny.transform.SetPosition({ 0.5, -0.4 + i * 0.2, 0.25 });
+		material.roughness = 0.25;
+		m_transModels.push_back(bunny);
+		m_transMaterials.push_back(material);
+	}
 
 	_InitRenderPass();
 	_InitDescriptorSetLayouts();

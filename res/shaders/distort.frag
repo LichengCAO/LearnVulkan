@@ -66,7 +66,8 @@ vec2 ComputeBufferUVDistortion(
 	in float ScreenRatioXY) // screen width / height
 {
 
-	vec2 ViewportUVDistortion = -TransformDirectionFromWorldToView(Normal).xy * (MaterialIOR - AIR_IOR); // UE use the positive one which I think is wrong...
+	//vec2 ViewportUVDistortion = -TransformDirectionFromWorldToView(Normal).xy * (MaterialIOR - AIR_IOR); // UE use the positive one which I think is wrong...
+	vec2 ViewportUVDistortion = -normalize(vViewNormal).xy * (MaterialIOR - AIR_IOR); // UE use the positive one which I think is wrong...
 	vec2 BufferUVDistortion = ViewportUVDistortion;// * FullResolutionDistortionPixelSize;
 	BufferUVDistortion *= 1.f;
 	// InvTanHalfFov only apply a correction for the distortion to be the same in screen space space whatever the FoV is (to make it consistent accross player setup).
