@@ -12,6 +12,15 @@ void CommandSubmission::_CreateSynchronizeObjects()
 	VK_CHECK(vkCreateFence(MyDevice::GetInstance().vkDevice, &fenceInfo, nullptr, &vkFence), "Failed to create the availability fence!");
 }
 
+void CommandSubmission::_UpdateImageLayout(VkImage vkImage, VkImageSubresourceRange range, VkImageLayout layout) const
+{
+	MyDevice& device = MyDevice::GetInstance();
+	if (device.imageLayouts.find(vkImage) != device.imageLayouts.end())
+	{
+		device.imageLayouts.at(vkImage).SetLayout(layout, range);
+	}
+}
+
 void CommandSubmission::SetQueueFamilyIndex(uint32_t _queueFamilyIndex)
 {
 	m_optQueueFamilyIndex = _queueFamilyIndex;
@@ -77,9 +86,6 @@ void CommandSubmission::StartCommands(const std::vector<WaitInformation>& _waitI
 		m_vkWaitStages.push_back(waitInfo.waitStage);
 		m_vkWaitSemaphores.push_back(waitInfo.waitSamaphore);
 	}
-
-	// clear all layout recorded when a new frame start
-	m_mapImageLayout.clear();
 }
 
 std::optional<uint32_t> CommandSubmission::GetQueueFamilyIndex() const
@@ -144,12 +150,21 @@ VkQueue CommandSubmission::GetVkQueue() const
 void CommandSubmission::EndRenderPass()
 {
 	CHECK_TRUE(m_isInRenderpass, "Not in render pass!");
-	
+	CHECK_TRUE(m_pCurFramebuffer, "No framebuffer!");
+	CHECK_TRUE(m_pCurRenderpass, "No render pass!");
 	for (int i = 0; i < m_pCurFramebuffer->attachments.size(); ++i)
 	{
 		const ImageView* key = m_pCurFramebuffer->attachments[i];
 		VkImageLayout val = m_pCurRenderpass->attachments[i].attachmentDescription.finalLayout;
-		m_mapImageLayout[key] = val;
+		VkImageSubresourceRange range{};
+		CHECK_TRUE(key != nullptr, "No image view!");
+		auto info = key->GetImageViewInformation();
+		range.aspectMask = info.aspectMask;
+		range.baseArrayLayer = info.baseArrayLayer;
+		range.baseMipLevel = info.baseMipLevel;
+		range.layerCount = info.layerCount;
+		range.levelCount = info.levelCount;
+		_UpdateImageLayout(key->pImage->vkImage, range, val);
 	}
 
 	m_isInRenderpass = false;
@@ -219,17 +234,13 @@ void CommandSubmission::AddPipelineBarrier(
 		0, nullptr,
 		imageBarriersCount, pImageBarriers
 	);
+	// update image layout
+	for (const auto& imageBarrier : imageBarriers)
+	{
+		_UpdateImageLayout(imageBarrier.image, imageBarrier.subresourceRange, imageBarrier.newLayout);
+	}
 }
 
-VkImageLayout CommandSubmission::GetImageLayout(const ImageView* pImageView) const
-{
-	VkImageLayout ret = VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED;
-	if (m_mapImageLayout.find(pImageView) != m_mapImageLayout.end())
-	{
-		ret = m_mapImageLayout.at(pImageView);
-	}
-	return ret;
-}
 void CommandSubmission::FillImageView(const ImageView* pImageView, VkClearColorValue clearValue) const
 {
 	VkImageSubresourceRange subresourceRange = {};
@@ -267,6 +278,29 @@ void CommandSubmission::BlitImage(VkImage srcImage, VkImageLayout srcLayout, VkI
 		static_cast<uint32_t>(regions.size()),
 		regions.data(),
 		filter
+	);
+
+	for (const auto& region : regions)
+	{
+		VkImageSubresourceRange range{};
+		range.aspectMask = region.dstSubresource.aspectMask;
+		range.baseArrayLayer = region.dstSubresource.baseArrayLayer;
+		range.layerCount = region.dstSubresource.layerCount;
+		range.baseMipLevel = region.dstSubresource.mipLevel;
+		range.levelCount = 1;
+		_UpdateImageLayout(dstImage, range, dstLayout);
+	}
+}
+
+void CommandSubmission::CopyBufferToImage(VkBuffer vkBuffer, VkImage vkImage, VkImageLayout layout, const std::vector<VkBufferImageCopy>& regions) const
+{
+	vkCmdCopyBufferToImage(
+		vkCommandBuffer,
+		vkBuffer,
+		vkImage,
+		layout,
+		static_cast<uint32_t>(regions.size()),
+		regions.data()
 	);
 }
 

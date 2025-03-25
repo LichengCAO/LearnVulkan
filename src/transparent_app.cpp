@@ -1982,17 +1982,22 @@ void TransparentApp::_DrawFrame()
 		ImageBarrierBuilder barrierBuilder{};
 		VkImageMemoryBarrier sampleCountBarrier = barrierBuilder.NewBarrier(
 			m_oitSampleCountImages[m_currentFrame].vkImage,
-			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
+			//VK_IMAGE_LAYOUT_UNDEFINED,
+			_GetImageLayout(&m_oitSampleCountImageViews[m_currentFrame]),
+			VK_IMAGE_LAYOUT_GENERAL,
 			VK_ACCESS_NONE, VK_ACCESS_TRANSFER_WRITE_BIT
 		);
 		VkImageMemoryBarrier inUseBarrier = barrierBuilder.NewBarrier(
 			m_oitInUseImages[m_currentFrame].vkImage,
-			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
+			//VK_IMAGE_LAYOUT_UNDEFINED,
+			_GetImageLayout(&m_oitInUseImageViews[m_currentFrame]),
+			VK_IMAGE_LAYOUT_GENERAL,
 			VK_ACCESS_NONE, VK_ACCESS_TRANSFER_WRITE_BIT
 		);
 
 		cmd.AddPipelineBarrier(
-			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT, VK_PIPELINE_STAGE_TRANSFER_BIT,
+			VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+			VK_PIPELINE_STAGE_TRANSFER_BIT,
 			{ sampleCountBarrier, inUseBarrier }
 		);
 
@@ -2008,12 +2013,14 @@ void TransparentApp::_DrawFrame()
 		sampleDataBarrier.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT | VkAccessFlagBits::VK_ACCESS_SHADER_WRITE_BIT;
 		VkImageMemoryBarrier sampleCountBarrier2 = barrierBuilder.NewBarrier(
 			m_oitSampleCountImages[m_currentFrame].vkImage,
-			cmd.GetImageLayout(&m_oitSampleCountImageViews[m_currentFrame]), VK_IMAGE_LAYOUT_GENERAL,
+			_GetImageLayout(&m_oitSampleCountImageViews[m_currentFrame]),
+			VK_IMAGE_LAYOUT_GENERAL,
 			VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
 		);
 		VkImageMemoryBarrier inUseBarrier2 = barrierBuilder.NewBarrier(
 			m_oitInUseImages[m_currentFrame].vkImage,
-			cmd.GetImageLayout(&m_oitInUseImageViews[m_currentFrame]), VK_IMAGE_LAYOUT_GENERAL,
+			_GetImageLayout(&m_oitInUseImageViews[m_currentFrame]),
+			VK_IMAGE_LAYOUT_GENERAL,
 			VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT | VK_ACCESS_SHADER_WRITE_BIT
 		);
 
@@ -2030,12 +2037,12 @@ void TransparentApp::_DrawFrame()
 		ImageBarrierBuilder barrierBuilder{};
 		VkImageMemoryBarrier gbufferPosBarrier = barrierBuilder.NewBarrier(
 			m_gbufferPosImages[m_currentFrame].vkImage,
-			cmd.GetImageLayout(&m_gbufferPosImageViews[m_currentFrame]), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			_GetImageLayout(&m_gbufferPosImageViews[m_currentFrame]), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT
 		);
 		VkImageMemoryBarrier gbufferNormalBarrier = barrierBuilder.NewBarrier(
 			m_gbufferNormalImages[m_currentFrame].vkImage,
-			cmd.GetImageLayout(&m_gbufferNormalImageViews[m_currentFrame]), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			_GetImageLayout(&m_gbufferNormalImageViews[m_currentFrame]), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT
 		);
 		VkImageMemoryBarrier gbufferAlbedoBarrier = barrierBuilder.NewBarrier(
@@ -2045,13 +2052,13 @@ void TransparentApp::_DrawFrame()
 		);
 		VkImageMemoryBarrier gbufferDepthBarrier = barrierBuilder.NewBarrier(
 			m_gbufferDepthImages[m_currentFrame].vkImage,
-			cmd.GetImageLayout(&m_gbufferDepthImageViews[m_currentFrame]), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			_GetImageLayout(&m_gbufferDepthImageViews[m_currentFrame]), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT
 		);
 		barrierBuilder.SetAspect(VK_IMAGE_ASPECT_DEPTH_BIT);
 		VkImageMemoryBarrier depthBarrier = barrierBuilder.NewBarrier(
 			m_depthImages[m_currentFrame].vkImage,
-			cmd.GetImageLayout(&m_depthImageViews[m_currentFrame]), VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
+			_GetImageLayout(&m_depthImageViews[m_currentFrame]), VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL,
 			VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT, VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT
 		);
 
@@ -2148,8 +2155,13 @@ void TransparentApp::_DrawFrame()
 		VkExtent2D imageSize = MyDevice::GetInstance().GetSwapchainExtent();
 		// transfer light output image layer 0 to SHADER_READONLY
 		ImageBarrierBuilder barrierBuilder{};
+		barrierBuilder.SetArrayLayerRange(0, 1);
+		barrierBuilder.SetMipLevelRange(0, 1);
+		barrierBuilder.SetAspect(VK_IMAGE_ASPECT_COLOR_BIT);
 		VkImageMemoryBarrier imageBarrier = barrierBuilder.NewBarrier(m_lightImages[m_currentFrame].vkImage, 
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			//VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			_GetImageLayout(m_lightImages[m_currentFrame].vkImage, 0, 1, 0, 1, VK_IMAGE_ASPECT_COLOR_BIT),
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			VK_ACCESS_COLOR_ATTACHMENT_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT
 		);
 		cmd.AddPipelineBarrier(
@@ -2163,7 +2175,9 @@ void TransparentApp::_DrawFrame()
 			barrierBuilder.Reset();
 			barrierBuilder.SetArrayLayerRange(m_blurLayers);
 			VkImageMemoryBarrier imageBarrierTmp = barrierBuilder.NewBarrier(m_lightImages[m_currentFrame].vkImage,
-				VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
+				// VK_IMAGE_LAYOUT_UNDEFINED,
+				_GetImageLayout(m_lightImages[m_currentFrame].vkImage, m_blurLayers, 1, 0, 1, VK_IMAGE_ASPECT_COLOR_BIT),
+				VK_IMAGE_LAYOUT_GENERAL,
 				VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_SHADER_WRITE_BIT
 				// read by last layer
 			);
@@ -2182,13 +2196,17 @@ void TransparentApp::_DrawFrame()
 
 			// transfer blurred tmp to SHDAER_READONLY, next layer to GENERAL
 			imageBarrierTmp = barrierBuilder.NewBarrier(m_lightImages[m_currentFrame].vkImage,
-				VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				// VK_IMAGE_LAYOUT_GENERAL,
+				_GetImageLayout(m_lightImages[m_currentFrame].vkImage, m_blurLayers, 1, 0, 1, VK_IMAGE_ASPECT_COLOR_BIT),
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 				VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT
 			);
 			barrierBuilder.Reset();
 			barrierBuilder.SetArrayLayerRange(i);
 			VkImageMemoryBarrier imageBarrierI = barrierBuilder.NewBarrier(m_lightImages[m_currentFrame].vkImage,
-				VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
+				// VK_IMAGE_LAYOUT_UNDEFINED,
+				_GetImageLayout(m_lightImages[m_currentFrame].vkImage, i, 1, 0, 1, VK_IMAGE_ASPECT_COLOR_BIT),
+				VK_IMAGE_LAYOUT_GENERAL,
 				VK_ACCESS_NONE, VK_ACCESS_SHADER_WRITE_BIT
 			);
 			cmd.AddPipelineBarrier(
@@ -2208,7 +2226,9 @@ void TransparentApp::_DrawFrame()
 			barrierBuilder.Reset();
 			barrierBuilder.SetArrayLayerRange(i);
 			imageBarrierI = barrierBuilder.NewBarrier(m_lightImages[m_currentFrame].vkImage,
-				VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				// VK_IMAGE_LAYOUT_GENERAL,
+				_GetImageLayout(m_lightImages[m_currentFrame].vkImage, i, 1, 0, 1, VK_IMAGE_ASPECT_COLOR_BIT),
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 				VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT
 			);
 			cmd.AddPipelineBarrier(
@@ -2224,7 +2244,9 @@ void TransparentApp::_DrawFrame()
 		ImageBarrierBuilder barrierBuilder{};
 		VkImageMemoryBarrier oitOutputImageBarrier = barrierBuilder.NewBarrier(
 			m_oitColorImages[m_currentFrame].vkImage,
-			VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_GENERAL,
+			// VK_IMAGE_LAYOUT_UNDEFINED,
+			_GetImageLayout(m_oitColorImages[m_currentFrame].vkImage, 0, 1, 0, 1, VK_IMAGE_ASPECT_COLOR_BIT),
+			VK_IMAGE_LAYOUT_GENERAL,
 			VK_ACCESS_NONE, VK_ACCESS_TRANSFER_WRITE_BIT
 		);
 		cmd.AddPipelineBarrier(
@@ -2239,7 +2261,9 @@ void TransparentApp::_DrawFrame()
 		// wait clear done
 		VkImageMemoryBarrier oitOutputImageBarrier2 = barrierBuilder.NewBarrier(
 			m_oitColorImages[m_currentFrame].vkImage,
-			VK_IMAGE_LAYOUT_GENERAL, VK_IMAGE_LAYOUT_GENERAL,
+			// VK_IMAGE_LAYOUT_GENERAL,
+			_GetImageLayout(m_oitColorImages[m_currentFrame].vkImage, 0, 1, 0, 1, VK_IMAGE_ASPECT_COLOR_BIT),
+			VK_IMAGE_LAYOUT_GENERAL,
 			VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_WRITE_BIT
 		);
 	}
@@ -2252,7 +2276,8 @@ void TransparentApp::_DrawFrame()
 		sampleDataBarrier.dstAccessMask = VkAccessFlagBits::VK_ACCESS_SHADER_READ_BIT;
 		VkImageMemoryBarrier sampleCountBarrier = barrierBuilder.NewBarrier(
 			m_oitSampleCountImages[m_currentFrame].vkImage,
-			cmd.GetImageLayout(&m_oitSampleCountImageViews[m_currentFrame]), VK_IMAGE_LAYOUT_GENERAL,
+			_GetImageLayout(&m_oitSampleCountImageViews[m_currentFrame]),
+			VK_IMAGE_LAYOUT_GENERAL,
 			VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT
 		);
 
@@ -2280,12 +2305,14 @@ void TransparentApp::_DrawFrame()
 		ImageBarrierBuilder barrierBuilder{};
 		VkImageMemoryBarrier oitSortBarrier = barrierBuilder.NewBarrier(
 			m_oitColorImages[m_currentFrame].vkImage,
-			cmd.GetImageLayout(&m_oitColorImageViews[m_currentFrame]), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			_GetImageLayout(&m_oitColorImageViews[m_currentFrame]),
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT
 		);
 		VkImageMemoryBarrier oitDistortBarrier = barrierBuilder.NewBarrier(
 			m_distortImages[m_currentFrame].vkImage,
-			cmd.GetImageLayout(&m_distortImageViews[m_currentFrame]), VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			_GetImageLayout(&m_distortImageViews[m_currentFrame]),
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			VK_ACCESS_SHADER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT
 		);
 
@@ -2302,7 +2329,9 @@ void TransparentApp::_DrawFrame()
 		ImageBarrierBuilder barrierBuilder{};
 		VkImageMemoryBarrier gbufferAlbedoBarrier = barrierBuilder.NewBarrier(
 			m_gbufferAlbedoImages[m_currentFrame].vkImage,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			// VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			_GetImageLayout(m_gbufferAlbedoImages[m_currentFrame].vkImage, 0, 1, 0, 1, VK_IMAGE_ASPECT_COLOR_BIT),
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 			VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_TRANSFER_WRITE_BIT
 			);		
 		if (m_mipLevel > 1)
@@ -2310,7 +2339,9 @@ void TransparentApp::_DrawFrame()
 			barrierBuilder.SetMipLevelRange(1, VK_REMAINING_MIP_LEVELS);
 			VkImageMemoryBarrier barrier = barrierBuilder.NewBarrier(
 				m_gbufferAlbedoImages[m_currentFrame].vkImage,
-				VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+				// VK_IMAGE_LAYOUT_UNDEFINED,
+				_GetImageLayout(m_gbufferAlbedoImages[m_currentFrame].vkImage, 0, 1, 1, VK_REMAINING_MIP_LEVELS,  VK_IMAGE_ASPECT_COLOR_BIT),
+				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				VK_ACCESS_NONE, VK_ACCESS_TRANSFER_WRITE_BIT);
 			cmd.AddPipelineBarrier(
 				VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
@@ -2337,7 +2368,9 @@ void TransparentApp::_DrawFrame()
 			barrierBuilder.SetMipLevelRange(i - 1);
 			VkImageMemoryBarrier transferBarrier1 = barrierBuilder.NewBarrier(
 				m_gbufferAlbedoImages[m_currentFrame].vkImage,
-				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				// VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+				_GetImageLayout(m_gbufferAlbedoImages[m_currentFrame].vkImage, 0, 1, i - 1, 1, VK_IMAGE_ASPECT_COLOR_BIT),
+				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
 				VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_TRANSFER_READ_BIT
 			);
 
@@ -2360,7 +2393,9 @@ void TransparentApp::_DrawFrame()
 
 			VkImageMemoryBarrier transferBarrer2 = barrierBuilder.NewBarrier(
 				m_gbufferAlbedoImages[m_currentFrame].vkImage,
-				VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+				//VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,
+				_GetImageLayout(m_gbufferAlbedoImages[m_currentFrame].vkImage, 0, 1, i - 1, 1, VK_IMAGE_ASPECT_COLOR_BIT),
+				VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 				VK_ACCESS_TRANSFER_READ_BIT, VK_ACCESS_SHADER_READ_BIT
 			);
 
@@ -2379,7 +2414,9 @@ void TransparentApp::_DrawFrame()
 		barrierBuilder.SetMipLevelRange(m_mipLevel - 1);
 		VkImageMemoryBarrier transferBarrier = barrierBuilder.NewBarrier(
 			m_gbufferAlbedoImages[m_currentFrame].vkImage,
-			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			//VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			_GetImageLayout(m_gbufferAlbedoImages[m_currentFrame].vkImage, 0, 1, m_mipLevel - 1, 1, VK_IMAGE_ASPECT_COLOR_BIT),
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			VK_ACCESS_TRANSFER_WRITE_BIT, VK_ACCESS_SHADER_READ_BIT
 		);
 		cmd.AddPipelineBarrier(
@@ -2467,6 +2504,23 @@ void TransparentApp::_ReadObjFile(const std::string& objFile, std::vector<Vertex
 			indices.push_back(uniqueVertices[vertex]);
 		}
 	}
+}
+
+VkImageLayout TransparentApp::_GetImageLayout(ImageView* pImageView) const
+{
+	MyDevice& device = MyDevice::GetInstance();
+	auto info = pImageView->GetImageViewInformation();
+	auto itr = device.imageLayouts.find(pImageView->pImage->vkImage);
+	CHECK_TRUE(itr != device.imageLayouts.end(), "Layout is not recorded!");
+	return itr->second.GetLayout(info.baseArrayLayer, info.layerCount, info.baseMipLevel, info.levelCount, info.aspectMask);
+}
+
+VkImageLayout TransparentApp::_GetImageLayout(VkImage vkImage, uint32_t baseArrayLayer, uint32_t layerCount, uint32_t baseMipLevel, uint32_t levelCount, VkImageAspectFlags aspect) const
+{
+	MyDevice& device = MyDevice::GetInstance();
+	auto itr = device.imageLayouts.find(vkImage);
+	CHECK_TRUE(itr != device.imageLayouts.end(), "Layout is not recorded!");
+	return itr->second.GetLayout(baseArrayLayer, layerCount, baseMipLevel, levelCount, aspect);
 }
 
 void TransparentApp::Run()

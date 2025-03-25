@@ -1,6 +1,7 @@
 #pragma once
 #include "common.h"
 #include "pipeline_io.h";
+
 struct WaitInformation
 {
 	VkSemaphore          waitSamaphore = VK_NULL_HANDLE;
@@ -45,7 +46,7 @@ private:
 	std::vector<VkSemaphore> m_vkWaitSemaphores;
 	std::vector<VkPipelineStageFlags> m_vkWaitStages;
 	std::optional<uint32_t> m_optQueueFamilyIndex;
-	std::unordered_map<const ImageView*, VkImageLayout> m_mapImageLayout;
+
 	VkQueue m_vkQueue = VK_NULL_HANDLE;
 	bool m_isRecording = false;
 	bool m_isInRenderpass = false;
@@ -53,6 +54,9 @@ private:
 	const Framebuffer* m_pCurFramebuffer = nullptr;
 
 	void _CreateSynchronizeObjects();
+	
+	void _UpdateImageLayout(VkImage vkImage, VkImageSubresourceRange range, VkImageLayout layout) const;
+
 public:
 	VkCommandBuffer vkCommandBuffer = VK_NULL_HANDLE;
 	VkFence vkFence = VK_NULL_HANDLE;
@@ -67,30 +71,33 @@ public:
 	void WaitTillAvailable() const; // make sure ALL values used in this command is update AFTER this call or we may access the value while the device still using it
 	void StartCommands(const std::vector<WaitInformation>& _waitInfos);
 	void StartRenderPass(const RenderPass* pRenderPass, const Framebuffer* pFramebuffer);
-	void EndRenderPass();
+	void EndRenderPass(); // this will change image layout
 	void StartOneTimeCommands(const std::vector<WaitInformation>& _waitInfos);
 	VkSemaphore SubmitCommands();
 
 	void AddPipelineBarrier(
 		VkPipelineStageFlags srcStageMask,
 		VkPipelineStageFlags dstStageMask,
-		const std::vector<VkImageMemoryBarrier>& imageBarriers);
+		const std::vector<VkImageMemoryBarrier>& imageBarriers); // this will change image layout
 	void AddPipelineBarrier(
 		VkPipelineStageFlags srcStageMask,
 		VkPipelineStageFlags dstStageMask,
-		const std::vector<VkMemoryBarrier>& memoryBarriers);
+		const std::vector<VkMemoryBarrier>& memoryBarriers); // this will change image layout
 	void AddPipelineBarrier(
 		VkPipelineStageFlags srcStageMask,
 		VkPipelineStageFlags dstStageMask,
 		const std::vector<VkMemoryBarrier>& memoryBarriers, 
-		const std::vector<VkImageMemoryBarrier>& imageBarriers);
+		const std::vector<VkImageMemoryBarrier>& imageBarriers); // this will change image layout
 
 	void FillImageView(const ImageView* pImageView, VkClearColorValue clearValue) const;
+	
 	void FillBuffer(const Buffer* pBuffer, uint32_t _data) const;
 	void FillBuffer(VkBuffer vkBuffer, VkDeviceSize offset, VkDeviceSize size, uint32_t data) const;
+	
 	void BlitImage(
 		VkImage srcImage, VkImageLayout srcLayout,
 		VkImage dstImage, VkImageLayout dstLayout,
-		const std::vector<VkImageBlit>& regions, VkFilter filter = VK_FILTER_LINEAR) const;
-	VkImageLayout GetImageLayout(const ImageView* pImageView) const;
+		const std::vector<VkImageBlit>& regions, VkFilter filter = VK_FILTER_LINEAR) const;  // this will change image layout
+
+	void CopyBufferToImage(VkBuffer vkBuffer, VkImage vkImage, VkImageLayout layout, const std::vector<VkBufferImageCopy>& regions) const;
 };

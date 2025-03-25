@@ -47,9 +47,9 @@ void Image::Init()
 	imgInfo.arrayLayers = m_imageInformation.arrayLayers;
 	imgInfo.format = m_imageInformation.format;
 	imgInfo.tiling = m_imageInformation.tiling;
-	CHECK_TRUE(m_imageInformation.layout == VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED || m_imageInformation.layout == VkImageLayout::VK_IMAGE_LAYOUT_PREINITIALIZED,
+	CHECK_TRUE(m_imageInformation.initialLayout == VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED || m_imageInformation.initialLayout == VkImageLayout::VK_IMAGE_LAYOUT_PREINITIALIZED,
 		"According to the Vulkan specification, VkImageCreateInfo::initialLayout must be set to VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED at image creation.");
-	imgInfo.initialLayout = m_imageInformation.layout;
+	imgInfo.initialLayout = m_imageInformation.initialLayout;
 	imgInfo.usage = m_imageInformation.usage;
 	imgInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 	imgInfo.samples = m_imageInformation.samples;
@@ -57,6 +57,7 @@ void Image::Init()
 	CHECK_TRUE(vkImage == VK_NULL_HANDLE, "VkImage is already created!");
 	VK_CHECK(vkCreateImage(MyDevice::GetInstance().vkDevice, &imgInfo, nullptr, &vkImage), "Failed to crate image!");
 
+	_AddImageLayout();
 	_AllocateMemory();
 }
 
@@ -64,6 +65,7 @@ void Image::Uninit()
 {
 	if (vkImage != VK_NULL_HANDLE)
 	{
+		_RemoveImageLayout();
 		vkDestroyImage(MyDevice::GetInstance().vkDevice, vkImage, nullptr);
 		vkImage = VK_NULL_HANDLE;
 	}
@@ -96,91 +98,68 @@ void Image::_FreeMemory()
 	}
 }
 
+void Image::_AddImageLayout() const
+{
+	MyDevice& device = MyDevice::GetInstance();
+	ImageLayout layout{};
+	layout.Reset(m_imageInformation.arrayLayers, m_imageInformation.mipLevels, m_imageInformation.initialLayout);
+	device.imageLayouts.insert({ vkImage, layout });
+}
+
+void Image::_RemoveImageLayout() const
+{
+	MyDevice& device = MyDevice::GetInstance();
+	device.imageLayouts.erase(vkImage);
+}
+
+VkImageLayout Image::_GetImageLayout() const
+{
+	MyDevice& device = MyDevice::GetInstance();
+	auto itr = device.imageLayouts.find(vkImage);
+	CHECK_TRUE(itr != device.imageLayouts.end(), "Layout is not recorded!");
+	return itr->second.GetLayout(0, m_imageInformation.arrayLayers, 0, m_imageInformation.mipLevels);
+}
+
 void Image::TransitionLayout(VkImageLayout newLayout)
 {
-	if (m_imageInformation.layout == newLayout) return;
+	VkImageLayout oldLayout = _GetImageLayout();
+	if (oldLayout == newLayout) return;
 	CommandSubmission cmdSubmit;
 	cmdSubmit.Init();
 	cmdSubmit.StartOneTimeCommands({});
-	VkImageMemoryBarrier barrier{VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER};
-	barrier.oldLayout = m_imageInformation.layout;
-	barrier.newLayout = newLayout;
-	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.image = vkImage;
+	ImageBarrierBuilder barrierBuilder{};
+	VkImageMemoryBarrier barrier{};
+	VkAccessFlags aspect = VK_IMAGE_ASPECT_NONE;
 
-	barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 	if (newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) 
 	{
-		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 		bool hasStencilComponent = (m_imageInformation.format == VK_FORMAT_D32_SFLOAT_S8_UINT || m_imageInformation.format == VK_FORMAT_D24_UNORM_S8_UINT);
 		if (hasStencilComponent) 
 		{
-			barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+			barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
 		}
-	}
-	barrier.subresourceRange.baseMipLevel = 0;
-	barrier.subresourceRange.levelCount = m_imageInformation.mipLevels;
-	barrier.subresourceRange.baseArrayLayer = 0;
-	barrier.subresourceRange.layerCount = 1;
-
-	VkPipelineStageFlags srcStage = VK_PIPELINE_STAGE_NONE;
-	VkPipelineStageFlags dstStage = VK_PIPELINE_STAGE_NONE;
-	if (m_imageInformation.layout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) 
-	{
-		barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
-		bool hasStencilComponent = (m_imageInformation.format == VK_FORMAT_D32_SFLOAT_S8_UINT || m_imageInformation.format == VK_FORMAT_D24_UNORM_S8_UINT);
-		if (hasStencilComponent)
+		else
 		{
-			barrier.subresourceRange.aspectMask |= VK_IMAGE_ASPECT_STENCIL_BIT;
+			aspect = VK_IMAGE_ASPECT_DEPTH_BIT;
 		}
-		barrier.srcAccessMask = 0;
-		barrier.dstAccessMask = VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_READ_BIT | VK_ACCESS_DEPTH_STENCIL_ATTACHMENT_WRITE_BIT;
-		//The reading happens in the VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT stage 
-		//and the writing in the VK_PIPELINE_STAGE_LATE_FRAGMENT_TESTS_BIT
-		dstStage = VK_PIPELINE_STAGE_EARLY_FRAGMENT_TESTS_BIT;	// the earlist pipeline stage that matches the specified operations
-		srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-
 	}
-	else if (m_imageInformation.layout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL) 
+	else
 	{
-		barrier.srcAccessMask = 0;
-		barrier.dstAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-		srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-		dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-	}
-	else if (m_imageInformation.layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL && newLayout == VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL) 
-	{
-		barrier.srcAccessMask = VK_ACCESS_TRANSFER_WRITE_BIT;
-		barrier.dstAccessMask = VK_ACCESS_SHADER_READ_BIT;
-
-		srcStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-		dstStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-	}
-	else if (m_imageInformation.layout == VK_IMAGE_LAYOUT_UNDEFINED && newLayout == VK_IMAGE_LAYOUT_GENERAL)
-	{
-		barrier.srcAccessMask = 0;
-		barrier.dstAccessMask = VkAccessFlagBits::VK_ACCESS_TRANSFER_WRITE_BIT;
-		srcStage = VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT;
-		dstStage = VK_PIPELINE_STAGE_TRANSFER_BIT;
-	}
-	else 
-	{
-		throw std::invalid_argument("Unsupported layout transition!");
+		aspect = VK_IMAGE_ASPECT_COLOR_BIT;
 	}
 
-	vkCmdPipelineBarrier(
-		cmdSubmit.vkCommandBuffer,
-		srcStage, 
-		dstStage,
-		0,
-		0, nullptr,
-		0, nullptr,
-		1, &barrier
+	barrierBuilder.SetAspect(aspect);
+	barrier = barrierBuilder.NewBarrier(vkImage, oldLayout, newLayout, VK_ACCESS_NONE, VK_ACCESS_NONE);
+
+	// one time submit command will wait to be done anyway
+	cmdSubmit.AddPipelineBarrier(
+		VK_PIPELINE_STAGE_TOP_OF_PIPE_BIT,
+		VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT,
+		{ barrier }
 	);
 
 	cmdSubmit.SubmitCommands();
-	m_imageInformation.layout = newLayout;
+	//m_imageInformation.initialLayout = newLayout;
 }
 
 void Image::CopyFromBuffer(const Buffer& stagingBuffer)
@@ -207,15 +186,11 @@ void Image::CopyFromBuffer(const Buffer& stagingBuffer)
 	.imageExtent = {m_imageInformation.width, m_imageInformation.height, 1},
 	};
 
-	CHECK_TRUE(m_imageInformation.layout == VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, "The layout is not transform to dst optimal yet!");
-
-	vkCmdCopyBufferToImage(
-		cmdSubmit.vkCommandBuffer,
+	cmdSubmit.CopyBufferToImage(
 		stagingBuffer.vkBuffer,
 		vkImage,
-		m_imageInformation.layout,
-		1,
-		&region
+		_GetImageLayout(),
+		{ region }
 	);
 
 	cmdSubmit.SubmitCommands();
@@ -420,8 +395,116 @@ void Texture::Uninit()
 VkDescriptorImageInfo Texture::GetVkDescriptorImageInfo() const
 {
 	VkDescriptorImageInfo info;
-	info.imageLayout = image.GetImageInformation().layout;
+	info.imageLayout = image._GetImageLayout();
 	info.sampler = vkSampler;
 	info.imageView = imageView.vkImageView;
 	return info;
+}
+
+bool ImageLayout::_IsInRange(uint32_t baseLayer, uint32_t& layerCount, uint32_t baseLevel, uint32_t& levelCount) const
+{
+	CHECK_TRUE(m_entries.size() > 0 && m_entries[0].size() > 0, "Image Layout doesn't have range!");
+	uint32_t maxLayer = static_cast<uint32_t>(m_entries.size());
+	uint32_t maxLevel = static_cast<uint32_t>(m_entries[0].size());
+	if (layerCount == VK_REMAINING_ARRAY_LAYERS)
+	{
+		CHECK_TRUE(baseLayer < maxLayer, "Wrong base layer!");
+		layerCount = maxLayer - baseLayer;
+	}
+	if (levelCount == VK_REMAINING_MIP_LEVELS)
+	{
+		CHECK_TRUE(baseLevel < maxLevel, "Wrong base level!");
+		levelCount = maxLevel - baseLevel;
+	}
+	bool layerOk = (baseLayer + layerCount) <= m_entries.size();
+	bool levelOK = (baseLevel + levelCount) <= m_entries[0].size();
+	return layerOk && levelOK;
+}
+void ImageLayout::Reset(uint32_t layerCount, uint32_t levelCount, VkImageLayout layout)
+{
+	m_entries.resize(layerCount);
+	for (auto& entry : m_entries)
+	{
+		entry.resize(levelCount);
+	}
+	for (int i = 0; i < layerCount; ++i)
+	{
+		for (int j = 0; j < levelCount; ++j)
+		{
+			m_entries[i][j].SetLayout(layout, VK_IMAGE_ASPECT_FLAG_BITS_MAX_ENUM);
+		}
+	}
+}
+VkImageLayout ImageLayout::GetLayout(VkImageSubresourceRange range) const
+{
+	return GetLayout(range.baseArrayLayer, range.layerCount, range.baseMipLevel, range.levelCount, range.aspectMask);
+}
+VkImageLayout ImageLayout::GetLayout(uint32_t baseLayer, uint32_t layerCount, uint32_t baseLevel, uint32_t levelCount, VkImageAspectFlags aspect) const
+{
+	VkImageLayout ret = VK_IMAGE_LAYOUT_UNDEFINED;
+	bool found = false;
+	CHECK_TRUE(_IsInRange(baseLayer, layerCount, baseLevel, levelCount), "Layout out of range");
+	for (int i = baseLayer; i < baseLayer + layerCount; ++i)
+	{
+		for (int j = baseLevel; j < baseLevel + levelCount; ++j)
+		{
+			if (!found)
+			{
+				ret = m_entries[i][j].GetLayout(aspect);
+				found = true;
+			}
+			else
+			{
+				CHECK_TRUE(ret == m_entries[i][j].GetLayout(aspect), "Subresource doesn't share the same layout!");
+			}
+		}
+	}
+	return ret;
+}
+void ImageLayout::SetLayout(VkImageLayout layout, VkImageSubresourceRange range)
+{
+	SetLayout(layout, range.baseArrayLayer, range.layerCount, range.baseMipLevel, range.levelCount, range.aspectMask);
+}
+void ImageLayout::SetLayout(VkImageLayout layout, uint32_t baseLayer, uint32_t layerCount, uint32_t baseLevel, uint32_t levelCount, VkImageAspectFlags aspect)
+{
+	CHECK_TRUE(_IsInRange(baseLayer, layerCount, baseLevel, levelCount), "Layout out of range");
+	for (int i = baseLayer; i < baseLayer + layerCount; ++i)
+	{
+		for (int j = baseLevel; j < baseLevel + levelCount; ++j)
+		{
+			m_entries[i][j].SetLayout(layout, aspect);
+		}
+	}
+}
+
+VkImageLayout ImageLayout::ImageLayoutEntry::GetLayout(VkImageAspectFlags aspect) const
+{
+	VkImageLayout ret = VK_IMAGE_LAYOUT_UNDEFINED;
+	bool found = false;
+	for (const auto& p : m_layouts)
+	{
+		if (aspect & p.first)
+		{
+			if (!found)
+			{
+				ret = p.second;
+				found = true;
+			}
+			else
+			{
+				CHECK_TRUE(ret == p.second, "Not the same layout");
+			}
+		}
+	}
+	return ret;
+}
+void ImageLayout::ImageLayoutEntry::SetLayout(VkImageLayout layout, VkImageAspectFlags aspect)
+{
+	for (auto& p : m_layouts)
+	{
+		if (p.first & aspect)
+		{
+			p.second = layout;
+		}
+	}
 }

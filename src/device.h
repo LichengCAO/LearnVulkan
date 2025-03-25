@@ -3,7 +3,7 @@
 #include "vk_struct.h"
 #include <VkBootstrap.h>
 #include "pipeline_io.h"
-
+#include "image.h"
 struct UserInput
 {
 	bool W = false;
@@ -17,8 +17,6 @@ struct UserInput
 	double xPos = 0.0;
 	double yPos = 0.0;
 };
-
-class Image;
 
 class MyDevice
 {
@@ -65,7 +63,7 @@ public:
 	VkSwapchainKHR		vkSwapchain = VK_NULL_HANDLE;
 	DescriptorAllocator descriptorAllocator{};
 	std::unordered_map<uint32_t, VkCommandPool>		vkCommandPools;
-	
+	std::unordered_map<VkImage, ImageLayout>        imageLayouts;
 	
 	void Init();
 	void Uninit();

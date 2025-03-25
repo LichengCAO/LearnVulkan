@@ -238,7 +238,8 @@ private:
 	void _ResizeWindow();
 
 	void _ReadObjFile(const std::string& objFile, std::vector<Vertex>& verts, std::vector<uint32_t>& indices) const;
-
+	VkImageLayout _GetImageLayout(ImageView* pImageView) const;
+	VkImageLayout _GetImageLayout(VkImage vkImage, uint32_t baseArrayLayer, uint32_t layerCount, uint32_t baseMipLevel, uint32_t levelCount, VkImageAspectFlags aspect) const;
 public:
 	void Run();
 };
