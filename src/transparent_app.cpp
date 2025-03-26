@@ -226,183 +226,73 @@ void TransparentApp::_InitDescriptorSetLayouts()
 {
 	// OIT front device write read
 	{
-		DescriptorSetEntry binding0{}; // sample image
-		binding0.descriptorCount = 1;
-		binding0.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER;
-		binding0.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT | VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT;
-
-		DescriptorSetEntry binding1{}; // sample count
-		binding1.descriptorCount = 1;
-		binding1.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-		binding1.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT | VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT;
-
-		DescriptorSetEntry binding2{}; // in use
-		binding2.descriptorCount = 1;
-		binding2.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-		binding2.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
-
-		DescriptorSetEntry binding3{}; // viewport
-		binding3.descriptorCount = 1;
-		binding3.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		binding3.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT | VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT;
-
-		m_oitSampleDSetLayout.AddBinding(binding0);
-		m_oitSampleDSetLayout.AddBinding(binding1);
-		m_oitSampleDSetLayout.AddBinding(binding2);
-		m_oitSampleDSetLayout.AddBinding(binding3);
+		m_oitSampleDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT); // sample image
+		m_oitSampleDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT); // sample count
+		m_oitSampleDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT); // in use
+		m_oitSampleDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT); // viewport
 		m_oitSampleDSetLayout.Init();
 	}
 
 	// OIT sorting device write
 	{
-		DescriptorSetEntry binding0{}; // output image
-		binding0.descriptorCount = 1;
-		binding0.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-		binding0.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT | VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT;
-
-		m_oitColorDSetLayout.AddBinding(binding0);
+		m_oitColorDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT);
 		m_oitColorDSetLayout.Init();
 	}
 
 	// model related host write device read
 	{
-		DescriptorSetEntry binding0;
-		binding0.descriptorCount = 1;
-		binding0.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		binding0.stageFlags = VK_SHADER_STAGE_VERTEX_BIT;
-
-		DescriptorSetEntry binding1;
-		binding1.descriptorCount = 1;
-		binding1.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		binding1.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-		m_modelDSetLayout.AddBinding(binding0);
-		m_modelDSetLayout.AddBinding(binding1);
+		m_modelDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT);
+		m_modelDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 		m_modelDSetLayout.Init();
 	}
 
 	//camera host write device read
 	{
-		DescriptorSetEntry binding0;
-		binding0.descriptorCount = 1;
-		binding0.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		binding0.stageFlags = VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT;
-
-		m_cameraDSetLayout.AddBinding(binding0);
+		m_cameraDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 		m_cameraDSetLayout.Init();
 	}
 
 	// gbuffer device read
 	{
-		DescriptorSetEntry binding0; // albedo
-		binding0.descriptorCount = 1;
-		binding0.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		binding0.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
-
-		DescriptorSetEntry binding1; // position
-		binding1.descriptorCount = 1;
-		binding1.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		binding1.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
-
-		DescriptorSetEntry binding2; // normal
-		binding2.descriptorCount = 1;
-		binding2.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		binding2.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
-
-		DescriptorSetEntry binding3; // depth
-		binding3.descriptorCount = 1;
-		binding3.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		binding3.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
-
-		m_gbufferDSetLayout.AddBinding(binding0);
-		m_gbufferDSetLayout.AddBinding(binding1);
-		m_gbufferDSetLayout.AddBinding(binding2);
-		m_gbufferDSetLayout.AddBinding(binding3);
+		m_gbufferDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT); // albedo
+		m_gbufferDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT); // position
+		m_gbufferDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT); // normal
+		m_gbufferDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT); // depth
 		m_gbufferDSetLayout.Init();
 	}
 
 	// distort host write device read
 	{
-		DescriptorSetEntry binding0; // camera view information
-		binding0.descriptorCount = 1;
-		binding0.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		binding0.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_VERTEX_BIT | VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
-
-		m_distortDSetLayout.AddBinding(binding0);
+		m_distortDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT); // camera view information
 		m_distortDSetLayout.Init();
 	}
 
 	// transparent device read
 	{
-		DescriptorSetEntry binding0; // oit
-		binding0.descriptorCount = 1;
-		binding0.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		binding0.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
-
-		DescriptorSetEntry binding1; // distort uv
-		binding1.descriptorCount = 1;
-		binding1.descriptorType = VkDescriptorType::VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		binding1.stageFlags = VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT;
-
-		m_transOutputDSetLayout.AddBinding(binding0);
-		m_transOutputDSetLayout.AddBinding(binding1);
+		m_transOutputDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT); // oit
+		m_transOutputDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT); // distort uv
 		m_transOutputDSetLayout.Init();
 	}
 
 	// material host write device read
 	{
-		DescriptorSetEntry binding0{};
-		binding0.descriptorCount = 1;
-		binding0.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		binding0.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-
-		m_materialDSetLayout.AddBinding(binding0);
+		m_materialDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT);
 		m_materialDSetLayout.Init();
 	}
 
 	// blur device write and read
 	{
-
-		DescriptorSetEntry binding0{}; // read only image
-		binding0.descriptorCount = 1;
-		binding0.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		binding0.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-
-		DescriptorSetEntry binding1{}; // write only image
-		binding1.descriptorCount = 1;
-		binding1.descriptorType = VK_DESCRIPTOR_TYPE_STORAGE_IMAGE;
-		binding1.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-
-		DescriptorSetEntry binding2{}; // viewport information
-		binding2.descriptorCount = 1;
-		binding2.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		binding2.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-
-		DescriptorSetEntry binding3{}; // blur information
-		binding3.descriptorCount = 1;
-		binding3.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		binding3.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-
-		DescriptorSetEntry binding4{}; // kernel
-		binding4.descriptorCount = m_blurRadius;
-		binding4.descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-		binding4.stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-
-		m_blurDSetLayout.AddBinding(binding0);
-		m_blurDSetLayout.AddBinding(binding1);
-		m_blurDSetLayout.AddBinding(binding2);
-		m_blurDSetLayout.AddBinding(binding3);
-		m_blurDSetLayout.AddBinding(binding4);
+		m_blurDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_COMPUTE_BIT); // read only image
+		m_blurDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT); // write only image
+		m_blurDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT); // viewport information
+		m_blurDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT); // blur information
+		m_blurDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT); // kernel
 		m_blurDSetLayout.Init();
 	}
 
 	// blur output device read
 	{
-		DescriptorSetEntry binding0{};
-		binding0.descriptorCount = 1;
-		binding0.descriptorType = VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER;
-		binding0.stageFlags = VK_SHADER_STAGE_FRAGMENT_BIT;
-		m_blurOutputDSetLayout.AddBinding(binding0);
+		m_blurOutputDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 		m_blurOutputDSetLayout.Init();
 	}
 }
@@ -1954,7 +1844,7 @@ void TransparentApp::_DrawFrame()
 	_UpdateUniformBuffer();
 	WaitInformation waitInfo{};
 	waitInfo.waitSamaphore = m_swapchainImageAvailabilities[m_currentFrame];
-	waitInfo.waitStage = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_COMMANDS_BIT | VkPipelineStageFlagBits::VK_PIPELINE_STAGE_ALL_GRAPHICS_BIT;// VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	waitInfo.waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	cmd.StartCommands({ waitInfo });
 	
 	// draw opaque objects

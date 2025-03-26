@@ -112,39 +112,32 @@ DescriptorSetLayout::~DescriptorSetLayout()
 {
 	assert(vkDescriptorSetLayout == VK_NULL_HANDLE);
 }
-void DescriptorSetLayout::AddBinding(const DescriptorSetEntry& _binding)
+
+uint32_t DescriptorSetLayout::AddBinding(uint32_t descriptorCount, VkDescriptorType descriptorType, VkShaderStageFlags stageFlags, const VkSampler* pImmutableSamplers)
 {
-	bindings.push_back(_binding);
+	VkDescriptorSetLayoutBinding layoutBinding{};
+	uint32_t binding = static_cast<uint32_t>(bindings.size());
+
+	layoutBinding.binding = binding;
+	layoutBinding.descriptorCount = descriptorCount;
+	layoutBinding.descriptorType = descriptorType;
+	layoutBinding.pImmutableSamplers = pImmutableSamplers;
+	layoutBinding.stageFlags = stageFlags;
+	
+	bindings.push_back(layoutBinding);
+	return binding;
 }
 void DescriptorSetLayout::Init()
 {
-	if (bindings.size() == 0)
-	{
-		throw std::runtime_error("No bindings set!");
-	}
-	if (vkDescriptorSetLayout != VK_NULL_HANDLE)
-	{
-		throw std::runtime_error("Layout is already initialized.");
-	}
-
-	std::vector<VkDescriptorSetLayoutBinding> layoutBindings;
-
-	for (uint32_t i = 0; i < bindings.size(); ++i)
-	{
-		VkDescriptorSetLayoutBinding layoutBinding;
-		layoutBinding.binding = i;
-		layoutBinding.descriptorCount = bindings[i].descriptorCount;
-		layoutBinding.descriptorType = bindings[i].descriptorType;
-		layoutBinding.pImmutableSamplers = nullptr;
-		layoutBinding.stageFlags = bindings[i].stageFlags;
-		layoutBindings.push_back(layoutBinding);
-	}
+	CHECK_TRUE(bindings.size() != 0, "No bindings set!");
+	CHECK_TRUE(vkDescriptorSetLayout == VK_NULL_HANDLE, "Layout is already initialized!");
 
 	VkDescriptorSetLayoutCreateInfo createInfo = {
 		.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO,
-		.bindingCount = static_cast<uint32_t>(layoutBindings.size()),
-		.pBindings = layoutBindings.data(),
+		.bindingCount = static_cast<uint32_t>(bindings.size()),
+		.pBindings = bindings.data(),
 	};
+
 	CHECK_TRUE(vkDescriptorSetLayout == VK_NULL_HANDLE, "VkDescriptorSetLayout is already created!");
 	VK_CHECK(vkCreateDescriptorSetLayout(MyDevice::GetInstance().vkDevice, &createInfo, nullptr, &vkDescriptorSetLayout), "Failed to create descriptor set layout!");
 }
@@ -155,6 +148,7 @@ void DescriptorSetLayout::Uninit()
 		vkDestroyDescriptorSetLayout(MyDevice::GetInstance().vkDevice, vkDescriptorSetLayout, nullptr);
 		vkDescriptorSetLayout = VK_NULL_HANDLE;
 	}
+	bindings.clear();
 }
 
 void VertexInputLayout::AddLocation(const VertexInputEntry& _location)
@@ -286,9 +280,9 @@ void Framebuffer::Init()
 	CHECK_TRUE(pRenderPass != nullptr, "No render pass!");
 	CHECK_TRUE(attachments.size() > 0, "No attachment!");
 	VkFramebufferCreateInfo framebufferInfo{ VK_STRUCTURE_TYPE_FRAMEBUFFER_CREATE_INFO };
+	std::vector<VkImageView> vkAttachments;
 	framebufferInfo.renderPass = pRenderPass->vkRenderPass;
 	framebufferInfo.attachmentCount = static_cast<uint32_t>(attachments.size());
-	std::vector<VkImageView> vkAttachments;
 	for (int i = 0; i < attachments.size(); ++i)
 	{
 		CHECK_TRUE(attachments[i]->vkImageView != VK_NULL_HANDLE, "Image view is not initialized!");

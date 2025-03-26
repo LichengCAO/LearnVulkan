@@ -4,20 +4,13 @@ class Buffer;
 class BufferView;
 class ImageView;
 // Pipeline can have multiple DescriptorSetLayout, when execute the pipeline we need to provide DescriptorSets for each of the DescriptorSetLayout
-struct DescriptorSetEntry // binding
-{
-	uint32_t descriptorCount = 1;
-	VkDescriptorType descriptorType = VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER;
-	VkShaderStageFlags stageFlags = VK_SHADER_STAGE_COMPUTE_BIT;
-};
-class DescriptorSet;
 class DescriptorSetLayout
 {
 public:
 	~DescriptorSetLayout();
 	VkDescriptorSetLayout vkDescriptorSetLayout = VK_NULL_HANDLE;
-	std::vector<DescriptorSetEntry> bindings;
-	void AddBinding(const DescriptorSetEntry& _binding);
+	std::vector<VkDescriptorSetLayoutBinding> bindings;
+	uint32_t AddBinding(uint32_t descriptorCount, VkDescriptorType descriptorType, VkShaderStageFlags stageFlags, const VkSampler* pImmutableSamplers = nullptr);
 	void Init();
 	void Uninit();
 };
