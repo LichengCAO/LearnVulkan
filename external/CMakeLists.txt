@@ -15,7 +15,7 @@ set(EXT_LIBS
     vk-bootstrap::vk-bootstrap
     meshoptimizer
 )
-add_subdirectory(glfw)
+add_subdirectory(GLFW)
 add_subdirectory(glm)
 add_subdirectory(tinyobj)
 add_subdirectory(vk-bootstrap)
