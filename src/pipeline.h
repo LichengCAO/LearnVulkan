@@ -2,13 +2,23 @@
 #include "common.h"
 #include "shader.h"
 #include "pipeline_io.h"
-struct GraphicsPipelineInput
+struct GraphicsVertexPipelineInput
 {
+	VkExtent2D imageSize{};
 	std::vector<const DescriptorSet*> pDescriptorSets;
 
-	VkExtent2D imageSize{};
 	const VertexIndexInput* pVertexIndexInput = nullptr;
 	std::vector<const VertexInput*> pVertexInputs;
+};
+
+struct GraphicsMeshPipelineInput
+{
+	VkExtent2D imageSize{};
+	std::vector<const DescriptorSet*> pDescriptorSets;
+
+	uint32_t groupCountX = 1;
+	uint32_t groupCountY = 1;
+	uint32_t groupCountZ = 1;
 };
 
 class GraphicsPipeline
@@ -26,6 +36,7 @@ private:
 	const RenderPass* m_pRenderPass = nullptr;
 	uint32_t m_subpass = 0;
 	void _InitCreateInfos();
+	void _DoCommon(VkCommandBuffer cmd, const VkExtent2D& imageSize, const std::vector<const DescriptorSet*>& pSets);
 public:
 	VkPipelineLayout vkPipelineLayout = VK_NULL_HANDLE;
 	VkPipeline vkPipeline = VK_NULL_HANDLE;
@@ -45,7 +56,8 @@ public:
 	void Init();
 	void Uninit();
 
-	void Do(VkCommandBuffer commandBuffer, const GraphicsPipelineInput& input);
+	void Do(VkCommandBuffer commandBuffer, const GraphicsVertexPipelineInput& input);
+	void Do(VkCommandBuffer commandBuffer, const GraphicsMeshPipelineInput& input);
 };
 
 struct ComputePipelineInput

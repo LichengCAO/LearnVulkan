@@ -7,13 +7,20 @@ class ImageView;
 class DescriptorSetLayout
 {
 public:
-	~DescriptorSetLayout();
 	VkDescriptorSetLayout vkDescriptorSetLayout = VK_NULL_HANDLE;
 	std::vector<VkDescriptorSetLayoutBinding> bindings;
+
+public:
+	~DescriptorSetLayout();
+
+public:
 	uint32_t AddBinding(uint32_t descriptorCount, VkDescriptorType descriptorType, VkShaderStageFlags stageFlags, const VkSampler* pImmutableSamplers = nullptr);
+	
 	void Init();
+	
 	void Uninit();
 };
+
 class DescriptorSet
 {
 private:
@@ -21,6 +28,7 @@ private:
 	struct DescriptorSetUpdate
 	{
 		uint32_t        binding = 0;
+		uint32_t        startElement = 0;
 		DescriptorType  descriptorType = DescriptorType::BUFFER;
 		std::vector<VkDescriptorBufferInfo> bufferInfos;
 		std::vector<VkDescriptorImageInfo>  imageInfos;
@@ -32,16 +40,22 @@ private:
 	const DescriptorSetLayout* m_pLayout = nullptr;
 
 public:
-	// ~DescriptorSet(); No worry, allocator will handle this
 	VkDescriptorSet vkDescriptorSet = VK_NULL_HANDLE;
+
+public:
+	// ~DescriptorSet(); No worry, allocator will handle this
+
+public:
 	void SetLayout(const DescriptorSetLayout* _layout);
-	void StartDescriptorSetUpdate();
-	void DescriptorSetUpdate_WriteBinding(int bindingId, const Buffer* pBuffer);
-	void DescriptorSetUpdate_WriteBinding(int bindingId, const VkDescriptorImageInfo& dImageInfo);
-	void DescriptorSetUpdate_WriteBinding(int bindingId, const BufferView* bufferView);
-	void DescriptorSetUpdate_WriteBinding(int bindingId, const std::vector<VkDescriptorBufferInfo>& bufferInfos);
-	void FinishDescriptorSetUpdate();
+	
 	void Init();
+
+	void StartUpdate();
+	void UpdateBinding(uint32_t bindingId, const Buffer* pBuffer);
+	void UpdateBinding(uint32_t bindingId, const VkDescriptorImageInfo& dImageInfo);
+	void UpdateBinding(uint32_t bindingId, const BufferView* bufferView);
+	void UpdateBinding(uint32_t bindingId, const std::vector<VkDescriptorBufferInfo>& bufferInfos);
+	void FinishUpdate();
 };
 class DescriptorAllocator
 {
@@ -148,15 +162,21 @@ class RenderPass
 {
 private:
 	std::vector<VkSubpassDependency> m_vkSubpassDependencies;
+
 public:
-	~RenderPass();
 	VkRenderPass vkRenderPass = VK_NULL_HANDLE;
 	std::vector<AttachmentInformation> attachments;
 	std::vector<SubpassInformation> subpasses;
+
+public:
+	~RenderPass();
+
 	uint32_t AddAttachment(AttachmentInformation _info);
 	uint32_t AddSubpass(SubpassInformation _subpass);
+	
 	void Init();
-	void Uninit();
 
 	Framebuffer NewFramebuffer(const std::vector<const ImageView*> _imageViews) const;
+	
+	void Uninit();
 };

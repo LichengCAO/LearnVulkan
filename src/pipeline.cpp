@@ -45,6 +45,34 @@ void GraphicsPipeline::_InitCreateInfos()
 	multisampleStateInfo.minSampleShading = .2f; // min fraction for sample shading; closer to one is smoother
 }
 
+void GraphicsPipeline::_DoCommon(VkCommandBuffer cmd, const VkExtent2D& imageSize, const std::vector<const DescriptorSet*>& pSets)
+{
+	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
+
+	VkViewport viewport;
+	viewport.x = 0.f;
+	viewport.y = 0.f;
+	viewport.width = static_cast<float>(imageSize.width);
+	viewport.height = static_cast<float>(imageSize.height);
+	viewport.minDepth = 0.f;
+	viewport.maxDepth = 1.f;
+	VkRect2D scissor;
+	scissor.offset = { 0, 0 };
+	scissor.extent = imageSize;
+	vkCmdSetViewport(cmd, 0, 1, &viewport);
+	vkCmdSetScissor(cmd, 0, 1, &scissor);
+
+	if (pSets.size() > 0)
+	{
+		std::vector<VkDescriptorSet> descriptorSets;
+		for (int i = 0; i < pSets.size(); ++i)
+		{
+			descriptorSets.push_back(pSets[i]->vkDescriptorSet);
+		}
+		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipelineLayout, 0, static_cast<uint32_t>(descriptorSets.size()), descriptorSets.data(), 0, nullptr);
+	}
+}
+
 GraphicsPipeline::GraphicsPipeline()
 {
 	_InitCreateInfos();
@@ -201,33 +229,12 @@ void GraphicsPipeline::Uninit()
 	m_pRenderPass = nullptr;
 }
 
-void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const GraphicsPipelineInput& input)
+void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const GraphicsVertexPipelineInput& input)
 {
 	// TODO: check m_subpass should match number of vkCmdNextSubpass calls after vkCmdBeginRenderPass
-	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
 
-	VkViewport viewport;
-	viewport.x = 0.f;
-	viewport.y = 0.f;
-	viewport.width = static_cast<float>(input.imageSize.width);
-	viewport.height = static_cast<float>(input.imageSize.height);
-	viewport.minDepth = 0.f;
-	viewport.maxDepth = 1.f;
-	VkRect2D scissor;
-	scissor.offset = { 0, 0 };
-	scissor.extent = input.imageSize;
-	vkCmdSetViewport(commandBuffer, 0, 1, &viewport);
-	vkCmdSetScissor(commandBuffer, 0, 1, &scissor);
-	
-	if (input.pDescriptorSets.size() > 0)
-	{
-		std::vector<VkDescriptorSet> descriptorSets;
-		for (int i = 0; i < input.pDescriptorSets.size(); ++i)
-		{
-			descriptorSets.push_back(input.pDescriptorSets[i]->vkDescriptorSet);
-		}
-		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipelineLayout, 0, static_cast<uint32_t>(descriptorSets.size()), descriptorSets.data(), 0, nullptr);
-	}
+	_DoCommon(commandBuffer, input.imageSize, input.pDescriptorSets);
+
 	if (input.pVertexInputs.size() > 0)
 	{
 		std::vector<VkBuffer> vertBuffers;
@@ -266,7 +273,12 @@ void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const GraphicsPipelineI
 			vkCmdDraw(commandBuffer, vertCount, 1, 0, 0);
 		}
 	}
+}
 
+void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const GraphicsMeshPipelineInput& input)
+{
+	_DoCommon(commandBuffer, input.imageSize, input.pDescriptorSets);
+	vkCmdDrawMeshTasksEXT(commandBuffer, input.groupCountX, input.groupCountY, input.groupCountZ);
 }
 
 ComputePipeline::~ComputePipeline()

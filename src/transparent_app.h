@@ -4,11 +4,9 @@
 #include "pipeline_io.h"
 #include "image.h"
 #include "buffer.h"
-#include "commandbuffer.h"
-#define GLM_ENABLE_EXPERIMENTAL
-#include <glm/gtx/hash.hpp>
 #include "camera.h"
 #include "transform.h"
+#include "geometry.h"
 struct CameraBuffer
 {
 	alignas(16) glm::mat4 view;
@@ -31,25 +29,7 @@ struct ModelTransform
 	alignas(16) glm::mat4 model;
 	alignas(16) glm::mat4 modelInvTranspose;
 };
-struct Vertex
-{
-	alignas(16) glm::vec3 pos{};
-	alignas(16) glm::vec3 normal{};
-	alignas(8)  glm::vec2 uv{};
-	bool operator==(const Vertex& other) const { return pos == other.pos && uv == other.uv && normal == other.normal; }
-};
-namespace std 
-{
-	template<> struct hash<Vertex> 
-	{
-		size_t operator()(Vertex const& vertex) const 
-		{
-			return hash<glm::vec3>()(vertex.pos) ^
-				  (hash<glm::vec2>()(vertex.uv) << 1)
-				;
-		}
-	};
-}
+
 struct Model
 {
 	std::string objFilePath;

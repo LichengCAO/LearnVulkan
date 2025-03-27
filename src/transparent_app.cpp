@@ -1052,12 +1052,12 @@ void TransparentApp::_InitDescriptorSets()
 			m_oitDSets.push_back(DescriptorSet{});
 			m_oitDSets[i].SetLayout(&m_oitSampleDSetLayout);
 			m_oitDSets[i].Init();
-			m_oitDSets[i].StartDescriptorSetUpdate();
-			m_oitDSets[i].DescriptorSetUpdate_WriteBinding(0, &m_oitSampleTexelBufferViews[i]);
-			m_oitDSets[i].DescriptorSetUpdate_WriteBinding(1, sampleCountImageInfo);
-			m_oitDSets[i].DescriptorSetUpdate_WriteBinding(2, inUseImageInfo);
-			m_oitDSets[i].DescriptorSetUpdate_WriteBinding(3, &m_oitViewportBuffer);
-			m_oitDSets[i].FinishDescriptorSetUpdate();
+			m_oitDSets[i].StartUpdate();
+			m_oitDSets[i].UpdateBinding(0, &m_oitSampleTexelBufferViews[i]);
+			m_oitDSets[i].UpdateBinding(1, sampleCountImageInfo);
+			m_oitDSets[i].UpdateBinding(2, inUseImageInfo);
+			m_oitDSets[i].UpdateBinding(3, &m_oitViewportBuffer);
+			m_oitDSets[i].FinishUpdate();
 		}
 
 		m_oitColorDSets.reserve(MAX_FRAME_COUNT);
@@ -1071,9 +1071,9 @@ void TransparentApp::_InitDescriptorSets()
 			m_oitColorDSets.push_back(DescriptorSet{});
 			m_oitColorDSets[i].SetLayout(&m_oitColorDSetLayout);
 			m_oitColorDSets[i].Init();
-			m_oitColorDSets[i].StartDescriptorSetUpdate();
-			m_oitColorDSets[i].DescriptorSetUpdate_WriteBinding(0, outputImageInfo);
-			m_oitColorDSets[i].FinishDescriptorSetUpdate();
+			m_oitColorDSets[i].StartUpdate();
+			m_oitColorDSets[i].UpdateBinding(0, outputImageInfo);
+			m_oitColorDSets[i].FinishUpdate();
 		}
 	}
 
@@ -1085,9 +1085,9 @@ void TransparentApp::_InitDescriptorSets()
 			m_distortDSets.push_back(DescriptorSet{});
 			m_distortDSets[i].SetLayout(&m_distortDSetLayout);
 			m_distortDSets[i].Init();
-			m_distortDSets[i].StartDescriptorSetUpdate();
-			m_distortDSets[i].DescriptorSetUpdate_WriteBinding(0, &m_distortBuffers[i]);
-			m_distortDSets[i].FinishDescriptorSetUpdate();
+			m_distortDSets[i].StartUpdate();
+			m_distortDSets[i].UpdateBinding(0, &m_distortBuffers[i]);
+			m_distortDSets[i].FinishUpdate();
 		}
 	}
 
@@ -1104,10 +1104,10 @@ void TransparentApp::_InitDescriptorSets()
 				m_vecModelDSets[i].push_back(DescriptorSet{});
 				m_vecModelDSets[i][j].SetLayout(&m_modelDSetLayout);
 				m_vecModelDSets[i][j].Init();
-				m_vecModelDSets[i][j].StartDescriptorSetUpdate();
-				m_vecModelDSets[i][j].DescriptorSetUpdate_WriteBinding(0, &m_vecModelBuffers[i][j]);
-				m_vecModelDSets[i][j].DescriptorSetUpdate_WriteBinding(1, m_modelTextures[j].GetVkDescriptorImageInfo());
-				m_vecModelDSets[i][j].FinishDescriptorSetUpdate();
+				m_vecModelDSets[i][j].StartUpdate();
+				m_vecModelDSets[i][j].UpdateBinding(0, &m_vecModelBuffers[i][j]);
+				m_vecModelDSets[i][j].UpdateBinding(1, m_modelTextures[j].GetVkDescriptorImageInfo());
+				m_vecModelDSets[i][j].FinishUpdate();
 			}
 		}
 
@@ -1122,9 +1122,9 @@ void TransparentApp::_InitDescriptorSets()
 				m_vecTransModelDSets[i].push_back(DescriptorSet{});
 				m_vecTransModelDSets[i][j].SetLayout(&m_modelDSetLayout);
 				m_vecTransModelDSets[i][j].Init();
-				m_vecTransModelDSets[i][j].StartDescriptorSetUpdate();
-				m_vecTransModelDSets[i][j].DescriptorSetUpdate_WriteBinding(0, &m_vecTransModelBuffers[i][j]);
-				m_vecTransModelDSets[i][j].FinishDescriptorSetUpdate();
+				m_vecTransModelDSets[i][j].StartUpdate();
+				m_vecTransModelDSets[i][j].UpdateBinding(0, &m_vecTransModelBuffers[i][j]);
+				m_vecTransModelDSets[i][j].FinishUpdate();
 			}
 		}
 	}
@@ -1142,9 +1142,9 @@ void TransparentApp::_InitDescriptorSets()
 				m_vecMaterialDSets[i].push_back(DescriptorSet{});
 				m_vecMaterialDSets[i][j].SetLayout(&m_materialDSetLayout);
 				m_vecMaterialDSets[i][j].Init();
-				m_vecMaterialDSets[i][j].StartDescriptorSetUpdate();
-				m_vecMaterialDSets[i][j].DescriptorSetUpdate_WriteBinding(0, &m_vecMaterialBuffers[i][j]);
-				m_vecMaterialDSets[i][j].FinishDescriptorSetUpdate();
+				m_vecMaterialDSets[i][j].StartUpdate();
+				m_vecMaterialDSets[i][j].UpdateBinding(0, &m_vecMaterialBuffers[i][j]);
+				m_vecMaterialDSets[i][j].FinishUpdate();
 			}
 		}
 	}
@@ -1157,9 +1157,9 @@ void TransparentApp::_InitDescriptorSets()
 			m_cameraDSets.push_back(DescriptorSet{});
 			m_cameraDSets.back().SetLayout(&m_cameraDSetLayout);
 			m_cameraDSets.back().Init();
-			m_cameraDSets.back().StartDescriptorSetUpdate();
-			m_cameraDSets.back().DescriptorSetUpdate_WriteBinding(0, &m_cameraBuffers[i]);
-			m_cameraDSets.back().FinishDescriptorSetUpdate();
+			m_cameraDSets.back().StartUpdate();
+			m_cameraDSets.back().UpdateBinding(0, &m_cameraBuffers[i]);
+			m_cameraDSets.back().FinishUpdate();
 		}
 	}
 
@@ -1196,12 +1196,12 @@ void TransparentApp::_InitDescriptorSets()
 			m_gbufferDSets.push_back(DescriptorSet{});
 			m_gbufferDSets.back().SetLayout(&m_gbufferDSetLayout);
 			m_gbufferDSets.back().Init();
-			m_gbufferDSets.back().StartDescriptorSetUpdate();
-			m_gbufferDSets.back().DescriptorSetUpdate_WriteBinding(0, imageInfo0);
-			m_gbufferDSets.back().DescriptorSetUpdate_WriteBinding(1, imageInfo1);
-			m_gbufferDSets.back().DescriptorSetUpdate_WriteBinding(2, imageInfo2);
-			m_gbufferDSets.back().DescriptorSetUpdate_WriteBinding(3, imageInfo3);
-			m_gbufferDSets.back().FinishDescriptorSetUpdate();
+			m_gbufferDSets.back().StartUpdate();
+			m_gbufferDSets.back().UpdateBinding(0, imageInfo0);
+			m_gbufferDSets.back().UpdateBinding(1, imageInfo1);
+			m_gbufferDSets.back().UpdateBinding(2, imageInfo2);
+			m_gbufferDSets.back().UpdateBinding(3, imageInfo3);
+			m_gbufferDSets.back().FinishUpdate();
 		}
 	}
 
@@ -1223,10 +1223,10 @@ void TransparentApp::_InitDescriptorSets()
 			m_transOutputDSets.push_back(DescriptorSet{});
 			m_transOutputDSets[i].SetLayout(&m_transOutputDSetLayout);
 			m_transOutputDSets[i].Init();
-			m_transOutputDSets[i].StartDescriptorSetUpdate();
-			m_transOutputDSets[i].DescriptorSetUpdate_WriteBinding(0, oitOutputImageInfo);
-			m_transOutputDSets[i].DescriptorSetUpdate_WriteBinding(1, distortOutputImageInfo);
-			m_transOutputDSets[i].FinishDescriptorSetUpdate();
+			m_transOutputDSets[i].StartUpdate();
+			m_transOutputDSets[i].UpdateBinding(0, oitOutputImageInfo);
+			m_transOutputDSets[i].UpdateBinding(1, distortOutputImageInfo);
+			m_transOutputDSets[i].FinishUpdate();
 		}
 	}
 
@@ -1268,13 +1268,13 @@ void TransparentApp::_InitDescriptorSets()
 				m_blurLayeredDSetsX[i].push_back(DescriptorSet{});
 				m_blurLayeredDSetsX[i][j].SetLayout(&m_blurDSetLayout);
 				m_blurLayeredDSetsX[i][j].Init();
-				m_blurLayeredDSetsX[i][j].StartDescriptorSetUpdate();
-				m_blurLayeredDSetsX[i][j].DescriptorSetUpdate_WriteBinding(0, blurInputImageInfoX);
-				m_blurLayeredDSetsX[i][j].DescriptorSetUpdate_WriteBinding(1, blurOutputImageInfoX);
-				m_blurLayeredDSetsX[i][j].DescriptorSetUpdate_WriteBinding(2, &m_oitViewportBuffer);
-				m_blurLayeredDSetsX[i][j].DescriptorSetUpdate_WriteBinding(3, &m_blurBuffers[i]);
-				m_blurLayeredDSetsX[i][j].DescriptorSetUpdate_WriteBinding(4, kernelInfos);
-				m_blurLayeredDSetsX[i][j].FinishDescriptorSetUpdate();
+				m_blurLayeredDSetsX[i][j].StartUpdate();
+				m_blurLayeredDSetsX[i][j].UpdateBinding(0, blurInputImageInfoX);
+				m_blurLayeredDSetsX[i][j].UpdateBinding(1, blurOutputImageInfoX);
+				m_blurLayeredDSetsX[i][j].UpdateBinding(2, &m_oitViewportBuffer);
+				m_blurLayeredDSetsX[i][j].UpdateBinding(3, &m_blurBuffers[i]);
+				m_blurLayeredDSetsX[i][j].UpdateBinding(4, kernelInfos);
+				m_blurLayeredDSetsX[i][j].FinishUpdate();
 
 				VkDescriptorImageInfo blurInputImageInfoY{};
 				blurInputImageInfoY.sampler = m_vkSampler;
@@ -1289,13 +1289,13 @@ void TransparentApp::_InitDescriptorSets()
 				m_blurLayeredDSetsY[i].push_back(DescriptorSet{});
 				m_blurLayeredDSetsY[i][j].SetLayout(&m_blurDSetLayout);
 				m_blurLayeredDSetsY[i][j].Init();
-				m_blurLayeredDSetsY[i][j].StartDescriptorSetUpdate();
-				m_blurLayeredDSetsY[i][j].DescriptorSetUpdate_WriteBinding(0, blurInputImageInfoY);
-				m_blurLayeredDSetsY[i][j].DescriptorSetUpdate_WriteBinding(1, blurOutputImageInfoY);
-				m_blurLayeredDSetsY[i][j].DescriptorSetUpdate_WriteBinding(2, &m_oitViewportBuffer);
-				m_blurLayeredDSetsY[i][j].DescriptorSetUpdate_WriteBinding(3, &m_blurBuffers[i]);
-				m_blurLayeredDSetsY[i][j].DescriptorSetUpdate_WriteBinding(4, kernelInfos);
-				m_blurLayeredDSetsY[i][j].FinishDescriptorSetUpdate();
+				m_blurLayeredDSetsY[i][j].StartUpdate();
+				m_blurLayeredDSetsY[i][j].UpdateBinding(0, blurInputImageInfoY);
+				m_blurLayeredDSetsY[i][j].UpdateBinding(1, blurOutputImageInfoY);
+				m_blurLayeredDSetsY[i][j].UpdateBinding(2, &m_oitViewportBuffer);
+				m_blurLayeredDSetsY[i][j].UpdateBinding(3, &m_blurBuffers[i]);
+				m_blurLayeredDSetsY[i][j].UpdateBinding(4, kernelInfos);
+				m_blurLayeredDSetsY[i][j].FinishUpdate();
 			}
 
 		}
@@ -1313,9 +1313,9 @@ void TransparentApp::_InitDescriptorSets()
 			m_blurOutputDSets.push_back(DescriptorSet{});
 			m_blurOutputDSets[i].SetLayout(&m_blurOutputDSetLayout);
 			m_blurOutputDSets[i].Init();
-			m_blurOutputDSets[i].StartDescriptorSetUpdate();
-			m_blurOutputDSets[i].DescriptorSetUpdate_WriteBinding(0, blurOutputImageInfo);
-			m_blurOutputDSets[i].FinishDescriptorSetUpdate();
+			m_blurOutputDSets[i].StartUpdate();
+			m_blurOutputDSets[i].UpdateBinding(0, blurOutputImageInfo);
+			m_blurOutputDSets[i].FinishUpdate();
 		}
 	}
 }
@@ -1851,7 +1851,7 @@ void TransparentApp::_DrawFrame()
 	cmd.StartRenderPass(&m_gbufferRenderPass, &m_gbufferFramebuffers[m_currentFrame]);
 	for (int i = 0; i < m_gbufferVertBuffers.size(); ++i)
 	{
-		GraphicsPipelineInput input;
+		GraphicsVertexPipelineInput input;
 		VertexIndexInput indexInput;
 		VertexInput vertInput;
 		indexInput.pBuffer = &m_gbufferIndexBuffers[i];
@@ -1963,7 +1963,7 @@ void TransparentApp::_DrawFrame()
 	cmd.StartRenderPass(&m_distortRenderPass, &m_distortFramebuffers[m_currentFrame]);
 	for (int i = 0; i < m_transModelVertBuffers.size(); ++i)
 	{
-		GraphicsPipelineInput input;
+		GraphicsVertexPipelineInput input;
 		VertexIndexInput indexInput;
 		VertexInput vertInput;
 		indexInput.pBuffer = &m_transModelIndexBuffers[i];
@@ -1989,7 +1989,7 @@ void TransparentApp::_DrawFrame()
 	cmd.StartRenderPass(&m_oitRenderPass, &m_oitFramebuffers[m_currentFrame]);
 	for (int i = 0; i < m_transModelVertBuffers.size(); ++i)
 	{
-		GraphicsPipelineInput input;
+		GraphicsVertexPipelineInput input;
 		VertexIndexInput indexInput;
 		VertexInput vertInput;
 		indexInput.pBuffer = &m_transModelIndexBuffers[i];
@@ -2025,7 +2025,7 @@ void TransparentApp::_DrawFrame()
 	}
 	cmd.StartRenderPass(&m_lightRenderPass, &m_lightFramebuffers[m_currentFrame]);
 	{
-		GraphicsPipelineInput input{};
+		GraphicsVertexPipelineInput input{};
 		VertexIndexInput indexInput{};
 		VertexInput vertInput{};
 		indexInput.indexType = VK_INDEX_TYPE_UINT32;
@@ -2318,7 +2318,7 @@ void TransparentApp::_DrawFrame()
 	// draw final result to the swapchain
 	cmd.StartRenderPass(&m_renderPass, &m_framebuffers[imageIndex.value()]);
 	{
-		GraphicsPipelineInput input;
+		GraphicsVertexPipelineInput input;
 		VertexIndexInput indexInput;
 		VertexInput vertInput;
 		indexInput.pBuffer = &m_quadIndexBuffer;

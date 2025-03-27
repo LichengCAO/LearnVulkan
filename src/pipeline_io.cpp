@@ -6,7 +6,7 @@ void DescriptorSet::SetLayout(const DescriptorSetLayout* _layout)
 {
 	m_pLayout = _layout;
 }
-void DescriptorSet::StartDescriptorSetUpdate()
+void DescriptorSet::StartUpdate()
 {
 	if (m_pLayout == nullptr)
 	{
@@ -18,7 +18,7 @@ void DescriptorSet::StartDescriptorSetUpdate()
 	}
 	m_updates.clear();
 }
-void DescriptorSet::DescriptorSetUpdate_WriteBinding(int bindingId, const Buffer* pBuffer)
+void DescriptorSet::UpdateBinding(uint32_t bindingId, const Buffer* pBuffer)
 {
 	DescriptorSetUpdate newUpdate{};
 	VkDescriptorBufferInfo bufferInfo{};
@@ -30,7 +30,7 @@ void DescriptorSet::DescriptorSetUpdate_WriteBinding(int bindingId, const Buffer
 	newUpdate.descriptorType = DescriptorType::BUFFER;
 	m_updates.push_back(newUpdate);
 }
-void DescriptorSet::DescriptorSetUpdate_WriteBinding(int bindingId, const VkDescriptorImageInfo& dImageInfo)
+void DescriptorSet::UpdateBinding(uint32_t bindingId, const VkDescriptorImageInfo& dImageInfo)
 {
 	DescriptorSetUpdate newUpdate{};
 	newUpdate.binding = bindingId;
@@ -38,7 +38,7 @@ void DescriptorSet::DescriptorSetUpdate_WriteBinding(int bindingId, const VkDesc
 	newUpdate.descriptorType = DescriptorType::IMAGE;
 	m_updates.push_back(newUpdate);
 }
-void DescriptorSet::DescriptorSetUpdate_WriteBinding(int bindingId, const BufferView* pBufferView)
+void DescriptorSet::UpdateBinding(uint32_t bindingId, const BufferView* pBufferView)
 {
 	DescriptorSetUpdate newUpdate{};
 	VkBufferView bufferView{};
@@ -48,7 +48,7 @@ void DescriptorSet::DescriptorSetUpdate_WriteBinding(int bindingId, const Buffer
 	newUpdate.descriptorType = DescriptorType::TEXEL_BUFFER;
 	m_updates.push_back(newUpdate);
 }
-void DescriptorSet::DescriptorSetUpdate_WriteBinding(int bindingId, const std::vector<VkDescriptorBufferInfo>& bufferInfos)
+void DescriptorSet::UpdateBinding(uint32_t bindingId, const std::vector<VkDescriptorBufferInfo>& bufferInfos)
 {
 	DescriptorSetUpdate newUpdate{};
 	newUpdate.binding = bindingId;
@@ -56,17 +56,19 @@ void DescriptorSet::DescriptorSetUpdate_WriteBinding(int bindingId, const std::v
 	newUpdate.descriptorType = DescriptorType::BUFFER;
 	m_updates.push_back(newUpdate);
 }
-void DescriptorSet::FinishDescriptorSetUpdate()
+void DescriptorSet::FinishUpdate()
 {
 	std::vector<VkWriteDescriptorSet> writes;
+	CHECK_TRUE(m_pLayout != nullptr, "Layout is not initialized!");
 	for (auto& eUpdate : m_updates)
 	{
 		VkWriteDescriptorSet wds{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
 		wds.dstSet = vkDescriptorSet;
 		wds.dstBinding = eUpdate.binding;
-		wds.dstArrayElement = 0;
+		wds.dstArrayElement = eUpdate.startElement;
+		CHECK_TRUE(m_pLayout->bindings.size() > static_cast<size_t>(eUpdate.binding), "The descriptor doesn't have this binding!");
 		wds.descriptorType = m_pLayout->bindings[eUpdate.binding].descriptorType;
-		// wds.descriptorCount = m_pLayout->bindings[eUpdate.binding].descriptorCount;
+		// wds.descriptorCount = m_pLayout->bindings[eUpdate.binding].descriptorCount; the number of elements to update doens't need to be the same as the total number of the elements
 		switch (eUpdate.descriptorType)
 		{
 		case DescriptorType::BUFFER:
