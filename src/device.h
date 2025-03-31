@@ -4,6 +4,7 @@
 #include <VkBootstrap.h>
 #include "pipeline_io.h"
 #include "image.h"
+#include "sampler.h"
 struct UserInput
 {
 	bool W = false;
@@ -61,6 +62,7 @@ public:
 	VkDevice			vkDevice = VK_NULL_HANDLE;
 	QueueFamilyIndices	queueFamilyIndices{};
 	VkSwapchainKHR		vkSwapchain = VK_NULL_HANDLE;
+	SamplerPool         samplerPool{};
 	DescriptorAllocator descriptorAllocator{};
 	std::unordered_map<uint32_t, VkCommandPool>		vkCommandPools;
 	std::unordered_map<VkImage, ImageLayout>        imageLayouts;

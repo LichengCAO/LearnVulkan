@@ -8,8 +8,21 @@
 #include "buffer.h"
 #include "geometry.h"
 #include "device.h"
+#include "transform.h"
 
 #define MYTYPE(x) std::vector<std::unique_ptr<x>>
+
+struct Model
+{
+	Transform transform;
+	std::vector<Vertex> verts;
+};
+
+struct ModelTransform
+{
+	glm::mat4 modelTransform;
+	glm::mat4 normalTransform; // inverse transpose of model transform
+};
 
 class MeshletApp
 {
@@ -19,6 +32,8 @@ private:
 	uint32_t m_currentFrame = 0;
 	PersCamera m_camera{ 400, 300, glm::vec3(2,2,2), glm::vec3(0,0,0), glm::vec3(0,0,1) };
 	MyDevice* pDevice = nullptr;
+
+	std::vector<Model> m_models;
 
 	// Descriptor sets
 	DescriptorSetLayout m_cameraDSetLayout;
@@ -30,8 +45,8 @@ private:
 	std::vector<MYTYPE(Buffer)>        m_vecUptrModelBuffers;
 
 	DescriptorSetLayout m_modelVertDSetLayout;
-	std::vector<MYTYPE(DescriptorSet)> m_vecUptrModelVertDSets;
-	std::vector<MYTYPE(Buffer)>        m_vecUptrModelVertBuffers;
+	std::vector<std::unique_ptr<DescriptorSet>> m_vecUptrModelVertDSets;
+	std::vector<std::unique_ptr<Buffer>>        m_vecUptrModelVertBuffers;
 
 	// Vertex inputs
 	VertexInputLayout m_quadVertLayout;
@@ -40,12 +55,12 @@ private:
 
 	// Samplers
 	VkSampler m_vkSampler = VK_NULL_HANDLE;
-	VkSampler m_vkLodSampler = VK_NULL_HANDLE;
 
 	// Renderpass
 	RenderPass m_renderPass;
 	MYTYPE(Image) m_depthImages;
 	MYTYPE(ImageView) m_depthImageViews;
+	MYTYPE(ImageView) m_swapchainImageViews;
 	MYTYPE(Framebuffer) m_framebuffers;
 
 	//pipelines

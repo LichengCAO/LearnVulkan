@@ -42,5 +42,5 @@ private:
 	uint32_t m_currentId = ~0;
 public:
 	VkSampler GetSampler(const SamplerInfo _info);
-	void ReturnSampler(VkSampler _sampler);
+	void ReturnSampler(VkSampler* _sampler);
 };
