@@ -29,12 +29,16 @@ void SimpleShader::SetSPVFile(const std::string& file)
 		VkShaderStageFlagBits::VK_SHADER_STAGE_COMPUTE_BIT,
 		VkShaderStageFlagBits::VK_SHADER_STAGE_VERTEX_BIT,
 		VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT,
+		VkShaderStageFlagBits::VK_SHADER_STAGE_TASK_BIT_EXT,
+		VkShaderStageFlagBits::VK_SHADER_STAGE_MESH_BIT_EXT,
 	};
 	std::vector<std::string> stageStrings =
 	{
 		".comp.",
 		".vert.",
-		".frag."
+		".frag.",
+		".task.",
+		".mesh.",
 	};
 	for (int i = 0; i < stages.size(); ++i)
 	{

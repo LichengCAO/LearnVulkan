@@ -24,6 +24,12 @@ struct ModelTransform
 	glm::mat4 normalTransform; // inverse transpose of model transform
 };
 
+struct CameraUBO
+{
+	alignas(16) glm::mat4 view;
+	alignas(16) glm::mat4 proj;
+};
+
 class MeshletApp
 {
 private:
@@ -37,16 +43,16 @@ private:
 
 	// Descriptor sets
 	DescriptorSetLayout m_cameraDSetLayout;
-	MYTYPE(DescriptorSet) m_uptrCameraDSets;
-	MYTYPE(Buffer) m_uptrCameraBuffers;
+	MYTYPE(DescriptorSet) m_cameraDSets;
+	MYTYPE(Buffer) m_cameraBuffers;
 
-	DescriptorSetLayout m_modelDSetLayout;
-	std::vector<MYTYPE(DescriptorSet)> m_vecUptrModelDSets;
-	std::vector<MYTYPE(Buffer)>        m_vecUptrModelBuffers;
+	DescriptorSetLayout m_modelTransformDSetLayout;
+	std::vector<MYTYPE(DescriptorSet)> m_modelTransformDSets;
+	std::vector<MYTYPE(Buffer)>        m_modelTransformBuffers;
 
 	DescriptorSetLayout m_modelVertDSetLayout;
-	std::vector<std::unique_ptr<DescriptorSet>> m_vecUptrModelVertDSets;
-	std::vector<std::unique_ptr<Buffer>>        m_vecUptrModelVertBuffers;
+	std::vector<std::unique_ptr<DescriptorSet>> m_modelVertDSets;
+	std::vector<std::unique_ptr<Buffer>>        m_modelVertBuffers;
 
 	// Vertex inputs
 	VertexInputLayout m_quadVertLayout;
@@ -58,13 +64,14 @@ private:
 
 	// Renderpass
 	RenderPass m_renderPass;
+	std::vector<Image> m_swapchainImages;
 	MYTYPE(Image) m_depthImages;
 	MYTYPE(ImageView) m_depthImageViews;
 	MYTYPE(ImageView) m_swapchainImageViews;
 	MYTYPE(Framebuffer) m_framebuffers;
 
 	//pipelines
-	GraphicsPipeline m_gbufferPipeline;
+	GraphicsPipeline m_pipeline;
 
 	// semaphores
 	std::vector<VkSemaphore>  m_swapchainImageAvailabilities;
@@ -94,8 +101,8 @@ private:
 	void _InitDescriptorSets();
 	void _UninitDescriptorSets();
 
-	void _InitVertexInputs();
-	void _UninitVertexInputs();
+	//void _InitVertexInputs();
+	//void _UninitVertexInputs();
 
 	void _InitPipelines();
 	void _UninitPipelines();

@@ -196,7 +196,7 @@ void Image::CopyFromBuffer(const Buffer& stagingBuffer)
 	cmdSubmit.SubmitCommands();
 }
 
-ImageView Image::NewImageView(const ImageViewInformation& imageViewInfo)
+ImageView Image::NewImageView(const ImageViewInformation& imageViewInfo) const
 {
 	CHECK_TRUE(vkImage != VK_NULL_HANDLE, "Image is not initialized!");
 	ImageView val{};

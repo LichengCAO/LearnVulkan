@@ -4,6 +4,7 @@ class Buffer;
 class BufferView;
 class ImageView;
 // Pipeline can have multiple DescriptorSetLayout, when execute the pipeline we need to provide DescriptorSets for each of the DescriptorSetLayout
+class DescriptorSet;
 class DescriptorSetLayout
 {
 public:
@@ -18,6 +19,8 @@ public:
 	
 	void Init();
 	
+	DescriptorSet NewDescriptorSet() const;
+
 	void Uninit();
 };
 
@@ -148,8 +151,8 @@ class RenderPass;
 class Framebuffer
 {
 public:
-	const RenderPass* pRenderPass = nullptr;
 	VkFramebuffer vkFramebuffer = VK_NULL_HANDLE;
+	const RenderPass* pRenderPass = nullptr;
 	std::vector<const ImageView*> attachments;
 	~Framebuffer();
 	

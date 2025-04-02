@@ -435,7 +435,7 @@ void TransparentApp::_InitBuffers()
 	// camera
 	{
 		BufferInformation bufferInfo;
-		bufferInfo.size = sizeof(CameraBuffer);
+		bufferInfo.size = sizeof(CameraUBO);
 		bufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;// | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT; this is use for device to device transfer
 		bufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 		m_cameraBuffers.reserve(MAX_FRAME_COUNT);
@@ -1780,7 +1780,7 @@ void TransparentApp::_UpdateUniformBuffer()
 		m_camera.MoveTo(mov);
 	}
 
-	CameraBuffer ubo{};
+	CameraUBO ubo{};
 	VkExtent2D swapchainExtent = MyDevice::GetInstance().GetSwapchainExtent();
 	ubo.proj = m_camera.GetProjectionMatrix();
 	ubo.proj[1][1] *= -1;

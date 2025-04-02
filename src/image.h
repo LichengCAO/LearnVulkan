@@ -104,7 +104,7 @@ public:
 	void TransitionLayout(VkImageLayout newLayout);
 	void CopyFromBuffer(const Buffer& stagingBuffer);
 
-	ImageView NewImageView(const ImageViewInformation& imageViewInfo);
+	ImageView NewImageView(const ImageViewInformation& imageViewInfo) const;
 
 	ImageInformation GetImageInformation() const;
 	friend class Texture;

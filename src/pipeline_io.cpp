@@ -6,6 +6,15 @@ void DescriptorSet::SetLayout(const DescriptorSetLayout* _layout)
 {
 	m_pLayout = _layout;
 }
+void DescriptorSet::Init()
+{
+	if (m_pLayout == nullptr)
+	{
+		throw std::runtime_error("No descriptor layout set!");
+	}
+	CHECK_TRUE(vkDescriptorSet == VK_NULL_HANDLE, "VkDescriptorSet is already created!");
+	MyDevice::GetInstance().descriptorAllocator.Allocate(&vkDescriptorSet, m_pLayout->vkDescriptorSetLayout);
+}
 void DescriptorSet::StartUpdate()
 {
 	if (m_pLayout == nullptr)
@@ -100,15 +109,6 @@ void DescriptorSet::FinishUpdate()
 	vkUpdateDescriptorSets(MyDevice::GetInstance().vkDevice, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
 	m_updates.clear();
 }
-void DescriptorSet::Init()
-{
-	if (m_pLayout == nullptr)
-	{
-		throw std::runtime_error("No descriptor layout set!");
-	}
-	CHECK_TRUE(vkDescriptorSet == VK_NULL_HANDLE, "VkDescriptorSet is already created!");
-	MyDevice::GetInstance().descriptorAllocator.Allocate(&vkDescriptorSet, m_pLayout->vkDescriptorSetLayout);
-}
 
 DescriptorSetLayout::~DescriptorSetLayout()
 {
@@ -142,6 +142,12 @@ void DescriptorSetLayout::Init()
 
 	CHECK_TRUE(vkDescriptorSetLayout == VK_NULL_HANDLE, "VkDescriptorSetLayout is already created!");
 	VK_CHECK(vkCreateDescriptorSetLayout(MyDevice::GetInstance().vkDevice, &createInfo, nullptr, &vkDescriptorSetLayout), "Failed to create descriptor set layout!");
+}
+DescriptorSet DescriptorSetLayout::NewDescriptorSet() const
+{
+	DescriptorSet result{};
+	result.SetLayout(this);
+	return result;
 }
 void DescriptorSetLayout::Uninit()
 {
