@@ -20,22 +20,6 @@
 #include <random>
 #include "VkBootstrap.h"
 
-#define VK_CHECK(vkcommand) \
-do{\
-if((vkcommand)!=VK_SUCCESS){\
-   throw std::runtime_error(\
-"something went wrong!");\
-}\
-}while(0)
-
-#define VK_CHECK(vkcommand, message) \
-do{\
-if((vkcommand)!=VK_SUCCESS){\
-   throw std::runtime_error(\
-#message);\
-}\
-}while(0)
-
 #define VKB_CHECK(vkcommand, message)   \
 do{                                     \
 if(!(vkcommand)){                       \
@@ -455,7 +439,7 @@ void HelloTriangleApplication::drawFrame(){
 			.signalSemaphoreCount = 1,
 			.pSignalSemaphores = &m_vkComputeFinishedSemaphores[m_curFrame],
 		};
-		VK_CHECK(vkQueueSubmit(m_vkComputeQueue, 1, &submitInfo, m_vkComputeInFlightFences[m_curFrame]), failed to submit compute command buffer!);
+		//VK_CHECK(vkQueueSubmit(m_vkComputeQueue, 1, &submitInfo, m_vkComputeInFlightFences[m_curFrame]), failed to submit compute command buffer!);
 
 	//wait for previous fences
 	vkWaitForFences(m_vkDevice, 1, &m_vkInFlightFences[m_curFrame], VK_TRUE, UINT64_MAX);
@@ -751,14 +735,14 @@ void HelloTriangleApplication::createGraphicsPipeline()
 
 	VkPipelineShaderStageCreateInfo vertShaderStageInfo{
 		.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-		.vkShaderStage = VK_SHADER_STAGE_VERTEX_BIT,
+		.stage = VK_SHADER_STAGE_VERTEX_BIT,
 		.module = vertShaderModule,
 		.pName = "main", // entry point function in shader
 	};
 
 	VkPipelineShaderStageCreateInfo fragShaderStageInfo{
 	.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-	.vkShaderStage = VK_SHADER_STAGE_FRAGMENT_BIT,
+	.stage = VK_SHADER_STAGE_FRAGMENT_BIT,
 	.module = fragShaderModule,
 	.pName = "main", // entry point function in shader
 	};
@@ -949,7 +933,7 @@ void HelloTriangleApplication::createCommandPool()
 	}
 
 	commandPoolInfo.queueFamilyIndex = queueFamilyIndices.transferFamily.value();
-	VK_CHECK(vkCreateCommandPool(m_vkDevice, &commandPoolInfo, nullptr, &m_vkCommandPool2), failed to create command pool2);
+	//VK_CHECK(vkCreateCommandPool(m_vkDevice, &commandPoolInfo, nullptr, &m_vkCommandPool2), failed to create command pool2);
 	createDebugInfo({(uint64_t)m_vkCommandPool2, VK_OBJECT_TYPE_COMMAND_POOL, "m_vkCommandPool2" });
 }
 
@@ -975,7 +959,7 @@ void HelloTriangleApplication::createCommandBuffers()
 
 	allocInfo.commandPool = m_vkCommandPool2;
 	allocInfo.commandBufferCount = static_cast<uint32_t>(m_vkCommandBuffers2.size());
-	VK_CHECK(vkAllocateCommandBuffers(m_vkDevice, &allocInfo, m_vkCommandBuffers2.data()), failed to allocate transfer command buffers!);
+	//VK_CHECK(vkAllocateCommandBuffers(m_vkDevice, &allocInfo, m_vkCommandBuffers2.data()), failed to allocate transfer command buffers!);
 }
 
 void HelloTriangleApplication::createSyncObjects(){
@@ -1144,14 +1128,14 @@ void HelloTriangleApplication::copyBuffer(VkBuffer& src, VkBuffer& dst, VkDevice
 	.commandBufferCount = 1
 	};
 	VkCommandBuffer cpyCommandBuffer;
-	VK_CHECK(vkAllocateCommandBuffers(m_vkDevice, &allocInfo, &cpyCommandBuffer), failed to allocate single time copy command buffer!);
+	//VK_CHECK(vkAllocateCommandBuffers(m_vkDevice, &allocInfo, &cpyCommandBuffer), failed to allocate single time copy command buffer!);
 
 	VkCommandBufferBeginInfo beginInfo = {
 		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
 	};
 
-	VK_CHECK(vkBeginCommandBuffer(cpyCommandBuffer, &beginInfo), failed to begin single time copy command!);
+	//VK_CHECK(vkBeginCommandBuffer(cpyCommandBuffer, &beginInfo), failed to begin single time copy command!);
 
 	VkBufferCopy cpyRegion = {
 		.srcOffset = 0,
@@ -1169,7 +1153,7 @@ void HelloTriangleApplication::copyBuffer(VkBuffer& src, VkBuffer& dst, VkDevice
 		.pCommandBuffers = &cpyCommandBuffer,
 	};
 
-	VK_CHECK(vkQueueSubmit(m_vkTransferQueue, 1, &submitInfo, VK_NULL_HANDLE), failed to submit single time command to queue!);
+	//VK_CHECK(vkQueueSubmit(m_vkTransferQueue, 1, &submitInfo, VK_NULL_HANDLE), failed to submit single time command to queue!);
 	vkQueueWaitIdle(m_vkTransferQueue);
 	vkFreeCommandBuffers(m_vkDevice, m_vkCommandPool2, 1, &cpyCommandBuffer);
 }
@@ -1233,7 +1217,7 @@ void HelloTriangleApplication::pickPhysicalDevice()
 	if (!physicalDeviceSelectorReturn)
 	{
 		std::cout << physicalDeviceSelectorReturn.error().message() << std::endl;
-		VK_CHECK(false, failed to find a suitable GPU!);
+		//VK_CHECK(false, failed to find a suitable GPU!);
 	}
 	m_physicalDevice = physicalDeviceSelectorReturn.value();
 	m_vkPhysicDevice = m_physicalDevice.physical_device;
@@ -1312,7 +1296,7 @@ void HelloTriangleApplication::createLogicalDevice()
 	if (!deviceBuilderReturn)
 	{
 		std::cout << deviceBuilderReturn.error().message() << std::endl;
-		VK_CHECK(false, FAILED to create logic device!);
+		//VK_CHECK(false, FAILED to create logic device!);
 	}
 	m_device = deviceBuilderReturn.value();
 	m_vkDevice = m_device.device;
@@ -1404,7 +1388,7 @@ void HelloTriangleApplication::createDescriptorSetLayout()
 		.pBindings = layoutBindings.data(),
 	};
 
-	VK_CHECK(vkCreateDescriptorSetLayout(m_vkDevice, &createInfo, nullptr, &m_vkComputeDescriptorSetLayout), failed to create compute descriptor set m_pLayout!);
+	//VK_CHECK(vkCreateDescriptorSetLayout(m_vkDevice, &createInfo, nullptr, &m_vkComputeDescriptorSetLayout), failed to create compute descriptor set m_pLayout!);
 }
 
 void HelloTriangleApplication::createUniformBuffers()
@@ -1424,7 +1408,7 @@ void HelloTriangleApplication::createUniformBuffers()
 			m_vkUniformBuffersMemory[i]
 			);
 
-		VK_CHECK(vkMapMemory(m_vkDevice, m_vkUniformBuffersMemory[i], 0, bufferSize, 0, &m_vkUniformBuffersMapped[i]), failed to map uniform memory!);
+		//VK_CHECK(vkMapMemory(m_vkDevice, m_vkUniformBuffersMemory[i], 0, bufferSize, 0, &m_vkUniformBuffersMapped[i]), failed to map uniform memory!);
 	}
 
 }
@@ -1470,7 +1454,7 @@ void HelloTriangleApplication::createDescriptorPool()
 		.pPoolSizes = poolSizes.data(),
 	};
 
-	VK_CHECK(vkCreateDescriptorPool(m_vkDevice, &poolInfo, nullptr, &m_vkDescriptorPool), failed to create descriptor pool!);
+	//VK_CHECK(vkCreateDescriptorPool(m_vkDevice, &poolInfo, nullptr, &m_vkDescriptorPool), failed to create descriptor pool!);
 }
 
 void HelloTriangleApplication::createDescriptorSets()
@@ -1484,12 +1468,12 @@ void HelloTriangleApplication::createDescriptorSets()
 	};
 
 	m_vkDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-	//VK_CHECK(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, m_vkDescriptorSets.data()), failed to allocate descriptor sets!);
+	////VK_CHECK(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, m_vkDescriptorSets.data()), failed to allocate descriptor sets!);
 
 	std::vector<VkDescriptorSetLayout> compLayouts(MAX_FRAMES_IN_FLIGHT, m_vkComputeDescriptorSetLayout);
 	allocInfo.pSetLayouts = compLayouts.data();
 	m_vkComputeDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-	VK_CHECK(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, m_vkComputeDescriptorSets.data()), failed to allocate descriptor sets!);
+	//VK_CHECK(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, m_vkComputeDescriptorSets.data()), failed to allocate descriptor sets!);
 
 }
 
@@ -1672,7 +1656,7 @@ void HelloTriangleApplication::createImage(uint32_t width, uint32_t height, uint
 	imgInfo.samples = numSamples;
 	imgInfo.flags = 0;
 
-	VK_CHECK(vkCreateImage(m_vkDevice, &imgInfo, nullptr, &image), failed to crate image!);
+	//VK_CHECK(vkCreateImage(m_vkDevice, &imgInfo, nullptr, &image), failed to crate image!);
 
 	VkMemoryRequirements memRequirements;
 	vkGetImageMemoryRequirements(m_vkDevice, image, &memRequirements);
@@ -1683,7 +1667,7 @@ void HelloTriangleApplication::createImage(uint32_t width, uint32_t height, uint
 		.memoryTypeIndex = findMemoryType(memRequirements.memoryTypeBits, properties)
 	};
 
-	VK_CHECK(vkAllocateMemory(m_vkDevice, &allocInfo, nullptr, &imageMemory), failed to allocate image stbi_info_from_memory!);
+	//VK_CHECK(vkAllocateMemory(m_vkDevice, &allocInfo, nullptr, &imageMemory), failed to allocate image stbi_info_from_memory!);
 
 	vkBindImageMemory(m_vkDevice, image, imageMemory, 0);
 }
@@ -1697,14 +1681,14 @@ VkCommandBuffer HelloTriangleApplication::beginSingleTimeCommands()
 		.commandBufferCount = 1
 	};
 	VkCommandBuffer commandBuffer;
-	VK_CHECK(vkAllocateCommandBuffers(m_vkDevice, &allocInfo, &commandBuffer),failed to allocate single time command buffer!);
+	//VK_CHECK(vkAllocateCommandBuffers(m_vkDevice, &allocInfo, &commandBuffer),failed to allocate single time command buffer!);
 
 	VkCommandBufferBeginInfo beginInfo = {
 		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO,
 		.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT,
 	};
 
-	VK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo), failed to begin single time command!);
+	//VK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo), failed to begin single time command!);
 	
 	return commandBuffer;
 }
@@ -1719,7 +1703,7 @@ void HelloTriangleApplication::endSingleTimeCommands(VkCommandBuffer commandBuff
 		.pCommandBuffers = &commandBuffer,
 	};
 
-	VK_CHECK(vkQueueSubmit(m_vkGraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE),failed to submit single time command to queue!);
+	//VK_CHECK(vkQueueSubmit(m_vkGraphicsQueue, 1, &submitInfo, VK_NULL_HANDLE),failed to submit single time command to queue!);
 	vkQueueWaitIdle(m_vkGraphicsQueue);
 
 	vkFreeCommandBuffers(m_vkDevice, m_vkCommandPool, 1, &commandBuffer);
@@ -1833,7 +1817,7 @@ VkImageView HelloTriangleApplication::createImageView(VkImage _image,uint32_t _m
 		}
 	};
 	VkImageView imageView;
-	VK_CHECK(vkCreateImageView(m_vkDevice, &viewInfo, nullptr, &imageView), failed to create image view!);
+	//VK_CHECK(vkCreateImageView(m_vkDevice, &viewInfo, nullptr, &imageView), failed to create image view!);
 	return imageView;
 }
 
@@ -1867,7 +1851,7 @@ void HelloTriangleApplication::createTextureSampler()
 	createInfo.minLod = static_cast<float>(0);
 	createInfo.maxLod = static_cast<float>(m_mipLevels);
 
-	VK_CHECK(vkCreateSampler(m_vkDevice, &createInfo, nullptr, &m_vkTextureSampler), failed to create texture sampler!);
+	//VK_CHECK(vkCreateSampler(m_vkDevice, &createInfo, nullptr, &m_vkTextureSampler), failed to create texture sampler!);
 }
 
 void HelloTriangleApplication::createDepthImage()
@@ -2095,7 +2079,7 @@ void HelloTriangleApplication::createComputePipeline()
 
 	VkPipelineShaderStageCreateInfo compShaderStageInfo{
 	.sType = VK_STRUCTURE_TYPE_PIPELINE_SHADER_STAGE_CREATE_INFO,
-	.vkShaderStage = VK_SHADER_STAGE_COMPUTE_BIT,
+	.stage = VK_SHADER_STAGE_COMPUTE_BIT,
 	.module = compShaderModule,
 	.pName = "main", // entry point function in shader
 	};
@@ -2111,11 +2095,11 @@ void HelloTriangleApplication::createComputePipeline()
 
 	VkComputePipelineCreateInfo pipelineInfo{
 		.sType = VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO,
-		.vkShaderStage = compShaderStageInfo,
+		.stage = compShaderStageInfo,
 		.layout = m_vkComputePipelineLayout,
 	};
 
-	VK_CHECK(vkCreateComputePipelines(m_vkDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_vkComputePipeline), failed to create compute pipeline!);
+	//VK_CHECK(vkCreateComputePipelines(m_vkDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &m_vkComputePipeline), failed to create compute pipeline!);
 
 	vkDestroyShaderModule(m_vkDevice, compShaderModule, nullptr);
 }
@@ -2177,14 +2161,14 @@ void HelloTriangleApplication::recordComputeCommand(VkCommandBuffer commandBuffe
 		.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO
 	};
 
-	VK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo), failed to begin recording command buffer!);
+	//VK_CHECK(vkBeginCommandBuffer(commandBuffer, &beginInfo), failed to begin recording command buffer!);
 
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_vkComputePipeline);
 	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, m_vkComputePipelineLayout, 0, 1, &m_vkComputeDescriptorSets[frameIdx], 0, nullptr);
 
 	vkCmdDispatch(commandBuffer, (PARTICLE_COUNT + 255) / 256, 1, 1);
 
-	VK_CHECK(vkEndCommandBuffer(commandBuffer), failed to record command buffer!);
+	//VK_CHECK(vkEndCommandBuffer(commandBuffer), failed to record command buffer!);
 }
 
 void HelloTriangleApplication::createComputeDescriptorSets()
@@ -2198,7 +2182,7 @@ void HelloTriangleApplication::createComputeDescriptorSets()
 	};
 	allocInfo.pSetLayouts = compLayouts.data();
 	m_vkComputeDescriptorSets.resize(MAX_FRAMES_IN_FLIGHT);
-	VK_CHECK(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, m_vkComputeDescriptorSets.data()), failed to allocate descriptor sets!);
+	//VK_CHECK(vkAllocateDescriptorSets(m_vkDevice, &allocInfo, m_vkComputeDescriptorSets.data()), failed to allocate descriptor sets!);
 }
 
 void HelloTriangleApplication::createDebugInfo(VkBuffer buffer, std::string name)
@@ -2213,7 +2197,7 @@ void HelloTriangleApplication::createDebugInfo(VkBuffer buffer, std::string name
 	auto func = (PFN_vkSetDebugUtilsObjectNameEXT)vkGetInstanceProcAddr(m_vkInstance, "vkSetDebugUtilsObjectNameEXT");
 	if (func != nullptr)
 	{
-		VK_CHECK(func(m_vkDevice, &info), failed to assign debug info!);
+		//VK_CHECK(func(m_vkDevice, &info), failed to assign debug info!);
 	}
 }
 
@@ -2230,7 +2214,7 @@ void HelloTriangleApplication::createDebugInfo(VkDeviceMemory memory, std::strin
 	auto func = (PFN_vkSetDebugUtilsObjectNameEXT)vkGetInstanceProcAddr(m_vkInstance, "vkSetDebugUtilsObjectNameEXT");
 	if (func != nullptr)
 	{
-		VK_CHECK(func(m_vkDevice, &info), failed to assign debug info!);
+		//VK_CHECK(func(m_vkDevice, &info), failed to assign debug info!);
 	}
 }
 
@@ -2246,7 +2230,7 @@ void HelloTriangleApplication::createDebugInfo(const DebugCreateInfo& _info)
 	auto func = (PFN_vkSetDebugUtilsObjectNameEXT)vkGetInstanceProcAddr(m_vkInstance, "vkSetDebugUtilsObjectNameEXT");
 	if (func != nullptr)
 	{
-		VK_CHECK(func(m_vkDevice, &info), failed to assign debug info!);
+		//VK_CHECK(func(m_vkDevice, &info), failed to assign debug info!);
 	}
 }
 

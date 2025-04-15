@@ -1,5 +1,4 @@
 #include "meshlet_app.h"
-
 #define MAX_FRAME_COUNT 3
 
 void MeshletApp::_InitPipelines()
@@ -7,19 +6,19 @@ void MeshletApp::_InitPipelines()
 	SimpleShader taskShader{};
 	SimpleShader meshShader{};
 	SimpleShader fragShader{};
-	
+
 	m_pipeline.AddDescriptorSetLayout(m_cameraDSetLayout.vkDescriptorSetLayout);
 	m_pipeline.AddDescriptorSetLayout(m_modelTransformDSetLayout.vkDescriptorSetLayout);
 	m_pipeline.AddDescriptorSetLayout(m_modelVertDSetLayout.vkDescriptorSetLayout);
 	m_pipeline.BindToSubpass(&m_renderPass, 0);
-	
+
 	taskShader.SetSPVFile("mesh.task.spv");
 	meshShader.SetSPVFile("mesh.mesh.spv");
 	fragShader.SetSPVFile("mesh.frag.spv");
 	taskShader.Init();
 	meshShader.Init();
 	fragShader.Init();
-	
+
 	m_pipeline.AddShader(taskShader.GetShaderStageInfo());
 	m_pipeline.AddShader(meshShader.GetShaderStageInfo());
 	m_pipeline.AddShader(fragShader.GetShaderStageInfo());
@@ -469,7 +468,7 @@ void MeshletApp::_InitDescriptorSets()
 
 			tmpTransformDSet.push_back(std::move(modelTransformDSet));
 		}
-		m_modelTransformDSets.push_back(tmpTransformDSet);
+		m_modelTransformDSets.push_back(std::move(tmpTransformDSet));
 		
 		VkDescriptorBufferInfo vertBufferInfo{};
 		const Buffer* pVertBuffer = m_modelVertBuffers[i].get();

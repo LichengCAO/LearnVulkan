@@ -5,6 +5,7 @@
 #include "pipeline_io.h"
 #include "image.h"
 #include "sampler.h"
+
 struct UserInput
 {
 	bool W = false;
@@ -43,6 +44,7 @@ private:
 	VkPresentModeKHR		 _ChooseSwapchainPresentMode(const std::vector<VkPresentModeKHR>& availableModes) const;
 	VkExtent2D				 _ChooseSwapchainExtent(const VkSurfaceCapabilitiesKHR& capabilities) const;
 
+	void _InitVolk();
 	void _InitGLFW();
 	void _CreateInstance();
 	void _CreateSurface();

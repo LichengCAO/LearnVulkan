@@ -3,7 +3,7 @@ set(CMAKE_MOUDULE_PATH ${CMAKE_MOUDULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 
 project(learn_vulkan)
 
-find_package(Vulkan REQUIRED)
+#find_package(Vulkan REQUIRED)
 
 set(CMAKE_CXX_STANDARD 20)
 
@@ -26,11 +26,7 @@ configure_file (
     "${PROJECT_SOURCE_DIR}/src/config.h.in"
     "${PROJECT_SOURCE_DIR}/src/config.h"
 )
-string (REPLACE "\\" "/" VULKAN_SDK $ENV{VULKAN_SDK})
-file(GLOB VK_HEADERS
-   "${VULKAN_SDK}/Include/vulkan/*.hpp"
-   "${VULKAN_SDK}/Include/vulkan/*.h"
-)
+
 file(GLOB SOURCES
      "src/*.cpp"
 )
@@ -41,12 +37,10 @@ file(GLOB HEADERS
 
 source_group("Sources" FILES ${SOURCES})
 source_group("Headers" FILES ${HEADERS})
-source_group("Vulkan Headers" FILES ${VK_HEADERS})
-add_executable(${CMAKE_PROJECT_NAME} ${SOURCES} ${HEADERS} ${VK_HEADERS})
+add_executable(${CMAKE_PROJECT_NAME} ${SOURCES} ${HEADERS})
 
 add_subdirectory(external)
 add_subdirectory(res)
 
 target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC ExternalLibs)
-target_include_directories(${CMAKE_PROJECT_NAME} PUBLIC Vulkan_INCLUDE_DIR)
 

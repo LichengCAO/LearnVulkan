@@ -84,7 +84,7 @@ VkPipelineShaderStageCreateInfo SimpleShader::GetShaderStageInfo(const std::stri
 		m_entries.insert(entry);
 		it = m_entries.find(entry);
 	}
-	shaderStageInfo.vkShaderStage = vkShaderStage;
+	shaderStageInfo.stage = vkShaderStage;
 	shaderStageInfo.module = vkShaderModule;
 	shaderStageInfo.pName = it->c_str();
 	return shaderStageInfo;

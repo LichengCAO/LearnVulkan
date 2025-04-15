@@ -1,7 +1,6 @@
 #pragma once
 
-#define GLFW_INCLUDE_VULKAN //->auto load <vulkan/vulkan.h>
-#include <GLFW/glfw3.h>
+#include "common.h"
 #define WIDTH 800
 #define HEIGHT 600
 #define PARTICLE_COUNT 1000

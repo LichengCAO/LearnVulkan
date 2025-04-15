@@ -1,0 +1,17 @@
+#version 450
+
+#extension GL_EXT_mesh_shader : require
+
+// struct Task
+// {
+// 	int task_id;
+// 	vec3 color;
+// };
+
+// taskPayloadSharedEXT Task OUT;
+
+
+void main()
+{
+	EmitMeshTasksEXT(1, 1, 1);// use gl_WorkGroupID to index in mesh shader
+}

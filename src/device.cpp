@@ -6,6 +6,8 @@
 #include "image.h"
 #include "pipeline_io.h"
 #include <iomanip>
+#define VOLK_IMPLEMENTATION
+#include "volk.h"
 
 MyDevice* MyDevice::s_pInstance = nullptr;
 
@@ -26,10 +28,12 @@ std::vector<const char*> MyDevice::_GetInstanceRequiredExtensions() const
 
 std::vector<const char*> MyDevice::_GetPhysicalDeviceRequiredExtensions() const
 {
-	return {VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+	return {
+		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
 		VK_KHR_MAINTENANCE1_EXTENSION_NAME,
 		VK_KHR_MAINTENANCE3_EXTENSION_NAME,
-		VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME
+		VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
+		VK_EXT_MESH_SHADER_EXTENSION_NAME, // mesh shader
 	};
 }
 
@@ -128,6 +132,11 @@ VkExtent2D MyDevice::_ChooseSwapchainExtent(const VkSurfaceCapabilitiesKHR& capa
 	return res;
 }
 
+void MyDevice::_InitVolk()
+{
+	VK_CHECK(volkInitialize(), "Failed to initialize volk!");
+}
+
 void MyDevice::_InitGLFW()
 {
 	glfwInit();
@@ -173,6 +182,7 @@ void MyDevice::_CreateInstance()
 	
 	m_instance = instanceBuildResult.value();
 	vkInstance = m_instance.instance;
+	volkLoadInstance(vkInstance);
 }
 
 void MyDevice::_CreateSurface()
@@ -183,6 +193,8 @@ void MyDevice::_CreateSurface()
 void MyDevice::_SelectPhysicalDevice()
 {
 	vkb::PhysicalDeviceSelector physicalDeviceSelector(m_instance);
+
+	//vk::StructureChain<VkPhysicalDeviceFeatures2, VkPhysicalDeviceMeshShaderFeaturesEXT, VkPhysicalDevice16BitStorageFeatures, VkPhysicalDevice8BitStorageFeatures> ext_chain;
 	VkPhysicalDeviceFeatures requiredFeatures{
 		.geometryShader = VK_TRUE,
 		.samplerAnisotropy = VK_TRUE
@@ -192,7 +204,9 @@ void MyDevice::_SelectPhysicalDevice()
 	auto vecRequiredExtensions = _GetPhysicalDeviceRequiredExtensions();
 	physicalDeviceSelector.set_surface(vkSurface);
 	physicalDeviceSelector.set_required_features(requiredFeatures);
-	physicalDeviceSelector.prefer_gpu_device_type();
+	//physicalDeviceSelector.add_required_extension_features(ext_chain);
+	//physicalDeviceSelector.add_required_extension_features()
+
 	for (auto requiredExtension : vecRequiredExtensions)
 	{
 		physicalDeviceSelector.add_required_extension(requiredExtension);
@@ -247,7 +261,7 @@ void MyDevice::_CreateLogicalDevice()
 	m_device = deviceBuilderReturn.value();
 	vkDevice = m_device.device;
 	m_dispatchTable = m_device.make_table();
-	
+	volkLoadDevice(vkDevice);
 	vkGetDeviceQueue(vkDevice, queueFamilyIndices.presentFamily.value(), 0, &m_vkPresentQueue);
 }
 
@@ -452,6 +466,7 @@ void MyDevice::_DestroyCommandPools()
 
 void MyDevice::Init()
 {
+	_InitVolk();
 	_InitGLFW();
 	_CreateInstance();
 	_CreateSurface();

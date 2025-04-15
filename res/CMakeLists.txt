@@ -8,6 +8,8 @@ file(GLOB SHADER_SOURCES
     "shaders/*.comp"
     "shaders/*.tesc"
     "shaders/*.tese"
+    "shaders/*.mesh"
+    "shaders/*.task"
 )
 
 file(GLOB IMAGES
@@ -31,7 +33,7 @@ foreach(SHADER ${SHADER_SOURCES})
     get_filename_component(fname ${SHADER} NAME)
     add_custom_target(${fname}.spv  
         COMMAND ${CMAKE_COMMAND} -E make_directory ${SHADER_DIR} &&
-        $ENV{VK_SDK_PATH}/Bin/glslangValidator.exe -V ${SHADER} -o ${SHADER_DIR}/${fname}.spv -g
+        $ENV{VK_SDK_PATH}/Bin/glslangValidator.exe --target-env vulkan1.2 -V ${SHADER} -o ${SHADER_DIR}/${fname}.spv -g
         SOURCES ${SHADER}
     )
     # message(${SHADER_DIR}/${fname}.spv)
