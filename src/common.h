@@ -8,7 +8,7 @@
 #else
 #endif
 #define VK_NO_PROTOTYPES
-#include "volk.h"
+#include <volk.h>
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
 #include <GLFW/glfw3.h>

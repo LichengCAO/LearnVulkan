@@ -7,14 +7,14 @@ void MeshletApp::_InitPipelines()
 	SimpleShader meshShader{};
 	SimpleShader fragShader{};
 
-	m_pipeline.AddDescriptorSetLayout(m_cameraDSetLayout.vkDescriptorSetLayout);
-	m_pipeline.AddDescriptorSetLayout(m_modelTransformDSetLayout.vkDescriptorSetLayout);
-	m_pipeline.AddDescriptorSetLayout(m_modelVertDSetLayout.vkDescriptorSetLayout);
+	//m_pipeline.AddDescriptorSetLayout(m_cameraDSetLayout.vkDescriptorSetLayout);
+	//m_pipeline.AddDescriptorSetLayout(m_modelTransformDSetLayout.vkDescriptorSetLayout);
+	//m_pipeline.AddDescriptorSetLayout(m_modelVertDSetLayout.vkDescriptorSetLayout);
 	m_pipeline.BindToSubpass(&m_renderPass, 0);
 
-	taskShader.SetSPVFile("mesh.task.spv");
-	meshShader.SetSPVFile("mesh.mesh.spv");
-	fragShader.SetSPVFile("mesh.frag.spv");
+	taskShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/mesh.task.spv");
+	meshShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/mesh.mesh.spv");
+	fragShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/mesh.frag.spv");
 	taskShader.Init();
 	meshShader.Init();
 	fragShader.Init();
@@ -95,11 +95,10 @@ void MeshletApp::_DrawFrame()
 		_ResizeWindow();
 	}
 
-	auto imageIndex = pDevice->AquireAvailableSwapchainImageIndex(m_swapchainImageAvailabilities[m_currentFrame]);
-	if (!imageIndex.has_value()) return;
-
 	auto& cmd = m_commandSubmissions[m_currentFrame];
 	cmd->WaitTillAvailable();
+	auto imageIndex = pDevice->AquireAvailableSwapchainImageIndex(m_swapchainImageAvailabilities[m_currentFrame]);
+	if (!imageIndex.has_value()) return;
 	_UpdateUniformBuffer();
 	WaitInformation waitInfo{};
 	waitInfo.waitSamaphore = m_swapchainImageAvailabilities[m_currentFrame];
@@ -107,14 +106,14 @@ void MeshletApp::_DrawFrame()
 	cmd->StartCommands({ waitInfo });
 
 	cmd->StartRenderPass(&m_renderPass, m_framebuffers[m_currentFrame].get());
-	for (int i = 0; i < m_models.size(); ++i)
+	//for (int i = 0; i < m_models.size(); ++i)
 	{
 		GraphicsMeshPipelineInput meshInput{};
 		meshInput.groupCountX = 126;
 		meshInput.groupCountY = 1;
 		meshInput.groupCountZ = 1;
 		meshInput.imageSize = pDevice->GetSwapchainExtent();
-		meshInput.pDescriptorSets = { m_cameraDSets[m_currentFrame].get(), m_modelTransformDSets[i][m_currentFrame].get(), m_modelVertDSets[i].get() };
+		//meshInput.pDescriptorSets = { m_cameraDSets[m_currentFrame].get(), m_modelTransformDSets[i][m_currentFrame].get(), m_modelVertDSets[i].get() };
 		m_pipeline.Do(cmd->vkCommandBuffer, meshInput);
 	}
 	cmd->EndRenderPass();
@@ -226,11 +225,11 @@ void MeshletApp::_InitRenderPass()
 	AttachmentInformation swapchainInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::SWAPCHAIN);
 	AttachmentInformation depthInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::DEPTH);
 	m_renderPass.AddAttachment(swapchainInfo);
-	m_renderPass.AddAttachment(depthInfo);
+	//m_renderPass.AddAttachment(depthInfo);
 
 	SubpassInformation subpassInfo{};
 	subpassInfo.AddColorAttachment(0);
-	subpassInfo.SetDepthStencilAttachment(1);
+	//subpassInfo.SetDepthStencilAttachment(1);
 	
 	m_renderPass.AddSubpass(subpassInfo);
 	m_renderPass.Init();
@@ -265,23 +264,7 @@ void MeshletApp::_UninitDescriptorSetLayouts()
 
 void MeshletApp::_InitSampler()
 {
-	SamplerInfo info{};
-	VkSamplerCreateInfo vkInfo{};
-
-	vkInfo.addressModeU = VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
-	vkInfo.addressModeV = VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
-	vkInfo.addressModeW = VK_SAMPLER_ADDRESS_MODE_MIRROR_CLAMP_TO_EDGE;
-	vkInfo.anisotropyEnable = VK_FALSE;
-	vkInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
-	vkInfo.compareEnable = VK_FALSE;
-	vkInfo.compareOp = VK_COMPARE_OP_ALWAYS;
-	vkInfo.flags = 0;
-	vkInfo.magFilter = VK_FILTER_LINEAR;
-	vkInfo.minFilter = VK_FILTER_LINEAR;
-	vkInfo.mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR;
-
-	info.info = vkInfo;
-	m_vkSampler = pDevice->samplerPool.GetSampler(info);
+	m_vkSampler = pDevice->samplerPool.GetSampler(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 }
 
 void MeshletApp::_UninitSampler()
@@ -390,9 +373,10 @@ void MeshletApp::_InitImagesAndViews()
 		depthViewInfo.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 
 		std::unique_ptr<Image> uptrDepthImage = std::make_unique<Image>();
-		std::unique_ptr<ImageView> uptrDepthView = std::make_unique<ImageView>(uptrDepthImage->NewImageView(depthViewInfo));
 		uptrDepthImage->SetImageInformation(depthImageInfo);
 		uptrDepthImage->Init();
+
+		std::unique_ptr<ImageView> uptrDepthView = std::make_unique<ImageView>(uptrDepthImage->NewImageView(depthViewInfo));
 		m_depthImages.push_back(std::move(uptrDepthImage));
 		uptrDepthView->Init();
 		m_depthImageViews.push_back(std::move(uptrDepthView));
@@ -413,7 +397,11 @@ void MeshletApp::_UninitImagesAndViews()
 		uptrView->Uninit();
 	}
 	m_depthImageViews.clear();
-
+	for (auto& uptrImage : m_depthImages)
+	{
+		uptrImage->Uninit();
+	}
+	m_depthImages.clear();
 	for (auto& uptrView : m_swapchainImageViews)
 	{
 		uptrView->Uninit();
@@ -427,7 +415,10 @@ void MeshletApp::_InitFramebuffers()
 
 	for (int i = 0; i < n; ++i)
 	{
-		std::vector<const ImageView*> renderViews{ m_swapchainImageViews[i].get(), m_depthImageViews[i].get() };
+		std::vector<const ImageView*> renderViews{ 
+			m_swapchainImageViews[i].get(),
+			//m_depthImageViews[i].get()
+		};
 		std::unique_ptr<Framebuffer> uptrFramebuffer = std::make_unique<Framebuffer>(m_renderPass.NewFramebuffer(renderViews));
 		uptrFramebuffer->Init();
 		m_framebuffers.push_back(std::move(uptrFramebuffer));

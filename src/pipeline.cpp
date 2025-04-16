@@ -25,7 +25,6 @@ void GraphicsPipeline::_InitCreateInfos()
 	rasterizerStateInfo.depthClampEnable = VK_FALSE;
 	rasterizerStateInfo.rasterizerDiscardEnable = VK_FALSE;
 	rasterizerStateInfo.polygonMode = VK_POLYGON_MODE_FILL;
-	rasterizerStateInfo.cullMode = VK_CULL_MODE_BACK_BIT;
 	rasterizerStateInfo.depthBiasEnable = VK_FALSE;//use for shadow mapping
 	rasterizerStateInfo.depthBiasConstantFactor = 0.0f;
 	rasterizerStateInfo.depthBiasClamp = 0.0f;

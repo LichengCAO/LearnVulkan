@@ -7,7 +7,7 @@
 #include "pipeline_io.h"
 #include <iomanip>
 #define VOLK_IMPLEMENTATION
-#include "volk.h"
+#include <volk.h>
 
 MyDevice* MyDevice::s_pInstance = nullptr;
 
@@ -33,7 +33,10 @@ std::vector<const char*> MyDevice::_GetPhysicalDeviceRequiredExtensions() const
 		VK_KHR_MAINTENANCE1_EXTENSION_NAME,
 		VK_KHR_MAINTENANCE3_EXTENSION_NAME,
 		VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
-		VK_EXT_MESH_SHADER_EXTENSION_NAME, // mesh shader
+		// mesh shader
+		VK_EXT_MESH_SHADER_EXTENSION_NAME, 
+		VK_KHR_SPIRV_1_4_EXTENSION_NAME,
+		VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME
 	};
 }
 
@@ -157,7 +160,7 @@ void MyDevice::_CreateInstance()
 	instanceBuilder.set_app_version(VK_MAKE_VERSION(1, 0, 0));
 	instanceBuilder.set_engine_name("No Engine");
 	instanceBuilder.set_engine_version(VK_MAKE_VERSION(1, 0, 0));
-	// instanceBuilder.desire_api_version(VK_API_VERSION_1_0);
+	instanceBuilder.desire_api_version(VK_API_VERSION_1_2);
 	instanceBuilder.set_debug_callback(
 		[](
 			VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -199,12 +202,17 @@ void MyDevice::_SelectPhysicalDevice()
 		.geometryShader = VK_TRUE,
 		.samplerAnisotropy = VK_TRUE
 	};
+	VkPhysicalDeviceMeshShaderFeaturesEXT meshShaderFeatures{
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT,
+		.taskShader = VK_TRUE,
+		.meshShader = VK_TRUE
+	};
 	requiredFeatures.sampleRateShading = VK_TRUE;
 	requiredFeatures.fragmentStoresAndAtomics = VK_TRUE;
 	auto vecRequiredExtensions = _GetPhysicalDeviceRequiredExtensions();
 	physicalDeviceSelector.set_surface(vkSurface);
 	physicalDeviceSelector.set_required_features(requiredFeatures);
-	//physicalDeviceSelector.add_required_extension_features(ext_chain);
+	physicalDeviceSelector.add_required_extension_features(meshShaderFeatures);
 	//physicalDeviceSelector.add_required_extension_features()
 
 	for (auto requiredExtension : vecRequiredExtensions)

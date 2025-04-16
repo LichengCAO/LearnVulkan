@@ -1,6 +1,6 @@
 #include "sampler.h"
 #include "device.h"
-VkSampler SamplerPool::GetSampler(const SamplerInfo _info)
+VkSampler SamplerPool::_GetSampler(const SamplerInfo _info)
 {
 	SamplerInfo key = _info;
 	key.info.pNext = nullptr;
@@ -36,6 +36,35 @@ VkSampler SamplerPool::GetSampler(const SamplerInfo _info)
 	
 	m_vecSamplerEntries[idx].refCount++;
 	return m_vecSamplerEntries[idx].vkSampler;
+}
+
+VkSampler SamplerPool::GetSampler(const VkSamplerCreateInfo& _createInfo)
+{
+	SamplerInfo info;
+	info.info = _createInfo;
+	return _GetSampler(info);
+}
+
+VkSampler SamplerPool::GetSampler(VkFilter filter, VkSamplerAddressMode addressMode, VkSamplerMipmapMode mipmapMode, float minLod, float maxLod, float mipLodBias, bool anistrophyEnable, float maxAnistrophy)
+{
+	VkSamplerCreateInfo createInfo{ VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+	
+	createInfo.addressModeU = addressMode;
+	createInfo.addressModeV = addressMode;
+	createInfo.addressModeW = addressMode;
+	createInfo.magFilter = filter;
+	createInfo.minFilter = filter;
+	createInfo.mipmapMode = mipmapMode;
+	createInfo.minLod = minLod;
+	createInfo.maxLod = maxLod;
+	createInfo.mipLodBias = mipLodBias;
+	createInfo.anisotropyEnable = anistrophyEnable ? VK_TRUE : VK_FALSE;
+	createInfo.maxAnisotropy = maxAnistrophy;
+	createInfo.compareEnable = VK_FALSE;
+	createInfo.compareOp = VK_COMPARE_OP_ALWAYS;
+	createInfo.borderColor = VK_BORDER_COLOR_INT_OPAQUE_BLACK;
+
+	return GetSampler(createInfo);
 }
 
 void SamplerPool::ReturnSampler(VkSampler* _sampler)

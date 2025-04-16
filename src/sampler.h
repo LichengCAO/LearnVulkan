@@ -1,24 +1,25 @@
 #pragma once
 #include "common.h"
 
-struct SamplerInfo
-{
-	VkSamplerCreateInfo info{};
-	SamplerInfo() { memset(this, 0, sizeof(SamplerInfo)); }
-
-	bool operator==(const SamplerInfo& other) const { return memcmp(this, &other, sizeof(SamplerInfo)) == 0; }
-};
 
 class Sampler
 {
+private:
+	VkSamplerCreateInfo m_vkSamplerCreateInfo{ VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
 public:
 	VkSampler vkSampler = VK_NULL_HANDLE;
-	SamplerInfo info{};
 };
 
 class SamplerPool
 {
 private:
+	struct SamplerInfo
+	{
+		VkSamplerCreateInfo info{ VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO };
+		
+		SamplerInfo() { memset(this, 0, sizeof(SamplerInfo)); }
+		bool operator==(const SamplerInfo& other) const { return memcmp(this, &other, sizeof(SamplerInfo)) == 0; }
+	};
 	struct SamplerEntry
 	{
 		VkSampler vkSampler = VK_NULL_HANDLE;
@@ -36,11 +37,28 @@ private:
 			return h1 ^ h2;
 		}
 	};
+
+private:
 	std::unordered_map<SamplerInfo, uint32_t, hash_fn> m_mapInfoToIndex;
 	std::unordered_map<VkSampler, uint32_t> m_mapSamplerToIndex;
 	std::vector<SamplerEntry> m_vecSamplerEntries;
 	uint32_t m_currentId = ~0;
+
+private:
+	VkSampler _GetSampler(const SamplerInfo _info);
+
 public:
-	VkSampler GetSampler(const SamplerInfo _info);
+	
+	VkSampler GetSampler(const VkSamplerCreateInfo& _createInfo);
+	VkSampler GetSampler(
+		VkFilter filter,
+		VkSamplerAddressMode addressMode,
+		VkSamplerMipmapMode mipmapMode = VK_SAMPLER_MIPMAP_MODE_LINEAR,
+		float minLod = 0.0f,
+		float maxLod = VK_LOD_CLAMP_NONE,
+		float mipLodBias = 0.0f,
+		bool anistrophyEnable = false,
+		float maxAnistrophy = 1.0f
+	);
 	void ReturnSampler(VkSampler* _sampler);
 };

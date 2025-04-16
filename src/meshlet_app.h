@@ -12,7 +12,7 @@
 
 #define MYTYPE(x) std::vector<std::unique_ptr<x>>
 
-struct Model
+struct ModelX
 {
 	Transform transform;
 	std::vector<Vertex> verts;
@@ -39,7 +39,7 @@ private:
 	PersCamera m_camera{ 400, 300, glm::vec3(2,2,2), glm::vec3(0,0,0), glm::vec3(0,0,1) };
 	MyDevice* pDevice = nullptr;
 
-	std::vector<Model> m_models;
+	std::vector<ModelX> m_models;
 
 	// Descriptor sets
 	DescriptorSetLayout m_cameraDSetLayout;
