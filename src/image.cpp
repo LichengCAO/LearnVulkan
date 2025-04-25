@@ -2,6 +2,9 @@
 #include "device.h"
 #include "buffer.h"
 #include "commandbuffer.h"
+#ifndef STB_IMAGE_IMPLEMENTATION
+#define STB_IMAGE_IMPLEMENTATION
+#endif
 #include "stb_image.h"
 uint32_t Image::_FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const
 {

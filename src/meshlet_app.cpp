@@ -7,9 +7,9 @@ void MeshletApp::_InitPipelines()
 	SimpleShader meshShader{};
 	SimpleShader fragShader{};
 
-	//m_pipeline.AddDescriptorSetLayout(m_cameraDSetLayout.vkDescriptorSetLayout);
-	//m_pipeline.AddDescriptorSetLayout(m_modelTransformDSetLayout.vkDescriptorSetLayout);
-	//m_pipeline.AddDescriptorSetLayout(m_modelVertDSetLayout.vkDescriptorSetLayout);
+	m_pipeline.AddDescriptorSetLayout(m_cameraDSetLayout.vkDescriptorSetLayout);
+	m_pipeline.AddDescriptorSetLayout(m_modelTransformDSetLayout.vkDescriptorSetLayout);
+	m_pipeline.AddDescriptorSetLayout(m_modelVertDSetLayout.vkDescriptorSetLayout);
 	m_pipeline.BindToSubpass(&m_renderPass, 0);
 
 	taskShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/mesh.task.spv");
@@ -106,14 +106,14 @@ void MeshletApp::_DrawFrame()
 	cmd->StartCommands({ waitInfo });
 
 	cmd->StartRenderPass(&m_renderPass, m_framebuffers[m_currentFrame].get());
-	//for (int i = 0; i < m_models.size(); ++i)
+	for (int i = 0; i < m_models.size(); ++i)
 	{
 		GraphicsMeshPipelineInput meshInput{};
 		meshInput.groupCountX = 126;
 		meshInput.groupCountY = 1;
 		meshInput.groupCountZ = 1;
 		meshInput.imageSize = pDevice->GetSwapchainExtent();
-		//meshInput.pDescriptorSets = { m_cameraDSets[m_currentFrame].get(), m_modelTransformDSets[i][m_currentFrame].get(), m_modelVertDSets[i].get() };
+		meshInput.pDescriptorSets = { m_cameraDSets[m_currentFrame].get(), m_modelTransformDSets[i][m_currentFrame].get(), m_modelVertDSets[i].get() };
 		m_pipeline.Do(cmd->vkCommandBuffer, meshInput);
 	}
 	cmd->EndRenderPass();
@@ -164,6 +164,15 @@ void MeshletApp::_Init()
 	pDevice = &MyDevice::GetInstance();
 	pDevice->Init();
 	
+	std::vector<Mesh> meshs;
+	MeshLoader::Load("E:/GitStorage/LearnVulkan/res/models/bunny/bunny.obj", meshs);
+	for (auto& mesh : meshs)
+	{
+		Model model{};
+		model.mesh = mesh;
+		m_models.push_back(model);
+	}
+
 	_InitRenderPass();
 	_InitDescriptorSetLayouts();
 
@@ -173,7 +182,6 @@ void MeshletApp::_Init()
 	_InitSampler();
 
 	_InitDescriptorSets();
-	//_InitVertexInputs();
 	_InitPipelines();
 	
 	// init semaphores 
@@ -225,11 +233,11 @@ void MeshletApp::_InitRenderPass()
 	AttachmentInformation swapchainInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::SWAPCHAIN);
 	AttachmentInformation depthInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::DEPTH);
 	m_renderPass.AddAttachment(swapchainInfo);
-	//m_renderPass.AddAttachment(depthInfo);
+	m_renderPass.AddAttachment(depthInfo);
 
 	SubpassInformation subpassInfo{};
 	subpassInfo.AddColorAttachment(0);
-	//subpassInfo.SetDepthStencilAttachment(1);
+	subpassInfo.SetDepthStencilAttachment(1);
 	
 	m_renderPass.AddSubpass(subpassInfo);
 	m_renderPass.Init();
@@ -243,15 +251,15 @@ void MeshletApp::_UninitRenderPass()
 void MeshletApp::_InitDescriptorSetLayouts()
 {
 	m_modelTransformDSetLayout = DescriptorSetLayout{};
-	m_modelTransformDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT);
+	m_modelTransformDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT);
 	m_modelTransformDSetLayout.Init();
 
 	m_modelVertDSetLayout = DescriptorSetLayout{};
-	m_modelVertDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT);
+	m_modelVertDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT);
 	m_modelVertDSetLayout.Init();
 
 	m_cameraDSetLayout = DescriptorSetLayout{};
-	m_cameraDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_MESH_BIT_EXT);
+	m_cameraDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT);
 	m_cameraDSetLayout.Init();
 }
 
@@ -278,11 +286,22 @@ void MeshletApp::_InitBuffers()
 	for (const auto& model : m_models)
 	{
 		// model vertex buffers
+		std::vector<VBO> curVBOs;
 		BufferInformation bufferInfo{};
 		BufferInformation stageBufferInfo{};
 		Buffer stageBuffer{};
+		
+		for (const auto& meshVert : model.mesh.verts)
+		{
+			VBO curVBO{};
+			curVBO.pos = meshVert.position;
+			CHECK_TRUE(meshVert.normal.has_value(), "We need a normal here!");
+			curVBO.normal = meshVert.normal.value();
 
-		bufferInfo.size = static_cast<uint32_t>(model.verts.size() * sizeof(Vertex));
+			curVBOs.push_back(curVBO);
+		}
+
+		bufferInfo.size = static_cast<uint32_t>(curVBOs.size() * sizeof(VBO));
 		bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		
@@ -291,7 +310,7 @@ void MeshletApp::_InitBuffers()
 		stageBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 
 		stageBuffer.Init(stageBufferInfo);
-		stageBuffer.CopyFromHost(model.verts.data());
+		stageBuffer.CopyFromHost(curVBOs.data());
 		std::unique_ptr<Buffer> uptrVertBuffer = std::make_unique<Buffer>();
 		uptrVertBuffer->Init(bufferInfo);
 		
@@ -302,7 +321,7 @@ void MeshletApp::_InitBuffers()
 		m_modelTransformBuffers.push_back({});
 		BufferInformation transformBufferInfo{};
 		transformBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-		transformBufferInfo.size = static_cast<uint32_t>(sizeof(ModelTransform));
+		transformBufferInfo.size = static_cast<uint32_t>(sizeof(ModelTransformUBO));
 		transformBufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 		{
@@ -417,7 +436,7 @@ void MeshletApp::_InitFramebuffers()
 	{
 		std::vector<const ImageView*> renderViews{ 
 			m_swapchainImageViews[i].get(),
-			//m_depthImageViews[i].get()
+			m_depthImageViews[i].get()
 		};
 		std::unique_ptr<Framebuffer> uptrFramebuffer = std::make_unique<Framebuffer>(m_renderPass.NewFramebuffer(renderViews));
 		uptrFramebuffer->Init();

@@ -7,50 +7,50 @@
 #include "camera.h"
 #include "transform.h"
 #include "geometry.h"
-struct CameraUBO
-{
-	alignas(16) glm::mat4 view;
-	alignas(16) glm::mat4 proj;
-	alignas(16) glm::vec4 eye;
-};
-
-struct ViewportInformation
-{
-	glm::ivec4 extent{};
-};
-struct CameraViewInformation
-{
-	alignas(16) glm::mat4 normalView; // inverse transpose of view matrix
-	alignas(4)  float invTanHalfFOV;
-	alignas(4)  float screenRatioXY;
-};
-struct ModelTransform
-{
-	alignas(16) glm::mat4 model;
-	alignas(16) glm::mat4 modelInvTranspose;
-};
-
-struct Model
-{
-	std::string objFilePath;
-	std::string texturePath;
-	Transform   transform{};
-};
-struct SimpleMaterial
-{
-	float roughness = 0;
-};
-struct GaussianBlurInformation
-{
-	uint32_t blurRad = 0;
-};
-struct GaussianKernels
-{
-	std::array<float, 16> kernels{};
-};
+#include "commandbuffer.h"
 
 class TransparentApp
 {
+private:
+	struct CameraUBO
+	{
+		alignas(16) glm::mat4 view;
+		alignas(16) glm::mat4 proj;
+		alignas(16) glm::vec4 eye;
+	};
+	struct ViewportInformation
+	{
+		glm::ivec4 extent{};
+	};
+	struct CameraViewInformation
+	{
+		alignas(16) glm::mat4 normalView; // inverse transpose of view matrix
+		alignas(4)  float invTanHalfFOV;
+		alignas(4)  float screenRatioXY;
+	};
+	struct ModelTransform
+	{
+		alignas(16) glm::mat4 model;
+		alignas(16) glm::mat4 modelInvTranspose;
+	};
+	struct Model
+	{
+		std::string objFilePath;
+		std::string texturePath;
+		Transform   transform{};
+	};
+	struct SimpleMaterial
+	{
+		float roughness = 0;
+	};
+	struct GaussianBlurInformation
+	{
+		uint32_t blurRad = 0;
+	};
+	struct GaussianKernels
+	{
+		std::array<float, 16> kernels{};
+	};
 private:
 	double lastTime = 0.0;
 	float frameTime = 0.0f;
@@ -217,7 +217,6 @@ private:
 
 	void _ResizeWindow();
 
-	void _ReadObjFile(const std::string& objFile, std::vector<Vertex>& verts, std::vector<uint32_t>& indices) const;
 	VkImageLayout _GetImageLayout(ImageView* pImageView) const;
 	VkImageLayout _GetImageLayout(VkImage vkImage, uint32_t baseArrayLayer, uint32_t layerCount, uint32_t baseMipLevel, uint32_t levelCount, VkImageAspectFlags aspect) const;
 public:

@@ -4,6 +4,8 @@
 #include <random>
 #define MAX_FRAME_COUNT 3
 #include "gaussian_blur.h"
+#include "commandbuffer.h"
+#include "utils.h"
 void TransparentApp::_Init()
 {
 	MyDevice::GetInstance().Init();
@@ -1343,141 +1345,84 @@ void TransparentApp::_UninitDescriptorSets()
 
 void TransparentApp::_InitVertexInputs()
 {
-	// Setup model vertex input layout
+	struct NormalVertex
 	{
-		VertexInputEntry location0;
-		location0.format = VkFormat::VK_FORMAT_R32G32B32_SFLOAT;
-		location0.offset = offsetof(Vertex, pos);
-		VertexInputEntry location1;
-		location1.format = VkFormat::VK_FORMAT_R32G32B32_SFLOAT;
-		location1.offset = offsetof(Vertex, normal);
-		VertexInputEntry location2;
-		location2.format = VkFormat::VK_FORMAT_R32G32_SFLOAT;
-		location2.offset = offsetof(Vertex, uv);
-
-		m_gbufferVertLayout.AddLocation(location0);
-		m_gbufferVertLayout.AddLocation(location1);
-		m_gbufferVertLayout.AddLocation(location2);
-		m_gbufferVertLayout.stride = sizeof(Vertex);
-		m_gbufferVertLayout.inputRate = VkVertexInputRate::VK_VERTEX_INPUT_RATE_VERTEX;
-
-		// Load models
-		std::vector<std::string> models;
-		for (int i = 0; i < m_models.size(); ++i)
-		{
-			models.push_back(m_models[i].objFilePath);
-		}
-		m_gbufferVertBuffers.reserve(models.size());
-		m_gbufferIndexBuffers.reserve(models.size());
-
-		for (int i = 0; i < models.size(); ++i)
-		{
-			std::vector<Vertex> vertices;
-			std::vector<uint32_t> indices;
-			_ReadObjFile(models[i], vertices, indices);
-			// Upload to device
-			m_gbufferVertBuffers.push_back(Buffer{});
-			m_gbufferIndexBuffers.push_back(Buffer{});
-			BufferInformation localBufferInfo;
-			BufferInformation stagingBufferInfo;
-			Buffer stagingBuffer;
-			Buffer& vertBuffer = m_gbufferVertBuffers.back();
-			Buffer& indexBuffer = m_gbufferIndexBuffers.back();
-			stagingBufferInfo.size = sizeof(Vertex) * vertices.size();
-			stagingBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-			stagingBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-			stagingBuffer.Init(stagingBufferInfo);
-			stagingBuffer.CopyFromHost(vertices.data());
-
-			localBufferInfo.size = sizeof(Vertex) * vertices.size();
-			localBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-			localBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-			vertBuffer.Init(localBufferInfo);
-			vertBuffer.CopyFromBuffer(stagingBuffer);
-
-			stagingBuffer.Uninit();
-			stagingBufferInfo.size = sizeof(uint32_t) * indices.size();
-			stagingBuffer.Init(stagingBufferInfo);
-			stagingBuffer.CopyFromHost(indices.data());
-
-			localBufferInfo.size = sizeof(uint32_t) * indices.size();;
-			localBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-			localBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-			indexBuffer.Init(localBufferInfo);
-			indexBuffer.CopyFromBuffer(stagingBuffer);
-
-			stagingBuffer.Uninit();
-		}
-	}
-	
+		alignas(16) glm::vec3 position;
+		alignas(16) glm::vec3 normal;
+		alignas(16) glm::vec2 uv;
+	};
 	struct TransparentVertex
 	{
 		alignas(16) glm::vec3 pos;
 		alignas(16) glm::vec3 normal;
 		alignas(16) glm::vec4 color;
 	};
+	struct QuadVertex
+	{
+		alignas(8) glm::vec2 pos{};
+		alignas(8) glm::vec2 uv{};
+	};
+	// Setup model vertex input layout
 	{
 		VertexInputEntry location0;
-		location0.format = VkFormat::VK_FORMAT_R32G32B32_SFLOAT;
-		location0.offset = offsetof(TransparentVertex, pos);
 		VertexInputEntry location1;
-		location1.format = VkFormat::VK_FORMAT_R32G32B32_SFLOAT;
-		location1.offset = offsetof(TransparentVertex, normal);
 		VertexInputEntry location2;
-		location2.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
-		location2.offset = offsetof(TransparentVertex, color);
 
-		m_transModelVertLayout.AddLocation(location0);
-		m_transModelVertLayout.AddLocation(location1);
-		m_transModelVertLayout.AddLocation(location2);
-		m_transModelVertLayout.stride = sizeof(TransparentVertex);
-		m_transModelVertLayout.inputRate = VkVertexInputRate::VK_VERTEX_INPUT_RATE_VERTEX;
+		location0.format = VkFormat::VK_FORMAT_R32G32B32_SFLOAT;
+		location0.offset = offsetof(NormalVertex, position);
+		location1.format = VkFormat::VK_FORMAT_R32G32B32_SFLOAT;
+		location1.offset = offsetof(NormalVertex, normal);
+		location2.format = VkFormat::VK_FORMAT_R32G32_SFLOAT;
+		location2.offset = offsetof(NormalVertex, uv);
 
-		std::vector<std::string> objFiles;
-		for (auto& model : m_transModels)
+		m_gbufferVertLayout.AddLocation(location0);
+		m_gbufferVertLayout.AddLocation(location1);
+		m_gbufferVertLayout.AddLocation(location2);
+		m_gbufferVertLayout.stride = sizeof(NormalVertex);
+		m_gbufferVertLayout.inputRate = VkVertexInputRate::VK_VERTEX_INPUT_RATE_VERTEX;
+
+		// Load models
+		m_gbufferVertBuffers.reserve(m_models.size());
+		m_gbufferIndexBuffers.reserve(m_models.size());
+		for (int i = 0; i < m_models.size(); ++i)
 		{
-			objFiles.push_back(model.objFilePath);
-		}
-		m_transModelVertBuffers.reserve(objFiles.size());
-		m_transModelIndexBuffers.reserve(objFiles.size());
-		
-		std::uniform_real_distribution<float> uniformDist;
-		std::default_random_engine            rnd(3625);  // Fixed seed
-		for (auto& objFile : objFiles)
-		{
-			std::vector<Vertex> verts{};
-			std::vector<uint32_t> indices{};
-			glm::vec4 color(uniformDist(rnd), uniformDist(rnd), uniformDist(rnd), uniformDist(rnd));
-			color.x *= color.x;
-			color.y *= color.y;
-			color.z *= color.z;
-			color.a = 0.05f;
-			color = glm::vec4(glm::vec3(0.0f, 0.0f, 1.0f), color.a);
-			_ReadObjFile(objFile, verts, indices);
-			std::vector<TransparentVertex> vertices{};
-			vertices.reserve(verts.size());
-			for (int i = 0; i < verts.size(); ++i)
-			{
-				vertices.push_back({verts[i].pos, verts[i].normal, color});
-			}
-			m_transModelVertBuffers.push_back(Buffer{});
-			m_transModelIndexBuffers.push_back(Buffer{});
+			Buffer stagingBuffer;
 			BufferInformation localBufferInfo;
 			BufferInformation stagingBufferInfo;
-			Buffer stagingBuffer;
-			Buffer& vertBuffer = m_transModelVertBuffers.back();
-			Buffer& indexBuffer = m_transModelIndexBuffers.back();
-			stagingBufferInfo.size = sizeof(TransparentVertex) * vertices.size();
-			stagingBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-			stagingBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+			std::vector<NormalVertex> vertices;
+			std::vector<uint32_t> indices;
+			std::vector<Mesh> scene;
+
+			CHECK_TRUE(MeshLoader::Load(m_models[i].objFilePath, scene), "Failed to load .obj file!");
+			
+			CHECK_TRUE(scene.size() > 0, "No model loaded!");
+			indices = scene[0].indices;
+			vertices.reserve(scene[0].verts.size());
+			for (int i = 0; i < scene[0].verts.size(); ++i)
+			{
+				NormalVertex curVertex{};
+				Vertex& meshVertex = scene[0].verts[i];
+				curVertex.position = meshVertex.position;
+				if (meshVertex.normal.has_value()) curVertex.normal = meshVertex.normal.value();
+				if (meshVertex.uv.has_value()) curVertex.uv = meshVertex.uv.value();
+				vertices.push_back(curVertex);
+			}
+
+			// Upload to device
+			m_gbufferVertBuffers.push_back(Buffer{});
+			m_gbufferIndexBuffers.push_back(Buffer{});
+
+			stagingBufferInfo.size = sizeof(NormalVertex) * vertices.size();
+			stagingBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+			stagingBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 			stagingBuffer.Init(stagingBufferInfo);
 			stagingBuffer.CopyFromHost(vertices.data());
 
-			localBufferInfo.size = sizeof(TransparentVertex) * vertices.size();
-			localBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-			localBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-			vertBuffer.Init(localBufferInfo);
-			vertBuffer.CopyFromBuffer(stagingBuffer);
+			localBufferInfo.size = sizeof(NormalVertex) * vertices.size();
+			localBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+			localBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+			m_gbufferVertBuffers.back().Init(localBufferInfo);
+			m_gbufferVertBuffers.back().CopyFromBuffer(stagingBuffer);
 
 			stagingBuffer.Uninit();
 			stagingBufferInfo.size = sizeof(uint32_t) * indices.size();
@@ -1485,59 +1430,133 @@ void TransparentApp::_InitVertexInputs()
 			stagingBuffer.CopyFromHost(indices.data());
 
 			localBufferInfo.size = sizeof(uint32_t) * indices.size();;
-			localBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-			localBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-			indexBuffer.Init(localBufferInfo);
-			indexBuffer.CopyFromBuffer(stagingBuffer);
+			localBufferInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+			localBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+			m_gbufferIndexBuffers.back().Init(localBufferInfo);
+			m_gbufferIndexBuffers.back().CopyFromBuffer(stagingBuffer);
+
+			stagingBuffer.Uninit();
+		}
+	}
+
+	{
+		std::uniform_real_distribution<float> uniformDist;
+		std::default_random_engine            rnd(3625);  // Fixed seed
+		VertexInputEntry location0;
+		VertexInputEntry location1;
+		VertexInputEntry location2;
+
+		location0.format = VK_FORMAT_R32G32B32_SFLOAT;
+		location0.offset = offsetof(TransparentVertex, pos);
+		location1.format = VK_FORMAT_R32G32B32_SFLOAT;
+		location1.offset = offsetof(TransparentVertex, normal);
+		location2.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+		location2.offset = offsetof(TransparentVertex, color);
+
+		m_transModelVertLayout.AddLocation(location0);
+		m_transModelVertLayout.AddLocation(location1);
+		m_transModelVertLayout.AddLocation(location2);
+		m_transModelVertLayout.stride = sizeof(TransparentVertex);
+		m_transModelVertLayout.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
+		m_transModelVertBuffers.reserve(m_transModels.size());
+		m_transModelIndexBuffers.reserve(m_transModels.size());
+		
+		for (auto& transModel : m_transModels)
+		{
+			std::vector<Mesh> scene;
+			std::vector<uint32_t> indices{};
+			std::vector<TransparentVertex> vertices{};
+			glm::vec4 color(uniformDist(rnd), uniformDist(rnd), uniformDist(rnd), uniformDist(rnd));
+			BufferInformation localBufferInfo;
+			BufferInformation stagingBufferInfo;
+			Buffer stagingBuffer;
+			// init color
+			{
+				color.x *= color.x;
+				color.y *= color.y;
+				color.z *= color.z;
+				color.a = 0.05f;
+				color = glm::vec4(glm::vec3(0.0f, 0.0f, 1.0f), color.a);
+			}
+
+			CHECK_TRUE(MeshLoader::Load(transModel.objFilePath, scene), "Failed to load .obj file!");
+			
+			CHECK_TRUE(scene.size() > 0, "No model loaded!");
+			indices = scene[0].indices;
+			vertices.resize(scene[0].verts.size(), TransparentVertex{});
+			for (int i = 0; i < vertices.size(); ++i)
+			{
+				Vertex& meshVertex = scene[0].verts[i];
+				vertices[i].pos = meshVertex.position;
+				if (meshVertex.normal.has_value()) vertices[i].normal = meshVertex.normal.value();
+				vertices[i].color = color;
+			}
+			m_transModelVertBuffers.push_back(Buffer{});
+			m_transModelIndexBuffers.push_back(Buffer{});
+
+			stagingBufferInfo.size = sizeof(TransparentVertex) * vertices.size();
+			stagingBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+			stagingBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+			stagingBuffer.Init(stagingBufferInfo);
+			stagingBuffer.CopyFromHost(vertices.data());
+
+			localBufferInfo.size = sizeof(TransparentVertex) * vertices.size();
+			localBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+			localBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+			m_transModelVertBuffers.back().Init(localBufferInfo);
+			m_transModelVertBuffers.back().CopyFromBuffer(stagingBuffer);
+
+			stagingBuffer.Uninit();
+			stagingBufferInfo.size = sizeof(uint32_t) * indices.size();
+			stagingBuffer.Init(stagingBufferInfo);
+			stagingBuffer.CopyFromHost(indices.data());
+
+			localBufferInfo.size = sizeof(uint32_t) * indices.size();;
+			localBufferInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+			localBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+			m_transModelIndexBuffers.back().Init(localBufferInfo);
+			m_transModelIndexBuffers.back().CopyFromBuffer(stagingBuffer);
 
 			stagingBuffer.Uninit();
 		}
 	}
 
 	// setup postprocess vertex input layout
-	struct QuadVertex
 	{
-		alignas(8) glm::vec2 pos{};
-		alignas(8) glm::vec2 uv{};
-	};
-	{
-		{
-			VertexInputEntry location0;
-			location0.format = VkFormat::VK_FORMAT_R32G32_SFLOAT;
-			location0.offset = offsetof(QuadVertex, pos);
-			VertexInputEntry location1;
-			location1.format = VkFormat::VK_FORMAT_R32G32_SFLOAT;
-			location1.offset = offsetof(QuadVertex, uv);
-			m_quadVertLayout.AddLocation(location0);
-			m_quadVertLayout.AddLocation(location1);
-			m_quadVertLayout.stride = sizeof(QuadVertex);
-			m_quadVertLayout.inputRate = VkVertexInputRate::VK_VERTEX_INPUT_RATE_VERTEX;
-		}
-
-		std::vector<QuadVertex> vertices = 
-		{
+		VertexInputEntry location0;
+		VertexInputEntry location1;
+		BufferInformation localBufferInfo;
+		BufferInformation stagingBufferInfo;
+		Buffer stagingBuffer;
+		std::vector<uint32_t> indices = { 2, 1, 0, 0, 3, 2 };
+		std::vector<QuadVertex> vertices = {
 			{{-1.f, -1.f}, {0.0f, 0.0f}},
 			{{ 1.f, -1.f}, {1.0f, 0.0f}},
 			{{ 1.f,  1.f}, {1.0f, 1.0f}},
 			{{-1.f,  1.f}, {0.0f, 1.0f}}
 		};
-		std::vector<uint32_t> indices = { 2, 1, 0, 0, 3, 2 };
-		BufferInformation localBufferInfo;
-		BufferInformation stagingBufferInfo;
-		Buffer stagingBuffer;
-		Buffer& vertBuffer = m_quadVertBuffer;
-		Buffer& indexBuffer = m_quadIndexBuffer;
+
+		location0.format = VK_FORMAT_R32G32_SFLOAT;
+		location0.offset = offsetof(QuadVertex, pos);
+		location1.format = VK_FORMAT_R32G32_SFLOAT;
+		location1.offset = offsetof(QuadVertex, uv);
+		m_quadVertLayout.AddLocation(location0);
+		m_quadVertLayout.AddLocation(location1);
+		m_quadVertLayout.stride = sizeof(QuadVertex);
+		m_quadVertLayout.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+
 		stagingBufferInfo.size = sizeof(QuadVertex) * vertices.size();
-		stagingBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-		stagingBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		stagingBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+		stagingBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 		stagingBuffer.Init(stagingBufferInfo);
 		stagingBuffer.CopyFromHost(vertices.data());
 
 		localBufferInfo.size = sizeof(QuadVertex) * vertices.size();
-		localBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-		localBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		vertBuffer.Init(localBufferInfo);
-		vertBuffer.CopyFromBuffer(stagingBuffer);
+		localBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+		localBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		m_quadVertBuffer.Init(localBufferInfo);
+		m_quadVertBuffer.CopyFromBuffer(stagingBuffer);
 
 		stagingBuffer.Uninit();
 		stagingBufferInfo.size = sizeof(uint32_t) * indices.size();
@@ -1545,10 +1564,10 @@ void TransparentApp::_InitVertexInputs()
 		stagingBuffer.CopyFromHost(indices.data());
 
 		localBufferInfo.size = sizeof(uint32_t) * indices.size();;
-		localBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-		localBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		indexBuffer.Init(localBufferInfo);
-		indexBuffer.CopyFromBuffer(stagingBuffer);
+		localBufferInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+		localBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		m_quadIndexBuffer.Init(localBufferInfo);
+		m_quadIndexBuffer.CopyFromBuffer(stagingBuffer);
 
 		stagingBuffer.Uninit();
 	}
@@ -2337,50 +2356,6 @@ void TransparentApp::_ResizeWindow()
 	_InitImagesAndViews();
 	_InitFramebuffers();
 	_InitDescriptorSets();
-}
-
-void TransparentApp::_ReadObjFile(const std::string& objFile, std::vector<Vertex>& vertices, std::vector<uint32_t>& indices) const
-{
-	tinyobj::attrib_t attrib;
-	std::vector<tinyobj::shape_t> shapes;
-	std::vector<tinyobj::material_t> materials;
-	std::string warn, err;
-	CHECK_TRUE(tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, objFile.c_str()), warn + err);
-	std::unordered_map<Vertex, uint32_t> uniqueVertices{};
-	for (const auto& shape : shapes)
-	{
-		for (const auto& index : shape.mesh.indices)
-		{
-			Vertex vertex{};
-			vertex.pos = {
-				attrib.vertices[3 * index.vertex_index + 0],
-				attrib.vertices[3 * index.vertex_index + 1],
-				attrib.vertices[3 * index.vertex_index + 2]
-			};
-			if (index.texcoord_index != -1)
-			{
-				vertex.uv = {
-					attrib.texcoords[2 * index.texcoord_index + 0],
-					1.0f - attrib.texcoords[2 * index.texcoord_index + 1] 
-				};
-			}
-			if (index.normal_index != -1)
-			{
-				vertex.normal = {
-					attrib.normals[3 * index.normal_index + 0],
-					attrib.normals[3 * index.normal_index + 1],
-					attrib.normals[3 * index.normal_index + 2],
-				};
-			}
-
-			if (uniqueVertices.count(vertex) == 0)
-			{
-				uniqueVertices[vertex] = static_cast<uint32_t>(vertices.size());
-				vertices.push_back(vertex);
-			}
-			indices.push_back(uniqueVertices[vertex]);
-		}
-	}
 }
 
 VkImageLayout TransparentApp::_GetImageLayout(ImageView* pImageView) const

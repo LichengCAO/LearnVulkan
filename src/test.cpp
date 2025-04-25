@@ -1,7 +1,7 @@
-#include "meshlet_app.h"
-//#include "transparent_app.h"
+//#include "meshlet_app.h"
+#include "transparent_app.h"
 int main() {
-	MeshletApp app;
+	TransparentApp app;
 	app.Run(); // easier to debug this way
 	//try {
 	//	app.Run();
