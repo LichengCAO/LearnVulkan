@@ -2338,7 +2338,6 @@ void TransparentApp::_DrawFrame()
 		m_gPipeline.Do(cmd.vkCommandBuffer, input);
 	}
 	cmd.EndRenderPass();
-
 	VkSemaphore renderpassFinish = cmd.SubmitCommands();
 	MyDevice::GetInstance().PresentSwapchainImage({ renderpassFinish }, imageIndex.value());
 	m_currentFrame = (m_currentFrame + 1) % MAX_FRAME_COUNT;

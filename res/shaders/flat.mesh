@@ -1,0 +1,50 @@
+#version 450
+
+#extension GL_EXT_mesh_shader : require
+
+layout(local_size_x = 64) in;
+layout(triangles, max_vertices = 64, max_primitives = 124) out;
+layout(binding = 0) buffer VertexBuffer
+{
+	vec3 positions[];
+	vec3 color[];
+};
+layout(binding = 1) buffer IndexBuffer
+{
+	uint indices[];
+};
+struct Meshlet
+{
+	uint vertexOffset;
+	uint vertexCount;
+	uint triangleOffset;
+	uint triangleCount;
+};
+layout(binding = 0) readonly buffer Meshlets {Meshlet meshlets[];};
+layout(binding = 1) readonly buffer MeshletVertices {uint meshletVertices[];};
+layout(binding = 2) readonly buffer MeshletTriangles {uint meshletTriangles[];};
+
+void main()
+{
+	const Meshlet meshlet = meshlets[gl_WorkGroupID.x];
+	const uint vertexCount = meshlet.vertexCount;
+	const uint primitiveCount = meshlet.triangleCount;
+	const uint threadIDInGroup = gl_LocalInvocationIndex;
+	SetMeshOutputsEXT(vertexCount, primitiveCount);
+	
+	for (uint i = threadIDInGroup; i < vertexCount; i += gl_WorkGroupSize.x/*local_size_x*/)
+	{
+		uint index = meshletVertices[meshlet.vertexOffset + i];
+		gl_MeshVerticesEXT[i].gl_Position = vec4(positions[index], 1.0f);
+	}
+	// since max_primitives is larger than workgroup size, we need to use a loop to emit all the primitives
+	for (uint i = threadIDInGroup; i < primitiveCount; i += gl_WorkGroupSize.x/*local_size_x*/)
+	{
+		uint offset = meshlet.triangleOffset + i * 3;
+		gl_PrimitiveTriangleIndicesEXT[i] = uvec3(
+			meshletTriangles[offset + 0],
+			meshletTriangles[offset + 1],
+			meshletTriangles[offset + 2],
+		);
+	}
+}
