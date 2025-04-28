@@ -1,6 +1,6 @@
 #include "utils.h"
 #include <meshoptimizer.h>
-bool MeshLoader::Load(const std::string& objFile, OUT std::vector<Mesh>& outMesh)
+bool MeshUtility::Load(const std::string& objFile, OUT std::vector<Mesh>& outMesh)
 {
 	bool bSuccess = false;
 	tinyobj::attrib_t attrib;
@@ -49,7 +49,7 @@ bool MeshLoader::Load(const std::string& objFile, OUT std::vector<Mesh>& outMesh
 	return bSuccess;
 }
 
-void MeshLoader::BuildMeshlets(const Mesh& inMesh, std::vector<Meshlet>& outMeshlets, std::vector<uint32_t>& outMeshletVertices, std::vector<uint8_t>& outMeshletTriangles)
+void MeshUtility::BuildMeshlets(const Mesh& inMesh, std::vector<Meshlet>& outMeshlets, std::vector<uint32_t>& outMeshletVertices, std::vector<uint8_t>& outMeshletTriangles)
 {
 	const std::vector<uint32_t>& indices = inMesh.indices;
 	const std::vector<Vertex>& vertices = inMesh.verts;
@@ -102,7 +102,7 @@ void MeshLoader::BuildMeshlets(const Mesh& inMesh, std::vector<Meshlet>& outMesh
 	}
 }
 
-void MeshLoader::_OptimizeMesh(Mesh& mesh)
+void MeshUtility::_OptimizeMesh(Mesh& mesh)
 {
 	std::vector<uint32_t> remap(std::max(mesh.indices.size(), mesh.verts.size()));
 	std::vector<uint32_t> dstIndices(mesh.indices.size());
@@ -147,7 +147,7 @@ void MeshLoader::_OptimizeMesh(Mesh& mesh)
 	mesh.indices = std::move(dstIndices);
 }
 
-void MeshLoader::_OptimizeMeshToVertexCacheStage(Mesh& mesh)
+void MeshUtility::_OptimizeMeshToVertexCacheStage(Mesh& mesh)
 {
 	std::vector<uint32_t> remap(std::max(mesh.indices.size(), mesh.verts.size()));
 	std::vector<uint32_t> dstIndices(mesh.indices.size());

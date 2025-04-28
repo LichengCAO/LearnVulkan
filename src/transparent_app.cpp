@@ -1393,7 +1393,7 @@ void TransparentApp::_InitVertexInputs()
 			std::vector<uint32_t> indices;
 			std::vector<Mesh> scene;
 
-			CHECK_TRUE(MeshLoader::Load(m_models[i].objFilePath, scene), "Failed to load .obj file!");
+			CHECK_TRUE(MeshUtility::Load(m_models[i].objFilePath, scene), "Failed to load .obj file!");
 			
 			CHECK_TRUE(scene.size() > 0, "No model loaded!");
 			indices = scene[0].indices;
@@ -1480,7 +1480,7 @@ void TransparentApp::_InitVertexInputs()
 				color = glm::vec4(glm::vec3(0.0f, 0.0f, 1.0f), color.a);
 			}
 
-			CHECK_TRUE(MeshLoader::Load(transModel.objFilePath, scene), "Failed to load .obj file!");
+			CHECK_TRUE(MeshUtility::Load(transModel.objFilePath, scene), "Failed to load .obj file!");
 			
 			CHECK_TRUE(scene.size() > 0, "No model loaded!");
 			indices = scene[0].indices;

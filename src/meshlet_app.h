@@ -20,22 +20,29 @@ private:
 	{
 		Mesh mesh;
 		Transform transform;
+		std::vector<Meshlet> meshlets;
+		std::vector<uint32_t> vertexRemap;
+		std::vector<uint8_t> triangleIndices;
 	};
 	struct VBO
 	{
 		alignas(16) glm::vec3 pos;
 		alignas(16) glm::vec3 normal;
 	};
-	struct ModelTransformUBO 
+	struct ModelUBO
 	{
-		glm::mat4 modelTransform;
-		glm::mat4 normalTransform; // inverse transpose of model transform
+		glm::mat4 model;
+		uint32_t meshletCount = 0;
+		uint32_t padding0 = 0;
+		uint32_t padding1 = 0;
+		uint32_t padding2 = 0;
 	};
 	struct CameraUBO
 	{
-		alignas(16) glm::mat4 view;
-		alignas(16) glm::mat4 proj;
+		glm::mat4 view;
+		glm::mat4 proj;
 	};
+
 private:
 	double lastTime = 0.0;
 	float frameTime = 0.0f;
@@ -45,23 +52,19 @@ private:
 
 	std::vector<Model> m_models;
 
-	// Descriptor sets
+	// cameraUBO changes across frames, i create buffers for each frame
 	DescriptorSetLayout m_cameraDSetLayout;
-	MYTYPE(DescriptorSet) m_cameraDSets;
-	MYTYPE(Buffer) m_cameraBuffers;
+	std::vector<std::unique_ptr<DescriptorSet>> m_cameraDSets;
+	std::vector<std::unique_ptr<Buffer>>        m_cameraBuffers;
 
-	DescriptorSetLayout m_modelTransformDSetLayout;
-	std::vector<MYTYPE(DescriptorSet)> m_modelTransformDSets;
-	std::vector<MYTYPE(Buffer)>        m_modelTransformBuffers;
-
-	DescriptorSetLayout m_modelVertDSetLayout;
-	std::vector<std::unique_ptr<DescriptorSet>> m_modelVertDSets;
-	std::vector<std::unique_ptr<Buffer>>        m_modelVertBuffers;
-
-	// Vertex inputs
-	VertexInputLayout m_quadVertLayout;
-	Buffer m_quadVertBuffer;
-	Buffer m_quadIndexBuffer;
+	// following buffers can be used cross frames, so i just create one buffer for one mesh instead of multiple buffers for each frame
+	DescriptorSetLayout m_meshletDSetLayout;
+	std::vector<std::unique_ptr<DescriptorSet>> m_meshletDSets;
+	std::vector<std::unique_ptr<Buffer>> m_meshletBuffers;
+	std::vector<std::unique_ptr<Buffer>> m_meshletVertexBuffers;
+	std::vector<std::unique_ptr<Buffer>> m_meshletTriangleBuffers;
+	std::vector<std::unique_ptr<Buffer>> m_meshletVBOBuffers;
+	std::vector<std::unique_ptr<Buffer>> m_meshUBOBuffers;
 
 	// Samplers
 	VkSampler m_vkSampler = VK_NULL_HANDLE;
@@ -69,10 +72,10 @@ private:
 	// Renderpass
 	RenderPass m_renderPass;
 	std::vector<Image> m_swapchainImages;
-	MYTYPE(Image) m_depthImages;
-	MYTYPE(ImageView) m_depthImageViews;
-	MYTYPE(ImageView) m_swapchainImageViews;
-	MYTYPE(Framebuffer) m_framebuffers;
+	std::vector<std::unique_ptr<Image>> m_depthImages;
+	std::vector<std::unique_ptr<ImageView>> m_depthImageViews;
+	std::vector<std::unique_ptr<ImageView>> m_swapchainImageViews;
+	std::vector<std::unique_ptr<Framebuffer>> m_framebuffers;
 
 	//pipelines
 	GraphicsPipeline m_pipeline;
@@ -93,6 +96,7 @@ private:
 	void _InitSampler();
 	void _UninitSampler();
 
+	void _InitModels();
 	void _InitBuffers();
 	void _UninitBuffers();
 

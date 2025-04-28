@@ -3,32 +3,30 @@
 
 void MeshletApp::_InitPipelines()
 {
-	SimpleShader taskShader{};
+	//SimpleShader taskShader{};
 	SimpleShader meshShader{};
 	SimpleShader fragShader{};
 
 	m_pipeline.AddDescriptorSetLayout(m_cameraDSetLayout.vkDescriptorSetLayout);
-	m_pipeline.AddDescriptorSetLayout(m_modelTransformDSetLayout.vkDescriptorSetLayout);
-	m_pipeline.AddDescriptorSetLayout(m_modelVertDSetLayout.vkDescriptorSetLayout);
+	m_pipeline.AddDescriptorSetLayout(m_meshletDSetLayout.vkDescriptorSetLayout);
 	m_pipeline.BindToSubpass(&m_renderPass, 0);
 
-	taskShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/mesh.task.spv");
+	//taskShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/mesh.task.spv");
 	meshShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/mesh.mesh.spv");
 	fragShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/mesh.frag.spv");
-	taskShader.Init();
+	//taskShader.Init();
 	meshShader.Init();
 	fragShader.Init();
 
-	m_pipeline.AddShader(taskShader.GetShaderStageInfo());
+	//m_pipeline.AddShader(taskShader.GetShaderStageInfo());
 	m_pipeline.AddShader(meshShader.GetShaderStageInfo());
 	m_pipeline.AddShader(fragShader.GetShaderStageInfo());
 	m_pipeline.Init();
 
 	fragShader.Uninit();
 	meshShader.Uninit();
-	taskShader.Uninit();
+	//taskShader.Uninit();
 }
-
 void MeshletApp::_UninitPipelines()
 {
 	m_pipeline.Uninit();
@@ -48,7 +46,6 @@ void MeshletApp::_MainLoop()
 
 	vkDeviceWaitIdle(pDevice->vkDevice);
 }
-
 void MeshletApp::_UpdateUniformBuffer()
 {
 	static std::optional<float> lastX;
@@ -109,7 +106,8 @@ void MeshletApp::_DrawFrame()
 	for (int i = 0; i < m_models.size(); ++i)
 	{
 		GraphicsMeshPipelineInput meshInput{};
-		meshInput.groupCountX = 126;
+		// don't use task shader here
+		meshInput.groupCountX = m_models[i].meshlets.size(); // meshlet count
 		meshInput.groupCountY = 1;
 		meshInput.groupCountZ = 1;
 		meshInput.imageSize = pDevice->GetSwapchainExtent();
@@ -164,18 +162,10 @@ void MeshletApp::_Init()
 	pDevice = &MyDevice::GetInstance();
 	pDevice->Init();
 	
-	std::vector<Mesh> meshs;
-	MeshLoader::Load("E:/GitStorage/LearnVulkan/res/models/bunny/bunny.obj", meshs);
-	for (auto& mesh : meshs)
-	{
-		Model model{};
-		model.mesh = mesh;
-		m_models.push_back(model);
-	}
-
 	_InitRenderPass();
 	_InitDescriptorSetLayouts();
 
+	_InitModels();
 	_InitBuffers();
 	_InitImagesAndViews();
 	_InitFramebuffers();
@@ -199,7 +189,6 @@ void MeshletApp::_Init()
 		m_commandSubmissions.back()->Init();
 	}
 }
-
 void MeshletApp::_Uninit()
 {
 	for (auto& cmd : m_commandSubmissions)
@@ -242,7 +231,6 @@ void MeshletApp::_InitRenderPass()
 	m_renderPass.AddSubpass(subpassInfo);
 	m_renderPass.Init();
 }
-
 void MeshletApp::_UninitRenderPass()
 {
 	m_renderPass.Uninit();
@@ -250,86 +238,48 @@ void MeshletApp::_UninitRenderPass()
 
 void MeshletApp::_InitDescriptorSetLayouts()
 {
-	m_modelTransformDSetLayout = DescriptorSetLayout{};
-	m_modelTransformDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT);
-	m_modelTransformDSetLayout.Init();
-
-	m_modelVertDSetLayout = DescriptorSetLayout{};
-	m_modelVertDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT | VK_SHADER_STAGE_TASK_BIT_EXT);
-	m_modelVertDSetLayout.Init();
-
 	m_cameraDSetLayout = DescriptorSetLayout{};
 	m_cameraDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT);
 	m_cameraDSetLayout.Init();
-}
 
+	m_meshletDSetLayout = DescriptorSetLayout{};
+	m_meshletDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT); // meshlets
+	m_meshletDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT); // meshlet vertices
+	m_meshletDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT); // meshlet triangles
+	m_meshletDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT); // VBOs
+	m_meshletDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT); // model UBO
+	m_meshletDSetLayout.Init();
+}
 void MeshletApp::_UninitDescriptorSetLayouts()
 {
+	m_meshletDSetLayout.Uninit();
 	m_cameraDSetLayout.Uninit();
-	m_modelVertDSetLayout.Uninit();
-	m_modelTransformDSetLayout.Uninit();
 }
 
 void MeshletApp::_InitSampler()
 {
 	m_vkSampler = pDevice->samplerPool.GetSampler(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
 }
-
 void MeshletApp::_UninitSampler()
 {
 	pDevice->samplerPool.ReturnSampler(&m_vkSampler);
 }
 
+void MeshletApp::_InitModels()
+{
+	std::vector<Mesh> meshs;
+	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/bunny/bunny.obj", meshs);
+	for (auto& mesh : meshs)
+	{
+		Model model{};
+		model.mesh = mesh;
+		MeshUtility::BuildMeshlets(mesh, model.meshlets, model.vertexRemap, model.triangleIndices);
+		m_models.push_back(model);
+	}
+}
 void MeshletApp::_InitBuffers()
 {
-	m_modelVertBuffers.reserve(m_models.size());
-	for (const auto& model : m_models)
-	{
-		// model vertex buffers
-		std::vector<VBO> curVBOs;
-		BufferInformation bufferInfo{};
-		BufferInformation stageBufferInfo{};
-		Buffer stageBuffer{};
-		
-		for (const auto& meshVert : model.mesh.verts)
-		{
-			VBO curVBO{};
-			curVBO.pos = meshVert.position;
-			CHECK_TRUE(meshVert.normal.has_value(), "We need a normal here!");
-			curVBO.normal = meshVert.normal.value();
-
-			curVBOs.push_back(curVBO);
-		}
-
-		bufferInfo.size = static_cast<uint32_t>(curVBOs.size() * sizeof(VBO));
-		bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		
-		stageBufferInfo.size = bufferInfo.size;
-		stageBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-		stageBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-
-		stageBuffer.Init(stageBufferInfo);
-		stageBuffer.CopyFromHost(curVBOs.data());
-		std::unique_ptr<Buffer> uptrVertBuffer = std::make_unique<Buffer>();
-		uptrVertBuffer->Init(bufferInfo);
-		
-		uptrVertBuffer->CopyFromBuffer(&stageBuffer);
-		m_modelVertBuffers.push_back(std::move(uptrVertBuffer));
-		
-		// model transform buffers
-		m_modelTransformBuffers.push_back({});
-		BufferInformation transformBufferInfo{};
-		transformBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-		transformBufferInfo.size = static_cast<uint32_t>(sizeof(ModelTransformUBO));
-		transformBufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
-		{
-			std::unique_ptr<Buffer> uptrTransform = std::make_unique<Buffer>();
-			uptrTransform->Init(transformBufferInfo);
-			m_modelTransformBuffers.back().push_back(std::move(uptrTransform));
-		}
-	}
+	int n = m_models.size();
 
 	m_cameraBuffers.reserve(MAX_FRAME_COUNT);
 	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
@@ -343,25 +293,109 @@ void MeshletApp::_InitBuffers()
 		cameraBuffer->Init(cameraBufferInfo);
 		m_cameraBuffers.push_back(std::move(cameraBuffer));
 	}
-}
 
+	m_meshletDSets.reserve(n);
+	for (int i = 0; i < n; ++i)
+	{
+		BufferInformation bufferInfo;
+		BufferInformation stagingBufferInfo;
+		Model& curModel = m_models[i];
+		std::unique_ptr<Buffer> meshletBuffer = std::make_unique<Buffer>(Buffer{});
+		std::unique_ptr<Buffer> meshletVertexBuffer = std::make_unique<Buffer>(Buffer{});
+		std::unique_ptr<Buffer> meshletTriangleBuffer = std::make_unique<Buffer>(Buffer{});
+		std::unique_ptr<Buffer> meshletVBOBuffer = std::make_unique<Buffer>(Buffer{});
+		std::unique_ptr<Buffer> meshUBOBuffer = std::make_unique<Buffer>(Buffer{});
+		Buffer stagingBuffer{};
+		
+		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+		stagingBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+		stagingBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+		
+		bufferInfo.size = static_cast<uint32_t>(sizeof(Meshlet)) * static_cast<uint32_t>(curModel.meshlets.size());
+		stagingBufferInfo.size = bufferInfo.size;
+		stagingBuffer.Init(stagingBufferInfo);
+		stagingBuffer.CopyFromHost(curModel.meshlets.data());
+		meshletBuffer->Init(bufferInfo);
+		meshletBuffer->CopyFromBuffer(stagingBuffer);
+		
+		
+		bufferInfo.size = static_cast<uint32_t>(sizeof(uint32_t)) * static_cast<uint32_t>(curModel.vertexRemap.size());
+		stagingBufferInfo.size = bufferInfo.size;
+		stagingBuffer.Uninit();
+		stagingBuffer.Init(stagingBufferInfo);
+		stagingBuffer.CopyFromHost(curModel.vertexRemap.data());
+		meshletVertexBuffer->Init(bufferInfo);
+		meshletVertexBuffer->CopyFromBuffer(stagingBuffer);
+
+		bufferInfo.size = static_cast<uint32_t>(sizeof(uint8_t)) * static_cast<uint32_t>(curModel.triangleIndices.size());
+		stagingBufferInfo.size = bufferInfo.size;
+		stagingBuffer.Uninit();
+		stagingBuffer.Init(stagingBufferInfo);
+		stagingBuffer.CopyFromHost(curModel.triangleIndices.data());
+		meshletTriangleBuffer->Init(bufferInfo);
+		meshletTriangleBuffer->CopyFromBuffer(stagingBuffer);
+
+		{
+			std::vector<VBO> vbos;
+			vbos.reserve(curModel.mesh.verts.size());
+			for (auto& vertex : curModel.mesh.verts)
+			{
+				VBO vbo{};
+				vbo.normal = vertex.normal.has_value() ? vertex.normal.value() : glm::vec3(0, 0, 1);
+				vbo.pos = vertex.position;
+				vbos.push_back(vbo);
+			}
+			bufferInfo.size = static_cast<uint32_t>(sizeof(VBO)) * static_cast<uint32_t>(curModel.mesh.verts.size());
+			stagingBufferInfo.size = bufferInfo.size;
+			stagingBuffer.Uninit();
+			stagingBuffer.Init(stagingBufferInfo);
+			stagingBuffer.CopyFromHost(vbos.data());
+			meshletVBOBuffer->Init(bufferInfo);
+			meshletVBOBuffer->CopyFromBuffer(stagingBuffer);
+		}
+
+
+		{
+			ModelUBO ubo{};
+			ubo.meshletCount = static_cast<uint32_t>(curModel.meshlets.size());
+			ubo.model = curModel.transform.GetModelMatrix();
+			bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+
+			bufferInfo.size = static_cast<uint32_t>(sizeof(ModelUBO));
+			stagingBufferInfo.size = bufferInfo.size;
+			stagingBuffer.Uninit();
+			stagingBuffer.Init(stagingBufferInfo);
+			stagingBuffer.CopyFromHost(&ubo);
+			meshUBOBuffer->Init(bufferInfo);
+			meshUBOBuffer->CopyFromBuffer(stagingBuffer);
+		}
+		stagingBuffer.Uninit();
+
+		m_meshletBuffers.push_back(std::move(meshletBuffer));
+		m_meshletVertexBuffers.push_back(std::move(meshletVertexBuffer));
+		m_meshletTriangleBuffers.push_back(std::move(meshletTriangleBuffer));
+		m_meshletVBOBuffers.push_back(std::move(meshletVBOBuffer));
+		m_meshUBOBuffers.push_back(std::move(meshUBOBuffer));
+	}
+}
 void MeshletApp::_UninitBuffers()
 {
-	for (auto& uptr : m_modelVertBuffers)
+	auto meshBuffers = {
+		&m_meshUBOBuffers,
+		&m_meshletVBOBuffers,
+		&m_meshletTriangleBuffers,
+		&m_meshletVertexBuffers,
+		&m_meshletBuffers,
+	};
+	for (auto pVec : meshBuffers)
 	{
-		uptr->Uninit();
-	}
-	m_modelVertBuffers.clear();
-
-	for (auto& vec : m_modelTransformBuffers)
-	{
-		for (auto& uptr : vec)
+		for (auto& uptr : *pVec)
 		{
 			uptr->Uninit();
 		}
-		vec.clear();
+		pVec->clear();
 	}
-	m_modelTransformBuffers.clear();
 
 	for (auto& uptr : m_cameraBuffers)
 	{
@@ -408,7 +442,6 @@ void MeshletApp::_InitImagesAndViews()
 		m_swapchainImageViews.push_back(std::move(uptrSwapchainView));
 	}
 }
-
 void MeshletApp::_UninitImagesAndViews()
 {
 	for (auto& uptrView : m_depthImageViews)
@@ -443,7 +476,6 @@ void MeshletApp::_InitFramebuffers()
 		m_framebuffers.push_back(std::move(uptrFramebuffer));
 	}
 }
-
 void MeshletApp::_UninitFramebuffers()
 {
 	for (auto& uptrFramebuffer : m_framebuffers)
@@ -455,46 +487,8 @@ void MeshletApp::_UninitFramebuffers()
 
 void MeshletApp::_InitDescriptorSets()
 {
-	int n = MAX_FRAME_COUNT;
-	// model related
-	for (int i = 0; i < m_models.size(); ++i)
-	{
-		const auto& model = m_models[i];
-		MYTYPE(DescriptorSet) tmpTransformDSet;
-		for (int j = 0; j < n; ++j)
-		{
-			std::unique_ptr<DescriptorSet> modelTransformDSet = std::make_unique<DescriptorSet>(m_modelTransformDSetLayout.NewDescriptorSet());
-			const Buffer* pTransformBuffer = m_modelTransformBuffers[i][j].get();
-			VkDescriptorBufferInfo transformBufferInfo{};
-			
-			transformBufferInfo.buffer = pTransformBuffer->vkBuffer;
-			transformBufferInfo.offset = 0;
-			transformBufferInfo.range = pTransformBuffer->GetBufferInformation().size;
-			
-			modelTransformDSet->Init();
-			modelTransformDSet->StartUpdate();
-			modelTransformDSet->UpdateBinding(0, { transformBufferInfo });
-			modelTransformDSet->FinishUpdate();
-
-			tmpTransformDSet.push_back(std::move(modelTransformDSet));
-		}
-		m_modelTransformDSets.push_back(std::move(tmpTransformDSet));
-		
-		VkDescriptorBufferInfo vertBufferInfo{};
-		const Buffer* pVertBuffer = m_modelVertBuffers[i].get();
-		std::unique_ptr<DescriptorSet> modelVertDSet = std::make_unique<DescriptorSet>(m_modelVertDSetLayout.NewDescriptorSet());
-		vertBufferInfo.buffer = pVertBuffer->vkBuffer;
-		vertBufferInfo.offset = 0;
-		vertBufferInfo.range = pVertBuffer->GetBufferInformation().size;
-		modelVertDSet->Init();
-		modelVertDSet->StartUpdate();
-		modelVertDSet->UpdateBinding(0, { vertBufferInfo });
-		modelVertDSet->FinishUpdate();
-		m_modelVertDSets.push_back(std::move(modelVertDSet));
-	}
-
 	// camera
-	for (int i = 0; i < n; ++i)
+	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 	{
 		std::unique_ptr<DescriptorSet> cameraDSet = std::make_unique<DescriptorSet>(m_cameraDSetLayout.NewDescriptorSet());
 		const Buffer* pCameraBuffer = m_cameraBuffers[i].get();
@@ -508,15 +502,25 @@ void MeshletApp::_InitDescriptorSets()
 		cameraDSet->FinishUpdate();
 		m_cameraDSets.push_back(std::move(cameraDSet));
 	}
-}
 
+	// meshlet
+	for (int i = 0; i < m_models.size(); ++i)
+	{
+		std::unique_ptr<DescriptorSet> meshletDSet = std::make_unique<DescriptorSet>(m_meshletDSetLayout.NewDescriptorSet());
+		VkDescriptorBufferInfo bufferInfo{};
+		meshletDSet->Init();
+		meshletDSet->StartUpdate();
+		meshletDSet->UpdateBinding(0, m_meshletBuffers[i].get());
+		meshletDSet->UpdateBinding(1, m_meshletVertexBuffers[i].get());
+		meshletDSet->UpdateBinding(2, m_meshletTriangleBuffers[i].get());
+		meshletDSet->UpdateBinding(3, m_meshletVBOBuffers[i].get());
+		meshletDSet->UpdateBinding(4, m_meshUBOBuffers[i].get());
+		meshletDSet->FinishUpdate();
+		m_meshletDSets.push_back(std::move(meshletDSet));
+	}
+}
 void MeshletApp::_UninitDescriptorSets()
 {
 	m_cameraDSets.clear();
-	m_modelVertDSets.clear();
-	for (auto& vec : m_modelTransformDSets)
-	{
-		vec.clear();
-	}
-	m_modelTransformDSets.clear();
+	m_meshletDSets.clear();
 }

@@ -18,7 +18,7 @@ struct Meshlet
 	uint32_t triangleCount;
 };
 
-class MeshLoader
+class MeshUtility
 {
 private:
 	static void _OptimizeMesh(Mesh& mesh);
