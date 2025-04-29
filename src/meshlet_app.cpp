@@ -12,8 +12,8 @@ void MeshletApp::_InitPipelines()
 	m_pipeline.BindToSubpass(&m_renderPass, 0);
 
 	//taskShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/mesh.task.spv");
-	meshShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/mesh.mesh.spv");
-	fragShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/mesh.frag.spv");
+	meshShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/flat.mesh.spv");
+	fragShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/flat.frag.spv");
 	//taskShader.Init();
 	meshShader.Init();
 	fragShader.Init();
@@ -107,11 +107,11 @@ void MeshletApp::_DrawFrame()
 	{
 		GraphicsMeshPipelineInput meshInput{};
 		// don't use task shader here
-		meshInput.groupCountX = m_models[i].meshlets.size(); // meshlet count
+		meshInput.groupCountX = static_cast<uint32_t>(m_models[i].meshlets.size()); // meshlet count
 		meshInput.groupCountY = 1;
 		meshInput.groupCountZ = 1;
 		meshInput.imageSize = pDevice->GetSwapchainExtent();
-		meshInput.pDescriptorSets = { m_cameraDSets[m_currentFrame].get(), m_modelTransformDSets[i][m_currentFrame].get(), m_modelVertDSets[i].get() };
+		meshInput.pDescriptorSets = { m_cameraDSets[m_currentFrame].get(), m_meshletDSets[i].get() };
 		m_pipeline.Do(cmd->vkCommandBuffer, meshInput);
 	}
 	cmd->EndRenderPass();
@@ -142,7 +142,6 @@ VkImageLayout MeshletApp::_GetImageLayout(ImageView* pImageView) const
 	CHECK_TRUE(itr != pDevice->imageLayouts.end(), "Layout is not recorded!");
 	return itr->second.GetLayout(info.baseArrayLayer, info.layerCount, info.baseMipLevel, info.levelCount, info.aspectMask);
 }
-
 VkImageLayout MeshletApp::_GetImageLayout(VkImage vkImage, uint32_t baseArrayLayer, uint32_t layerCount, uint32_t baseMipLevel, uint32_t levelCount, VkImageAspectFlags aspect) const
 {
 	auto itr = pDevice->imageLayouts.find(vkImage);
@@ -360,7 +359,7 @@ void MeshletApp::_InitBuffers()
 			ModelUBO ubo{};
 			ubo.meshletCount = static_cast<uint32_t>(curModel.meshlets.size());
 			ubo.model = curModel.transform.GetModelMatrix();
-			bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+			bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
 			bufferInfo.size = static_cast<uint32_t>(sizeof(ModelUBO));
 			stagingBufferInfo.size = bufferInfo.size;

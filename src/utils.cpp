@@ -1,6 +1,6 @@
 #include "utils.h"
 #include <meshoptimizer.h>
-bool MeshUtility::Load(const std::string& objFile, OUT std::vector<Mesh>& outMesh)
+bool MeshUtility::Load(const std::string& objFile, std::vector<Mesh>& outMesh)
 {
 	bool bSuccess = false;
 	tinyobj::attrib_t attrib;

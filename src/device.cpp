@@ -207,6 +207,11 @@ void MyDevice::_SelectPhysicalDevice()
 		.taskShader = VK_TRUE,
 		.meshShader = VK_TRUE
 	};
+	VkPhysicalDevice8BitStorageFeatures meshShader8bitFeature{
+		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES,
+		.storageBuffer8BitAccess = VK_TRUE
+	};
+	meshShaderFeatures.pNext = &meshShader8bitFeature;
 	requiredFeatures.sampleRateShading = VK_TRUE;
 	requiredFeatures.fragmentStoresAndAtomics = VK_TRUE;
 	auto vecRequiredExtensions = _GetPhysicalDeviceRequiredExtensions();

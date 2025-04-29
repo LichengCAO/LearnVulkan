@@ -1,16 +1,15 @@
 #version 450
 
 #extension GL_EXT_mesh_shader : require
+#extension GL_EXT_shader_8bit_storage: require
 
 layout(local_size_x = 64) in;
 layout(triangles, max_vertices = 64, max_primitives = 124) out;
 
-struct CameraUBO
-{
+layout(set = 0, binding = 0) uniform CameraUBO {
 	mat4 view;
 	mat4 proj;
-};
-layout(set = 0, binding = 0) uniform CameraUBO ubo;
+}ubo;
 
 struct Meshlet
 {
@@ -23,23 +22,19 @@ struct VBO
 {
 	vec3 position;
 	vec3 normal;
-	vec2 uv;
-};
-struct ModelUBO
-{
-	mat4 model;
-	uint meshletCount;
 };
 layout(set = 1, binding = 0) readonly buffer Meshlets {Meshlet meshlets[];};
 layout(set = 1, binding = 1) readonly buffer MeshletVertices {uint meshletVertices[];};
-layout(set = 1, binding = 2) readonly buffer MeshletTriangles {uint meshletTriangles[];};
+layout(set = 1, binding = 2) readonly buffer MeshletTriangles {uint8_t meshletTriangles[];};
 layout(set = 1, binding = 3) readonly buffer VertexBuffer {VBO vertices[];};
-layout(set = 1, binding = 4) uniform ModelUBO modelUBO;
+layout(set = 1, binding = 4) uniform ModelUBO{
+	mat4 model;
+	uint meshletCount;
+}modelUBO;
 
 layout(location = 0) out PerVertexData
 {
 	vec3 normal;
-	vec2 uv;
 } v_out[];
 
 uint getMeshletID()
@@ -70,7 +65,6 @@ void main()
 		VBO vertex = getVertex(index);
 		gl_MeshVerticesEXT[i].gl_Position = ubo.proj * ubo.view * modelUBO.model * vec4(vertex.position, 1.0);
 		v_out[i].normal = vertex.normal;
-		v_out[i].uv = vertex.uv;
 	}
 	// since max_primitives is larger than workgroup size, we need to use a loop to emit all the primitives
 	for (uint i = threadIDInGroup; i < primitiveCount; i += gl_WorkGroupSize.x/*local_size_x*/)
@@ -79,7 +73,7 @@ void main()
 		gl_PrimitiveTriangleIndicesEXT[i] = uvec3(
 			meshletTriangles[offset + 0],
 			meshletTriangles[offset + 1],
-			meshletTriangles[offset + 2],
+			meshletTriangles[offset + 2]
 		);
 	}
 }
