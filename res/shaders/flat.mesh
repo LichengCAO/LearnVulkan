@@ -34,7 +34,7 @@ layout(set = 1, binding = 4) uniform ModelUBO{
 
 layout(location = 0) out PerVertexData
 {
-	vec3 normal;
+	vec3 colorRGB;
 } v_out[];
 
 uint getMeshletID()
@@ -47,6 +47,18 @@ VBO getVertex(uint index)
 	return vertices[index];
 }
 
+vec3 randomColor(uint seed) {
+    // Normalize the seed (uint8_t is between 0-255)
+    float base = float(seed & 0xFFu) / 255.0;
+
+    // Generate pseudo-random RGB values based on the seed
+    float r = fract(sin(base * 12.9898) * 43758.5453) + 0.02;
+    float g = fract(sin(base * 78.233) * 43758.5453) + 0.02;
+    float b = fract(sin(base * 45.164) * 43758.5453) + 0.02;
+
+    return vec3(r, g, b); // Return the generated color
+}
+
 void main()
 {
 	if (getMeshletID() >= modelUBO.meshletCount)
@@ -57,6 +69,7 @@ void main()
 	const uint vertexCount = meshlet.vertexCount;
 	const uint primitiveCount = meshlet.triangleCount;
 	const uint threadIDInGroup = gl_LocalInvocationIndex;
+	const vec3 color = randomColor(getMeshletID());
 	SetMeshOutputsEXT(vertexCount, primitiveCount);
 	
 	for (uint i = threadIDInGroup; i < vertexCount; i += gl_WorkGroupSize.x/*local_size_x*/)
@@ -64,16 +77,16 @@ void main()
 		uint index = meshletVertices[meshlet.vertexOffset + i];
 		VBO vertex = getVertex(index);
 		gl_MeshVerticesEXT[i].gl_Position = ubo.proj * ubo.view * modelUBO.model * vec4(vertex.position, 1.0);
-		v_out[i].normal = vertex.normal;
+		v_out[i].colorRGB = color;
 	}
 	// since max_primitives is larger than workgroup size, we need to use a loop to emit all the primitives
 	for (uint i = threadIDInGroup; i < primitiveCount; i += gl_WorkGroupSize.x/*local_size_x*/)
 	{
 		uint offset = meshlet.triangleOffset + i * 3;
 		gl_PrimitiveTriangleIndicesEXT[i] = uvec3(
-			meshletTriangles[offset + 0],
+			meshletTriangles[offset + 2],
 			meshletTriangles[offset + 1],
-			meshletTriangles[offset + 2]
+			meshletTriangles[offset + 0]
 		);
 	}
 }

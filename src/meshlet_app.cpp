@@ -173,12 +173,14 @@ void MeshletApp::_Init()
 	_InitDescriptorSets();
 	_InitPipelines();
 	
-	// init semaphores 
-	VkSemaphoreCreateInfo semaphoreInfo{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-	m_swapchainImageAvailabilities.resize(MAX_FRAME_COUNT);
-	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+	// init semaphores
 	{
-		VK_CHECK(vkCreateSemaphore(pDevice->vkDevice, &semaphoreInfo, nullptr, &m_swapchainImageAvailabilities[i]), "Failed to create semaphore!");
+		VkSemaphoreCreateInfo semaphoreInfo{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+		m_swapchainImageAvailabilities.resize(MAX_FRAME_COUNT);
+		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+		{
+			VK_CHECK(vkCreateSemaphore(pDevice->vkDevice, &semaphoreInfo, nullptr, &m_swapchainImageAvailabilities[i]), "Failed to create semaphore!");
+		}
 	}
 	
 	// init command buffers
@@ -267,10 +269,12 @@ void MeshletApp::_UninitSampler()
 void MeshletApp::_InitModels()
 {
 	std::vector<Mesh> meshs;
-	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/bunny/bunny.obj", meshs);
+	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/wahoo/wahoo.obj", meshs);
 	for (auto& mesh : meshs)
 	{
 		Model model{};
+		//model.transform.SetScale({ 0.05, 0.05, 0.05 });
+		model.transform.SetRotation({ -90, 0, 0 });
 		model.mesh = mesh;
 		MeshUtility::BuildMeshlets(mesh, model.meshlets, model.vertexRemap, model.triangleIndices);
 		m_models.push_back(model);

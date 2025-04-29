@@ -176,8 +176,8 @@ void MyDevice::_CreateInstance()
 			return VK_FALSE;
 		}
 	);
-	auto instanceBuildResult = instanceBuilder.build();
 
+	auto instanceBuildResult = instanceBuilder.build();
 	if (!instanceBuildResult)
 	{
 		throw std::runtime_error("Failed to create instance!");
@@ -196,30 +196,24 @@ void MyDevice::_CreateSurface()
 void MyDevice::_SelectPhysicalDevice()
 {
 	vkb::PhysicalDeviceSelector physicalDeviceSelector(m_instance);
+	VkPhysicalDeviceFeatures requiredFeatures{};
+	VkPhysicalDeviceMeshShaderFeaturesEXT meshShaderFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT };
+	VkPhysicalDevice8BitStorageFeatures shader8BitFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES };
 
-	//vk::StructureChain<VkPhysicalDeviceFeatures2, VkPhysicalDeviceMeshShaderFeaturesEXT, VkPhysicalDevice16BitStorageFeatures, VkPhysicalDevice8BitStorageFeatures> ext_chain;
-	VkPhysicalDeviceFeatures requiredFeatures{
-		.geometryShader = VK_TRUE,
-		.samplerAnisotropy = VK_TRUE
-	};
-	VkPhysicalDeviceMeshShaderFeaturesEXT meshShaderFeatures{
-		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT,
-		.taskShader = VK_TRUE,
-		.meshShader = VK_TRUE
-	};
-	VkPhysicalDevice8BitStorageFeatures meshShader8bitFeature{
-		.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES,
-		.storageBuffer8BitAccess = VK_TRUE
-	};
-	meshShaderFeatures.pNext = &meshShader8bitFeature;
+	requiredFeatures.geometryShader = VK_TRUE;
+	requiredFeatures.samplerAnisotropy = VK_TRUE;
 	requiredFeatures.sampleRateShading = VK_TRUE;
 	requiredFeatures.fragmentStoresAndAtomics = VK_TRUE;
-	auto vecRequiredExtensions = _GetPhysicalDeviceRequiredExtensions();
+	meshShaderFeatures.taskShader = VK_TRUE;
+	meshShaderFeatures.meshShader = VK_TRUE;
+	shader8BitFeatures.storageBuffer8BitAccess = VK_TRUE;
+
 	physicalDeviceSelector.set_surface(vkSurface);
 	physicalDeviceSelector.set_required_features(requiredFeatures);
 	physicalDeviceSelector.add_required_extension_features(meshShaderFeatures);
-	//physicalDeviceSelector.add_required_extension_features()
-
+	physicalDeviceSelector.add_required_extension_features(shader8BitFeatures);
+	
+	auto vecRequiredExtensions = _GetPhysicalDeviceRequiredExtensions();
 	for (auto requiredExtension : vecRequiredExtensions)
 	{
 		physicalDeviceSelector.add_required_extension(requiredExtension);
