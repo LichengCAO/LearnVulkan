@@ -49,7 +49,12 @@ bool MeshUtility::Load(const std::string& objFile, std::vector<Mesh>& outMesh)
 	return bSuccess;
 }
 
-void MeshUtility::BuildMeshlets(const Mesh& inMesh, std::vector<Meshlet>& outMeshlets, std::vector<uint32_t>& outMeshletVertices, std::vector<uint8_t>& outMeshletTriangles)
+void MeshUtility::BuildMeshlets(
+	const Mesh& inMesh,
+	std::vector<Meshlet>& outMeshlets,
+	std::vector<uint32_t>& outMeshletVertices,
+	std::vector<uint8_t>& outMeshletTriangles
+)
 {
 	const std::vector<uint32_t>& indices = inMesh.indices;
 	const std::vector<Vertex>& vertices = inMesh.verts;
@@ -99,6 +104,24 @@ void MeshUtility::BuildMeshlets(const Mesh& inMesh, std::vector<Meshlet>& outMes
 			m.vertex_count
 		);
 		outMeshlets.push_back(outMeshlet);
+	}
+}
+
+void MeshUtility::BuildMeshlets(
+	const Mesh& inMesh,
+	std::vector<Meshlet>& outMeshlets,
+	std::vector<MeshletBounds>& outMeshletBounds,
+	std::vector<uint32_t>& outMeshletVertices,
+	std::vector<uint8_t>& outMeshletTriangles
+)
+{
+	size_t offset = outMeshlets.size();
+	
+	BuildMeshlets(inMesh, outMeshlets, outMeshletVertices, outMeshletTriangles);
+	outMeshletBounds.reserve(outMeshletBounds.size() + outMeshlets.size() - offset);
+	for (int i = offset; i < outMeshlets.size(); ++i)
+	{
+		outMeshletBounds.push_back(_ComputeMeshletBounds(inMesh, outMeshlets[i], outMeshletVertices, outMeshletTriangles));
 	}
 }
 
@@ -172,4 +195,24 @@ void MeshUtility::_OptimizeMeshToVertexCacheStage(Mesh& mesh)
 	meshopt_remapIndexBuffer(dstIndices.data(), mesh.indices.data(), indexCount, remap.data());
 	meshopt_optimizeVertexCache(mesh.indices.data(), dstIndices.data(), indexCount, vertexCount);
 	mesh.verts = std::move(dstVerts);
+}
+
+MeshletBounds MeshUtility::_ComputeMeshletBounds(const Mesh& inMesh, const Meshlet& inMeshlet, const std::vector<uint32_t>& inMeshletVertices, const std::vector<uint8_t>& inMeshletTriangles)
+{
+	MeshletBounds meshletBounds{};
+	meshopt_Bounds bounds{};
+	bounds = meshopt_computeMeshletBounds(
+		&inMeshletVertices[inMeshlet.vertexOffset],
+		&inMeshletTriangles[inMeshlet.triangleOffset],
+		inMeshlet.triangleCount,
+		reinterpret_cast<const float*>(inMesh.verts.data()),
+		inMesh.verts.size(),
+		sizeof(Vertex)
+	);
+	meshletBounds.center = glm::vec3(bounds.center[0], bounds.center[1], bounds.center[2]);
+	meshletBounds.radius = bounds.radius;
+	meshletBounds.coneApex = glm::vec3(bounds.cone_apex[0], bounds.cone_apex[1], bounds.cone_apex[2]);
+	meshletBounds.coneAxis = glm::vec3(bounds.cone_axis[0], bounds.cone_axis[1], bounds.cone_axis[2]);
+	meshletBounds.coneCutoff = bounds.cone_cutoff;
+	return meshletBounds;
 }
