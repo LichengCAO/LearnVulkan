@@ -198,7 +198,8 @@ void MyDevice::_SelectPhysicalDevice()
 	vkb::PhysicalDeviceSelector physicalDeviceSelector(m_instance);
 	VkPhysicalDeviceFeatures requiredFeatures{};
 	VkPhysicalDeviceMeshShaderFeaturesEXT meshShaderFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT };
-	VkPhysicalDevice8BitStorageFeatures shader8BitFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES };
+	//VkPhysicalDevice8BitStorageFeatures shader8BitFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES };
+	VkPhysicalDeviceVulkan12Features vulkan12Featrues{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
 
 	requiredFeatures.geometryShader = VK_TRUE;
 	requiredFeatures.samplerAnisotropy = VK_TRUE;
@@ -206,12 +207,16 @@ void MyDevice::_SelectPhysicalDevice()
 	requiredFeatures.fragmentStoresAndAtomics = VK_TRUE;
 	meshShaderFeatures.taskShader = VK_TRUE;
 	meshShaderFeatures.meshShader = VK_TRUE;
-	shader8BitFeatures.storageBuffer8BitAccess = VK_TRUE;
+	//shader8BitFeatures.storageBuffer8BitAccess = VK_TRUE;
+	vulkan12Featrues.shaderInt8 = VK_TRUE;
+	vulkan12Featrues.storageBuffer8BitAccess = VK_TRUE;
+	vulkan12Featrues.descriptorIndexing = VK_TRUE;
 
 	physicalDeviceSelector.set_surface(vkSurface);
 	physicalDeviceSelector.set_required_features(requiredFeatures);
 	physicalDeviceSelector.add_required_extension_features(meshShaderFeatures);
-	physicalDeviceSelector.add_required_extension_features(shader8BitFeatures);
+	//physicalDeviceSelector.add_required_extension_features(shader8BitFeatures);
+	physicalDeviceSelector.add_required_extension_features(vulkan12Featrues);
 	
 	auto vecRequiredExtensions = _GetPhysicalDeviceRequiredExtensions();
 	for (auto requiredExtension : vecRequiredExtensions)
@@ -237,7 +242,7 @@ void MyDevice::_CreateLogicalDevice()
 	physicalDeviceDescriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
 	physicalDeviceDescriptorIndexingFeatures.runtimeDescriptorArray = VK_TRUE;
 	physicalDeviceDescriptorIndexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
-	deviceBuilder.add_pNext(&physicalDeviceDescriptorIndexingFeatures);
+	//deviceBuilder.add_pNext(&physicalDeviceDescriptorIndexingFeatures);
 
 	std::vector<vkb::CustomQueueDescription> queueDescription;
 	float priority = 1.0f;

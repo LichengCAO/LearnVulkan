@@ -11,8 +11,6 @@
 #include "transform.h"
 #include "utils.h"
 
-#define MYTYPE(x) std::vector<std::unique_ptr<x>>
-
 class MeshletApp
 {
 private:
@@ -20,9 +18,10 @@ private:
 	{
 		Mesh mesh;
 		Transform transform;
-		std::vector<Meshlet> meshlets;
-		std::vector<uint32_t> vertexRemap;
-		std::vector<uint8_t> triangleIndices;
+		std::vector<Meshlet>       vecMeshlet;
+		std::vector<uint32_t>      vecVertexRemap;
+		std::vector<uint8_t>       vecTriangleIndex;
+		std::vector<MeshletBounds> vecMeshletBounds;
 	};
 	struct VBO
 	{
@@ -42,6 +41,28 @@ private:
 		glm::mat4 view;
 		glm::mat4 proj;
 	};
+	struct MeshletSBO
+	{
+		uint32_t vertexOffset;
+		uint32_t vertexCount;
+		uint32_t triangleOffset;
+		uint32_t triangleCount;
+	};
+	struct MeshletBoundsSBO
+	{
+		alignas(16) glm::vec4 boundSphere;
+		alignas(16) glm::vec3 coneApex;
+		alignas(16) glm::vec4 coneNormalCutoff;
+	};
+	struct FrustumUBO
+	{
+		alignas(16) glm::vec4 topFace;
+		alignas(16) glm::vec4 bottomFace;
+		alignas(16) glm::vec4 leftFace;
+		alignas(16) glm::vec4 rightFace;
+		alignas(16) glm::vec4 nearFace;
+		alignas(16) glm::vec4 farFace;
+	};
 
 private:
 	double lastTime = 0.0;
@@ -56,6 +77,7 @@ private:
 	DescriptorSetLayout m_cameraDSetLayout;
 	std::vector<std::unique_ptr<DescriptorSet>> m_cameraDSets;
 	std::vector<std::unique_ptr<Buffer>>        m_cameraBuffers;
+	std::vector<std::unique_ptr<Buffer>>        m_frustumBuffers;
 
 	// following buffers can be used cross frames, so i just create one buffer for one mesh instead of multiple buffers for each frame
 	DescriptorSetLayout m_meshletDSetLayout;
@@ -65,6 +87,7 @@ private:
 	std::vector<std::unique_ptr<Buffer>> m_meshletTriangleBuffers;
 	std::vector<std::unique_ptr<Buffer>> m_meshletVBOBuffers;
 	std::vector<std::unique_ptr<Buffer>> m_meshUBOBuffers;
+	std::vector<std::unique_ptr<Buffer>> m_meshletBoundsBuffers;
 
 	// Samplers
 	VkSampler m_vkSampler = VK_NULL_HANDLE;
@@ -82,7 +105,7 @@ private:
 
 	// semaphores
 	std::vector<VkSemaphore>  m_swapchainImageAvailabilities;
-	MYTYPE(CommandSubmission) m_commandSubmissions;
+	std::vector<std::unique_ptr<CommandSubmission>> m_commandSubmissions;
 private:
 	void _Init();
 	void _Uninit();

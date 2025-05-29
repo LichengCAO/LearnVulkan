@@ -1,0 +1,114 @@
+#version 450
+
+#extension GL_EXT_mesh_shader : require
+#extension GL_EXT_shader_8bit_storage: require
+#extension GL_EXT_shader_explicit_arithmetic_types_int8 : require
+
+// meshlets count each task shader workgroup processes
+#define MESHLETS_PER_TASK_WORKGROUP 32
+#define TASK_WORKGROUP_SIZE 32
+#define MESHLETS_PER_MESH_WORKGROUP 1
+
+const uint MESHLETS_PER_TASK_INVOCATION = (MESHLETS_PER_TASK_WORKGROUP + TASK_WORKGROUP_SIZE - 1) / TASK_WORKGROUP_SIZE;
+
+struct Task
+{
+	uint baseMeshletId;
+	uint8_t meshletIdOffset[MESHLETS_PER_TASK_WORKGROUP];
+};
+struct MeshletBounds
+{
+	vec4 boundSphere;
+	vec4 coneApex;
+	vec4 coneAxisCutoff;
+};
+
+layout(local_size_x = TASK_WORKGROUP_SIZE) in;
+layout(set = 0, binding = 0) uniform CameraUBO
+{
+	mat4 view;
+	mat4 proj;
+}cameraUBO;
+layout(set = 0, binding = 1) uniform Frustum
+{
+	vec4 topFace;
+	vec4 bottomFace;
+	vec4 leftFace;
+	vec4 rightFace;
+	vec4 nearFace;
+	vec4 farFace;
+};
+layout(set = 1, binding = 4) uniform ModelUBO
+{
+	mat4 model;
+	uint meshletCount;
+}modelUBO;
+layout(set = 1, binding = 5) readonly buffer MeshletBoundsBuffer
+{
+	MeshletBounds meshletBounds[];
+};
+
+// Shared by task workgroup, and workgroups of mesh shader emit by EmitMeshTasksEXT
+taskPayloadSharedEXT Task OUT;
+
+// Shared by all task invocations within the task workgroup
+shared uint s_uMeshletCount;
+
+bool EarlyCull(uint meshletID)
+{
+	vec3 eye = vec3(cameraUBO.view[0][3], cameraUBO.view[1][3], cameraUBO.view[2][3]);
+	MeshletBounds bounds = meshletBounds[meshletID];
+	bool bFrustumCull = false; 
+	bool bBackFaceCull = dot(normalize(bounds.coneApex.xyz - eye), bounds.coneAxisCutoff.xyz) >= bounds.coneAxisCutoff.w;
+	// Frustum culling
+	if (!bBackFaceCull)
+	{
+		vec4 boundSphere = vec4(bounds.boundSphere.xyz, 1.0);
+		vec4 spherePos = modelUBO.model * boundSphere;
+		float radius = boundSphere.w;
+		bFrustumCull = 
+			(dot(spherePos, topFace)       > radius) ||
+			(dot(spherePos, bottomFace)    > radius) ||
+			(dot(spherePos, leftFace)      > radius) ||
+			(dot(spherePos, rightFace)     > radius) ||
+			(dot(spherePos, nearFace)      > radius) ||
+			(dot(spherePos, farFace)       > radius);
+	}
+
+	return bFrustumCull || bBackFaceCull;
+}
+
+void main()
+{
+	const uint baseID = gl_WorkGroupID.x * MESHLETS_PER_TASK_WORKGROUP;
+	const uint laneID = gl_LocalInvocationID.x * MESHLETS_PER_TASK_INVOCATION;
+
+	// Initialize the shared meshlet count for this task workgroup
+	if (laneID == 0u)
+	{
+		s_uMeshletCount = 0u;
+		OUT.baseMeshletId = baseID;
+	}
+	barrier();
+	
+	for (uint i = 0u; i < MESHLETS_PER_TASK_INVOCATION; i++)
+	{
+		uint meshletID = baseID + laneID + i;
+		uint uCurrentMeshletId = 0u;
+		if (meshletID >= modelUBO.meshletCount)
+			break;
+		if (EarlyCull(meshletID))
+			continue;
+		uCurrentMeshletId = atomicAdd(s_uMeshletCount, 1u);
+		OUT.meshletIdOffset[uCurrentMeshletId] = uint8_t(laneID + i);
+	}
+
+	barrier();
+
+	// Defines the mesh workgroup size for this task workgroup (NOT task invocation)
+	EmitMeshTasksEXT( 
+		(s_uMeshletCount + MESHLETS_PER_MESH_WORKGROUP - 1) / MESHLETS_PER_MESH_WORKGROUP,
+		1,
+		1
+	);// use gl_WorkGroupID to index in mesh shader
+}

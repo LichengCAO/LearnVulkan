@@ -42,7 +42,7 @@ void Camera::RecomputeAttributes()
     aspect = width / height;
 }
 
-glm::mat4 Camera::GetViewProj()const
+glm::mat4 Camera::GetViewProjectionMatrix()const
 {
     return GetProjectionMatrix()*GetViewMatrix();
 }
@@ -116,6 +116,29 @@ void Camera::Zoom(float amt)
 {
     glm::vec3 translation = look * amt;
     eye += translation;
+}
+
+Frustum Camera::GetFrustum() const
+{
+	// https://www.gamedevs.org/uploads/fast-extraction-viewing-frustum-planes-from-world-view-projection-matrix.pdf
+	Frustum ret{};
+	glm::mat4 viewProj = GetViewProjectionMatrix();
+	ret.leftPlane   = - viewProj[3] - viewProj[0];
+	ret.rightPlane  = - viewProj[3] + viewProj[0];
+	ret.bottomPlane = - viewProj[3] - viewProj[1];
+	ret.topPlane    = - viewProj[3] + viewProj[1];
+	ret.nearPlane   = - viewProj[3] - viewProj[2];
+	ret.farPlane    = - viewProj[3] + viewProj[2];
+
+	// normalize plane so that the signed distance won't be stretched
+	ret.leftPlane   /= glm::dot(glm::vec3(ret.leftPlane), glm::vec3(ret.leftPlane));
+	ret.rightPlane  /= glm::dot(glm::vec3(ret.rightPlane), glm::vec3(ret.rightPlane));
+	ret.bottomPlane /= glm::dot(glm::vec3(ret.bottomPlane), glm::vec3(ret.bottomPlane));
+	ret.topPlane    /= glm::dot(glm::vec3(ret.topPlane), glm::vec3(ret.topPlane));
+	ret.nearPlane   /= glm::dot(glm::vec3(ret.nearPlane), glm::vec3(ret.nearPlane));
+	ret.farPlane    /= glm::dot(glm::vec3(ret.farPlane), glm::vec3(ret.farPlane));
+
+	return ret;
 }
 
 void Camera::TranslateAlongLook(float amt)

@@ -1,5 +1,19 @@
 #pragma once
 #include "common.h"
+
+// how to use these planes:
+// dot(plane, v4WorldPosition) is the signed distance to the plane
+// if the distance is negative, the point is inside frustum
+struct Frustum
+{
+	glm::vec4 leftPlane;
+	glm::vec4 rightPlane;
+	glm::vec4 topPlane;
+	glm::vec4 bottomPlane;
+	glm::vec4 nearPlane;
+	glm::vec4 farPlane;
+};
+
 class Camera
 {
 public:
@@ -20,10 +34,10 @@ public:
     Camera(const Camera& c);
     //Computed attributes
     float aspect;
-    glm::mat4 GetViewProj()const;
-    glm::mat4 GetViewMatrix()const;
+    glm::mat4 GetViewProjectionMatrix() const;
+    glm::mat4 GetViewMatrix() const;
     glm::mat4 GetInverseTransposeViewMatrix() const;
-    virtual glm::mat4 GetProjectionMatrix()const = 0;
+    virtual glm::mat4 GetProjectionMatrix() const = 0;
     virtual void RecomputeAttributes();
 
     void LookAlong(const glm::vec3& dir);
@@ -42,6 +56,8 @@ public:
     void MoveTo(const glm::vec3& wPos);
 
     void Zoom(float amt);
+
+	Frustum GetFrustum() const;
 
     virtual void Reset();
 };
