@@ -123,20 +123,24 @@ Frustum Camera::GetFrustum() const
 	// https://www.gamedevs.org/uploads/fast-extraction-viewing-frustum-planes-from-world-view-projection-matrix.pdf
 	Frustum ret{};
 	glm::mat4 viewProj = GetViewProjectionMatrix();
-	ret.leftPlane   = /*- viewProj[3]*/ - viewProj[0];
-	ret.rightPlane  = - viewProj[3] + viewProj[0];
-	ret.bottomPlane = - viewProj[3] - viewProj[1];
-	ret.topPlane    = - viewProj[3] + viewProj[1];
-	ret.nearPlane   = - viewProj[3] - viewProj[2];
-	ret.farPlane    = - viewProj[3] + viewProj[2];
+	auto GetRow = [](const glm::mat4& _mat, uint32_t _row)
+	{
+		return glm::vec4(_mat[0][_row], _mat[1][_row], _mat[2][_row], _mat[3][_row]);
+	};
+	ret.leftPlane   = - GetRow(viewProj, 3) - GetRow(viewProj, 0);
+	ret.rightPlane  = - GetRow(viewProj, 3) + GetRow(viewProj, 0);
+	ret.bottomPlane = - GetRow(viewProj, 3) - GetRow(viewProj, 1);
+	ret.topPlane    = - GetRow(viewProj, 3) + GetRow(viewProj, 1);
+	ret.nearPlane   = - GetRow(viewProj, 3);// -viewProj[2];
+	ret.farPlane    = - GetRow(viewProj, 3) + GetRow(viewProj, 2);
 
 	// normalize plane so that the signed distance won't be stretched
-	ret.leftPlane   /= glm::dot(glm::vec3(ret.leftPlane), glm::vec3(ret.leftPlane));
-	ret.rightPlane  /= glm::dot(glm::vec3(ret.rightPlane), glm::vec3(ret.rightPlane));
-	ret.bottomPlane /= glm::dot(glm::vec3(ret.bottomPlane), glm::vec3(ret.bottomPlane));
-	ret.topPlane    /= glm::dot(glm::vec3(ret.topPlane), glm::vec3(ret.topPlane));
-	ret.nearPlane   /= glm::dot(glm::vec3(ret.nearPlane), glm::vec3(ret.nearPlane));
-	ret.farPlane    /= glm::dot(glm::vec3(ret.farPlane), glm::vec3(ret.farPlane));
+	ret.leftPlane   *= glm::inversesqrt(glm::dot(glm::vec3(ret.leftPlane), glm::vec3(ret.leftPlane)));
+	ret.rightPlane  *= glm::inversesqrt(glm::dot(glm::vec3(ret.rightPlane), glm::vec3(ret.rightPlane)));
+	ret.bottomPlane *= glm::inversesqrt(glm::dot(glm::vec3(ret.bottomPlane), glm::vec3(ret.bottomPlane)));
+	ret.topPlane    *= glm::inversesqrt(glm::dot(glm::vec3(ret.topPlane), glm::vec3(ret.topPlane)));
+	ret.nearPlane   *= glm::inversesqrt(glm::dot(glm::vec3(ret.nearPlane), glm::vec3(ret.nearPlane)));
+	ret.farPlane    *= glm::inversesqrt(glm::dot(glm::vec3(ret.farPlane), glm::vec3(ret.farPlane)));
 
 	return ret;
 }

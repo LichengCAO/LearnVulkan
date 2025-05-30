@@ -73,6 +73,7 @@ private:
 	MyDevice* pDevice = nullptr;
 
 	std::vector<Model> m_models;
+	std::vector<MeshletBoundsSBO> m_tBound;
 
 	// cameraUBO changes across frames, i create buffers for each frame
 	DescriptorSetLayout m_cameraDSetLayout;

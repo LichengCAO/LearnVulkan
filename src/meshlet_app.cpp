@@ -203,6 +203,7 @@ void MeshletApp::_InitBuffers()
 			stagingBufferInfo.size = bufferInfo.size;
 			stagingBuffer.Uninit();
 			stagingBuffer.Init(stagingBufferInfo);
+			m_tBound = sbos;
 			stagingBuffer.CopyFromHost(sbos.data());
 			meshletBoundsBuffer->Init(bufferInfo);
 			meshletBoundsBuffer->CopyFromBuffer(stagingBuffer);
@@ -516,6 +517,33 @@ void MeshletApp::_UpdateUniformBuffer()
 	frustumUBO.farFace = cameraFrustum.farPlane;
 	frustumUBO.nearFace = cameraFrustum.nearPlane;
 	m_frustumBuffers[m_currentFrame]->CopyFromHost(&frustumUBO);
+
+	int culled = 0;
+	for (int i = 0; i < m_tBound.size(); ++i)
+	{
+		glm::vec4 b = m_tBound[i].boundSphere;
+		glm::vec4 bcenter = glm::vec4(glm::vec3(b), 1.0f);
+		float r = b.w;
+		if (
+			(glm::dot(bcenter, frustumUBO.leftFace)      < r)
+			&& (glm::dot(bcenter, frustumUBO.rightFace)  < r)
+			&& (glm::dot(bcenter, frustumUBO.topFace)    < r)
+			&& (glm::dot(bcenter, frustumUBO.bottomFace) < r)
+			&& (glm::dot(bcenter, frustumUBO.farFace)    < r)
+			&& (glm::dot(bcenter, frustumUBO.nearFace)   < r)
+			)
+		{
+			glm::vec4 v = cameraUBO.proj * cameraUBO.view * bcenter;
+			v /= v.w;
+			std::cout << v[0] << ", " << v[1] << ", " << v[2] << ", " << v[3] << std::endl;
+		}
+		else
+		{
+			culled++;
+		}
+	}
+	std::cout << "culled: " << culled << std::endl;
+
 }
 void MeshletApp::_DrawFrame()
 {

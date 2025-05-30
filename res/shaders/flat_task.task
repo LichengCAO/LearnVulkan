@@ -61,21 +61,20 @@ bool EarlyCull(uint meshletID)
 	vec4 coneApex = cameraUBO.view * modelUBO.model * bounds.coneApex;
 	vec4 coneAxis = cameraUBO.view * normalize(modelUBO.inverseTransposeModel * vec4(bounds.coneAxisCutoff.xyz, 0.0f));
 	bool bFrustumCull = false; 
-	bool bBackFaceCull = false;//dot(normalize(coneApex.xyz), coneAxis.xyz) >= bounds.coneAxisCutoff.w;
+	bool bBackFaceCull = dot(normalize(coneApex.xyz), coneAxis.xyz) >= bounds.coneAxisCutoff.w;
 	// Frustum culling
 	// if (!bBackFaceCull)
 	// {
-		vec4 boundSphere = vec4(bounds.boundSphere.xyz, 1.0);
-		vec4 spherePos = modelUBO.model * boundSphere;
-		float radius = boundSphere.w;
-		bFrustumCull = (dot(spherePos, leftFace)      > 0.0f);
+		// vec4 boundSphere = vec4(bounds.boundSphere.xyz, 1.0);
+		// vec4 spherePos = modelUBO.model * boundSphere;
+		// float radius = boundSphere.w;
 		// bFrustumCull = 
-		// 	(dot(spherePos, topFace)       > 0.0f) ||
-		// 	(dot(spherePos, bottomFace)    > 0.0f) ||
-		// 	(dot(spherePos, leftFace)      > 0.0f) ||
-		// 	(dot(spherePos, rightFace)     > 0.0f) ||
-		// 	(dot(spherePos, nearFace)      > 0.0f) ||
-		// 	(dot(spherePos, farFace)       > 0.0f);
+		// 	(dot(spherePos, topFace)       > radius) ||
+		// 	(dot(spherePos, bottomFace)    > radius) ||
+		// 	(dot(spherePos, leftFace)      > radius) ||
+		// 	(dot(spherePos, rightFace)     > radius) ||
+		// 	(dot(spherePos, nearFace)      > radius) ||
+		// 	(dot(spherePos, farFace)       > radius);
 	// }
 
 	return bFrustumCull || bBackFaceCull;
