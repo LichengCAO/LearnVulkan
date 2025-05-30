@@ -31,6 +31,7 @@ private:
 	struct ModelUBO
 	{
 		glm::mat4 model;
+		glm::mat4 inverseTranposeModel;
 		uint32_t meshletCount = 0;
 		uint32_t padding0 = 0;
 		uint32_t padding1 = 0;

@@ -116,12 +116,12 @@ void MeshletApp::_UninitSampler()
 void MeshletApp::_InitModels()
 {
 	std::vector<Mesh> meshs;
-	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/wahoo/wahoo.obj", meshs);
+	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/bunny/bunny.obj", meshs);
 	for (auto& mesh : meshs)
 	{
 		Model model{};
 		//model.transform.SetScale({ 0.05, 0.05, 0.05 });
-		model.transform.SetRotation({ -90, 0, 0 });
+		//model.transform.SetRotation({ -90, 0, 0 });
 		model.mesh = mesh;
 		MeshUtility::BuildMeshlets(mesh, model.vecMeshlet, model.vecMeshletBounds, model.vecVertexRemap, model.vecTriangleIndex);
 		m_models.push_back(model);
@@ -247,6 +247,7 @@ void MeshletApp::_InitBuffers()
 			ModelUBO ubo{};
 			ubo.meshletCount = static_cast<uint32_t>(curModel.vecMeshlet.size());
 			ubo.model = curModel.transform.GetModelMatrix();
+			ubo.inverseTranposeModel = curModel.transform.GetModelInverseTransposeMatrix();
 			bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
 			bufferInfo.size = static_cast<uint32_t>(sizeof(ModelUBO));

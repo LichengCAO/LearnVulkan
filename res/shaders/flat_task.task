@@ -41,6 +41,7 @@ layout(set = 0, binding = 1) uniform Frustum
 layout(set = 1, binding = 4) uniform ModelUBO
 {
 	mat4 model;
+	mat4 inverseTransposeModel;
 	uint meshletCount;
 }modelUBO;
 layout(set = 1, binding = 5) readonly buffer MeshletBoundsBuffer
@@ -56,24 +57,26 @@ shared uint s_uMeshletCount;
 
 bool EarlyCull(uint meshletID)
 {
-	vec3 eye = vec3(cameraUBO.view[0][3], cameraUBO.view[1][3], cameraUBO.view[2][3]);
 	MeshletBounds bounds = meshletBounds[meshletID];
+	vec4 coneApex = cameraUBO.view * modelUBO.model * bounds.coneApex;
+	vec4 coneAxis = cameraUBO.view * normalize(modelUBO.inverseTransposeModel * vec4(bounds.coneAxisCutoff.xyz, 0.0f));
 	bool bFrustumCull = false; 
-	bool bBackFaceCull = dot(normalize(bounds.coneApex.xyz - eye), bounds.coneAxisCutoff.xyz) >= bounds.coneAxisCutoff.w;
+	bool bBackFaceCull = false;//dot(normalize(coneApex.xyz), coneAxis.xyz) >= bounds.coneAxisCutoff.w;
 	// Frustum culling
-	if (!bBackFaceCull)
-	{
+	// if (!bBackFaceCull)
+	// {
 		vec4 boundSphere = vec4(bounds.boundSphere.xyz, 1.0);
 		vec4 spherePos = modelUBO.model * boundSphere;
 		float radius = boundSphere.w;
-		bFrustumCull = 
-			(dot(spherePos, topFace)       > radius) ||
-			(dot(spherePos, bottomFace)    > radius) ||
-			(dot(spherePos, leftFace)      > radius) ||
-			(dot(spherePos, rightFace)     > radius) ||
-			(dot(spherePos, nearFace)      > radius) ||
-			(dot(spherePos, farFace)       > radius);
-	}
+		bFrustumCull = (dot(spherePos, leftFace)      > 0.0f);
+		// bFrustumCull = 
+		// 	(dot(spherePos, topFace)       > 0.0f) ||
+		// 	(dot(spherePos, bottomFace)    > 0.0f) ||
+		// 	(dot(spherePos, leftFace)      > 0.0f) ||
+		// 	(dot(spherePos, rightFace)     > 0.0f) ||
+		// 	(dot(spherePos, nearFace)      > 0.0f) ||
+		// 	(dot(spherePos, farFace)       > 0.0f);
+	// }
 
 	return bFrustumCull || bBackFaceCull;
 }

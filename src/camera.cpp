@@ -123,7 +123,7 @@ Frustum Camera::GetFrustum() const
 	// https://www.gamedevs.org/uploads/fast-extraction-viewing-frustum-planes-from-world-view-projection-matrix.pdf
 	Frustum ret{};
 	glm::mat4 viewProj = GetViewProjectionMatrix();
-	ret.leftPlane   = - viewProj[3] - viewProj[0];
+	ret.leftPlane   = /*- viewProj[3]*/ - viewProj[0];
 	ret.rightPlane  = - viewProj[3] + viewProj[0];
 	ret.bottomPlane = - viewProj[3] - viewProj[1];
 	ret.topPlane    = - viewProj[3] + viewProj[1];

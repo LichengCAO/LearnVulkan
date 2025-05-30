@@ -47,6 +47,7 @@ layout(set = 1, binding = 2) readonly buffer MeshletTriangles {uint8_t meshletTr
 layout(set = 1, binding = 3) readonly buffer VertexBuffer {VBO vertices[];};
 layout(set = 1, binding = 4) uniform ModelUBO{
 	mat4 model;
+	mat4 inverseTransposeModel;
 	uint meshletCount;
 }modelUBO;
 
