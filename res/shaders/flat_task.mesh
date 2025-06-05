@@ -8,8 +8,12 @@
 #define TASK_WORKGROUP_SIZE 32
 #define MESH_WORKGROUP_SIZE 64
 #define MESHLETS_PER_MESH_WORKGROUP 1
+#define MAX_PRIMITIVES_PER_MESHLET 124
+#define MAX_VERTICES_PER_MESHLET 64
 
 const uint MESHLETS_PER_TASK_INVOCATION = (MESHLETS_PER_TASK_WORKGROUP + TASK_WORKGROUP_SIZE - 1) / TASK_WORKGROUP_SIZE;
+const uint PRIMITIVE_ITERATION_COUNT = (MAX_PRIMITIVES_PER_MESHLET + MESH_WORKGROUP_SIZE - 1) / MESH_WORKGROUP_SIZE;
+const uint VERTEX_ITERATION_COUNT = (MAX_VERTICES_PER_MESHLET + MESH_WORKGROUP_SIZE - 1) / MESH_WORKGROUP_SIZE;
 
 struct Meshlet
 {
@@ -31,7 +35,7 @@ struct Task
 
 taskPayloadSharedEXT Task IN;
 layout(local_size_x = MESH_WORKGROUP_SIZE) in;
-layout(triangles, max_vertices = 64, max_primitives = 124) out;
+layout(triangles, max_vertices = MAX_VERTICES_PER_MESHLET, max_primitives = MAX_PRIMITIVES_PER_MESHLET) out;
 layout(location = 0) out PerVertexData
 {
 	vec3 colorRGB;
@@ -83,15 +87,14 @@ vec3 randomColor(uint seed) {
     return vec3(r, g, b); // Return the generated color
 }
 
-// each mesh shader invocation doesn't process a complete meshlet, 
-// but processes only part of the meshlet owned by the same mesh workgroup
-// it's the mesh workgroup that processes complete meshlets
 void main()
 {
 	Meshlet vecMeshlets[MESHLETS_PER_MESH_WORKGROUP];
 	uint uMeshOutputVertexCount = 0u;
 	uint uMeshOutputPrimitiveCount = 0u;
 	uint uValidIndexCount = 0u;
+	const uint uPrimitiveBaseOffset = getLocalInvocationID() * PRIMITIVE_ITERATION_COUNT;
+	const uint uVertexBaseOffset    = getLocalInvocationID() * VERTEX_ITERATION_COUNT;
 	
 	for (uint i = 0u; i < MESHLETS_PER_MESH_WORKGROUP; ++i)
 	{
@@ -100,11 +103,12 @@ void main()
 		{
 			break;
 		}
-		vecMeshlets[i] = meshlets[uMeshletID];
+		vecMeshlets[i]             = meshlets[uMeshletID];
 		uMeshOutputVertexCount    += vecMeshlets[i].vertexCount;
 		uMeshOutputPrimitiveCount += vecMeshlets[i].triangleCount;
 		++uValidIndexCount;
 	}
+	// Should be the same for all mesh shader invocations in the same workgroup
 	SetMeshOutputsEXT(uMeshOutputVertexCount, uMeshOutputPrimitiveCount);
 	
 	// Emit meshlet vertices and triangles
@@ -112,30 +116,43 @@ void main()
 	uint uPrimitiveTriangleOffset = 0u;
 	for (uint i = 0u; i < uValidIndexCount; ++i)
 	{
+		// each mesh shader invocation doesn't process a complete meshlet, 
+		// but processes only part of the meshlet owned by the same mesh workgroup
+		// it's the mesh workgroup that processes complete meshlets
 		const vec3 color = randomColor(getMeshletID(i));
 		const uint uVertexCount = vecMeshlets[i].vertexCount;
 		const uint uPrimitiveCount = vecMeshlets[i].triangleCount;
 		const uint uVertexOffset = vecMeshlets[i].vertexOffset;
 		const uint uTriangleOffset = vecMeshlets[i].triangleOffset;
 
-		// we add MESH_WORKGROUP_SIZE to make each invocation process vertices and triangles of the same meshlet evenly
-		for (uint j = getLocalInvocationID(); j < uVertexCount; j += MESH_WORKGROUP_SIZE)
+		for (uint j = 0u; j < VERTEX_ITERATION_COUNT; ++j)
 		{
-			uint index = meshletVertices[uVertexOffset + j];
-			VBO vertex = getVertex(index);
-			gl_MeshVerticesEXT[j + uMeshVerticesOffset].gl_Position = ubo.proj * ubo.view * modelUBO.model * vec4(vertex.position, 1.0);
-			v_out[j + uMeshVerticesOffset].colorRGB = color;
+			uint uMeshletVertexIndex = uVertexBaseOffset + j; // the index of the vertex in the meshlet
+			if (uMeshletVertexIndex >= uVertexCount)
+				break; // prevent out of bounds access
+			
+			uint uGlobalVertexIndex = meshletVertices[uVertexOffset + uMeshletVertexIndex];
+			VBO vertex = getVertex(uGlobalVertexIndex);
+			
+			gl_MeshVerticesEXT[uMeshletVertexIndex + uMeshVerticesOffset].gl_Position = ubo.proj * ubo.view * modelUBO.model * vec4(vertex.position, 1.0);
+			v_out[uMeshletVertexIndex + uMeshVerticesOffset].colorRGB = color;
 		}
 
-		for (uint j = getLocalInvocationID(); j < uPrimitiveCount; j += MESH_WORKGROUP_SIZE)
+		for (uint j = 0u; j < PRIMITIVE_ITERATION_COUNT; ++j)
 		{
-			uint offset = uTriangleOffset + j * 3;
-			gl_PrimitiveTriangleIndicesEXT[j + uPrimitiveTriangleOffset] = uvec3(
-				meshletTriangles[offset + 2],
-				meshletTriangles[offset + 1],
-				meshletTriangles[offset + 0]
+			uint uMeshletPrimitiveIndex = uPrimitiveBaseOffset + j; // the index of the primitive in the meshlet
+			if (uMeshletPrimitiveIndex >= uPrimitiveCount)
+				break; // prevent out of bounds access
+			
+			uint uGlobalTriangleOffset = uTriangleOffset + uMeshletPrimitiveIndex * 3;
+			
+			gl_PrimitiveTriangleIndicesEXT[uMeshletPrimitiveIndex + uPrimitiveTriangleOffset] = uvec3(
+				meshletTriangles[uGlobalTriangleOffset + 2],
+				meshletTriangles[uGlobalTriangleOffset + 1],
+				meshletTriangles[uGlobalTriangleOffset + 0]
 			);
 		}
+
 		uMeshVerticesOffset += uVertexCount;
 		uPrimitiveTriangleOffset += uPrimitiveCount;
 	}
