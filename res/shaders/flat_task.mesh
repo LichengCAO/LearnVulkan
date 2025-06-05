@@ -40,6 +40,7 @@ layout(location = 0) out PerVertexData
 layout(set = 0, binding = 0) uniform CameraUBO {
 	mat4 view;
 	mat4 proj;
+	vec4 eye;
 }ubo;
 layout(set = 1, binding = 0) readonly buffer Meshlets {Meshlet meshlets[];};
 layout(set = 1, binding = 1) readonly buffer MeshletVertices {uint meshletVertices[];};

@@ -131,7 +131,7 @@ Frustum Camera::GetFrustum() const
 	ret.rightPlane  = - GetRow(viewProj, 3) + GetRow(viewProj, 0);
 	ret.bottomPlane = - GetRow(viewProj, 3) - GetRow(viewProj, 1);
 	ret.topPlane    = - GetRow(viewProj, 3) + GetRow(viewProj, 1);
-	ret.nearPlane   = - GetRow(viewProj, 3);// -viewProj[2];
+	ret.nearPlane   = - GetRow(viewProj, 3);
 	ret.farPlane    = - GetRow(viewProj, 3) + GetRow(viewProj, 2);
 
 	// normalize plane so that the signed distance won't be stretched
