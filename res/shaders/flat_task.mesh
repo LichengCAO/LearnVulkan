@@ -49,6 +49,7 @@ layout(set = 1, binding = 3) readonly buffer VertexBuffer {VBO vertices[];};
 layout(set = 1, binding = 4) uniform ModelUBO{
 	mat4 model;
 	mat4 inverseTransposeModel;
+	float scaleFactor;
 	uint meshletCount;
 }modelUBO;
 
@@ -82,14 +83,16 @@ vec3 randomColor(uint seed) {
     return vec3(r, g, b); // Return the generated color
 }
 
-// each mesh shader invocation doesn't process a complete meshlet, but processes part of the meshlet of the same mesh workgroup
-// it's the mesh workgroup that processes complete meshlets uint
+// each mesh shader invocation doesn't process a complete meshlet, 
+// but processes only part of the meshlet owned by the same mesh workgroup
+// it's the mesh workgroup that processes complete meshlets
 void main()
 {
+	Meshlet vecMeshlets[MESHLETS_PER_MESH_WORKGROUP];
 	uint uMeshOutputVertexCount = 0u;
 	uint uMeshOutputPrimitiveCount = 0u;
 	uint uValidIndexCount = 0u;
-	Meshlet vecMeshlets[MESHLETS_PER_MESH_WORKGROUP];
+	
 	for (uint i = 0u; i < MESHLETS_PER_MESH_WORKGROUP; ++i)
 	{
 		uint uMeshletID = getMeshletID(i);

@@ -32,10 +32,10 @@ private:
 	{
 		glm::mat4 model;
 		glm::mat4 inverseTranposeModel;
-		uint32_t meshletCount = 0;
-		uint32_t padding0 = 0;
-		uint32_t padding1 = 0;
-		uint32_t padding2 = 0;
+		float     maxScale = 1.0f; // stores the max scale for bounding sphere
+		uint32_t  meshletCount = 0u;
+		uint32_t  padding1 = 0u;
+		uint32_t  padding2 = 0u;
 	};
 	struct CameraUBO
 	{

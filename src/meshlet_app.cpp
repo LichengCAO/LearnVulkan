@@ -120,8 +120,8 @@ void MeshletApp::_InitModels()
 	for (auto& mesh : meshs)
 	{
 		Model model{};
-		//model.transform.SetScale({ 0.05, 0.05, 0.05 });
-		//model.transform.SetRotation({ -90, 0, 0 });
+		model.transform.SetScale({ 2.0, 2.0, 2.0 });
+		model.transform.SetRotation({ -90, 0, 0 });
 		model.mesh = mesh;
 		MeshUtility::BuildMeshlets(mesh, model.vecMeshlet, model.vecMeshletBounds, model.vecVertexRemap, model.vecTriangleIndex);
 		m_models.push_back(model);
@@ -249,6 +249,17 @@ void MeshletApp::_InitBuffers()
 			ubo.meshletCount = static_cast<uint32_t>(curModel.vecMeshlet.size());
 			ubo.model = curModel.transform.GetModelMatrix();
 			ubo.inverseTranposeModel = curModel.transform.GetModelInverseTransposeMatrix();
+			ubo.maxScale = 1.0f;
+			{
+				float scale2 = 0.0f;
+				for (int col = 0; col < 3; ++col)
+				{
+					float curScale2 = glm::dot(glm::vec3(ubo.model[col]), glm::vec3(ubo.model[col]));
+					scale2 = std::max(scale2, curScale2);
+				}
+				ubo.maxScale = std::sqrt(scale2);
+			}
+
 			bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
 			bufferInfo.size = static_cast<uint32_t>(sizeof(ModelUBO));

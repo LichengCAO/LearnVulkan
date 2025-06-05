@@ -43,6 +43,7 @@ layout(set = 1, binding = 4) uniform ModelUBO
 {
 	mat4 model;
 	mat4 inverseTransposeModel;
+	float scaleFactor;
 	uint meshletCount;
 }modelUBO;
 layout(set = 1, binding = 5) readonly buffer MeshletBoundsBuffer
@@ -53,22 +54,22 @@ layout(set = 1, binding = 5) readonly buffer MeshletBoundsBuffer
 // Shared by task workgroup, and workgroups of mesh shader emit by EmitMeshTasksEXT
 taskPayloadSharedEXT Task OUT;
 
-// Shared by all task invocations within the task workgroup
+// Shared by all task invocations within the one task workgroup
 shared uint s_uMeshletCount;
 
-bool EarlyCull(uint meshletID)
+bool EarlyCull(uint uMeshletID)
 {
-	MeshletBounds bounds = meshletBounds[meshletID];
+	MeshletBounds bounds = meshletBounds[uMeshletID];
 	vec4 coneApex = modelUBO.model * bounds.coneApex;
 	vec4 coneAxis = normalize(modelUBO.inverseTransposeModel * vec4(bounds.coneAxisCutoff.xyz, 0.0f));
 	bool bFrustumCull = false; 
 	bool bBackFaceCull = dot(normalize(coneApex.xyz - cameraUBO.eye.xyz), coneAxis.xyz) >= bounds.coneAxisCutoff.w;
+	
 	// Frustum culling
 	if (!bBackFaceCull)
 	{
-		vec4 boundSphere = vec4(bounds.boundSphere.xyz, 1.0);
-		vec4 spherePos = modelUBO.model * boundSphere;
-		float radius = boundSphere.w;
+		vec4 spherePos = modelUBO.model * vec4(bounds.boundSphere.xyz, 1.0);
+		float radius = bounds.boundSphere.w * modelUBO.scaleFactor;
 		bFrustumCull = 
 			(dot(spherePos, topFace)       > radius) ||
 			(dot(spherePos, bottomFace)    > radius) ||
@@ -83,29 +84,28 @@ bool EarlyCull(uint meshletID)
 
 void main()
 {
-	const uint baseID = gl_WorkGroupID.x * MESHLETS_PER_TASK_WORKGROUP;
-	const uint laneID = gl_LocalInvocationID.x * MESHLETS_PER_TASK_INVOCATION;
+	const uint uBaseID = gl_WorkGroupID.x * MESHLETS_PER_TASK_WORKGROUP;
+	const uint uLaneID = gl_LocalInvocationID.x * MESHLETS_PER_TASK_INVOCATION;
 
 	// Initialize the shared meshlet count for this task workgroup
-	if (laneID == 0u)
+	if (uLaneID == 0u)
 	{
 		s_uMeshletCount = 0u;
-		OUT.baseMeshletId = baseID;
+		OUT.baseMeshletId = uBaseID;
 	}
 	barrier();
 	
 	for (uint i = 0u; i < MESHLETS_PER_TASK_INVOCATION; i++)
 	{
-		uint meshletID = baseID + laneID + i;
-		uint uCurrentMeshletId = 0u;
-		if (meshletID >= modelUBO.meshletCount)
+		uint uMeshletID = uBaseID + uLaneID + i; // the meshlet ID this invocation will process
+		uint uCurrentMeshletIdSlot = 0u;         // the slot this invocation will write to in OUT.meshletIdOffset
+		if (uMeshletID >= modelUBO.meshletCount)
 			break;
-		if (EarlyCull(meshletID))
+		if (EarlyCull(uMeshletID))
 			continue;
-		uCurrentMeshletId = atomicAdd(s_uMeshletCount, 1u);
-		OUT.meshletIdOffset[uCurrentMeshletId] = uint8_t(laneID + i);
+		uCurrentMeshletIdSlot = atomicAdd(s_uMeshletCount, 1u);
+		OUT.meshletIdOffset[uCurrentMeshletIdSlot] = uint8_t(uLaneID + i);
 	}
-
 	barrier();
 
 	// Defines the mesh workgroup size for this task workgroup (NOT task invocation)
@@ -113,5 +113,5 @@ void main()
 		(s_uMeshletCount + MESHLETS_PER_MESH_WORKGROUP - 1) / MESHLETS_PER_MESH_WORKGROUP,
 		1,
 		1
-	);// use gl_WorkGroupID to index in mesh shader
+	);
 }
