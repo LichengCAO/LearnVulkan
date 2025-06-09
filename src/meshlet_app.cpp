@@ -574,7 +574,7 @@ void MeshletApp::_DrawFrame()
 	waitInfo.waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	cmd->StartCommands({ waitInfo });
 
-	cmd->StartRenderPass(&m_renderPass, m_framebuffers[m_currentFrame].get());
+	cmd->StartRenderPass(&m_renderPass, m_framebuffers[imageIndex.value()].get());
 	for (int i = 0; i < m_models.size(); ++i)
 	{
 		GraphicsMeshPipelineInput meshInput{};

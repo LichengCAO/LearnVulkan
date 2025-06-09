@@ -87,3 +87,15 @@ public:
 
 	void Do(VkCommandBuffer commandBuffer, const ComputePipelineInput& input);
 };
+
+struct RayTracePipelineInput
+{
+	std::vector<const DescriptorSet*> pDescriptorSets;
+	const VkStridedDeviceAddressRegionKHR* pRayGenerationRegion = nullptr;
+	const VkStridedDeviceAddressRegionKHR* pMissRegion = nullptr;
+	const VkStridedDeviceAddressRegionKHR* pHitRegion = nullptr;
+	const VkStridedDeviceAddressRegionKHR* pCallableRegion = nullptr;
+	uint32_t uWidth = 0u;
+	uint32_t uHeight = 0u;
+	uint32_t uDepth = 0u;
+};
