@@ -339,3 +339,277 @@ void ComputePipeline::Do(VkCommandBuffer commandBuffer, const ComputePipelineInp
 
 	vkCmdDispatch(commandBuffer, input.groupCountX, input.groupCountY, input.groupCountZ);
 }
+
+RayTracingPipeline::RayTracingPipeline()
+{
+}
+
+RayTracingPipeline::~RayTracingPipeline()
+{
+	assert(vkPipeline == VK_NULL_HANDLE);
+	assert(vkPipelineLayout == VK_NULL_HANDLE);
+}
+
+uint32_t RayTracingPipeline::AddShader(const VkPipelineShaderStageCreateInfo& shaderInfo)
+{
+	uint32_t uIndex = ~0;
+	assert(vkPipeline == VK_NULL_HANDLE);
+	uIndex = static_cast<uint32_t>(m_shaderStageInfos.size());
+	m_shaderStageInfos.push_back(shaderInfo);
+	return uIndex;
+}
+
+void RayTracingPipeline::AddDescriptorSetLayout(const DescriptorSetLayout* pSetLayout)
+{
+	AddDescriptorSetLayout(pSetLayout->vkDescriptorSetLayout);
+}
+
+void RayTracingPipeline::AddDescriptorSetLayout(VkDescriptorSetLayout vkDSetLayout)
+{
+	m_descriptorSetLayouts.push_back(vkDSetLayout);
+}
+
+uint32_t RayTracingPipeline::SetRayGenerationShaderRecord(uint32_t rayGen)
+{
+	VkRayTracingShaderGroupCreateInfoKHR shaderRecord{ VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR };
+	uint32_t uRet = static_cast<uint32_t>(m_shaderRecords.size());
+	
+	shaderRecord.pNext = nullptr;
+	shaderRecord.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+	shaderRecord.generalShader = rayGen;
+	shaderRecord.closestHitShader = VK_SHADER_UNUSED_KHR;
+	shaderRecord.anyHitShader = VK_SHADER_UNUSED_KHR;
+	shaderRecord.intersectionShader = VK_SHADER_UNUSED_KHR;
+	shaderRecord.pShaderGroupCaptureReplayHandle = nullptr;
+
+	m_shaderRecords.push_back(shaderRecord);
+	m_SBT.SetRayGenRecord(uRet);
+	return uRet;
+}
+
+uint32_t RayTracingPipeline::AddHitShaderRecord(uint32_t closestHit, uint32_t anyHit, uint32_t intersection)
+{
+	VkRayTracingShaderGroupCreateInfoKHR shaderRecord{ VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR };
+	uint32_t uRet = static_cast<uint32_t>(m_shaderRecords.size());
+
+	shaderRecord.pNext = nullptr;
+	shaderRecord.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
+	shaderRecord.generalShader = VK_SHADER_UNUSED_KHR;
+	shaderRecord.closestHitShader = closestHit;
+	shaderRecord.anyHitShader = anyHit;
+	shaderRecord.intersectionShader = intersection;
+	shaderRecord.pShaderGroupCaptureReplayHandle = nullptr;
+
+	m_shaderRecords.push_back(shaderRecord);
+	m_SBT.AddHitRecord(uRet);
+	return uRet;
+}
+
+uint32_t RayTracingPipeline::AddMissShaderRecord(uint32_t miss)
+{
+	VkRayTracingShaderGroupCreateInfoKHR shaderRecord{ VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR };
+	uint32_t uRet = static_cast<uint32_t>(m_shaderRecords.size());
+
+	shaderRecord.pNext = nullptr;
+	shaderRecord.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+	shaderRecord.generalShader = miss;
+	shaderRecord.closestHitShader = VK_SHADER_UNUSED_KHR;
+	shaderRecord.anyHitShader = VK_SHADER_UNUSED_KHR;
+	shaderRecord.intersectionShader = VK_SHADER_UNUSED_KHR;
+	shaderRecord.pShaderGroupCaptureReplayHandle = nullptr;
+
+	m_shaderRecords.push_back(shaderRecord);
+	m_SBT.AddMissRecord(uRet);
+	return uRet;
+}
+
+void RayTracingPipeline::SetMaxRecursion(uint32_t maxRecur)
+{
+	m_maxRayRecursionDepth = maxRecur;
+}
+
+void RayTracingPipeline::Init()
+{
+	VkPipelineLayoutCreateInfo pipelineLayoutInfo{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
+	pipelineLayoutInfo.setLayoutCount = static_cast<uint32_t>(m_descriptorSetLayouts.size());
+	pipelineLayoutInfo.pSetLayouts = m_descriptorSetLayouts.data();
+	pipelineLayoutInfo.pushConstantRangeCount = 0;
+	pipelineLayoutInfo.pPushConstantRanges = nullptr;
+	CHECK_TRUE(vkPipelineLayout == VK_NULL_HANDLE, "VkPipelineLayout is already created!");
+	VK_CHECK(vkCreatePipelineLayout(MyDevice::GetInstance().vkDevice, &pipelineLayoutInfo, nullptr, &vkPipelineLayout), "Failed to create pipeline layout!");
+
+	VkRayTracingPipelineCreateInfoKHR pipelineInfo{VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR};
+	pipelineInfo.pNext = nullptr;
+	pipelineInfo.flags = 0;
+	pipelineInfo.stageCount = static_cast<uint32_t>(m_shaderStageInfos.size());
+	pipelineInfo.pStages = m_shaderStageInfos.data();
+	pipelineInfo.groupCount = static_cast<uint32_t>(m_shaderRecords.size());
+	pipelineInfo.pGroups = m_shaderRecords.data();
+	pipelineInfo.maxPipelineRayRecursionDepth = m_maxRayRecursionDepth;
+	pipelineInfo.pLibraryInfo = nullptr;
+	pipelineInfo.pLibraryInterface = nullptr;
+	pipelineInfo.pDynamicState = nullptr;
+	pipelineInfo.layout = vkPipelineLayout;
+	pipelineInfo.basePipelineHandle = VK_NULL_HANDLE;
+	pipelineInfo.basePipelineIndex = -1;
+
+	CHECK_TRUE(vkPipeline == VK_NULL_HANDLE, "VkPipeline is already created!");
+	VK_CHECK(vkCreateRayTracingPipelinesKHR(MyDevice::GetInstance().vkDevice, {}, {}, 1, &pipelineInfo, nullptr, &vkPipeline), "Failed to create ray tracing pipeline!");
+
+	m_SBT.Init(this);
+}
+
+void RayTracingPipeline::Uninit()
+{
+	m_SBT.Uninit();
+	if (vkPipeline != VK_NULL_HANDLE)
+	{
+		vkDestroyPipeline(MyDevice::GetInstance().vkDevice, vkPipeline, nullptr);
+		vkPipeline = VK_NULL_HANDLE;
+	}
+	if (vkPipelineLayout != VK_NULL_HANDLE)
+	{
+		vkDestroyPipelineLayout(MyDevice::GetInstance().vkDevice, vkPipelineLayout, nullptr);
+		vkPipelineLayout = VK_NULL_HANDLE;
+	}
+}
+
+void RayTracingPipeline::Do(VkCommandBuffer commandBuffer, const RayTracingPipelineInput& input)
+{
+	const auto& pSets = input.pDescriptorSets;
+	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, vkPipeline);
+
+	if (pSets.size() > 0)
+	{
+		std::vector<VkDescriptorSet> descriptorSets;
+		for (int i = 0; i < pSets.size(); ++i)
+		{
+			descriptorSets.push_back(pSets[i]->vkDescriptorSet);
+		}
+		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, vkPipelineLayout, 0, static_cast<uint32_t>(descriptorSets.size()), descriptorSets.data(), 0, nullptr);
+	}
+
+	vkCmdTraceRaysKHR(commandBuffer, &m_SBT.vkRayGenRegion, &m_SBT.vkMissRegion, &m_SBT.vkHitRegion, &m_SBT.vkCallRegion, input.uWidth, input.uHeight, input.uDepth);
+}
+
+void RayTracingPipeline::ShaderBindingTable::SetRayGenRecord(uint32_t index)
+{
+	m_uRayGenerationIndex = index;
+}
+
+void RayTracingPipeline::ShaderBindingTable::AddMissRecord(uint32_t index)
+{
+	m_uMissIndices.push_back(index);
+}
+
+void RayTracingPipeline::ShaderBindingTable::AddHitRecord(uint32_t index)
+{
+	m_uHitIndices.push_back(index);
+}
+
+void RayTracingPipeline::ShaderBindingTable::AddCallableRecord(uint32_t index)
+{
+	m_uCallableIndices.push_back(index);
+}
+
+void RayTracingPipeline::ShaderBindingTable::Init(const RayTracingPipeline* pRayTracingPipeline)
+{
+	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rayTracingProperties{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR };
+	VkPhysicalDeviceProperties2 prop2{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
+	uint32_t uRecordCount = static_cast<uint32_t>(pRayTracingPipeline->m_shaderRecords.size()); // This is because the inner (nested) class A is considered part of B and has access to all private, protected, and public members of B
+	uint32_t uHandleSizeHost = 0u;
+	uint32_t uHandleSizeDevice = 0u;
+	size_t uGroupDataSize = 0u;
+	std::vector<uint8_t> groupData;
+	static auto funcAlignUp = [](uint32_t uToAlign, uint32_t uAlignRef)
+	{
+		return (uToAlign + uAlignRef - 1) & ~(uAlignRef - 1);
+	};
+	
+	prop2.pNext = &rayTracingProperties;
+	vkGetPhysicalDeviceProperties2(MyDevice::GetInstance().vkPhysicalDevice, &prop2);
+	
+	uHandleSizeHost = rayTracingProperties.shaderGroupHandleSize;
+	uHandleSizeDevice = funcAlignUp(uHandleSizeHost, rayTracingProperties.shaderGroupHandleAlignment);
+
+	vkRayGenRegion.size = funcAlignUp(uHandleSizeDevice * 1u, rayTracingProperties.shaderGroupBaseAlignment);
+	vkMissRegion.size = funcAlignUp(uHandleSizeDevice * static_cast<uint32_t>(m_uMissIndices.size()), rayTracingProperties.shaderGroupBaseAlignment);
+	vkHitRegion.size = funcAlignUp(uHandleSizeDevice * static_cast<uint32_t>(m_uHitIndices.size()), rayTracingProperties.shaderGroupBaseAlignment);
+	vkCallRegion.size = funcAlignUp(uHandleSizeDevice * static_cast<uint32_t>(m_uCallableIndices.size()), rayTracingProperties.shaderGroupBaseAlignment);
+
+	vkRayGenRegion.stride = vkRayGenRegion.size; // The size member of pRayGenShaderBindingTable must be equal to its stride member
+	vkMissRegion.stride = uHandleSizeDevice;
+	vkHitRegion.stride = uHandleSizeDevice;
+	vkCallRegion.stride = uHandleSizeDevice;
+
+	uGroupDataSize = static_cast<size_t>(uRecordCount * uHandleSizeHost);
+	groupData.resize(uGroupDataSize);
+	VK_CHECK(vkGetRayTracingShaderGroupHandlesKHR(MyDevice::GetInstance().vkDevice, pRayTracingPipeline->vkPipeline, 0, uRecordCount, uGroupDataSize, groupData.data())
+		, "Failed to get group handle data!");
+
+	// bind shader group(shader record) handle to table on device
+	{
+		Buffer stagingBuffer{};
+		BufferInformation stagBufferInfo{};
+		BufferInformation bufferInfo{};
+		VkDeviceAddress SBTAddress = 0;
+		std::vector<uint8_t> dataToDevice;
+		auto funcGetGroupHandle = [&](int i) { return groupData.data() + i * static_cast<int>(uHandleSizeHost); };
+		m_uptrBuffer = std::make_unique<Buffer>();
+
+		stagBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+		stagBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+		stagBufferInfo.size = vkRayGenRegion.size + vkMissRegion.size + vkHitRegion.size + vkCallRegion.size;
+
+		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
+		bufferInfo.size = stagBufferInfo.size;
+
+		stagingBuffer.Init(stagBufferInfo);
+		m_uptrBuffer->Init(bufferInfo);
+
+		SBTAddress = m_uptrBuffer->GetDeviceAddress();
+
+		dataToDevice.resize(stagBufferInfo.size, 0u);
+		// set rayGen
+		uint8_t* pEntryPoint = dataToDevice.data();
+		vkRayGenRegion.deviceAddress = SBTAddress;
+		memcpy(pEntryPoint, funcGetGroupHandle(m_uRayGenerationIndex), static_cast<size_t>(uHandleSizeHost));
+
+		// set Miss
+		vkMissRegion.deviceAddress = SBTAddress + vkRayGenRegion.size;
+		pEntryPoint = dataToDevice.data() + vkRayGenRegion.size;
+		for (const auto index : m_uMissIndices)
+		{
+			memcpy(pEntryPoint, funcGetGroupHandle(index), static_cast<size_t>(uHandleSizeHost));
+			pEntryPoint += static_cast<int>(uHandleSizeDevice);
+		}
+
+		// set Hit
+		vkHitRegion.deviceAddress = SBTAddress + vkRayGenRegion.size + vkMissRegion.size;
+		pEntryPoint = dataToDevice.data() + vkRayGenRegion.size + vkMissRegion.size;
+		for (const auto index : m_uHitIndices)
+		{
+			memcpy(pEntryPoint, funcGetGroupHandle(index), static_cast<size_t>(uHandleSizeHost));
+			pEntryPoint += static_cast<int>(uHandleSizeDevice);
+		}
+
+		// set Callable
+		vkCallRegion.deviceAddress = SBTAddress + vkRayGenRegion.size + vkMissRegion.size + vkHitRegion.size;
+		pEntryPoint = dataToDevice.data() + vkRayGenRegion.size + vkMissRegion.size + vkHitRegion.size;
+		for (const auto index : m_uCallableIndices)
+		{
+			memcpy(pEntryPoint, funcGetGroupHandle(index), static_cast<size_t>(uHandleSizeHost));
+			pEntryPoint += static_cast<int>(uHandleSizeDevice);
+		}
+
+		stagingBuffer.CopyFromHost(dataToDevice.data());
+		m_uptrBuffer->CopyFromBuffer(stagingBuffer);
+		stagingBuffer.Uninit();
+	}
+}
+
+void RayTracingPipeline::ShaderBindingTable::Uninit()
+{
+	m_uptrBuffer->Uninit();
+}

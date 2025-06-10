@@ -13,7 +13,7 @@ uint32_t Buffer::_FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags p
 		}
 	}
 	throw std::runtime_error("Failed to find suitable memory type!");
-	return uint32_t();
+	return ~0;
 }
 
 Buffer::~Buffer()
@@ -127,6 +127,20 @@ void Buffer::CopyFromBuffer(const Buffer* pOtherBuffer)
 BufferInformation Buffer::GetBufferInformation() const
 {
 	return m_bufferInformation;
+}
+
+VkDeviceAddress Buffer::GetDeviceAddress() const
+{
+	VkDeviceAddress vkDeviceAddr = 0;
+	VkBufferDeviceAddressInfo info{ VK_STRUCTURE_TYPE_BUFFER_DEVICE_ADDRESS_INFO };
+	
+	assert(vkBuffer != VK_NULL_HANDLE);
+	info.pNext = nullptr;
+	info.buffer = vkBuffer;
+
+	vkDeviceAddr = vkGetBufferDeviceAddress(MyDevice::GetInstance().vkDevice, &info);
+
+	return vkDeviceAddr;
 }
 
 BufferView Buffer::NewBufferView(VkFormat _format)

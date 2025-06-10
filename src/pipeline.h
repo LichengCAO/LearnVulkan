@@ -10,7 +10,6 @@ struct GraphicsVertexPipelineInput
 	const VertexIndexInput* pVertexIndexInput = nullptr;
 	std::vector<const VertexInput*> pVertexInputs;
 };
-
 struct GraphicsMeshPipelineInput
 {
 	VkExtent2D imageSize{};
@@ -20,7 +19,6 @@ struct GraphicsMeshPipelineInput
 	uint32_t groupCountY = 1;
 	uint32_t groupCountZ = 1;
 };
-
 class GraphicsPipeline
 {
 private:
@@ -88,14 +86,78 @@ public:
 	void Do(VkCommandBuffer commandBuffer, const ComputePipelineInput& input);
 };
 
-struct RayTracePipelineInput
+struct RayTracingPipelineInput
 {
 	std::vector<const DescriptorSet*> pDescriptorSets;
-	const VkStridedDeviceAddressRegionKHR* pRayGenerationRegion = nullptr;
-	const VkStridedDeviceAddressRegionKHR* pMissRegion = nullptr;
-	const VkStridedDeviceAddressRegionKHR* pHitRegion = nullptr;
-	const VkStridedDeviceAddressRegionKHR* pCallableRegion = nullptr;
+	// for simplicity, i bind SBT in RT pipeline
 	uint32_t uWidth = 0u;
 	uint32_t uHeight = 0u;
-	uint32_t uDepth = 0u;
+	uint32_t uDepth = 1u;
+};
+class RayTracingPipeline
+{
+private:
+	class ShaderBindingTable
+	{
+	private:
+		std::unique_ptr<Buffer> m_uptrBuffer;
+		uint32_t              m_uRayGenerationIndex = ~0;
+		std::vector<uint32_t> m_uMissIndices;
+		std::vector<uint32_t> m_uHitIndices;
+		std::vector<uint32_t> m_uCallableIndices;
+
+	private:
+		ShaderBindingTable(const ShaderBindingTable& _other) = delete;
+		ShaderBindingTable& operator=(const ShaderBindingTable& _other) = delete;
+
+	public:
+		ShaderBindingTable() {};
+
+		void SetRayGenRecord(uint32_t index);
+		void AddMissRecord(uint32_t index);
+		void AddHitRecord(uint32_t index);
+		void AddCallableRecord(uint32_t index);
+		
+		void Init(const RayTracingPipeline* pRayTracingPipeline);
+		void Uninit();
+
+		VkStridedDeviceAddressRegionKHR vkRayGenRegion{};
+		VkStridedDeviceAddressRegionKHR vkMissRegion{};
+		VkStridedDeviceAddressRegionKHR vkHitRegion{};
+		VkStridedDeviceAddressRegionKHR vkCallRegion{};
+	};
+
+private:
+	std::vector<VkPipelineShaderStageCreateInfo> m_shaderStageInfos;
+	std::vector<VkRayTracingShaderGroupCreateInfoKHR> m_shaderRecords;
+	std::vector<VkDescriptorSetLayout> m_descriptorSetLayouts;
+	ShaderBindingTable m_SBT{};
+	uint32_t m_maxRayRecursionDepth = 1u;
+
+public:
+	VkPipelineLayout vkPipelineLayout = VK_NULL_HANDLE;
+	VkPipeline vkPipeline = VK_NULL_HANDLE;
+
+	RayTracingPipeline();
+	~RayTracingPipeline();
+
+	uint32_t AddShader(const VkPipelineShaderStageCreateInfo& shaderInfo);
+	void AddDescriptorSetLayout(const DescriptorSetLayout* pSetLayout);
+	void AddDescriptorSetLayout(VkDescriptorSetLayout vkDSetLayout);
+
+	// https://www.willusher.io/graphics/2019/11/20/the-sbt-three-ways/
+	
+	// Set Ray Generation shader record in self shader binding table, return the index of this record in all ShaderRecords, i.e. index of element in pGroups of VkRayTracingPipelineCreateInfoKHR
+	uint32_t SetRayGenerationShaderRecord(uint32_t rayGen); 
+	// Add Hit shader record in self shader binding table, return the index of this record in all ShaderRecords, i.e. index of element in pGroups of VkRayTracingPipelineCreateInfoKHR
+	uint32_t AddHitShaderRecord(uint32_t closestHit, uint32_t anyHit = VK_SHADER_UNUSED_KHR, uint32_t intersection = VK_SHADER_UNUSED_KHR);
+	// Add Miss shader record in self shader binding table, return the index of this record in all ShaderRecords, i.e. index of element in pGroups of VkRayTracingPipelineCreateInfoKHR
+	uint32_t AddMissShaderRecord(uint32_t miss);
+
+	void SetMaxRecursion(uint32_t maxRecur);
+
+	void Init();
+	void Uninit();
+
+	void Do(VkCommandBuffer commandBuffer, const RayTracingPipelineInput& input);
 };

@@ -32,6 +32,7 @@ public:
 	void CopyFromBuffer(const Buffer* pOtherBuffer);
 
 	BufferInformation GetBufferInformation() const;
+	VkDeviceAddress GetDeviceAddress() const;
 
 	BufferView NewBufferView(VkFormat _format);
 };
