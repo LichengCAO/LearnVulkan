@@ -61,3 +61,12 @@ public:
 		std::vector<uint8_t>& outMeshletTriangles
 	);
 };
+
+namespace CommonUtils
+{
+	template <class intType>
+	constexpr intType AlignUp(intType x, size_t a)
+	{
+		return intType((x + intType(a) - 1) & ~intType(a - 1));
+	}
+}

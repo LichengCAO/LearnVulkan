@@ -304,6 +304,21 @@ void CommandSubmission::CopyBufferToImage(VkBuffer vkBuffer, VkImage vkImage, Vk
 	);
 }
 
+void CommandSubmission::BuildAccelerationStructures(const std::vector<VkAccelerationStructureBuildGeometryInfoKHR>& buildGeomInfos, const std::vector<const VkAccelerationStructureBuildRangeInfoKHR*> buildRangeInfoPtrs) const
+{
+	vkCmdBuildAccelerationStructuresKHR(vkCommandBuffer, static_cast<uint32_t>(buildGeomInfos.size()), buildGeomInfos.data(), buildRangeInfoPtrs.data());
+}
+
+void CommandSubmission::WriteAccelerationStructuresProperties(const std::vector<VkAccelerationStructureKHR>& vkAccelerationStructs, VkQueryType queryType, VkQueryPool queryPool, uint32_t firstQuery) const
+{
+	vkCmdWriteAccelerationStructuresPropertiesKHR(vkCommandBuffer, static_cast<uint32_t>(vkAccelerationStructs.size()), vkAccelerationStructs.data(), queryType, queryPool, firstQuery);
+}
+
+void CommandSubmission::CopyAccelerationStructure(const VkCopyAccelerationStructureInfoKHR& copyInfo) const
+{
+	vkCmdCopyAccelerationStructureKHR(vkCommandBuffer, &copyInfo);
+}
+
 void CommandSubmission::WaitTillAvailable()const
 {
 	if (vkFence != VK_NULL_HANDLE && !m_isRecording)

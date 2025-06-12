@@ -100,4 +100,14 @@ public:
 		const std::vector<VkImageBlit>& regions, VkFilter filter = VK_FILTER_LINEAR) const;  // this will change image layout
 
 	void CopyBufferToImage(VkBuffer vkBuffer, VkImage vkImage, VkImageLayout layout, const std::vector<VkBufferImageCopy>& regions) const;
+
+	void BuildAccelerationStructures(
+		const std::vector<VkAccelerationStructureBuildGeometryInfoKHR>& buildGeomInfos,
+		const std::vector<const VkAccelerationStructureBuildRangeInfoKHR*> buildRangeInfoPtrs) const;
+
+	void WriteAccelerationStructuresProperties(
+		const std::vector<VkAccelerationStructureKHR>& vkAccelerationStructs,
+		VkQueryType queryType, VkQueryPool queryPool, uint32_t firstQuery) const;
+
+	void CopyAccelerationStructure(const VkCopyAccelerationStructureInfoKHR& copyInfo) const;
 };
