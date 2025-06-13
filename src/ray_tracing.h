@@ -25,6 +25,12 @@ private:
 		VkAccelerationStructureKHR vkAccelerationStructure = VK_NULL_HANDLE;
 		VkDeviceAddress vkDeviceAddress;
 
+		BLAS() {};
+		BLAS(BLAS&& other) { 
+			uptrBuffer = std::move(other.uptrBuffer);
+			vkAccelerationStructure = other.vkAccelerationStructure;
+			vkDeviceAddress = other.vkDeviceAddress;
+		};
 		~BLAS() { assert(vkAccelerationStructure == VK_NULL_HANDLE); };
 
 		// create BLAS not build it
