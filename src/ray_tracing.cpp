@@ -30,7 +30,7 @@ void RayTracingAccelerationStructure::_InitScratchBuffer(
 	CHECK_TRUE(maxBudget >= maxScratchChunk, "Max Budget is too small!");
 
 	// Find the scratch buffer size
-	if (fullScratchSize < maxBudget)
+	if (fullScratchSize <= maxBudget)
 	{
 		scratchBufferInfo.size = fullScratchSize;
 		uSlotCount = buildSizeInfo.size();
@@ -46,7 +46,7 @@ void RayTracingAccelerationStructure::_InitScratchBuffer(
 
 	// fill slotAddresses
 	slotAddresses.reserve(uSlotCount);
-	if (fullScratchSize < maxBudget)
+	if (fullScratchSize <= maxBudget)
 	{
 		VkDeviceAddress curAddress = scratchBufferToInit.GetDeviceAddress();
 		for (int i = 0; i < buildSizeInfo.size(); ++i)
@@ -69,7 +69,7 @@ void RayTracingAccelerationStructure::_InitScratchBuffer(
 	}
 }
 
-void RayTracingAccelerationStructure::_BuildBLASes()
+void RayTracingAccelerationStructure::_BuildBLASs()
 {
 	VkBuildAccelerationStructureFlagsKHR vkBuildASFlags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR;
 	VkDeviceSize maxBudget = 256'000'000;
@@ -226,7 +226,7 @@ void RayTracingAccelerationStructure::_BuildBLASes()
 						copyInfo.dst = compactBLAS.vkAccelerationStructure;
 
 						cmd.CopyAccelerationStructure(copyInfo);
-						m_BLASes.push_back(std::move(compactBLAS));
+						m_BLASs.push_back(std::move(compactBLAS));
 					}
 				}
 				queryIndex = BLASIndex;
@@ -240,7 +240,7 @@ void RayTracingAccelerationStructure::_BuildBLASes()
 			// process BLASes Init in this iter
 			if (bNeedCompact)
 			{
-				// we already push the compacted BLAS copy into the m_BLASes, therefore BLASes in BLASesInitInThisIter is useless
+				// we already push the compacted BLAS copy into the m_BLASs, therefore BLASes in BLASesInitInThisIter is useless
 				for (auto& uselessBLAS : BLASesInitInThisIter)
 				{
 					uselessBLAS.Uninit();
@@ -251,7 +251,7 @@ void RayTracingAccelerationStructure::_BuildBLASes()
 			{
 				for (int i = 0; i < BLASesInitInThisIter.size(); ++i)
 				{
-					m_BLASes.push_back(std::move(BLASesInitInThisIter[i]));
+					m_BLASs.push_back(std::move(BLASesInitInThisIter[i]));
 				}
 			}
 		}
@@ -260,6 +260,7 @@ void RayTracingAccelerationStructure::_BuildBLASes()
 	}
 	
 	scratchBuffer.Uninit();
+	m_BLASInputs.clear();
 }
 
 void RayTracingAccelerationStructure::_PrepareQueryPool(uint32_t uQueryCount)
@@ -279,6 +280,65 @@ void RayTracingAccelerationStructure::_PrepareQueryPool(uint32_t uQueryCount)
 	}
 }
 
+void RayTracingAccelerationStructure::_BuildTLAS()
+{
+	CommandSubmission cmd{};
+	Buffer scratchBuffer{};
+	VkAccelerationStructureBuildGeometryInfoKHR buildGeomInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR };
+	VkAccelerationStructureBuildSizesInfoKHR buildSizeInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR };
+	uint32_t uMaxPrimitiveCount = 0u; // we only have one TLAS here, so I use a uint32_t instead of a vector
+	std::vector<VkDeviceAddress> slotAddresses; // size should be one
+
+	buildGeomInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+	buildGeomInfo.flags = m_TLASInput.vkBuildFlags;
+	buildGeomInfo.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
+	buildGeomInfo.srcAccelerationStructure = VK_NULL_HANDLE;
+	buildGeomInfo.dstAccelerationStructure = VK_NULL_HANDLE;
+	buildGeomInfo.geometryCount = 1u;
+	buildGeomInfo.pGeometries = &m_TLASInput.vkASGeometry;
+
+	uMaxPrimitiveCount = m_TLASInput.vkASBuildRangeInfo.primitiveCount; 
+
+	vkGetAccelerationStructureBuildSizesKHR(MyDevice::GetInstance().vkDevice, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &buildGeomInfo, &uMaxPrimitiveCount, &buildSizeInfo);
+
+	_InitScratchBuffer(buildSizeInfo.buildScratchSize, { buildSizeInfo }, scratchBuffer, slotAddresses);
+
+	m_TLAS.Init(buildSizeInfo.accelerationStructureSize);
+	vkAccelerationStructure = m_TLAS.vkAccelerationStructure;
+
+	buildGeomInfo.dstAccelerationStructure = vkAccelerationStructure;
+	buildGeomInfo.scratchData.deviceAddress = scratchBuffer.GetDeviceAddress();
+
+	cmd.Init();
+	cmd.StartOneTimeCommands({});
+	
+	cmd.BuildAccelerationStructures({ buildGeomInfo }, { &m_TLASInput.vkASBuildRangeInfo });
+	
+	cmd.SubmitCommands();
+	cmd.Uninit();
+
+	scratchBuffer.Uninit();
+
+	// From GPT:
+	// Instance buffer data - unlike triangle data - can be destroy after the AS is built. For triangle data, it depends on GPU vendor's implementations
+	//
+	// Instance Data (in VkAccelerationStructureGeometryInstancesDataKHR.data)
+	// When building a Top - Level Acceleration Structure(TLAS), the instance data(which specifies the references to BLASes, their transforms, and other metadata) 
+	// is always copied into the TLAS during the build process.
+	// This ensures that the instance information is stored entirely within the TLASand does not require access to the original buffer after the build.
+	// Vulkan explicitly guarantees this behavior in the specification : the GPU will copy all required instance data into the TLAS memory during the build process.
+	// Therefore, the buffer used for data.deviceAddress only needs to be valid during the TLAS build operation, and it can be safely destroyed afterward.
+	//
+	// Triangle Vertex Data(in VkAccelerationStructureGeometryTrianglesDataKHR.vertexData)
+	// When building a Bottom - Level Acceleration Structure(BLAS) from triangle geometry, the behavior is implementation - dependent :
+	// Some Vulkan implementations may copy vertex data directly into the BLAS, making the original vertex buffer unnecessary after the build.
+	// Other implementations may reference the original vertex data at runtime, meaning the vertex buffer must remain valid for as long as the BLAS is used.
+	// Because this behavior depends on the GPU driverand hardware, 
+	// you cannot assume that the vertex buffer can always be destroyed after the BLAS is built unless you¡¯ve confirmed the implementation¡¯s behavior.
+	m_TLASInput.uptrInstanceBuffer->Uninit();
+	m_TLASInput = TLASInput{};
+}
+
 uint32_t RayTracingAccelerationStructure::AddBLAS(const std::vector<TriangleData>& geomData)
 {
 	uint32_t uRet = static_cast<uint32_t>(m_BLASInputs.size());
@@ -292,7 +352,7 @@ uint32_t RayTracingAccelerationStructure::AddBLAS(const std::vector<TriangleData
 		triangles.vertexStride = geom.uVertexStride;
 		triangles.indexType = geom.vkIndexType;
 		triangles.indexData.deviceAddress = geom.vkDeviceAddressIndex;
-		triangles.transformData = {};
+		triangles.transformData = {}; // transform
 		triangles.maxVertex = geom.uVertexCount - 1;
 		triangles.pNext = nullptr;
 
@@ -317,6 +377,91 @@ uint32_t RayTracingAccelerationStructure::AddBLAS(const std::vector<TriangleData
     return uRet;
 }
 
+void RayTracingAccelerationStructure::SetupTLAS(const std::vector<InstanceData>& instData)
+{
+	uint32_t gl_InstanceCustomIndex = 0u;
+	TLASInput& tlasInput = m_TLASInput;
+	std::vector<VkAccelerationStructureInstanceKHR> ASInstances;
+	VkAccelerationStructureGeometryInstancesDataKHR geomInstancesData{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR };
+	VkAccelerationStructureGeometryKHR				geom{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR };
+	VkAccelerationStructureBuildRangeInfoKHR		buildRangeInfo{};
+	
+	_BuildBLASs();
+
+	tlasInput = TLASInput{};
+
+	// prepare instance data
+	ASInstances.reserve(instData.size());
+	for (const auto& instInfo : instData)
+	{
+		VkAccelerationStructureInstanceKHR vkASInst{};
+		vkASInst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+		vkASInst.mask = 0xFF;
+		vkASInst.instanceCustomIndex = gl_InstanceCustomIndex;
+		vkASInst.accelerationStructureReference = m_BLASs[instInfo.uBLASIndex].vkDeviceAddress;
+		vkASInst.instanceShaderBindingTableRecordOffset = instInfo.uHitShaderGroupIndex;
+		vkASInst.transform = CommonUtils::ToTransformMatrixKHR(instInfo.transformMatrix);
+
+		gl_InstanceCustomIndex++;
+		ASInstances.push_back(vkASInst);
+	}
+
+	// setup instance buffer
+	{
+		BufferInformation bufferInfo{};
+		BufferInformation stagBufferInfo{};
+		Buffer stagBuffer{};
+		tlasInput.uptrInstanceBuffer = std::make_unique<Buffer>();
+
+		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		bufferInfo.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+		bufferInfo.size = ASInstances.size() * sizeof(VkAccelerationStructureInstanceKHR);
+
+		stagBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+		stagBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+		stagBufferInfo.size = ASInstances.size() * sizeof(VkAccelerationStructureInstanceKHR);
+
+		tlasInput.uptrInstanceBuffer->Init(bufferInfo);
+		stagBuffer.Init(stagBufferInfo);
+
+		stagBuffer.CopyFromHost(ASInstances.data());
+		tlasInput.uptrInstanceBuffer->CopyFromBuffer(stagBuffer);
+
+		stagBuffer.Uninit();
+	}
+
+	buildRangeInfo.primitiveCount = static_cast<uint32_t>(instData.size());
+	geomInstancesData.data.deviceAddress = tlasInput.uptrInstanceBuffer->GetDeviceAddress();
+	geom.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
+	geom.geometry.instances = geomInstancesData;
+
+	tlasInput.vkASBuildRangeInfo = buildRangeInfo;
+	tlasInput.vkASGeometry = geom;
+}
+
+void RayTracingAccelerationStructure::Init()
+{
+	_BuildTLAS();
+}
+
+void RayTracingAccelerationStructure::Uninit()
+{
+	if (m_vkQueryPool != VK_NULL_HANDLE)
+	{
+		vkDestroyQueryPool(MyDevice::GetInstance().vkDevice, m_vkQueryPool, nullptr);
+		m_vkQueryPool = VK_NULL_HANDLE;
+	}
+	m_TLAS.Uninit();
+	vkAccelerationStructure = VK_NULL_HANDLE;
+	m_TLASInput.uptrInstanceBuffer->Uninit();
+	for (auto& curBLAS : m_BLASs)
+	{
+		curBLAS.Uninit();
+	}
+	m_BLASs.clear();
+	m_BLASInputs.clear();
+}
+
 void RayTracingAccelerationStructure::BLAS::Init(VkDeviceSize size)
 {
 	BufferInformation bufferInfo{};
@@ -334,7 +479,7 @@ void RayTracingAccelerationStructure::BLAS::Init(VkDeviceSize size)
 	uptrBuffer->Init(bufferInfo);
 	info.buffer = uptrBuffer->vkBuffer;
 
-	vkCreateAccelerationStructureKHR(MyDevice::GetInstance().vkDevice, &info, nullptr, &vkAccelerationStructure);
+	VK_CHECK(vkCreateAccelerationStructureKHR(MyDevice::GetInstance().vkDevice, &info, nullptr, &vkAccelerationStructure), "Failed to create BLAS!");
 
 	vkASAddrInfo.accelerationStructure = vkAccelerationStructure;
 	vkASAddrInfo.pNext = nullptr;
@@ -342,6 +487,47 @@ void RayTracingAccelerationStructure::BLAS::Init(VkDeviceSize size)
 }
 
 void RayTracingAccelerationStructure::BLAS::Uninit()
+{
+	if (uptrBuffer.get() != nullptr)
+	{
+		uptrBuffer->Uninit();
+		uptrBuffer.reset();
+	}
+	if (vkAccelerationStructure != VK_NULL_HANDLE)
+	{
+		vkDestroyAccelerationStructureKHR(MyDevice::GetInstance().vkDevice, vkAccelerationStructure, nullptr);
+		vkAccelerationStructure = VK_NULL_HANDLE;
+	}
+}
+
+void RayTracingAccelerationStructure::TLAS::Init(VkDeviceSize ASSize)
+{
+	// create VkAcceleartionStructure
+	VkAccelerationStructureCreateInfoKHR createInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR };
+	VkAccelerationStructureDeviceAddressInfoKHR addrInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR };
+	BufferInformation bufferInfo{};
+
+	bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	bufferInfo.size = ASSize;
+	bufferInfo.usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+	uptrBuffer->Init(bufferInfo);
+
+	createInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+	createInfo.size = ASSize;
+	createInfo.pNext = nullptr;
+	createInfo.offset = 0;
+	createInfo.buffer = uptrBuffer->vkBuffer;
+	createInfo.deviceAddress = 0; // https://registry.khronos.org/vulkan/specs/latest/man/html/VkAccelerationStructureCreateInfoKHR.html
+	createInfo.createFlags = 0;
+
+	VK_CHECK(vkCreateAccelerationStructureKHR(MyDevice::GetInstance().vkDevice, &createInfo, nullptr, &vkAccelerationStructure), "Failed to create TLAS!");
+
+	addrInfo.accelerationStructure = vkAccelerationStructure;
+	
+	vkDeviceAddress = vkGetAccelerationStructureDeviceAddressKHR(MyDevice::GetInstance().vkDevice, &addrInfo);
+}
+
+void RayTracingAccelerationStructure::TLAS::Uninit()
 {
 	if (uptrBuffer.get() != nullptr)
 	{

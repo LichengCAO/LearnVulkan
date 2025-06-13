@@ -5,9 +5,13 @@
 class RayTracingAccelerationStructure
 {
 private:
-	class TLAS
+	struct TLASInput
 	{
+		VkAccelerationStructureGeometryKHR				vkASGeometry;
+		VkAccelerationStructureBuildRangeInfoKHR		vkASBuildRangeInfo;
+		VkBuildAccelerationStructureFlagsKHR			vkBuildFlags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
 
+		std::unique_ptr<Buffer>							uptrInstanceBuffer;
 	};
 	struct BLASInput
 	{
@@ -22,6 +26,19 @@ private:
 		VkDeviceAddress vkDeviceAddress;
 
 		~BLAS() { assert(vkAccelerationStructure == VK_NULL_HANDLE); };
+
+		// create BLAS not build it
+		void Init(VkDeviceSize size);
+		void Uninit();
+	};
+	struct TLAS {
+		std::unique_ptr<Buffer> uptrBuffer;
+		VkAccelerationStructureKHR vkAccelerationStructure = VK_NULL_HANDLE;
+		VkDeviceAddress vkDeviceAddress;
+
+		~TLAS() { assert(vkAccelerationStructure == VK_NULL_HANDLE); };
+		
+		// create TLAS not build it
 		void Init(VkDeviceSize size);
 		void Uninit();
 	};
@@ -36,11 +53,20 @@ public:
 		VkIndexType		vkIndexType;
 		uint32_t		uIndexCount;
 	};
+	struct InstanceData
+	{
+		uint32_t	uBLASIndex;
+		uint32_t	uHitShaderGroupIndex;
+		glm::mat4   transformMatrix;
+		// i just use the index of input array for gl_InstanceCustomIndex;
+	};
 
 private:
-	std::vector<BLASInput> m_BLASInputs;
-	std::vector<BLAS> m_BLASes;
-	VkQueryPool       m_vkQueryPool = VK_NULL_HANDLE;
+	std::vector<BLASInput>	m_BLASInputs; // hold info temporarily, will be invalid after Init
+	std::vector<BLAS>		m_BLASs;
+	TLASInput				m_TLASInput; // hold info temporarily, will be invalid after Init
+	TLAS					m_TLAS;
+	VkQueryPool				m_vkQueryPool = VK_NULL_HANDLE;
 
 private:
 	// Helper function to initialize scratch buffer, 
@@ -55,17 +81,29 @@ private:
 		std::vector<VkDeviceAddress>& slotAddresses
 	) const;
 
-	// Build all BLASes, after all BLASInputs are added
-	void _BuildBLASes();
+	// Build all BLASs, after all BLASInputs are added
+	void _BuildBLASs();
 
 	// Create m_vkQueryPool if not have one with given size, or reset current pool to given size
 	void _PrepareQueryPool(uint32_t uQueryCount);
 
+	// Build TLAS
+	void _BuildTLAS();
+
 public:
 	VkAccelerationStructureKHR vkAccelerationStructure = VK_NULL_HANDLE;
+	
 	~RayTracingAccelerationStructure() { assert(m_vkQueryPool == VK_NULL_HANDLE); assert(vkAccelerationStructure == VK_NULL_HANDLE); };
 
 	// Add BLAS to this acceleration structure, 
-	// return the index of this BLAS in the vector of BLASes this acceleration structure holds
+	// return the index of this BLAS in the vector of BLASs this acceleration structure holds
 	uint32_t AddBLAS(const std::vector<TriangleData>& geomData);
+
+	// Setup TLAS after BLASs are all built, TLAS will not be created or be built, we do it in Init
+	void SetupTLAS(const std::vector<InstanceData>& instData);
+	
+	// Build TLAS after all BLASs are added
+	void Init();
+
+	void Uninit();
 };
