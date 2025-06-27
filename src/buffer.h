@@ -18,6 +18,15 @@ private:
 	uint32_t _FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const;
 	void _AllocateMemory();
 	void _FreeMemory();
+
+	// Check if this buffer is host coherent
+	bool _IsHostCoherent() const;
+
+	// Map the memory and copy, if this buffer is host coherent
+	void _CopyFromHostWithMappedMemory(const void* src, size_t size);
+	// Create a staging buffer to copy from host and then copy from staging buffer
+	void _CopyFromHostWithStaggingBuffer(const void* src, size_t size);
+
 public:
 	~Buffer();
 	VkBuffer	   vkBuffer = VK_NULL_HANDLE;
@@ -26,9 +35,14 @@ public:
 	void Init(BufferInformation bufferInfo);
 	void Uninit();
 
+	// Copy from host, will use stagging buffer if necessary, use buffer's size as length
 	void CopyFromHost(const void* src);
+	// Copy from host, will use stagging buffer if necessary
 	void CopyFromHost(const void* src, size_t size);
+
+	// Copy from buffer, will wait until copy is done, use buffer's size as length
 	void CopyFromBuffer(const Buffer& otherBuffer);
+	// Copy from buffer, will wait until copy is done, use buffer's size as length
 	void CopyFromBuffer(const Buffer* pOtherBuffer);
 
 	BufferInformation GetBufferInformation() const;

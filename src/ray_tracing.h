@@ -101,14 +101,14 @@ public:
 	
 	~RayTracingAccelerationStructure() { assert(m_vkQueryPool == VK_NULL_HANDLE); assert(vkAccelerationStructure == VK_NULL_HANDLE); };
 
-	// Add BLAS to this acceleration structure, 
+	// Add a BLAS to this acceleration structure, 
 	// return the index of this BLAS in the vector of BLASs this acceleration structure holds
 	uint32_t AddBLAS(const std::vector<TriangleData>& geomData);
 
-	// Setup TLAS after BLASs are all built, TLAS will not be created or be built, we do it in Init
-	void SetupTLAS(const std::vector<InstanceData>& instData);
+	// Set up TLAS after BLASs are all added, TLAS will not be created or be built, we do it in Init
+	void SetUpTLAS(const std::vector<InstanceData>& instData);
 	
-	// Build TLAS after all BLASs are added
+	// Build AS after all BLASs are added and TLAS's setup
 	void Init();
 
 	void Uninit();

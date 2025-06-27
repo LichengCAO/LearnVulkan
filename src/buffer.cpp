@@ -79,44 +79,75 @@ void Buffer::_FreeMemory()
 	}
 }
 
-void Buffer::CopyFromHost(const void* src)
+bool Buffer::_IsHostCoherent() const
 {
-	CHECK_TRUE(vkDeviceMemory != VK_NULL_HANDLE, "Not allocate memory yet!");
+	bool bResult = false;
+
+	bResult = ((m_bufferInformation.memoryProperty & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) != 0);
+
+	return bResult;
+}
+
+void Buffer::_CopyFromHostWithMappedMemory(const void* src, size_t size)
+{
 	if (m_mappedMemory == nullptr)
 	{
 		vkMapMemory(MyDevice::GetInstance().vkDevice, vkDeviceMemory, 0, m_bufferInformation.size, 0, &m_mappedMemory);
 	}
-	memcpy(m_mappedMemory, src, (size_t)m_bufferInformation.size);
+	memcpy(m_mappedMemory, src, size);
+}
+
+void Buffer::_CopyFromHostWithStaggingBuffer(const void* src, size_t size)
+{
+	BufferInformation stagBufInfo{};
+	Buffer stagBuf{};
+
+	stagBufInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+	stagBufInfo.size = static_cast<VkDeviceSize>(size);
+	stagBufInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+
+	stagBuf.Init(stagBufInfo);
+	stagBuf.CopyFromHost(src, size);
+
+	CopyFromBuffer(stagBuf);
+
+	stagBuf.Uninit();
+}
+
+void Buffer::CopyFromHost(const void* src)
+{
+	CopyFromHost(src, static_cast<size_t>(m_bufferInformation.size));
 }
 
 void Buffer::CopyFromHost(const void* src, size_t size)
 {
 	CHECK_TRUE(vkDeviceMemory != VK_NULL_HANDLE, "Not allocate memory yet!");
-	if (m_mappedMemory == nullptr)
-	{
-		vkMapMemory(MyDevice::GetInstance().vkDevice, vkDeviceMemory, 0, m_bufferInformation.size, 0, &m_mappedMemory);
-	}
 	CHECK_TRUE(size <= static_cast<size_t>(m_bufferInformation.size), "Try to copy too much data from host!");
-	memcpy(m_mappedMemory, src, size);
+	if (_IsHostCoherent())
+	{
+		_CopyFromHostWithMappedMemory(src, size);
+	}
+	else
+	{
+		_CopyFromHostWithStaggingBuffer(src, size);
+	}
 }
 
 void Buffer::CopyFromBuffer(const Buffer& otherBuffer)
 {
-	CHECK_TRUE(vkBuffer != VK_NULL_HANDLE, "This buffer is not initialized!");
+	CommandSubmission cmdSubmit{};
+	VkBufferCopy copyInfo{};
 
-	CommandSubmission cmdSubmit;
+	CHECK_TRUE(vkBuffer != VK_NULL_HANDLE, "This buffer is not initialized!");
+	CHECK_TRUE(((m_bufferInformation.usage & VK_BUFFER_USAGE_TRANSFER_DST_BIT) != 0), "This buffer must have VK_BUFFER_USAGE_TRANSFER_DST_BIT to copy from other buffer!");
+
+	copyInfo.size = m_bufferInformation.size;
+
 	cmdSubmit.Init();
 	cmdSubmit.StartOneTimeCommands({});
-
-	VkBufferCopy cpyRegion = {
-		.srcOffset = 0,
-		.dstOffset = 0,
-		.size = m_bufferInformation.size,
-	};
-
-	vkCmdCopyBuffer(cmdSubmit.vkCommandBuffer, otherBuffer.vkBuffer, vkBuffer, 1, &cpyRegion);
-
+	cmdSubmit.CopyBuffer(otherBuffer.vkBuffer, vkBuffer, { copyInfo });
 	cmdSubmit.SubmitCommands();
+	cmdSubmit.Uninit();
 }
 
 void Buffer::CopyFromBuffer(const Buffer* pOtherBuffer)

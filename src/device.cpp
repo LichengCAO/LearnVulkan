@@ -197,9 +197,14 @@ void MyDevice::_SelectPhysicalDevice()
 {
 	vkb::PhysicalDeviceSelector physicalDeviceSelector(m_instance);
 	VkPhysicalDeviceFeatures requiredFeatures{};
+
+	// Mesh shader
 	VkPhysicalDeviceMeshShaderFeaturesEXT meshShaderFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT };
-	//VkPhysicalDevice8BitStorageFeatures shader8BitFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_8BIT_STORAGE_FEATURES };
 	VkPhysicalDeviceVulkan12Features vulkan12Featrues{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
+
+	// Ray tracing
+	VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
+	VkPhysicalDeviceRayTracingPipelineFeaturesKHR rayTracingPipelineFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
 
 	requiredFeatures.geometryShader = VK_TRUE;
 	requiredFeatures.samplerAnisotropy = VK_TRUE;
@@ -207,7 +212,6 @@ void MyDevice::_SelectPhysicalDevice()
 	requiredFeatures.fragmentStoresAndAtomics = VK_TRUE;
 	meshShaderFeatures.taskShader = VK_TRUE;
 	meshShaderFeatures.meshShader = VK_TRUE;
-	//shader8BitFeatures.storageBuffer8BitAccess = VK_TRUE;
 	vulkan12Featrues.shaderInt8 = VK_TRUE;
 	vulkan12Featrues.storageBuffer8BitAccess = VK_TRUE;
 	vulkan12Featrues.descriptorIndexing = VK_TRUE;
@@ -215,7 +219,6 @@ void MyDevice::_SelectPhysicalDevice()
 	physicalDeviceSelector.set_surface(vkSurface);
 	physicalDeviceSelector.set_required_features(requiredFeatures);
 	physicalDeviceSelector.add_required_extension_features(meshShaderFeatures);
-	//physicalDeviceSelector.add_required_extension_features(shader8BitFeatures);
 	physicalDeviceSelector.add_required_extension_features(vulkan12Featrues);
 	
 	auto vecRequiredExtensions = _GetPhysicalDeviceRequiredExtensions();

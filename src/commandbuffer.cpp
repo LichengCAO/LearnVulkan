@@ -292,6 +292,11 @@ void CommandSubmission::BlitImage(VkImage srcImage, VkImageLayout srcLayout, VkI
 	}
 }
 
+void CommandSubmission::CopyBuffer(VkBuffer vkBufferFrom, VkBuffer vkBufferTo, std::vector<VkBufferCopy> const& copies) const
+{
+	vkCmdCopyBuffer(vkCommandBuffer, vkBufferFrom, vkBufferTo, static_cast<uint32_t>(copies.size()), copies.data());
+}
+
 void CommandSubmission::CopyBufferToImage(VkBuffer vkBuffer, VkImage vkImage, VkImageLayout layout, const std::vector<VkBufferImageCopy>& regions) const
 {
 	vkCmdCopyBufferToImage(
@@ -304,7 +309,7 @@ void CommandSubmission::CopyBufferToImage(VkBuffer vkBuffer, VkImage vkImage, Vk
 	);
 }
 
-void CommandSubmission::BuildAccelerationStructures(const std::vector<VkAccelerationStructureBuildGeometryInfoKHR>& buildGeomInfos, const std::vector<const VkAccelerationStructureBuildRangeInfoKHR*> buildRangeInfoPtrs) const
+void CommandSubmission::BuildAccelerationStructures(const std::vector<VkAccelerationStructureBuildGeometryInfoKHR>& buildGeomInfos, const std::vector<const VkAccelerationStructureBuildRangeInfoKHR*>& buildRangeInfoPtrs) const
 {
 	vkCmdBuildAccelerationStructuresKHR(vkCommandBuffer, static_cast<uint32_t>(buildGeomInfos.size()), buildGeomInfos.data(), buildRangeInfoPtrs.data());
 }

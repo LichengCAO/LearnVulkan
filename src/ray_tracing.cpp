@@ -377,7 +377,7 @@ uint32_t RayTracingAccelerationStructure::AddBLAS(const std::vector<TriangleData
     return uRet;
 }
 
-void RayTracingAccelerationStructure::SetupTLAS(const std::vector<InstanceData>& instData)
+void RayTracingAccelerationStructure::SetUpTLAS(const std::vector<InstanceData>& instData)
 {
 	uint32_t gl_InstanceCustomIndex = 0u;
 	TLASInput& tlasInput = m_TLASInput;

@@ -97,13 +97,16 @@ public:
 	void BlitImage(
 		VkImage srcImage, VkImageLayout srcLayout,
 		VkImage dstImage, VkImageLayout dstLayout,
-		const std::vector<VkImageBlit>& regions, VkFilter filter = VK_FILTER_LINEAR) const;  // this will change image layout
+		std::vector<VkImageBlit> const& regions,
+		VkFilter filter = VK_FILTER_LINEAR) const;  // this will change image layout
+
+	void CopyBuffer(VkBuffer vkBufferFrom, VkBuffer vkBufferTo, std::vector<VkBufferCopy> const& copies) const;
 
 	void CopyBufferToImage(VkBuffer vkBuffer, VkImage vkImage, VkImageLayout layout, const std::vector<VkBufferImageCopy>& regions) const;
 
 	void BuildAccelerationStructures(
 		const std::vector<VkAccelerationStructureBuildGeometryInfoKHR>& buildGeomInfos,
-		const std::vector<const VkAccelerationStructureBuildRangeInfoKHR*> buildRangeInfoPtrs) const;
+		const std::vector<const VkAccelerationStructureBuildRangeInfoKHR*>& buildRangeInfoPtrs) const;
 
 	void WriteAccelerationStructuresProperties(
 		const std::vector<VkAccelerationStructureKHR>& vkAccelerationStructs,

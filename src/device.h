@@ -43,7 +43,7 @@ private:
 	VkSurfaceFormatKHR		 _ChooseSwapchainFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) const;
 	VkPresentModeKHR		 _ChooseSwapchainPresentMode(const std::vector<VkPresentModeKHR>& availableModes) const;
 	VkExtent2D				 _ChooseSwapchainExtent(const VkSurfaceCapabilitiesKHR& capabilities) const;
-
+	
 	void _InitVolk();
 	void _InitGLFW();
 	void _CreateInstance();
@@ -78,12 +78,11 @@ public:
 	void PresentSwapchainImage(const std::vector<VkSemaphore>& waitSemaphores, uint32_t imageIdx);
 	bool NeedRecreateSwapchain() const;
 	VkExtent2D GetSwapchainExtent() const;
-
 	VkFormat FindSupportFormat(const std::vector<VkFormat>& candidates, VkImageTiling tilling, VkFormatFeatureFlags features) const;
 	VkFormat GetDepthFormat() const;
 	VkFormat GetSwapchainFormat() const;
-
 	UserInput GetUserInput() const;
+
 public:
 	static MyDevice& GetInstance();
 	static void OnFramebufferResized(GLFWwindow* _pWindow, int width, int height);
