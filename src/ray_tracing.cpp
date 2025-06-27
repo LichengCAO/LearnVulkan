@@ -409,25 +409,14 @@ void RayTracingAccelerationStructure::SetUpTLAS(const std::vector<InstanceData>&
 	// setup instance buffer
 	{
 		BufferInformation bufferInfo{};
-		BufferInformation stagBufferInfo{};
-		Buffer stagBuffer{};
 		tlasInput.uptrInstanceBuffer = std::make_unique<Buffer>();
 
 		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		bufferInfo.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 		bufferInfo.size = ASInstances.size() * sizeof(VkAccelerationStructureInstanceKHR);
 
-		stagBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-		stagBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-		stagBufferInfo.size = ASInstances.size() * sizeof(VkAccelerationStructureInstanceKHR);
-
 		tlasInput.uptrInstanceBuffer->Init(bufferInfo);
-		stagBuffer.Init(stagBufferInfo);
-
-		stagBuffer.CopyFromHost(ASInstances.data());
-		tlasInput.uptrInstanceBuffer->CopyFromBuffer(stagBuffer);
-
-		stagBuffer.Uninit();
+		tlasInput.uptrInstanceBuffer->CopyFromHost(ASInstances.data());
 	}
 
 	buildRangeInfo.primitiveCount = static_cast<uint32_t>(instData.size());

@@ -88,6 +88,9 @@ private:
 	void _InitBuffers();
 	void _UninitBuffers();
 
+	void _InitAS();
+	void _UninitAS();
+
 	void _InitImagesAndViews();
 	void _UninitImagesAndViews();
 

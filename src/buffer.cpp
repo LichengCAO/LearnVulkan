@@ -169,6 +169,8 @@ VkDeviceAddress Buffer::GetDeviceAddress() const
 	info.pNext = nullptr;
 	info.buffer = vkBuffer;
 
+	CHECK_TRUE(((m_bufferInformation.usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) != 0), "Maybe VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT need to be added!");
+
 	vkDeviceAddr = vkGetBufferDeviceAddress(MyDevice::GetInstance().vkDevice, &info);
 
 	return vkDeviceAddr;
