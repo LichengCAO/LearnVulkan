@@ -1,5 +1,7 @@
 #include "ray_tracing_app.h"
 
+#define MAX_FRAME_COUNT 3
+
 void RayTracingApp::_Init()
 {
 	_InitRenderPass();
@@ -47,18 +49,24 @@ void RayTracingApp::_Uninit()
 void RayTracingApp::_InitRenderPass()
 {	
 	SubpassInformation subpassInfo{};
-	m_renderPass = RenderPass{};
-	m_renderPass.AddAttachment(AttachmentInformation::GetPresetInformation(AttachmentPreset::GBUFFER_ALBEDO));
+	SubpassInformation attachmentLessSubpassInfo{};
+	m_scRenderPass = RenderPass{};
+	m_scRenderPass.AddAttachment(AttachmentInformation::GetPresetInformation(AttachmentPreset::GBUFFER_ALBEDO));
 
 	subpassInfo.AddColorAttachment(0u);
-	m_renderPass.AddSubpass(subpassInfo);
+	m_scRenderPass.AddSubpass(subpassInfo);
 
-	m_renderPass.Init();
+	m_scRenderPass.Init();
+
+	m_rtRenderPass = RenderPass{};
+	m_rtRenderPass.AddSubpass(attachmentLessSubpassInfo);
+	m_rtRenderPass.Init();
 }
 
 void RayTracingApp::_UninitRenderPass()
 {
-	m_renderPass.Uninit();
+	m_rtRenderPass.Uninit();
+	m_scRenderPass.Uninit();
 }
 
 void RayTracingApp::_InitDescriptorSetLayouts()
@@ -67,12 +75,15 @@ void RayTracingApp::_InitDescriptorSetLayouts()
 	m_modelDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_RAYGEN_BIT_KHR); // AS
 	m_modelDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_RAYGEN_BIT_KHR); // image output
 	m_modelDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR); // instance data
-
 	m_modelDSetLayout.Init();
+
+	m_swapchainImageDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+	m_swapchainImageDSetLayout.Init();
 }
 
 void RayTracingApp::_UninitDescriptorSetLayouts()
 {
+	m_swapchainImageDSetLayout.Uninit();
 	m_modelDSetLayout.Uninit();
 }
 
@@ -100,7 +111,21 @@ void RayTracingApp::_InitModels()
 
 void RayTracingApp::_InitBuffers()
 {
+	struct QuadVertex
+	{
+		alignas(8) glm::vec2 pos{};
+		alignas(8) glm::vec2 uv{};
+	};
 	BufferInformation bufferInfo{};
+	BufferInformation quadVertexBufferInfo{};
+	BufferInformation quadIndexBufferInfo{};
+	std::vector<uint32_t> indices = { 2, 1, 0, 0, 3, 2 };
+	std::vector<QuadVertex> vertices = {
+		{{-1.f, -1.f}, {0.0f, 0.0f}},
+		{{ 1.f, -1.f}, {1.0f, 0.0f}},
+		{{ 1.f,  1.f}, {1.0f, 1.0f}},
+		{{-1.f,  1.f}, {0.0f, 1.0f}}
+	};
 
 	bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 	bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT
@@ -136,6 +161,20 @@ void RayTracingApp::_InitBuffers()
 		m_vertexBuffers.push_back(std::move(uptrVertexBuffer));
 		m_indexBuffers.push_back(std::move(uptrIndexBuffer));
 	}
+
+	quadIndexBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	quadIndexBufferInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	quadIndexBufferInfo.size = static_cast<VkDeviceSize>(indices.size() * sizeof(uint32_t));
+	m_quadIndexBuffer = std::make_unique<Buffer>();
+	m_quadIndexBuffer->Init(quadIndexBufferInfo);
+	m_quadIndexBuffer->CopyFromHost(indices.data());
+
+	quadVertexBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	quadVertexBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	quadVertexBufferInfo.size = static_cast<VkDeviceSize>(vertices.size() * sizeof(QuadVertex));
+	m_quadVertexBuffer = std::make_unique<Buffer>();
+	m_quadVertexBuffer->Init(quadVertexBufferInfo);
+	m_quadVertexBuffer->CopyFromHost(vertices.data());
 }
 
 void RayTracingApp::_UninitBuffers()
@@ -150,6 +189,11 @@ void RayTracingApp::_UninitBuffers()
 		uptrBuffer->Uninit();
 	}
 	m_indexBuffers.clear();
+
+	m_quadVertexBuffer->Uninit();
+	m_quadVertexBuffer.reset();
+	m_quadIndexBuffer->Uninit();
+	m_quadIndexBuffer.reset();
 }
 
 void RayTracingApp::_InitAS()
@@ -186,4 +230,143 @@ void RayTracingApp::_InitAS()
 void RayTracingApp::_UninitAS()
 {
 	m_rayTracingAS.Uninit();
+}
+
+void RayTracingApp::_InitImagesAndViews()
+{
+	m_scImages = MyDevice::GetInstance().GetSwapchainImages();
+	for (auto const& img : m_scImages)
+	{
+		ImageViewInformation imgInfo{};
+		imgInfo.type = ImageType::IMAGE_TYPE_2D;
+		imgInfo.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		imgInfo.baseArrayLayer = 0u;
+		imgInfo.baseMipLevel = 0u;
+		imgInfo.layerCount = 1u;
+		imgInfo.levelCount = 1u;
+		m_scImageViews.push_back(std::make_unique<ImageView>(img.NewImageView(imgInfo)));
+	}
+
+	m_rtImages.clear();
+	m_rtImages.reserve(MAX_FRAME_COUNT);
+	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+	{
+		Image rtImage{};
+		ImageViewInformation imgViewInfo{};
+		ImageInformation imgInfo{};
+
+		imgInfo.arrayLayers = 1u;
+		imgInfo.depth = 1u;
+		imgInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+		imgInfo.imageType = VK_IMAGE_TYPE_2D;
+		imgInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		imgInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		imgInfo.mipLevels = 1u;
+		imgInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		imgInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		imgInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
+		imgInfo.width = MyDevice::GetInstance().GetSwapchainExtent().width;
+		imgInfo.height = MyDevice::GetInstance().GetSwapchainExtent().height;
+
+		imgViewInfo.type = ImageType::IMAGE_TYPE_2D;
+		imgViewInfo.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		imgViewInfo.baseArrayLayer = 0u;
+		imgViewInfo.baseMipLevel = 0u;
+		imgViewInfo.layerCount = 1u;
+		imgViewInfo.levelCount = 1u;
+
+		rtImage.SetImageInformation(imgInfo);
+		rtImage.Init();
+
+		m_rtImageViews.push_back(std::make_unique<ImageView>(rtImage.NewImageView(imgViewInfo)));
+		m_rtImages.push_back(std::move(rtImage));
+	}
+
+	for (auto& imgView : m_scImageViews)
+	{
+		imgView->Init();
+	}
+
+	for (auto& imgView : m_rtImageViews)
+	{
+		imgView->Init();
+	}
+}
+
+void RayTracingApp::_UninitImagesAndViews()
+{
+	for (auto& imgView : m_rtImageViews)
+	{
+		imgView->Uninit();
+	}
+	m_rtImageViews.clear();
+
+	for (auto& imgView : m_scImageViews)
+	{
+		imgView->Uninit();
+	}
+	m_scImageViews.clear();
+
+	for (auto& img : m_rtImages)
+	{
+		img.Uninit();
+	}
+	m_rtImages.clear();
+
+	m_scImages.clear();
+}
+
+void RayTracingApp::_InitFramebuffers()
+{
+	for (auto const& imgView : m_scImageViews)
+	{
+		std::unique_ptr<Framebuffer> uptrFramebuffer = std::make_unique<Framebuffer>(m_scRenderPass.NewFramebuffer({ imgView.get() }));
+
+		uptrFramebuffer->Init();
+
+		m_scFramebuffers.push_back(std::move(uptrFramebuffer));
+	}
+}
+
+void RayTracingApp::_UninitFramebuffers()
+{
+	for (auto& framebuffer : m_scFramebuffers)
+	{
+		framebuffer->Uninit();
+	}
+	m_scFramebuffers.clear();
+}
+
+void RayTracingApp::_InitDescriptorSets()
+{
+	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+	{
+		std::unique_ptr<DescriptorSet> uptrDSet = std::make_unique<DescriptorSet>(m_cameraDSetLayout.NewDescriptorSet());
+
+		uptrDSet->Init();
+
+		m_cameraDSets.push_back(std::move(uptrDSet));
+	}
+
+	{
+		m_ASDSet = std::make_unique<DescriptorSet>(m_modelDSetLayout.NewDescriptorSet());
+
+		m_ASDSet->Init();
+	}
+
+	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+	{
+		std::unique_ptr<DescriptorSet> uptrDSet = std::make_unique<DescriptorSet>(m_swapchainImageDSetLayout.NewDescriptorSet());
+
+		uptrDSet->Init();
+
+		m_swapchainImageDSets.push_back(std::move(uptrDSet));
+	}
+}
+
+void RayTracingApp::_UninitDescriptorSets() 
+{
+	m_swapchainImageDSets.clear();
+	m_ASDSet.reset();
+	m_cameraDSets.clear();
 }

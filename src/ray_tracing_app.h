@@ -55,17 +55,27 @@ private:
 	std::vector<std::unique_ptr<Buffer>> m_indexBuffers;
 	RayTracingAccelerationStructure m_rayTracingAS;
 
+	// descriptor sets to write to swapchain images
+	DescriptorSetLayout m_swapchainImageDSetLayout;
+	std::vector<std::unique_ptr<DescriptorSet>> m_swapchainImageDSets;
+	std::unique_ptr<Buffer> m_quadVertexBuffer;
+	std::unique_ptr<Buffer> m_quadIndexBuffer;
+
 	// Samplers
 	VkSampler m_vkSampler = VK_NULL_HANDLE;
 
-	// Renderpass
-	RenderPass m_renderPass;
-	std::vector<Image> m_swapchainImages;
-	std::vector<std::unique_ptr<ImageView>> m_swapchainImageViews;
-	std::vector<std::unique_ptr<Framebuffer>> m_framebuffers;
+	// Render passes
+	RenderPass m_rtRenderPass; // store the result of ray tracing and then present it to swap chain images
+	std::vector<Image> m_rtImages;
+	std::vector<std::unique_ptr<ImageView>> m_rtImageViews;
+	RenderPass m_scRenderPass; // draw result to swapchain for presentation
+	std::vector<Image> m_scImages;
+	std::vector<std::unique_ptr<ImageView>> m_scImageViews;
+	std::vector<std::unique_ptr<Framebuffer>> m_scFramebuffers;
 
 	//pipelines
-	RayTracingPipeline m_pipeline;
+	RayTracingPipeline m_rayTracingPipeline;
+	GraphicsPipeline m_presentPipeline;
 
 	// semaphores
 	std::vector<VkSemaphore>  m_swapchainImageAvailabilities;
