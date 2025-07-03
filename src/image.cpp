@@ -29,7 +29,7 @@ Image::~Image()
 	assert(vkDeviceMemory == VK_NULL_HANDLE);
 }
 
-void Image::SetImageInformation(ImageInformation& imageInfo)
+void Image::SetImageInformation(Information& imageInfo)
 {
 	CHECK_TRUE(vkImage == VK_NULL_HANDLE, "Image is already initialized!");
 	m_imageInformation = imageInfo;
@@ -199,33 +199,119 @@ void Image::CopyFromBuffer(const Buffer& stagingBuffer)
 	cmdSubmit.SubmitCommands();
 }
 
-ImageView Image::NewImageView(const ImageViewInformation& imageViewInfo) const
+void Image::Fill(const VkClearColorValue& clearColor, const VkImageSubresourceRange* range, CommandSubmission* pCmd)
 {
-	CHECK_TRUE(vkImage != VK_NULL_HANDLE, "Image is not initialized!");
+	if (pCmd == nullptr)
+	{
+		CommandSubmission cmd{};
+
+		cmd.Init();
+		cmd.StartOneTimeCommands({});
+		cmd.ClearColorImage(vkImage, VK_IMAGE_LAYOUT_GENERAL, clearColor, { *range });
+		cmd.SubmitCommands();
+		cmd.Uninit();
+	}
+	else
+	{
+		pCmd->ClearColorImage(vkImage, VK_IMAGE_LAYOUT_GENERAL, clearColor, { *range });
+	}
+}
+
+void Image::Fill(const VkClearColorValue& clearColor, CommandSubmission* pCmd)
+{
+	std::unique_ptr<VkImageSubresourceRange> uptrRange = std::make_unique<VkImageSubresourceRange>(VkImageSubresourceRange{});
+
+	uptrRange->aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	uptrRange->baseArrayLayer = 0u;
+	uptrRange->baseMipLevel = 0u;
+	uptrRange->layerCount = VK_REMAINING_ARRAY_LAYERS;
+	uptrRange->levelCount = VK_REMAINING_MIP_LEVELS;
+
+	Fill(clearColor, uptrRange.get(), pCmd);
+}
+
+ImageView Image::NewImageView(VkImageAspectFlags aspect, uint32_t baseMipLevel, uint32_t levelCount, uint32_t baseArrayLayer, uint32_t layerCount) const
+{
 	ImageView val{};
-	val.m_viewInformation = imageViewInfo;
-	
-	if (imageViewInfo.levelCount == VK_REMAINING_MIP_LEVELS)
+	ImageView::Information& viewInfo = val.m_viewInformation;
+
+	CHECK_TRUE(vkImage != VK_NULL_HANDLE, "Image is not initialized!");
+
+	viewInfo.aspectMask = aspect;
+	viewInfo.baseArrayLayer = baseArrayLayer;
+	viewInfo.baseMipLevel = baseMipLevel;
+	viewInfo.format = m_imageInformation.format;
+	viewInfo.layerCount = layerCount;
+	viewInfo.levelCount = levelCount;
+	viewInfo.type;
+
+	if (levelCount == VK_REMAINING_MIP_LEVELS)
 	{
-		CHECK_TRUE(m_imageInformation.mipLevels > imageViewInfo.baseMipLevel, "Wrong base mip level!");
-		val.m_viewInformation.levelCount = m_imageInformation.mipLevels - imageViewInfo.baseMipLevel;
+		CHECK_TRUE(m_imageInformation.mipLevels > baseMipLevel, "Wrong base mip level!");
+		viewInfo.levelCount = m_imageInformation.mipLevels - baseMipLevel;
 	}
-	if (imageViewInfo.layerCount == VK_REMAINING_ARRAY_LAYERS)
+	if (layerCount == VK_REMAINING_ARRAY_LAYERS)
 	{
-		CHECK_TRUE(m_imageInformation.arrayLayers > imageViewInfo.baseArrayLayer, "Wrong base array layer!");
-		val.m_viewInformation.layerCount = m_imageInformation.arrayLayers - imageViewInfo.baseArrayLayer;
+		CHECK_TRUE(m_imageInformation.arrayLayers > baseArrayLayer, "Wrong base array layer!");
+		viewInfo.layerCount = m_imageInformation.arrayLayers - baseArrayLayer;
 	}
-	CHECK_TRUE((val.m_viewInformation.baseArrayLayer + val.m_viewInformation.layerCount) <= m_imageInformation.arrayLayers, "Image doesn't have these layers!");
-	CHECK_TRUE((val.m_viewInformation.baseMipLevel + val.m_viewInformation.levelCount) <= m_imageInformation.mipLevels, "Image doesn't have these mipmap levels!");
+	CHECK_TRUE((viewInfo.baseArrayLayer + viewInfo.layerCount) <= m_imageInformation.arrayLayers, "Image doesn't have these layers!");
+	CHECK_TRUE((viewInfo.baseMipLevel   + viewInfo.levelCount) <= m_imageInformation.mipLevels, "Image doesn't have these mipmap levels!");
 
 	val.pImage = this;
+
+	if (viewInfo.layerCount > 1)
+	{
+		switch (m_imageInformation.imageType)
+		{
+		case VK_IMAGE_TYPE_1D:
+			viewInfo.type = VK_IMAGE_VIEW_TYPE_1D_ARRAY;
+			break;
+		case VK_IMAGE_TYPE_2D:
+			viewInfo.type = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+			break;
+		case VK_IMAGE_TYPE_3D:
+			CHECK_TRUE(false, "No 3D image array!");
+			break;
+		default:
+			CHECK_TRUE(false, "Unhandled image type!");
+			break;
+		}
+	}
+	else
+	{
+		switch (m_imageInformation.imageType)
+		{
+		case VK_IMAGE_TYPE_1D:
+			viewInfo.type = VK_IMAGE_VIEW_TYPE_1D;
+			break;
+		case VK_IMAGE_TYPE_2D:
+			viewInfo.type = VK_IMAGE_VIEW_TYPE_2D;
+			break;
+		case VK_IMAGE_TYPE_3D:
+			viewInfo.type = VK_IMAGE_VIEW_TYPE_3D;
+			break;
+		default:
+			CHECK_TRUE(false, "Unhandled image type!");
+			break;
+		}
+	}
 
 	return val;
 }
 
-ImageInformation Image::GetImageInformation() const
+const Image::Information& Image::GetImageInformation() const
 {
 	return m_imageInformation;
+}
+
+VkExtent3D Image::GetImageSize() const
+{
+	VkExtent3D extent{};
+	extent.width = m_imageInformation.width;
+	extent.height = m_imageInformation.height;
+	extent.depth = m_imageInformation.depth;
+	return extent;
 }
 
 ImageView::~ImageView()
@@ -237,53 +323,10 @@ void ImageView::Init()
 {
 	CHECK_TRUE(pImage != nullptr, "No image!");
 	CHECK_TRUE(m_viewInformation.layerCount != 0, "No layer count!");
-	VkImageViewType viewType = VK_IMAGE_VIEW_TYPE_MAX_ENUM;
-	if (m_viewInformation.layerCount == 1)
-	{
-		switch (m_viewInformation.type)
-		{
-		case ImageType::IMAGE_TYPE_1D:
-			viewType = VK_IMAGE_VIEW_TYPE_1D;
-			break;
-		case ImageType::IMAGE_TYPE_2D:
-			viewType = VK_IMAGE_VIEW_TYPE_2D;
-			break;
-		case ImageType::IMAGE_TYPE_3D:
-			viewType = VK_IMAGE_VIEW_TYPE_3D;
-			break;
-		case ImageType::IMAGE_TYPE_CUBE:
-			viewType = VK_IMAGE_VIEW_TYPE_CUBE;
-			break;
-		default:
-			CHECK_TRUE(false, "Unhandled image type!");
-			break;
-		}
-	}
-	else
-	{
-		switch (m_viewInformation.type)
-		{
-		case ImageType::IMAGE_TYPE_1D:
-			viewType = VK_IMAGE_VIEW_TYPE_1D_ARRAY;
-			break;
-		case ImageType::IMAGE_TYPE_2D:
-			viewType = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-			break;
-		case ImageType::IMAGE_TYPE_3D:
-			CHECK_TRUE(false, "No 3D image array!");
-			break;
-		case ImageType::IMAGE_TYPE_CUBE:
-			viewType = VK_IMAGE_VIEW_TYPE_CUBE_ARRAY;
-			break;
-		default:
-			CHECK_TRUE(false, "Unhandled image type!");
-			break;
-		}
-	}
 	VkImageViewCreateInfo viewInfo = {
 	.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
 	.image = pImage->vkImage,
-	.viewType = viewType,
+	.viewType = m_viewInformation.type,
 	.format = pImage->GetImageInformation().format,
 	.subresourceRange = {
 		.aspectMask = m_viewInformation.aspectMask,
@@ -307,9 +350,21 @@ void ImageView::Uninit()
 	pImage = nullptr;
 }
 
-ImageViewInformation ImageView::GetImageViewInformation() const
+const ImageView::Information& ImageView::GetImageViewInformation() const
 {
 	return m_viewInformation;
+}
+
+VkImageSubresourceRange ImageView::GetRange() const
+{
+	VkImageSubresourceRange subRange{};
+	subRange.aspectMask = m_viewInformation.aspectMask;
+	subRange.baseMipLevel = m_viewInformation.baseMipLevel;
+	subRange.levelCount = m_viewInformation.levelCount;
+	subRange.baseArrayLayer = m_viewInformation.baseArrayLayer;
+	subRange.layerCount = m_viewInformation.layerCount;
+
+	return subRange;
 }
 
 void Texture::SetFilePath(std::string path)
@@ -334,31 +389,29 @@ void Texture::Init()
 	// copy host image to device
 	Buffer stagingBuffer;
 	BufferInformation bufferInfo;
-	bufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+	bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 	bufferInfo.size = imageSize;
-	bufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+	bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 	stagingBuffer.Init(bufferInfo);
 	stagingBuffer.CopyFromHost(pixels);
 
 	stbi_image_free(pixels);
 
-	ImageInformation imageInfo;
+	Image::Information imageInfo;
 	imageInfo.width = static_cast<uint32_t>(texWidth);
 	imageInfo.height = static_cast<uint32_t>(texHeight);
-	imageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-	imageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
+	imageInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 	image.SetImageInformation(imageInfo);
 	image.Init();
-	image.TransitionLayout(VkImageLayout::VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	image.TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 	image.CopyFromBuffer(stagingBuffer);
-	image.TransitionLayout(VkImageLayout::VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+	image.TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
 	stagingBuffer.Uninit();
 
 	// create image view
-	ImageViewInformation imageviewInfo;
-	imageviewInfo.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
-	imageView = image.NewImageView(imageviewInfo);
+	imageView = image.NewImageView();
 	imageView.Init();
 
 	// create sampler

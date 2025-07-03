@@ -4,34 +4,38 @@
 class Buffer;
 class Image;
 class Texture;
+class CommandSubmission;
 
-enum class ImageType
-{
-	IMAGE_TYPE_1D,
-	IMAGE_TYPE_2D,
-	IMAGE_TYPE_3D,
-	IMAGE_TYPE_CUBE
-};
-struct ImageViewInformation
-{
-	uint32_t baseMipLevel = 0;
-	uint32_t levelCount = VK_REMAINING_MIP_LEVELS;
-	uint32_t baseArrayLayer = 0;
-	uint32_t layerCount = VK_REMAINING_ARRAY_LAYERS;
-	VkImageAspectFlags aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
-	ImageType type = ImageType::IMAGE_TYPE_2D;
-};
 class ImageView
 {
+public:
+	struct Information
+	{
+		uint32_t baseMipLevel = 0;
+		uint32_t levelCount = VK_REMAINING_MIP_LEVELS;
+		uint32_t baseArrayLayer = 0;
+		uint32_t layerCount = VK_REMAINING_ARRAY_LAYERS;
+		VkFormat format = VK_FORMAT_UNDEFINED; // https://stackoverflow.com/questions/58600143/why-would-vkimageview-format-differ-from-the-underlying-vkimage-format
+		VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+		VkImageViewType type = VK_IMAGE_VIEW_TYPE_2D;
+	};
+
 private:
-	ImageViewInformation m_viewInformation{};
+	Information m_viewInformation{};
+
 public:
 	const Image* pImage = nullptr;
 	VkImageView vkImageView = VK_NULL_HANDLE;
+	
+public:
 	~ImageView();
+	
 	void Init();
 	void Uninit();
-	ImageViewInformation GetImageViewInformation() const;
+	
+	const Information& GetImageViewInformation() const;
+	VkImageSubresourceRange GetRange() const;
+
 	friend class Image;
 };
 
@@ -65,48 +69,71 @@ public:
 		VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT);
 };
 
-struct ImageInformation
-{
-	uint32_t width = 0;
-	uint32_t height = 0;
-	uint32_t depth = 1;
-	uint32_t mipLevels = 1;
-	uint32_t arrayLayers = 1;
-	VkFormat format = VK_FORMAT_R8G8B8A8_SRGB;
-	VkImageType imageType = VK_IMAGE_TYPE_2D;
-	VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL;
-	VkImageUsageFlags usage = 0;
-	VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
-	VkMemoryPropertyFlags memoryProperty = 0; // image memory
-	VkImageLayout initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // transfer layout
-};
 class Image
 {
+public:
+	struct Information
+	{
+		uint32_t width = 0;
+		uint32_t height = 0;
+		uint32_t depth = 1;
+		uint32_t mipLevels = 1;
+		uint32_t arrayLayers = 1;
+		VkFormat format = VK_FORMAT_R8G8B8A8_SRGB;
+		VkImageType imageType = VK_IMAGE_TYPE_2D;
+		VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL;
+		VkImageUsageFlags usage = 0;
+		VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
+		VkMemoryPropertyFlags memoryProperty = 0; // image memory
+		VkImageLayout initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // transfer layout
+	};
+
 private:
 	bool m_initCalled = false;
-	ImageInformation m_imageInformation{};
+	Information m_imageInformation{};
 	uint32_t _FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const;
 	void _AllocateMemory();
 	void _FreeMemory();
 	void _AddImageLayout() const;
 	void _RemoveImageLayout() const;
 	VkImageLayout _GetImageLayout() const;
+
 public:
 	~Image();
 	VkImage vkImage = VK_NULL_HANDLE;
 	VkDeviceMemory vkDeviceMemory = VK_NULL_HANDLE;
 	
-	void SetImageInformation(ImageInformation& imageInfo);
+	void SetImageInformation(Information& imageInfo);
 
 	void Init();
 	void Uninit();
 	
 	void TransitionLayout(VkImageLayout newLayout);
+
 	void CopyFromBuffer(const Buffer& stagingBuffer);
 
-	ImageView NewImageView(const ImageViewInformation& imageViewInfo) const;
+	// Fill range with clear color,
+	// if pCmd is nullptr, it will create a command buffer and wait till this action done,
+	// else, it will record the command in the command buffer, and user need to manage the synchronization
+	void Fill(const VkClearColorValue& clearColor, const VkImageSubresourceRange* range, CommandSubmission* pCmd = nullptr);
+	// Fill range with clear color,
+	// if pCmd is nullptr, it will create a command buffer and wait till this action done,
+	// else, it will record the command in the command buffer, and user need to manage the synchronization
+	void Fill(const VkClearColorValue& clearColor, CommandSubmission* pCmd = nullptr);
 
-	ImageInformation GetImageInformation() const;
+	// Return a image view of this image, 
+	// the view returned is NOT initialized yet
+	ImageView NewImageView(
+		VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT,
+		uint32_t baseMipLevel = 0,
+		uint32_t levelCount = VK_REMAINING_MIP_LEVELS,
+		uint32_t baseArrayLayer = 0,
+		uint32_t layerCount = VK_REMAINING_ARRAY_LAYERS) const;
+
+	const Information& GetImageInformation() const;
+
+	VkExtent3D GetImageSize() const;
+
 	friend class Texture;
 };
 

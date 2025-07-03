@@ -333,7 +333,7 @@ std::vector<Image> MyDevice::GetSwapchainImages() const
 	for (const auto& vkImage : swapchainImages)
 	{
 		Image tmpImage{};
-		ImageInformation imageInfo;
+		Image::Information imageInfo;
 		imageInfo.width = m_swapchain.extent.width;
 		imageInfo.height = m_swapchain.extent.height;
 		imageInfo.usage = m_swapchain.image_usage_flags;

@@ -2,6 +2,7 @@
 #include "common.h"
 
 class BufferView;
+class CommandSubmission;
 struct BufferInformation
 {
 	VkDeviceSize size = 0;
@@ -45,7 +46,13 @@ public:
 	// Copy from buffer, will wait until copy is done, use buffer's size as length
 	void CopyFromBuffer(const Buffer* pOtherBuffer);
 
+	// Fill buffer with input data,
+	// if pCmd is nullptr it will create a command buffer and wait this action to finish,
+	// if command buffer is provided, then when does this command finish depends on user
+	void Fill(uint32_t _data, CommandSubmission* pCmd = nullptr);
+
 	BufferInformation GetBufferInformation() const;
+	
 	VkDeviceAddress GetDeviceAddress() const;
 
 	BufferView NewBufferView(VkFormat _format);

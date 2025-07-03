@@ -317,7 +317,7 @@ VkExtent2D Framebuffer::GetImageSize() const
 {
 	CHECK_TRUE(attachments.size() > 0, "No image in this framebuffer!");
 	VkExtent2D ret{};
-	ImageInformation imageInfo = attachments[0]->pImage->GetImageInformation();
+	Image::Information imageInfo = attachments[0]->pImage->GetImageInformation();
 	ret.width = imageInfo.width;
 	ret.height = imageInfo.height;
 	return ret;

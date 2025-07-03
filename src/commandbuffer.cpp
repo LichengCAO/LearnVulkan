@@ -133,8 +133,7 @@ void CommandSubmission::StartRenderPass(const RenderPass* pRenderPass, const Fra
 	if (pFramebuffer != nullptr) renderPassInfo.framebuffer = pFramebuffer->vkFramebuffer;
 	if (pFramebuffer != nullptr && pRenderPass->attachments.size() > 0)
 	{
-		ImageInformation imageInfo = pFramebuffer->attachments[0]->pImage->GetImageInformation();
-		renderPassInfo.renderArea.extent = { imageInfo.width, imageInfo.height };
+		renderPassInfo.renderArea.extent = pFramebuffer->GetImageSize();
 	}
 	renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size()); 
 	renderPassInfo.pClearValues = clearValues.data(); // should have same length as attachments, although index of those who don't clear on load will be ignored
@@ -241,7 +240,7 @@ void CommandSubmission::AddPipelineBarrier(
 	}
 }
 
-void CommandSubmission::FillImageView(const ImageView* pImageView, VkClearColorValue clearValue) const
+void CommandSubmission::FillImageView(const ImageView* pImageView, VkClearColorValue clearValue)
 {
 	VkImageSubresourceRange subresourceRange = {};
 	auto info = pImageView->GetImageViewInformation();
@@ -259,15 +258,25 @@ void CommandSubmission::FillImageView(const ImageView* pImageView, VkClearColorV
 		&subresourceRange
 	);
 }
-void CommandSubmission::FillBuffer(const Buffer* pBuffer, uint32_t data) const
+
+void CommandSubmission::ClearColorImage(VkImage vkImage, VkImageLayout vkImageLayout, const VkClearColorValue& clearColor, const std::vector<VkImageSubresourceRange>& ranges)
 {
-	FillBuffer(pBuffer->vkBuffer, 0, pBuffer->GetBufferInformation().size, data);
+	vkCmdClearColorImage(
+		vkCommandBuffer,
+		vkImage,
+		vkImageLayout,
+		&clearColor,
+		static_cast<uint32_t>(ranges.size()),
+		ranges.data()
+	);
 }
-void CommandSubmission::FillBuffer(VkBuffer vkBuffer, VkDeviceSize offset, VkDeviceSize size, uint32_t data) const
+
+void CommandSubmission::FillBuffer(VkBuffer vkBuffer, VkDeviceSize offset, VkDeviceSize size, uint32_t data)
 {
 	vkCmdFillBuffer(vkCommandBuffer, vkBuffer, offset, size, data);
 }
-void CommandSubmission::BlitImage(VkImage srcImage, VkImageLayout srcLayout, VkImage dstImage, VkImageLayout dstLayout, const std::vector<VkImageBlit>& regions, VkFilter filter) const
+
+void CommandSubmission::BlitImage(VkImage srcImage, VkImageLayout srcLayout, VkImage dstImage, VkImageLayout dstLayout, const std::vector<VkImageBlit>& regions, VkFilter filter)
 {
 	vkCmdBlitImage(
 		vkCommandBuffer,

@@ -2,6 +2,7 @@
 #include "common.h"
 #include "pipeline_io.h";
 
+class GraphicsPipeline;
 struct WaitInformation
 {
 	VkSemaphore          waitSamaphore = VK_NULL_HANDLE;
@@ -15,6 +16,7 @@ private:
 	uint32_t                   m_srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	uint32_t                   m_dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
 	VkImageSubresourceRange    m_subresourceRange{};
+
 public:
 	ImageBarrierBuilder();
 	void Reset();
@@ -23,11 +25,12 @@ public:
 	void SetAspect(VkImageAspectFlags aspectMask);
 	VkImageMemoryBarrier NewBarrier(VkImage _image, VkImageLayout _oldLayout, VkImageLayout _newLayout, VkAccessFlags _srcAccessMask, VkAccessFlags _dstAccessMask) const;
 };
-
 class ImageBlitBuilder
 {
+private:
 	VkImageSubresourceLayers m_srcSubresourceLayers{};
 	VkImageSubresourceLayers m_dstSubresourceLayers{};
+
 public:
 	ImageBlitBuilder();
 	void Reset();
@@ -89,16 +92,25 @@ public:
 		const std::vector<VkMemoryBarrier>& memoryBarriers, 
 		const std::vector<VkImageMemoryBarrier>& imageBarriers); // this will change image layout
 
-	void FillImageView(const ImageView* pImageView, VkClearColorValue clearValue) const;
+	void FillImageView(const ImageView* pImageView, VkClearColorValue clearValue);
+
+	void ClearColorImage(
+		VkImage vkImage,
+		VkImageLayout vkImageLayout,
+		const VkClearColorValue& clearColor,
+		const std::vector<VkImageSubresourceRange>& ranges);
 	
-	void FillBuffer(const Buffer* pBuffer, uint32_t _data) const;
-	void FillBuffer(VkBuffer vkBuffer, VkDeviceSize offset, VkDeviceSize size, uint32_t data) const;
+	void FillBuffer(
+		VkBuffer vkBuffer, 
+		VkDeviceSize offset, 
+		VkDeviceSize size, 
+		uint32_t data);
 	
 	void BlitImage(
 		VkImage srcImage, VkImageLayout srcLayout,
 		VkImage dstImage, VkImageLayout dstLayout,
 		std::vector<VkImageBlit> const& regions,
-		VkFilter filter = VK_FILTER_LINEAR) const;  // this will change image layout
+		VkFilter filter = VK_FILTER_LINEAR);  // this will change image layout
 
 	void CopyBuffer(VkBuffer vkBufferFrom, VkBuffer vkBufferTo, std::vector<VkBufferCopy> const& copies) const;
 
@@ -113,4 +125,6 @@ public:
 		VkQueryType queryType, VkQueryPool queryPool, uint32_t firstQuery) const;
 
 	void CopyAccelerationStructure(const VkCopyAccelerationStructureInfoKHR& copyInfo) const;
+
+	friend class GraphicsPipeline;
 };

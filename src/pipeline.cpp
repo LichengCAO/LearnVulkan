@@ -228,7 +228,7 @@ void GraphicsPipeline::Uninit()
 	m_pRenderPass = nullptr;
 }
 
-void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const GraphicsVertexPipelineInput& input)
+void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput_Vertex& input)
 {
 	// TODO: check m_subpass should match number of vkCmdNextSubpass calls after vkCmdBeginRenderPass
 
@@ -274,10 +274,15 @@ void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const GraphicsVertexPip
 	}
 }
 
-void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const GraphicsMeshPipelineInput& input)
+void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput_Mesh& input)
 {
 	_DoCommon(commandBuffer, input.imageSize, input.pDescriptorSets);
 	vkCmdDrawMeshTasksEXT(commandBuffer, input.groupCountX, input.groupCountY, input.groupCountZ);
+}
+
+void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput_Draw& input)
+{
+	_DoCommon(commandBuffer, input.imageSize, input.pDescriptorSets);
 }
 
 ComputePipeline::~ComputePipeline()
@@ -327,7 +332,7 @@ void ComputePipeline::Uninit()
 	}
 }
 
-void ComputePipeline::Do(VkCommandBuffer commandBuffer, const ComputePipelineInput& input)
+void ComputePipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput& input)
 {
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, vkPipeline);
 	std::vector<VkDescriptorSet> descriptorSets;
@@ -357,11 +362,6 @@ uint32_t RayTracingPipeline::AddShader(const VkPipelineShaderStageCreateInfo& sh
 	uIndex = static_cast<uint32_t>(m_shaderStageInfos.size());
 	m_shaderStageInfos.push_back(shaderInfo);
 	return uIndex;
-}
-
-void RayTracingPipeline::AddDescriptorSetLayout(const DescriptorSetLayout* pSetLayout)
-{
-	AddDescriptorSetLayout(pSetLayout->vkDescriptorSetLayout);
 }
 
 void RayTracingPipeline::AddDescriptorSetLayout(VkDescriptorSetLayout vkDSetLayout)
@@ -474,7 +474,7 @@ void RayTracingPipeline::Uninit()
 	}
 }
 
-void RayTracingPipeline::Do(VkCommandBuffer commandBuffer, const RayTracingPipelineInput& input)
+void RayTracingPipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput& input)
 {
 	const auto& pSets = input.pDescriptorSets;
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, vkPipeline);

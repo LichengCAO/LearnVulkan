@@ -2,23 +2,7 @@
 #include "common.h"
 #include "shader.h"
 #include "pipeline_io.h"
-struct GraphicsVertexPipelineInput
-{
-	VkExtent2D imageSize{};
-	std::vector<const DescriptorSet*> pDescriptorSets;
 
-	const VertexIndexInput* pVertexIndexInput = nullptr;
-	std::vector<const VertexInput*> pVertexInputs;
-};
-struct GraphicsMeshPipelineInput
-{
-	VkExtent2D imageSize{};
-	std::vector<const DescriptorSet*> pDescriptorSets;
-
-	uint32_t groupCountX = 1;
-	uint32_t groupCountY = 1;
-	uint32_t groupCountZ = 1;
-};
 class GraphicsPipeline
 {
 private:
@@ -35,6 +19,38 @@ private:
 	uint32_t m_subpass = 0;
 	void _InitCreateInfos();
 	void _DoCommon(VkCommandBuffer cmd, const VkExtent2D& imageSize, const std::vector<const DescriptorSet*>& pSets);
+
+public:
+	// For pipelines that don't bind vertex buffers, e.g. pass through
+	struct PipelineInput_Draw
+	{
+		VkExtent2D imageSize{};
+		std::vector<const DescriptorSet*> pDescriptorSets;
+
+		uint32_t vertexCount = 0u;
+	};
+
+	// For general graphics pipelines that use vertex buffers
+	struct PipelineInput_Vertex
+	{
+		VkExtent2D imageSize{};
+		std::vector<const DescriptorSet*> pDescriptorSets;
+
+		const VertexIndexInput* pVertexIndexInput = nullptr;
+		std::vector<const VertexInput*> pVertexInputs;
+	};
+
+	// For mesh shader pipelines
+	struct PipelineInput_Mesh
+	{
+		VkExtent2D imageSize{};
+		std::vector<const DescriptorSet*> pDescriptorSets;
+
+		uint32_t groupCountX = 1;
+		uint32_t groupCountY = 1;
+		uint32_t groupCountZ = 1;
+	};
+
 public:
 	VkPipelineLayout vkPipelineLayout = VK_NULL_HANDLE;
 	VkPipeline vkPipeline = VK_NULL_HANDLE;
@@ -54,23 +70,27 @@ public:
 	void Init();
 	void Uninit();
 
-	void Do(VkCommandBuffer commandBuffer, const GraphicsVertexPipelineInput& input);
-	void Do(VkCommandBuffer commandBuffer, const GraphicsMeshPipelineInput& input);
+	void Do(VkCommandBuffer commandBuffer, const PipelineInput_Vertex& input);
+	void Do(VkCommandBuffer commandBuffer, const PipelineInput_Mesh& input);
+	void Do(VkCommandBuffer commandBuffer, const PipelineInput_Draw& input);
 };
 
-struct ComputePipelineInput
-{
-	std::vector<const DescriptorSet*> pDescriptorSets;
-
-	uint32_t groupCountX = 1;
-	uint32_t groupCountY = 1;
-	uint32_t groupCountZ = 1;
-};
 class ComputePipeline
 {
 private:
 	VkPipelineShaderStageCreateInfo m_shaderStageInfo{};
 	std::vector<VkDescriptorSetLayout> m_descriptorSetLayouts;
+
+public:
+	struct PipelineInput
+	{
+		std::vector<const DescriptorSet*> pDescriptorSets;
+
+		uint32_t groupCountX = 1;
+		uint32_t groupCountY = 1;
+		uint32_t groupCountZ = 1;
+	};
+
 public:
 	VkPipelineLayout vkPipelineLayout = VK_NULL_HANDLE;
 	VkPipeline vkPipeline = VK_NULL_HANDLE;
@@ -83,17 +103,9 @@ public:
 	void Init();
 	void Uninit();
 
-	void Do(VkCommandBuffer commandBuffer, const ComputePipelineInput& input);
+	void Do(VkCommandBuffer commandBuffer, const PipelineInput& input);
 };
 
-struct RayTracingPipelineInput
-{
-	std::vector<const DescriptorSet*> pDescriptorSets;
-	// for simplicity, i bind SBT in RT pipeline
-	uint32_t uWidth = 0u;
-	uint32_t uHeight = 0u;
-	uint32_t uDepth = 1u;
-};
 class RayTracingPipeline
 {
 private:
@@ -135,6 +147,16 @@ private:
 	uint32_t m_maxRayRecursionDepth = 1u;
 
 public:
+	struct PipelineInput
+	{
+		std::vector<const DescriptorSet*> pDescriptorSets;
+		// for simplicity, i bind SBT in RT pipeline
+		uint32_t uWidth = 0u;
+		uint32_t uHeight = 0u;
+		uint32_t uDepth = 1u;
+	};
+
+public:
 	VkPipelineLayout vkPipelineLayout = VK_NULL_HANDLE;
 	VkPipeline vkPipeline = VK_NULL_HANDLE;
 
@@ -142,16 +164,23 @@ public:
 	~RayTracingPipeline();
 
 	uint32_t AddShader(const VkPipelineShaderStageCreateInfo& shaderInfo);
-	void AddDescriptorSetLayout(const DescriptorSetLayout* pSetLayout);
 	void AddDescriptorSetLayout(VkDescriptorSetLayout vkDSetLayout);
 
 	// https://www.willusher.io/graphics/2019/11/20/the-sbt-three-ways/
 	
-	// Set Ray Generation shader record in self shader binding table, return the index of this record in all ShaderRecords, i.e. index of element in pGroups of VkRayTracingPipelineCreateInfoKHR
+	// Set Ray Generation shader record in self shader binding table,
+	// return the index of this record in all ShaderRecords,
+	// i.e. index of element in pGroups of VkRayTracingPipelineCreateInfoKHR
 	uint32_t SetRayGenerationShaderRecord(uint32_t rayGen); 
-	// Add Hit shader record in self shader binding table, return the index of this record in all ShaderRecords, i.e. index of element in pGroups of VkRayTracingPipelineCreateInfoKHR
+	
+	// Add Hit shader record in self shader binding table,
+	// return the index of this record in all ShaderRecords,
+	// i.e. index of element in pGroups of VkRayTracingPipelineCreateInfoKHR
 	uint32_t AddHitShaderRecord(uint32_t closestHit, uint32_t anyHit = VK_SHADER_UNUSED_KHR, uint32_t intersection = VK_SHADER_UNUSED_KHR);
-	// Add Miss shader record in self shader binding table, return the index of this record in all ShaderRecords, i.e. index of element in pGroups of VkRayTracingPipelineCreateInfoKHR
+	
+	// Add Miss shader record in self shader binding table,
+	// return the index of this record in all ShaderRecords,
+	// i.e. index of element in pGroups of VkRayTracingPipelineCreateInfoKHR
 	uint32_t AddMissShaderRecord(uint32_t miss);
 
 	void SetMaxRecursion(uint32_t maxRecur);
@@ -159,5 +188,5 @@ public:
 	void Init();
 	void Uninit();
 
-	void Do(VkCommandBuffer commandBuffer, const RayTracingPipelineInput& input);
+	void Do(VkCommandBuffer commandBuffer, const PipelineInput& input);
 };

@@ -155,6 +155,23 @@ void Buffer::CopyFromBuffer(const Buffer* pOtherBuffer)
 	CopyFromBuffer(*pOtherBuffer);
 }
 
+void Buffer::Fill(uint32_t _data, CommandSubmission* pCmd)
+{
+	if (pCmd != nullptr)
+	{
+		pCmd->FillBuffer(vkBuffer, 0u, m_bufferInformation.size, _data);
+	}
+	else
+	{
+		CommandSubmission cmdSubmit{};
+		cmdSubmit.Init();
+		cmdSubmit.StartOneTimeCommands({});
+		cmdSubmit.FillBuffer(vkBuffer, 0u, m_bufferInformation.size, _data);
+		cmdSubmit.SubmitCommands();
+		cmdSubmit.Uninit();
+	}
+}
+
 BufferInformation Buffer::GetBufferInformation() const
 {
 	return m_bufferInformation;

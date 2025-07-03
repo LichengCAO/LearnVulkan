@@ -318,7 +318,7 @@ void MeshletApp::_InitImagesAndViews()
 	int n = m_swapchainImages.size();
 	for (int i = 0; i < n; ++i)
 	{
-		ImageInformation depthImageInfo{};
+		Image::Information depthImageInfo{};
 		depthImageInfo.arrayLayers = 1;
 		depthImageInfo.depth = 1;
 		depthImageInfo.format = pDevice->GetDepthFormat();
@@ -330,22 +330,17 @@ void MeshletApp::_InitImagesAndViews()
 		depthImageInfo.mipLevels = 1;
 		depthImageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 		depthImageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-		ImageViewInformation depthViewInfo{};
-		depthViewInfo.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT;
 
 		std::unique_ptr<Image> uptrDepthImage = std::make_unique<Image>();
 		uptrDepthImage->SetImageInformation(depthImageInfo);
 		uptrDepthImage->Init();
 
-		std::unique_ptr<ImageView> uptrDepthView = std::make_unique<ImageView>(uptrDepthImage->NewImageView(depthViewInfo));
+		std::unique_ptr<ImageView> uptrDepthView = std::make_unique<ImageView>(uptrDepthImage->NewImageView(VK_IMAGE_ASPECT_DEPTH_BIT));
 		m_depthImages.push_back(std::move(uptrDepthImage));
 		uptrDepthView->Init();
 		m_depthImageViews.push_back(std::move(uptrDepthView));
 		
-		ImageViewInformation swapchainViewInfo{};
-		swapchainViewInfo.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		swapchainViewInfo.levelCount = m_swapchainImages[i].GetImageInformation().mipLevels;
-		std::unique_ptr<ImageView> uptrSwapchainView = std::make_unique<ImageView>(m_swapchainImages[i].NewImageView(swapchainViewInfo));
+		std::unique_ptr<ImageView> uptrSwapchainView = std::make_unique<ImageView>(m_swapchainImages[i].NewImageView());
 		uptrSwapchainView->Init();
 		m_swapchainImageViews.push_back(std::move(uptrSwapchainView));
 	}
@@ -577,7 +572,7 @@ void MeshletApp::_DrawFrame()
 	cmd->StartRenderPass(&m_renderPass, m_framebuffers[imageIndex.value()].get());
 	for (int i = 0; i < m_models.size(); ++i)
 	{
-		GraphicsMeshPipelineInput meshInput{};
+		GraphicsPipeline::PipelineInput_Mesh meshInput{};
 		const uint32_t meshletCountPerWorkgroup = 32;
 		// don't use task shader here
 		//meshInput.groupCountX = static_cast<uint32_t>(m_models[i].vecMeshlet.size()); // meshlet count

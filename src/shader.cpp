@@ -31,6 +31,9 @@ void SimpleShader::SetSPVFile(const std::string& file)
 		VkShaderStageFlagBits::VK_SHADER_STAGE_FRAGMENT_BIT,
 		VkShaderStageFlagBits::VK_SHADER_STAGE_TASK_BIT_EXT,
 		VkShaderStageFlagBits::VK_SHADER_STAGE_MESH_BIT_EXT,
+		VkShaderStageFlagBits::VK_SHADER_STAGE_RAYGEN_BIT_KHR,
+		VkShaderStageFlagBits::VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
+		VkShaderStageFlagBits::VK_SHADER_STAGE_MISS_BIT_KHR
 	};
 	std::vector<std::string> stageStrings =
 	{
@@ -39,6 +42,9 @@ void SimpleShader::SetSPVFile(const std::string& file)
 		".frag.",
 		".task.",
 		".mesh.",
+		".rgen.",
+		".rchit.",
+		".rmiss.",
 	};
 	for (int i = 0; i < stages.size(); ++i)
 	{
@@ -57,11 +63,9 @@ void SimpleShader::Init()
 {
 	CHECK_TRUE(!m_spvFile.empty(), "SPV file is unset!");
 	auto code = _ReadFile(m_spvFile);
-	VkShaderModuleCreateInfo createInfo{
-	.sType = VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO,
-	.codeSize = code.size(),
-	.pCode = reinterpret_cast<const uint32_t*>(code.data())
-	};
+	VkShaderModuleCreateInfo createInfo{ VK_STRUCTURE_TYPE_SHADER_MODULE_CREATE_INFO };
+	createInfo.codeSize = code.size();
+	createInfo.pCode = reinterpret_cast<const uint32_t*>(code.data());
 	CHECK_TRUE(vkShaderModule == VK_NULL_HANDLE, "VkShaderModule is already created!");
 	VK_CHECK(vkCreateShaderModule(MyDevice::GetInstance().vkDevice, &createInfo, nullptr, &vkShaderModule), "Failed to create shader module!");
 }

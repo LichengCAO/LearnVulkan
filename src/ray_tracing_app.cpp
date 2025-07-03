@@ -237,14 +237,7 @@ void RayTracingApp::_InitImagesAndViews()
 	m_scImages = MyDevice::GetInstance().GetSwapchainImages();
 	for (auto const& img : m_scImages)
 	{
-		ImageViewInformation imgInfo{};
-		imgInfo.type = ImageType::IMAGE_TYPE_2D;
-		imgInfo.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		imgInfo.baseArrayLayer = 0u;
-		imgInfo.baseMipLevel = 0u;
-		imgInfo.layerCount = 1u;
-		imgInfo.levelCount = 1u;
-		m_scImageViews.push_back(std::make_unique<ImageView>(img.NewImageView(imgInfo)));
+		m_scImageViews.push_back(std::make_unique<ImageView>(img.NewImageView()));
 	}
 
 	m_rtImages.clear();
@@ -252,8 +245,7 @@ void RayTracingApp::_InitImagesAndViews()
 	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 	{
 		Image rtImage{};
-		ImageViewInformation imgViewInfo{};
-		ImageInformation imgInfo{};
+		Image::Information imgInfo{};
 
 		imgInfo.arrayLayers = 1u;
 		imgInfo.depth = 1u;
@@ -268,17 +260,10 @@ void RayTracingApp::_InitImagesAndViews()
 		imgInfo.width = MyDevice::GetInstance().GetSwapchainExtent().width;
 		imgInfo.height = MyDevice::GetInstance().GetSwapchainExtent().height;
 
-		imgViewInfo.type = ImageType::IMAGE_TYPE_2D;
-		imgViewInfo.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		imgViewInfo.baseArrayLayer = 0u;
-		imgViewInfo.baseMipLevel = 0u;
-		imgViewInfo.layerCount = 1u;
-		imgViewInfo.levelCount = 1u;
-
 		rtImage.SetImageInformation(imgInfo);
 		rtImage.Init();
 
-		m_rtImageViews.push_back(std::make_unique<ImageView>(rtImage.NewImageView(imgViewInfo)));
+		m_rtImageViews.push_back(std::make_unique<ImageView>(rtImage.NewImageView()));
 		m_rtImages.push_back(std::move(rtImage));
 	}
 
@@ -369,4 +354,63 @@ void RayTracingApp::_UninitDescriptorSets()
 	m_swapchainImageDSets.clear();
 	m_ASDSet.reset();
 	m_cameraDSets.clear();
+}
+
+void RayTracingApp::_InitPipelines()
+{
+	SimpleShader rgen{};
+	SimpleShader rchit{};
+	SimpleShader rmiss{};
+	uint32_t rgenId = 0u;
+	uint32_t rchitId = 0u;
+	uint32_t rmissId = 0u;
+
+	rgen.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/rt.rgen.spv");
+	rchit.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/rt.rchit.spv");
+	rmiss.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/rt.rmiss.spv");
+
+	rgen.Init();
+	rchit.Init();
+	rmiss.Init();
+
+	m_rayTracingPipeline.AddDescriptorSetLayout(m_cameraDSetLayout.vkDescriptorSetLayout);
+	m_rayTracingPipeline.AddDescriptorSetLayout(m_modelDSetLayout.vkDescriptorSetLayout);
+	rgenId  = m_rayTracingPipeline.AddShader(rgen.GetShaderStageInfo());
+	rchitId = m_rayTracingPipeline.AddShader(rchit.GetShaderStageInfo());
+	rmissId = m_rayTracingPipeline.AddShader(rmiss.GetShaderStageInfo());
+
+	m_rayTracingPipeline.SetRayGenerationShaderRecord(rgenId);
+	m_rayTracingPipeline.AddHitShaderRecord(rchitId);
+	m_rayTracingPipeline.AddMissShaderRecord(rmissId);
+	m_rayTracingPipeline.SetMaxRecursion(1u);
+
+	m_rayTracingPipeline.Init();
+
+	rgen.Uninit();
+	rchit.Uninit();
+	rmiss.Uninit();
+}
+
+void RayTracingApp::_UninitPipelines()
+{
+	m_rayTracingPipeline.Uninit();
+}
+
+void RayTracingApp::_MainLoop()
+{
+
+}
+
+void RayTracingApp::_UpdateUniformBuffer()
+{
+
+}
+
+void RayTracingApp::_DrawFrame()
+{
+
+}
+
+void RayTracingApp::_ResizeWindow()
+{
 }
