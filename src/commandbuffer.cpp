@@ -21,6 +21,13 @@ void CommandSubmission::_UpdateImageLayout(VkImage vkImage, VkImageSubresourceRa
 	}
 }
 
+void CommandSubmission::_BeginRenderPass(const VkRenderPassBeginInfo& info, VkSubpassContents content)
+{
+	CHECK_TRUE(!m_isInRenderpass, "Already in render pass!");
+	m_isInRenderpass = true;
+	vkCmdBeginRenderPass(vkCommandBuffer, &info, content);
+}
+
 void CommandSubmission::SetQueueFamilyIndex(uint32_t _queueFamilyIndex)
 {
 	m_optQueueFamilyIndex = _queueFamilyIndex;
@@ -116,29 +123,7 @@ void CommandSubmission::StartOneTimeCommands(const std::vector<WaitInformation>&
 
 void CommandSubmission::StartRenderPass(const RenderPass* pRenderPass, const Framebuffer* pFramebuffer)
 {
-	CHECK_TRUE(!m_isInRenderpass, "Already in render pass!");
-	m_isInRenderpass = true;
-	m_pCurRenderpass = pRenderPass;
-	m_pCurFramebuffer = pFramebuffer;
-	std::vector<VkClearValue> clearValues;
-	// CHECK_TRUE(pRenderPass->attachments.size() > 0, "No attachment in render pass!"); // the attachment-less renderpass is allowed in vulkan
-	for (int i = 0; i < pRenderPass->attachments.size(); ++i)
-	{
-		// Note that the order of clearValues should be identical to the order of your attachments.
-		clearValues.push_back(pRenderPass->attachments[i].clearValue);
-	}
-	VkRenderPassBeginInfo renderPassInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
-	renderPassInfo.renderPass = pRenderPass->vkRenderPass;
-	renderPassInfo.renderArea.offset = { 0,0 };
-	if (pFramebuffer != nullptr) renderPassInfo.framebuffer = pFramebuffer->vkFramebuffer;
-	if (pFramebuffer != nullptr && pRenderPass->attachments.size() > 0)
-	{
-		renderPassInfo.renderArea.extent = pFramebuffer->GetImageSize();
-	}
-	renderPassInfo.clearValueCount = static_cast<uint32_t>(clearValues.size()); 
-	renderPassInfo.pClearValues = clearValues.data(); // should have same length as attachments, although index of those who don't clear on load will be ignored
-
-	vkCmdBeginRenderPass(vkCommandBuffer, &renderPassInfo, VK_SUBPASS_CONTENTS_INLINE);
+	pRenderPass->StartRenderPass(this, pFramebuffer);
 }
 
 VkQueue CommandSubmission::GetVkQueue() const
@@ -149,27 +134,15 @@ VkQueue CommandSubmission::GetVkQueue() const
 void CommandSubmission::EndRenderPass()
 {
 	CHECK_TRUE(m_isInRenderpass, "Not in render pass!");
-	CHECK_TRUE(m_pCurFramebuffer, "No framebuffer!");
-	CHECK_TRUE(m_pCurRenderpass, "No render pass!");
-	for (int i = 0; i < m_pCurFramebuffer->attachments.size(); ++i)
-	{
-		const ImageView* key = m_pCurFramebuffer->attachments[i];
-		VkImageLayout val = m_pCurRenderpass->attachments[i].attachmentDescription.finalLayout;
-		VkImageSubresourceRange range{};
-		CHECK_TRUE(key != nullptr, "No image view!");
-		auto info = key->GetImageViewInformation();
-		range.aspectMask = info.aspectMask;
-		range.baseArrayLayer = info.baseArrayLayer;
-		range.baseMipLevel = info.baseMipLevel;
-		range.layerCount = info.layerCount;
-		range.levelCount = info.levelCount;
-		_UpdateImageLayout(key->pImage->vkImage, range, val);
-	}
-
 	m_isInRenderpass = false;
-	m_pCurRenderpass = nullptr;
-	m_pCurFramebuffer = nullptr;
 	vkCmdEndRenderPass(vkCommandBuffer);
+	auto& queue = m_callbacks[CALLBACK_BINDING_POINT::END_RENDER_PASS];
+	while (!queue.empty())
+	{
+		auto& func = queue.front();
+		func(this);
+		queue.pop();
+	}
 }
 
 VkSemaphore CommandSubmission::SubmitCommands()
@@ -238,25 +211,6 @@ void CommandSubmission::AddPipelineBarrier(
 	{
 		_UpdateImageLayout(imageBarrier.image, imageBarrier.subresourceRange, imageBarrier.newLayout);
 	}
-}
-
-void CommandSubmission::FillImageView(const ImageView* pImageView, VkClearColorValue clearValue)
-{
-	VkImageSubresourceRange subresourceRange = {};
-	auto info = pImageView->GetImageViewInformation();
-	subresourceRange.aspectMask = info.aspectMask;	   // Specify the aspect, e.g., color
-	subresourceRange.baseMipLevel = info.baseMipLevel; // Start at the first mip level
-	subresourceRange.levelCount = info.levelCount;	   // VK_REMAINING_MIP_LEVELS;    // Apply to all mip levels
-	subresourceRange.baseArrayLayer = info.baseArrayLayer; // Start at the first array layer
-	subresourceRange.layerCount = info.layerCount;     // VK_REMAINING_ARRAY_LAYERS;  // Apply to all array layers
-	vkCmdClearColorImage(
-		vkCommandBuffer,
-		pImageView->pImage->vkImage,
-		VK_IMAGE_LAYOUT_GENERAL,
-		&clearValue,
-		1,
-		&subresourceRange
-	);
 }
 
 void CommandSubmission::ClearColorImage(VkImage vkImage, VkImageLayout vkImageLayout, const VkClearColorValue& clearColor, const std::vector<VkImageSubresourceRange>& ranges)
@@ -331,6 +285,11 @@ void CommandSubmission::WriteAccelerationStructuresProperties(const std::vector<
 void CommandSubmission::CopyAccelerationStructure(const VkCopyAccelerationStructureInfoKHR& copyInfo) const
 {
 	vkCmdCopyAccelerationStructureKHR(vkCommandBuffer, &copyInfo);
+}
+
+void CommandSubmission::BindCallback(CALLBACK_BINDING_POINT bindPoint, std::function<void(CommandSubmission*)> callback)
+{
+	m_callbacks[bindPoint].push(callback);
 }
 
 void CommandSubmission::WaitTillAvailable()const

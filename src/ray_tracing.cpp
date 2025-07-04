@@ -11,7 +11,7 @@ void RayTracingAccelerationStructure::_InitScratchBuffer(
 	std::vector<VkDeviceAddress>& slotAddresses
 ) const
 {
-	BufferInformation scratchBufferInfo{};
+	Buffer::Information scratchBufferInfo{};
 	uint32_t	uMinAlignment = 128; /*m_rtASProperties.minAccelerationStructureScratchOffsetAlignment*/
 	VkDeviceSize maxScratchChunk = 0;
 	VkDeviceSize fullScratchSize = 0;
@@ -408,7 +408,7 @@ void RayTracingAccelerationStructure::SetUpTLAS(const std::vector<InstanceData>&
 
 	// setup instance buffer
 	{
-		BufferInformation bufferInfo{};
+		Buffer::Information bufferInfo{};
 		tlasInput.uptrInstanceBuffer = std::make_unique<Buffer>();
 
 		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
@@ -453,7 +453,7 @@ void RayTracingAccelerationStructure::Uninit()
 
 void RayTracingAccelerationStructure::BLAS::Init(VkDeviceSize size)
 {
-	BufferInformation bufferInfo{};
+	Buffer::Information bufferInfo{};
 	VkAccelerationStructureCreateInfoKHR info{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR };
 	VkAccelerationStructureDeviceAddressInfoKHR vkASAddrInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR };
 
@@ -494,7 +494,7 @@ void RayTracingAccelerationStructure::TLAS::Init(VkDeviceSize ASSize)
 	// create VkAcceleartionStructure
 	VkAccelerationStructureCreateInfoKHR createInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR };
 	VkAccelerationStructureDeviceAddressInfoKHR addrInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR };
-	BufferInformation bufferInfo{};
+	Buffer::Information bufferInfo{};
 
 	bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 	bufferInfo.size = ASSize;

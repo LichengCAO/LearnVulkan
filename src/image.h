@@ -18,6 +18,7 @@ public:
 		VkFormat format = VK_FORMAT_UNDEFINED; // https://stackoverflow.com/questions/58600143/why-would-vkimageview-format-differ-from-the-underlying-vkimage-format
 		VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
 		VkImageViewType type = VK_IMAGE_VIEW_TYPE_2D;
+		VkImage vkImage = VK_NULL_HANDLE;
 	};
 
 private:
@@ -115,7 +116,7 @@ public:
 	// Fill range with clear color,
 	// if pCmd is nullptr, it will create a command buffer and wait till this action done,
 	// else, it will record the command in the command buffer, and user need to manage the synchronization
-	void Fill(const VkClearColorValue& clearColor, const VkImageSubresourceRange* range, CommandSubmission* pCmd = nullptr);
+	void Fill(const VkClearColorValue& clearColor, const VkImageSubresourceRange& range, CommandSubmission* pCmd = nullptr);
 	// Fill range with clear color,
 	// if pCmd is nullptr, it will create a command buffer and wait till this action done,
 	// else, it will record the command in the command buffer, and user need to manage the synchronization

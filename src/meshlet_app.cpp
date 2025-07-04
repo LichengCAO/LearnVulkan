@@ -70,7 +70,7 @@ void MeshletApp::_InitRenderPass()
 	m_renderPass.AddAttachment(swapchainInfo);
 	m_renderPass.AddAttachment(depthInfo);
 
-	SubpassInformation subpassInfo{};
+	Subpass subpassInfo{};
 	subpassInfo.AddColorAttachment(0);
 	subpassInfo.SetDepthStencilAttachment(1);
 	
@@ -136,7 +136,7 @@ void MeshletApp::_InitBuffers()
 	{
 		std::unique_ptr<Buffer> cameraBuffer = std::make_unique<Buffer>(Buffer{});
 		std::unique_ptr<Buffer> frustumBuffer = std::make_unique<Buffer>(Buffer{});
-		BufferInformation bufferInfo{};
+		Buffer::Information bufferInfo{};
 		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 		bufferInfo.size = static_cast<uint32_t>(sizeof(CameraUBO));
 		bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
@@ -152,8 +152,7 @@ void MeshletApp::_InitBuffers()
 	m_meshletDSets.reserve(n);
 	for (int i = 0; i < n; ++i)
 	{
-		BufferInformation bufferInfo;
-		BufferInformation stagingBufferInfo;
+		Buffer::Information bufferInfo;
 		Model& curModel = m_models[i];
 		std::unique_ptr<Buffer> meshletBuffer = std::make_unique<Buffer>(Buffer{});
 		std::unique_ptr<Buffer> meshletBoundsBuffer = std::make_unique<Buffer>(Buffer{});
@@ -161,12 +160,9 @@ void MeshletApp::_InitBuffers()
 		std::unique_ptr<Buffer> meshletTriangleBuffer = std::make_unique<Buffer>(Buffer{});
 		std::unique_ptr<Buffer> meshletVBOBuffer = std::make_unique<Buffer>(Buffer{});
 		std::unique_ptr<Buffer> meshUBOBuffer = std::make_unique<Buffer>(Buffer{});
-		Buffer stagingBuffer{};
 		
 		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-		stagingBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-		stagingBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 		
 		{
 			std::vector<MeshletSBO> sbos;
@@ -181,11 +177,8 @@ void MeshletApp::_InitBuffers()
 				sbos.push_back(sbo);
 			}
 			bufferInfo.size = static_cast<uint32_t>(sizeof(MeshletSBO)) * static_cast<uint32_t>(sbos.size());
-			stagingBufferInfo.size = bufferInfo.size;
-			stagingBuffer.Init(stagingBufferInfo);
-			stagingBuffer.CopyFromHost(sbos.data());
 			meshletBuffer->Init(bufferInfo);
-			meshletBuffer->CopyFromBuffer(stagingBuffer);
+			meshletBuffer->CopyFromHost(sbos.data());
 		}
 
 		{
@@ -200,30 +193,18 @@ void MeshletApp::_InitBuffers()
 				sbos.push_back(sbo);
 			}
 			bufferInfo.size = static_cast<uint32_t>(sizeof(MeshletBoundsSBO)) * static_cast<uint32_t>(sbos.size());
-			stagingBufferInfo.size = bufferInfo.size;
-			stagingBuffer.Uninit();
-			stagingBuffer.Init(stagingBufferInfo);
 			m_tBound = sbos;
-			stagingBuffer.CopyFromHost(sbos.data());
 			meshletBoundsBuffer->Init(bufferInfo);
-			meshletBoundsBuffer->CopyFromBuffer(stagingBuffer);
+			meshletBoundsBuffer->CopyFromHost(sbos.data());
 		}
 		
 		bufferInfo.size = static_cast<uint32_t>(sizeof(uint32_t)) * static_cast<uint32_t>(curModel.vecVertexRemap.size());
-		stagingBufferInfo.size = bufferInfo.size;
-		stagingBuffer.Uninit();
-		stagingBuffer.Init(stagingBufferInfo);
-		stagingBuffer.CopyFromHost(curModel.vecVertexRemap.data());
 		meshletVertexBuffer->Init(bufferInfo);
-		meshletVertexBuffer->CopyFromBuffer(stagingBuffer);
+		meshletVertexBuffer->CopyFromHost(curModel.vecVertexRemap.data());
 
 		bufferInfo.size = static_cast<uint32_t>(sizeof(uint8_t)) * static_cast<uint32_t>(curModel.vecTriangleIndex.size());
-		stagingBufferInfo.size = bufferInfo.size;
-		stagingBuffer.Uninit();
-		stagingBuffer.Init(stagingBufferInfo);
-		stagingBuffer.CopyFromHost(curModel.vecTriangleIndex.data());
 		meshletTriangleBuffer->Init(bufferInfo);
-		meshletTriangleBuffer->CopyFromBuffer(stagingBuffer);
+		meshletTriangleBuffer->CopyFromHost(curModel.vecTriangleIndex.data());
 
 		{
 			std::vector<VBO> vbos;
@@ -236,12 +217,8 @@ void MeshletApp::_InitBuffers()
 				vbos.push_back(vbo);
 			}
 			bufferInfo.size = static_cast<uint32_t>(sizeof(VBO)) * static_cast<uint32_t>(curModel.mesh.verts.size());
-			stagingBufferInfo.size = bufferInfo.size;
-			stagingBuffer.Uninit();
-			stagingBuffer.Init(stagingBufferInfo);
-			stagingBuffer.CopyFromHost(vbos.data());
 			meshletVBOBuffer->Init(bufferInfo);
-			meshletVBOBuffer->CopyFromBuffer(stagingBuffer);
+			meshletVBOBuffer->CopyFromHost(vbos.data());
 		}
 
 		{
@@ -263,14 +240,9 @@ void MeshletApp::_InitBuffers()
 			bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
 			bufferInfo.size = static_cast<uint32_t>(sizeof(ModelUBO));
-			stagingBufferInfo.size = bufferInfo.size;
-			stagingBuffer.Uninit();
-			stagingBuffer.Init(stagingBufferInfo);
-			stagingBuffer.CopyFromHost(&ubo);
 			meshUBOBuffer->Init(bufferInfo);
-			meshUBOBuffer->CopyFromBuffer(stagingBuffer);
+			meshUBOBuffer->CopyFromHost(&ubo);
 		}
-		stagingBuffer.Uninit();
 
 		m_meshletBuffers.push_back(std::move(meshletBuffer));
 		m_meshletVertexBuffers.push_back(std::move(meshletVertexBuffer));
@@ -564,7 +536,7 @@ void MeshletApp::_DrawFrame()
 	auto imageIndex = pDevice->AquireAvailableSwapchainImageIndex(m_swapchainImageAvailabilities[m_currentFrame]);
 	if (!imageIndex.has_value()) return;
 	_UpdateUniformBuffer();
-	WaitInformation waitInfo{};
+	CommandSubmission::WaitInformation waitInfo{};
 	waitInfo.waitSamaphore = m_swapchainImageAvailabilities[m_currentFrame];
 	waitInfo.waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	cmd->StartCommands({ waitInfo });

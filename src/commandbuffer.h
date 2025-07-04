@@ -1,13 +1,11 @@
 #pragma once
 #include "common.h"
 #include "pipeline_io.h";
+#include <queue>
+// https://stackoverflow.com/questions/44105058/implementing-component-system-from-unity-in-c
 
 class GraphicsPipeline;
-struct WaitInformation
-{
-	VkSemaphore          waitSamaphore = VK_NULL_HANDLE;
-	VkPipelineStageFlags waitStage = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
-};
+class RenderPass;
 
 class ImageBarrierBuilder
 {
@@ -42,57 +40,79 @@ public:
 	VkImageBlit NewBlit(VkOffset2D srcOffsetLR, uint32_t srcMipLevel, VkOffset2D dstOffsetLR, uint32_t dstMipLevel) const;
 };
 
+// class handles commandbuffer and queue submission, synchronization
 class CommandSubmission
 {
+public:
+	enum class CALLBACK_BINDING_POINT
+	{
+		END_RENDER_PASS,
+	};
+	struct WaitInformation
+	{
+		VkSemaphore          waitSamaphore = VK_NULL_HANDLE;
+		VkPipelineStageFlags waitStage = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	};
+
 private:
 	VkSemaphore m_vkSemaphore = VK_NULL_HANDLE;
 	std::vector<VkSemaphore> m_vkWaitSemaphores;
 	std::vector<VkPipelineStageFlags> m_vkWaitStages;
 	std::optional<uint32_t> m_optQueueFamilyIndex;
+	std::unordered_map<CALLBACK_BINDING_POINT, std::queue<std::function<void(CommandSubmission*)>>> m_callbacks;
 
 	VkQueue m_vkQueue = VK_NULL_HANDLE;
 	bool m_isRecording = false;
 	bool m_isInRenderpass = false;
-	const RenderPass* m_pCurRenderpass = nullptr;
-	const Framebuffer* m_pCurFramebuffer = nullptr;
 
 	void _CreateSynchronizeObjects();
 	
 	void _UpdateImageLayout(VkImage vkImage, VkImageSubresourceRange range, VkImageLayout layout) const;
+
+	// I want this function to be called by Renderpass only
+	void _BeginRenderPass(const VkRenderPassBeginInfo& info, VkSubpassContents content = VK_SUBPASS_CONTENTS_INLINE);
 
 public:
 	VkCommandBuffer vkCommandBuffer = VK_NULL_HANDLE;
 	VkFence vkFence = VK_NULL_HANDLE;
 
 	void SetQueueFamilyIndex(uint32_t _queueFamilyIndex);
+	
 	std::optional<uint32_t> GetQueueFamilyIndex() const;
+	
 	VkQueue GetVkQueue() const;
 
 	void Init();
+	
 	void Uninit();
 
 	void WaitTillAvailable() const; // make sure ALL values used in this command is update AFTER this call or we may access the value while the device still using it
-	void StartCommands(const std::vector<WaitInformation>& _waitInfos);
+	
+	void StartCommands(const std::vector<WaitInformation>& _waitInfos);	
+	
 	void StartRenderPass(const RenderPass* pRenderPass, const Framebuffer* pFramebuffer);
+	
 	void EndRenderPass(); // this will change image layout
+	
 	void StartOneTimeCommands(const std::vector<WaitInformation>& _waitInfos);
+	
 	VkSemaphore SubmitCommands();
 
 	void AddPipelineBarrier(
 		VkPipelineStageFlags srcStageMask,
 		VkPipelineStageFlags dstStageMask,
 		const std::vector<VkImageMemoryBarrier>& imageBarriers); // this will change image layout
+	
 	void AddPipelineBarrier(
 		VkPipelineStageFlags srcStageMask,
 		VkPipelineStageFlags dstStageMask,
 		const std::vector<VkMemoryBarrier>& memoryBarriers); // this will change image layout
+	
 	void AddPipelineBarrier(
 		VkPipelineStageFlags srcStageMask,
 		VkPipelineStageFlags dstStageMask,
 		const std::vector<VkMemoryBarrier>& memoryBarriers, 
 		const std::vector<VkImageMemoryBarrier>& imageBarriers); // this will change image layout
-
-	void FillImageView(const ImageView* pImageView, VkClearColorValue clearValue);
 
 	void ClearColorImage(
 		VkImage vkImage,
@@ -126,5 +146,10 @@ public:
 
 	void CopyAccelerationStructure(const VkCopyAccelerationStructureInfoKHR& copyInfo) const;
 
+	// Bind callback to a function,
+	// the callback will be called only once
+	void BindCallback(CALLBACK_BINDING_POINT bindPoint, std::function<void(CommandSubmission*)> callback);
+
+	friend class RenderPass;
 	friend class GraphicsPipeline;
 };

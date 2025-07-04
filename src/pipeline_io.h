@@ -3,8 +3,11 @@
 class Buffer;
 class BufferView;
 class ImageView;
-// Pipeline can have multiple DescriptorSetLayout, when execute the pipeline we need to provide DescriptorSets for each of the DescriptorSetLayout
+class CommandSubmission;
 class DescriptorSet;
+class RenderPass;
+
+// Pipeline can have multiple DescriptorSetLayout, when execute the pipeline we need to provide DescriptorSets for each of the DescriptorSetLayout
 class DescriptorSetLayout
 {
 public:
@@ -23,7 +26,6 @@ public:
 
 	void Uninit();
 };
-
 class DescriptorSet
 {
 private:
@@ -137,7 +139,8 @@ struct AttachmentInformation
 
 	static AttachmentInformation GetPresetInformation(AttachmentPreset _preset);
 };
-struct SubpassInformation
+
+struct Subpass
 {
 	std::vector<VkAttachmentReference> colorAttachments;
 	std::optional<VkAttachmentReference> optDepthStencilAttachment;
@@ -148,16 +151,19 @@ struct SubpassInformation
 	void AddResolveAttachment(uint32_t _binding);
 };
 
-class RenderPass;
 class Framebuffer
 {
 public:
 	VkFramebuffer vkFramebuffer = VK_NULL_HANDLE;
+	
 	const RenderPass* pRenderPass = nullptr;
+	
 	std::vector<const ImageView*> attachments;
+	
 	~Framebuffer();
 	
 	void Init();
+	
 	void Uninit();
 
 	VkExtent2D GetImageSize() const;
@@ -168,20 +174,28 @@ class RenderPass
 private:
 	std::vector<VkSubpassDependency> m_vkSubpassDependencies;
 
+private:
+	// Return begin info of this render pass
+	VkRenderPassBeginInfo _GetVkRenderPassBeginInfo(const Framebuffer* pFramebuffer = nullptr) const;
+
 public:
 	VkRenderPass vkRenderPass = VK_NULL_HANDLE;
 	std::vector<AttachmentInformation> attachments;
-	std::vector<SubpassInformation> subpasses;
+	std::vector<Subpass> subpasses;
 
 public:
 	~RenderPass();
 
 	uint32_t AddAttachment(AttachmentInformation _info);
-	uint32_t AddSubpass(SubpassInformation _subpass);
+	
+	uint32_t AddSubpass(Subpass _subpass);
 	
 	void Init();
 
 	Framebuffer NewFramebuffer(const std::vector<const ImageView*> _imageViews) const;
+
+	// record vkCmdBeginRenderPass command in command buffer, also bind callback for image layout management
+	void StartRenderPass(CommandSubmission* pCmd, const Framebuffer* pFramebuffer = nullptr) const;
 	
 	void Uninit();
 };

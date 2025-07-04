@@ -549,28 +549,21 @@ void RayTracingPipeline::ShaderBindingTable::Init(const RayTracingPipeline* pRay
 
 	// bind shader group(shader record) handle to table on device
 	{
-		Buffer stagingBuffer{};
-		BufferInformation stagBufferInfo{};
-		BufferInformation bufferInfo{};
+		Buffer::Information bufferInfo{};
 		VkDeviceAddress SBTAddress = 0;
 		std::vector<uint8_t> dataToDevice;
 		auto funcGetGroupHandle = [&](int i) { return groupData.data() + i * static_cast<int>(uHandleSizeHost); };
 		m_uptrBuffer = std::make_unique<Buffer>();
 
-		stagBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
-		stagBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-		stagBufferInfo.size = vkRayGenRegion.size + vkMissRegion.size + vkHitRegion.size + vkCallRegion.size;
-
 		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
-		bufferInfo.size = stagBufferInfo.size;
+		bufferInfo.size = vkRayGenRegion.size + vkMissRegion.size + vkHitRegion.size + vkCallRegion.size;
 
-		stagingBuffer.Init(stagBufferInfo);
 		m_uptrBuffer->Init(bufferInfo);
-
+		
 		SBTAddress = m_uptrBuffer->GetDeviceAddress();
+		dataToDevice.resize(bufferInfo.size, 0u);
 
-		dataToDevice.resize(stagBufferInfo.size, 0u);
 		// set rayGen
 		uint8_t* pEntryPoint = dataToDevice.data();
 		vkRayGenRegion.deviceAddress = SBTAddress;
@@ -602,10 +595,7 @@ void RayTracingPipeline::ShaderBindingTable::Init(const RayTracingPipeline* pRay
 			memcpy(pEntryPoint, funcGetGroupHandle(index), static_cast<size_t>(uHandleSizeHost));
 			pEntryPoint += static_cast<int>(uHandleSizeDevice);
 		}
-
-		stagingBuffer.CopyFromHost(dataToDevice.data());
-		m_uptrBuffer->CopyFromBuffer(stagingBuffer);
-		stagingBuffer.Uninit();
+		m_uptrBuffer->CopyFromHost(dataToDevice.data());
 	}
 }
 

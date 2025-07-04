@@ -3,17 +3,20 @@
 
 class BufferView;
 class CommandSubmission;
-struct BufferInformation
-{
-	VkDeviceSize size = 0;
-	VkBufferUsageFlags usage = 0;
-	VkSharingMode sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	VkMemoryPropertyFlags memoryProperty = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-};
+
 class Buffer
 {
+public:
+	struct Information
+	{
+		VkDeviceSize size = 0;
+		VkBufferUsageFlags usage = 0;
+		VkSharingMode sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		VkMemoryPropertyFlags memoryProperty = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+	};
+
 private:
-	BufferInformation m_bufferInformation{};
+	Information m_bufferInformation{};
 	void* m_mappedMemory = nullptr; // we store this value, since mapping is not free
 
 	uint32_t _FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const;
@@ -33,7 +36,7 @@ public:
 	VkBuffer	   vkBuffer = VK_NULL_HANDLE;
 	VkDeviceMemory vkDeviceMemory = VK_NULL_HANDLE;
 
-	void Init(BufferInformation bufferInfo);
+	void Init(Information bufferInfo);
 	void Uninit();
 
 	// Copy from host, will use stagging buffer if necessary, use buffer's size as length
@@ -51,15 +54,18 @@ public:
 	// if command buffer is provided, then when does this command finish depends on user
 	void Fill(uint32_t _data, CommandSubmission* pCmd = nullptr);
 
-	BufferInformation GetBufferInformation() const;
+	Information GetBufferInformation() const;
 	
 	VkDeviceAddress GetDeviceAddress() const;
 
 	BufferView NewBufferView(VkFormat _format);
 };
+
 class BufferView // use for texel buffer
 {
+private:
 	VkFormat m_format = VkFormat::VK_FORMAT_UNDEFINED;
+
 public:
 	const Buffer* pBuffer = nullptr;
 	VkBufferView vkBufferView = VK_NULL_HANDLE;

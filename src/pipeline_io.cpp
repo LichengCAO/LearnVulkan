@@ -2,6 +2,8 @@
 #include "device.h"
 #include "buffer.h"
 #include "image.h"
+#include "commandbuffer.h"
+
 void DescriptorSet::SetLayout(const DescriptorSetLayout* _layout)
 {
 	m_pLayout = _layout;
@@ -197,7 +199,7 @@ uint32_t RenderPass::AddAttachment(AttachmentInformation _info)
 	attachments.push_back(_info);
 	return ret;
 }
-uint32_t RenderPass::AddSubpass(SubpassInformation _subpass)
+uint32_t RenderPass::AddSubpass(Subpass _subpass)
 {
 	uint32_t ret = static_cast<uint32_t>(subpasses.size());
 	assert(vkRenderPass == VK_NULL_HANDLE);
@@ -254,6 +256,64 @@ void RenderPass::Init()
 	renderPassInfo.pDependencies = m_vkSubpassDependencies.data();
 	CHECK_TRUE(vkRenderPass == VK_NULL_HANDLE, "VkRenderPass is already created!");
 	VK_CHECK(vkCreateRenderPass(MyDevice::GetInstance().vkDevice, &renderPassInfo, nullptr, &vkRenderPass), "Failed to create render pass!");
+}
+VkRenderPassBeginInfo RenderPass::_GetVkRenderPassBeginInfo(const Framebuffer* pFramebuffer) const
+{
+	VkRenderPassBeginInfo ret{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
+	std::vector<VkClearValue> clearValues;
+	ret.renderPass = vkRenderPass;
+	ret.renderArea.offset = { 0, 0 };
+	if (pFramebuffer != nullptr)
+	{
+		CHECK_TRUE(this == pFramebuffer->pRenderPass, "This framebuffer doesn't belong to this render pass!");
+		ret.framebuffer = pFramebuffer->vkFramebuffer;
+		ret.renderArea.extent = pFramebuffer->GetImageSize();
+		for (int i = 0; i < attachments.size(); ++i)
+		{
+			clearValues.push_back(attachments[i].clearValue);
+		}
+		ret.clearValueCount = static_cast<uint32_t>(clearValues.size()); // should have same length as attachments, although index of those who don't clear on load will be ignored
+		ret.pClearValues = clearValues.data();
+	}
+	return ret;
+}
+void RenderPass::StartRenderPass(CommandSubmission* pCmd, const Framebuffer* pFramebuffer) const
+{
+	pCmd->_BeginRenderPass(_GetVkRenderPassBeginInfo(pFramebuffer), VK_SUBPASS_CONTENTS_INLINE);
+	if (pFramebuffer != nullptr)
+	{
+		int n = pFramebuffer->attachments.size();
+		std::vector<VkImage> images;
+		std::vector<VkImageSubresourceRange> ranges;
+		std::vector<VkImageLayout> layouts;
+		images.reserve(n);
+		ranges.reserve(n);
+		layouts.reserve(n);
+		for (int i = 0; i < n; ++i)
+		{
+			auto info = pFramebuffer->attachments[i]->GetImageViewInformation();
+			VkImageSubresourceRange range{};
+			range.aspectMask = info.aspectMask;
+			range.baseArrayLayer = info.baseArrayLayer;
+			range.baseMipLevel = info.baseMipLevel;
+			range.layerCount = info.layerCount;
+			range.levelCount = info.levelCount;
+
+			images.push_back(info.vkImage);
+			ranges.push_back(range);
+			layouts.push_back(attachments[i].attachmentDescription.finalLayout);
+		}
+		pCmd->BindCallback(
+			CommandSubmission::CALLBACK_BINDING_POINT::END_RENDER_PASS, 
+			[images, ranges, layouts](CommandSubmission* pCmd) 
+			{
+				for (int i = 0; i < images.size(); ++i)
+				{
+					pCmd->_UpdateImageLayout(images[i], ranges[i], layouts[i]);
+				}
+			}
+		);
+	}
 }
 void RenderPass::Uninit()
 {
@@ -445,25 +505,25 @@ void DescriptorAllocator::Uninit()
 	}
 }
 
-void SubpassInformation::AddColorAttachment(uint32_t _binding)
+void Subpass::AddColorAttachment(uint32_t _binding)
 {
 	colorAttachments.push_back({ _binding, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
 }
-void SubpassInformation::SetDepthStencilAttachment(uint32_t _binding, bool _readOnly)
+void Subpass::SetDepthStencilAttachment(uint32_t _binding, bool _readOnly)
 {
 	// ATTACHMENT here means writable
 	// VK_IMAGE_LAYOUT_DEPTH_READ_ONLY_STENCIL_ATTACHMENT_OPTIMAL -> depth is readonly, stencil is writable
 	// VK_IMAGE_LAYOUT_DEPTH_ATTACHMENT_STENCIL_READ_ONLY_OPTIMAL -> depth is writable, stencil is readonly
 	if (_readOnly)
 	{
-		optDepthStencilAttachment = { _binding, VkImageLayout::VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL };
+		optDepthStencilAttachment = { _binding, VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL };
 	}
 	else
 	{
 		optDepthStencilAttachment = { _binding, VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL };
 	}
 }
-void SubpassInformation::AddResolveAttachment(uint32_t _binding)
+void Subpass::AddResolveAttachment(uint32_t _binding)
 {
 	resolveAttachments.push_back({ _binding, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });
 }

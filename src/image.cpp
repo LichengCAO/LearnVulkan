@@ -199,7 +199,7 @@ void Image::CopyFromBuffer(const Buffer& stagingBuffer)
 	cmdSubmit.SubmitCommands();
 }
 
-void Image::Fill(const VkClearColorValue& clearColor, const VkImageSubresourceRange* range, CommandSubmission* pCmd)
+void Image::Fill(const VkClearColorValue& clearColor, const VkImageSubresourceRange& range, CommandSubmission* pCmd)
 {
 	if (pCmd == nullptr)
 	{
@@ -207,13 +207,13 @@ void Image::Fill(const VkClearColorValue& clearColor, const VkImageSubresourceRa
 
 		cmd.Init();
 		cmd.StartOneTimeCommands({});
-		cmd.ClearColorImage(vkImage, VK_IMAGE_LAYOUT_GENERAL, clearColor, { *range });
+		cmd.ClearColorImage(vkImage, VK_IMAGE_LAYOUT_GENERAL, clearColor, { range });
 		cmd.SubmitCommands();
 		cmd.Uninit();
 	}
 	else
 	{
-		pCmd->ClearColorImage(vkImage, VK_IMAGE_LAYOUT_GENERAL, clearColor, { *range });
+		pCmd->ClearColorImage(vkImage, VK_IMAGE_LAYOUT_GENERAL, clearColor, { range });
 	}
 }
 
@@ -227,7 +227,7 @@ void Image::Fill(const VkClearColorValue& clearColor, CommandSubmission* pCmd)
 	uptrRange->layerCount = VK_REMAINING_ARRAY_LAYERS;
 	uptrRange->levelCount = VK_REMAINING_MIP_LEVELS;
 
-	Fill(clearColor, uptrRange.get(), pCmd);
+	Fill(clearColor, *uptrRange, pCmd);
 }
 
 ImageView Image::NewImageView(VkImageAspectFlags aspect, uint32_t baseMipLevel, uint32_t levelCount, uint32_t baseArrayLayer, uint32_t layerCount) const
@@ -243,7 +243,7 @@ ImageView Image::NewImageView(VkImageAspectFlags aspect, uint32_t baseMipLevel, 
 	viewInfo.format = m_imageInformation.format;
 	viewInfo.layerCount = layerCount;
 	viewInfo.levelCount = levelCount;
-	viewInfo.type;
+	viewInfo.vkImage = vkImage;
 
 	if (levelCount == VK_REMAINING_MIP_LEVELS)
 	{
@@ -388,7 +388,7 @@ void Texture::Init()
 
 	// copy host image to device
 	Buffer stagingBuffer;
-	BufferInformation bufferInfo;
+	Buffer::Information bufferInfo;
 	bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 	bufferInfo.size = imageSize;
 	bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;

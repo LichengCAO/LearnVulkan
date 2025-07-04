@@ -119,7 +119,7 @@ void TransparentApp::_InitRenderPass()
 		readOnlyDepthInfo.attachmentDescription.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 		readOnlyDepthInfo.attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 		m_oitRenderPass.AddAttachment(readOnlyDepthInfo);
-		SubpassInformation oitSubpassInfo{};
+		Subpass oitSubpassInfo{};
 		oitSubpassInfo.SetDepthStencilAttachment(0, true);
 		m_oitRenderPass.AddSubpass(oitSubpassInfo);
 		m_oitRenderPass.Init();
@@ -150,7 +150,7 @@ void TransparentApp::_InitRenderPass()
 
 		m_distortRenderPass.AddAttachment(uvDistortInfo);
 		m_distortRenderPass.AddAttachment(depthInfo);
-		SubpassInformation distortSubpassInfo{};
+		Subpass distortSubpassInfo{};
 		distortSubpassInfo.AddColorAttachment(0);
 		distortSubpassInfo.SetDepthStencilAttachment(1, true);
 		m_distortRenderPass.AddSubpass(distortSubpassInfo);
@@ -171,7 +171,7 @@ void TransparentApp::_InitRenderPass()
 		m_gbufferRenderPass.AddAttachment(normalInfo);
 		m_gbufferRenderPass.AddAttachment(gDepthInfo);
 		m_gbufferRenderPass.AddAttachment(depthInfo);
-		SubpassInformation gSubpassInfo{};
+		Subpass gSubpassInfo{};
 		gSubpassInfo.AddColorAttachment(0);
 		gSubpassInfo.AddColorAttachment(1);
 		gSubpassInfo.AddColorAttachment(2);
@@ -185,7 +185,7 @@ void TransparentApp::_InitRenderPass()
 	{
 		AttachmentInformation lightInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::GBUFFER_ALBEDO);
 		m_lightRenderPass.AddAttachment(lightInfo);
-		SubpassInformation subpassInfo{};
+		Subpass subpassInfo{};
 		subpassInfo.AddColorAttachment(0);
 		m_lightRenderPass.AddSubpass(subpassInfo);
 		m_lightRenderPass.Init();
@@ -195,7 +195,7 @@ void TransparentApp::_InitRenderPass()
 	{
 		AttachmentInformation swapchainInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::SWAPCHAIN);
 		m_renderPass.AddAttachment(swapchainInfo);
-		SubpassInformation subpassInfo{};
+		Subpass subpassInfo{};
 		subpassInfo.AddColorAttachment(0);
 		m_renderPass.AddSubpass(subpassInfo);
 		m_renderPass.Init();
@@ -342,13 +342,13 @@ void TransparentApp::_InitBuffers()
 		uint32_t width = MyDevice::GetInstance().GetSwapchainExtent().width;
 		uint32_t height = MyDevice::GetInstance().GetSwapchainExtent().height;
 
-		BufferInformation oitViewportBufferInfo{};
+		Buffer::Information oitViewportBufferInfo{};
 		oitViewportBufferInfo.size = sizeof(glm::ivec3);
 		oitViewportBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 		oitViewportBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 		m_oitViewportBuffer.Init(oitViewportBufferInfo);
 
-		BufferInformation oitSampleTexelBufferInfo{};
+		Buffer::Information oitSampleTexelBufferInfo{};
 		oitSampleTexelBufferInfo.size = sizeof(glm::uvec4) * width * height * 5/* OIT_LAYER */;
 		oitSampleTexelBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT; // we need to clear it first
 		oitSampleTexelBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
@@ -370,7 +370,7 @@ void TransparentApp::_InitBuffers()
 
 	// model
 	{
-		BufferInformation modelBufferInfo;
+		Buffer::Information modelBufferInfo;
 		modelBufferInfo.size = sizeof(ModelTransform);
 		modelBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 		modelBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
@@ -402,7 +402,7 @@ void TransparentApp::_InitBuffers()
 
 	// material
 	{
-		BufferInformation materialBufferInfo;
+		Buffer::Information materialBufferInfo;
 		materialBufferInfo.size = sizeof(SimpleMaterial);
 		materialBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 		materialBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
@@ -422,7 +422,7 @@ void TransparentApp::_InitBuffers()
 
 	// camera
 	{
-		BufferInformation bufferInfo;
+		Buffer::Information bufferInfo;
 		bufferInfo.size = sizeof(CameraUBO);
 		bufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;// | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT; this is use for device to device transfer
 		bufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
@@ -436,7 +436,7 @@ void TransparentApp::_InitBuffers()
 
 	// distort camera view info
 	{
-		BufferInformation bufferInfo;
+		Buffer::Information bufferInfo;
 		bufferInfo.size = sizeof(CameraViewInformation);
 		bufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 		bufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
@@ -450,12 +450,12 @@ void TransparentApp::_InitBuffers()
 
 	// blur
 	{
-		BufferInformation bufferInfo;
+		Buffer::Information bufferInfo;
 		bufferInfo.size = sizeof(GaussianBlurInformation);
 		bufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 		bufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 
-		BufferInformation kernelBufferInfo;
+		Buffer::Information kernelBufferInfo;
 		kernelBufferInfo.size = (m_blurRadius + 1 + 15) / 16 * sizeof(GaussianKernels);
 		kernelBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 		kernelBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
@@ -1348,9 +1348,7 @@ void TransparentApp::_InitVertexInputs()
 		m_gbufferIndexBuffers.reserve(m_models.size());
 		for (int i = 0; i < m_models.size(); ++i)
 		{
-			Buffer stagingBuffer;
-			BufferInformation localBufferInfo;
-			BufferInformation stagingBufferInfo;
+			Buffer::Information localBufferInfo;
 			std::vector<NormalVertex> vertices;
 			std::vector<uint32_t> indices;
 			std::vector<Mesh> scene;
@@ -1374,30 +1372,17 @@ void TransparentApp::_InitVertexInputs()
 			m_gbufferVertBuffers.push_back(Buffer{});
 			m_gbufferIndexBuffers.push_back(Buffer{});
 
-			stagingBufferInfo.size = sizeof(NormalVertex) * vertices.size();
-			stagingBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-			stagingBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-			stagingBuffer.Init(stagingBufferInfo);
-			stagingBuffer.CopyFromHost(vertices.data());
-
 			localBufferInfo.size = sizeof(NormalVertex) * vertices.size();
 			localBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 			localBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 			m_gbufferVertBuffers.back().Init(localBufferInfo);
-			m_gbufferVertBuffers.back().CopyFromBuffer(stagingBuffer);
-
-			stagingBuffer.Uninit();
-			stagingBufferInfo.size = sizeof(uint32_t) * indices.size();
-			stagingBuffer.Init(stagingBufferInfo);
-			stagingBuffer.CopyFromHost(indices.data());
+			m_gbufferVertBuffers.back().CopyFromHost(vertices.data());
 
 			localBufferInfo.size = sizeof(uint32_t) * indices.size();;
 			localBufferInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 			localBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 			m_gbufferIndexBuffers.back().Init(localBufferInfo);
-			m_gbufferIndexBuffers.back().CopyFromBuffer(stagingBuffer);
-
-			stagingBuffer.Uninit();
+			m_gbufferIndexBuffers.back().CopyFromHost(indices.data());
 		}
 	}
 
@@ -1430,9 +1415,7 @@ void TransparentApp::_InitVertexInputs()
 			std::vector<uint32_t> indices{};
 			std::vector<TransparentVertex> vertices{};
 			glm::vec4 color(uniformDist(rnd), uniformDist(rnd), uniformDist(rnd), uniformDist(rnd));
-			BufferInformation localBufferInfo;
-			BufferInformation stagingBufferInfo;
-			Buffer stagingBuffer;
+			Buffer::Information localBufferInfo;
 			// init color
 			{
 				color.x *= color.x;
@@ -1457,30 +1440,17 @@ void TransparentApp::_InitVertexInputs()
 			m_transModelVertBuffers.push_back(Buffer{});
 			m_transModelIndexBuffers.push_back(Buffer{});
 
-			stagingBufferInfo.size = sizeof(TransparentVertex) * vertices.size();
-			stagingBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-			stagingBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-			stagingBuffer.Init(stagingBufferInfo);
-			stagingBuffer.CopyFromHost(vertices.data());
-
 			localBufferInfo.size = sizeof(TransparentVertex) * vertices.size();
 			localBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 			localBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 			m_transModelVertBuffers.back().Init(localBufferInfo);
-			m_transModelVertBuffers.back().CopyFromBuffer(stagingBuffer);
-
-			stagingBuffer.Uninit();
-			stagingBufferInfo.size = sizeof(uint32_t) * indices.size();
-			stagingBuffer.Init(stagingBufferInfo);
-			stagingBuffer.CopyFromHost(indices.data());
+			m_transModelVertBuffers.back().CopyFromHost(vertices.data());
 
 			localBufferInfo.size = sizeof(uint32_t) * indices.size();;
 			localBufferInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 			localBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 			m_transModelIndexBuffers.back().Init(localBufferInfo);
-			m_transModelIndexBuffers.back().CopyFromBuffer(stagingBuffer);
-
-			stagingBuffer.Uninit();
+			m_transModelIndexBuffers.back().CopyFromHost(indices.data());
 		}
 	}
 
@@ -1488,9 +1458,7 @@ void TransparentApp::_InitVertexInputs()
 	{
 		VertexInputEntry location0;
 		VertexInputEntry location1;
-		BufferInformation localBufferInfo;
-		BufferInformation stagingBufferInfo;
-		Buffer stagingBuffer;
+		Buffer::Information localBufferInfo;
 		std::vector<uint32_t> indices = { 2, 1, 0, 0, 3, 2 };
 		std::vector<QuadVertex> vertices = {
 			{{-1.f, -1.f}, {0.0f, 0.0f}},
@@ -1508,30 +1476,17 @@ void TransparentApp::_InitVertexInputs()
 		m_quadVertLayout.stride = sizeof(QuadVertex);
 		m_quadVertLayout.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
-		stagingBufferInfo.size = sizeof(QuadVertex) * vertices.size();
-		stagingBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-		stagingBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-		stagingBuffer.Init(stagingBufferInfo);
-		stagingBuffer.CopyFromHost(vertices.data());
-
 		localBufferInfo.size = sizeof(QuadVertex) * vertices.size();
 		localBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 		localBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		m_quadVertBuffer.Init(localBufferInfo);
-		m_quadVertBuffer.CopyFromBuffer(stagingBuffer);
-
-		stagingBuffer.Uninit();
-		stagingBufferInfo.size = sizeof(uint32_t) * indices.size();
-		stagingBuffer.Init(stagingBufferInfo);
-		stagingBuffer.CopyFromHost(indices.data());
+		m_quadVertBuffer.CopyFromHost(vertices.data());
 
 		localBufferInfo.size = sizeof(uint32_t) * indices.size();;
 		localBufferInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 		localBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		m_quadIndexBuffer.Init(localBufferInfo);
-		m_quadIndexBuffer.CopyFromBuffer(stagingBuffer);
-
-		stagingBuffer.Uninit();
+		m_quadIndexBuffer.CopyFromHost(indices.data());
 	}
 }
 void TransparentApp::_UninitVertexInputs()
@@ -1810,7 +1765,7 @@ void TransparentApp::_DrawFrame()
 	auto imageIndex = MyDevice::GetInstance().AquireAvailableSwapchainImageIndex(m_swapchainImageAvailabilities[m_currentFrame]);
 	if (!imageIndex.has_value()) return;
 	_UpdateUniformBuffer();
-	WaitInformation waitInfo{};
+	CommandSubmission::WaitInformation waitInfo{};
 	waitInfo.waitSamaphore = m_swapchainImageAvailabilities[m_currentFrame];
 	waitInfo.waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	cmd.StartCommands({ waitInfo });
@@ -2114,7 +2069,7 @@ void TransparentApp::_DrawFrame()
 		);
 
 		VkClearColorValue clearColor32Ruint{ .uint32 = {0u} };
-		cmd.FillImageView(&m_oitColorImageViews[m_currentFrame], clearColor32Ruint);
+		m_oitColorImages[m_currentFrame].Fill(clearColor32Ruint, m_oitColorImageViews[m_currentFrame].GetRange(), &cmd);
 
 		// wait clear done
 		VkImageMemoryBarrier oitOutputImageBarrier2 = barrierBuilder.NewBarrier(

@@ -186,6 +186,7 @@ public:
 	void SetMaxRecursion(uint32_t maxRecur);
 
 	void Init();
+
 	void Uninit();
 
 	void Do(VkCommandBuffer commandBuffer, const PipelineInput& input);

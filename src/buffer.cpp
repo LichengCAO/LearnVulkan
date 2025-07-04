@@ -23,7 +23,7 @@ Buffer::~Buffer()
 	assert(m_mappedMemory == nullptr);
 }
 
-void Buffer::Init(BufferInformation info)
+void Buffer::Init(Information info)
 {
 	VkBufferCreateInfo bufferInfo = {
 		.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
@@ -99,7 +99,7 @@ void Buffer::_CopyFromHostWithMappedMemory(const void* src, size_t size)
 
 void Buffer::_CopyFromHostWithStaggingBuffer(const void* src, size_t size)
 {
-	BufferInformation stagBufInfo{};
+	Information stagBufInfo{};
 	Buffer stagBuf{};
 
 	stagBufInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
@@ -172,7 +172,7 @@ void Buffer::Fill(uint32_t _data, CommandSubmission* pCmd)
 	}
 }
 
-BufferInformation Buffer::GetBufferInformation() const
+Buffer::Information Buffer::GetBufferInformation() const
 {
 	return m_bufferInformation;
 }

@@ -48,8 +48,8 @@ void RayTracingApp::_Uninit()
 
 void RayTracingApp::_InitRenderPass()
 {	
-	SubpassInformation subpassInfo{};
-	SubpassInformation attachmentLessSubpassInfo{};
+	Subpass subpassInfo{};
+	Subpass attachmentLessSubpassInfo{};
 	m_scRenderPass = RenderPass{};
 	m_scRenderPass.AddAttachment(AttachmentInformation::GetPresetInformation(AttachmentPreset::GBUFFER_ALBEDO));
 
@@ -116,9 +116,9 @@ void RayTracingApp::_InitBuffers()
 		alignas(8) glm::vec2 pos{};
 		alignas(8) glm::vec2 uv{};
 	};
-	BufferInformation bufferInfo{};
-	BufferInformation quadVertexBufferInfo{};
-	BufferInformation quadIndexBufferInfo{};
+	Buffer::Information bufferInfo{};
+	Buffer::Information quadVertexBufferInfo{};
+	Buffer::Information quadIndexBufferInfo{};
 	std::vector<uint32_t> indices = { 2, 1, 0, 0, 3, 2 };
 	std::vector<QuadVertex> vertices = {
 		{{-1.f, -1.f}, {0.0f, 0.0f}},
