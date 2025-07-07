@@ -105,10 +105,10 @@ public:
 	// return the index of this BLAS in the vector of BLASs this acceleration structure holds
 	uint32_t AddBLAS(const std::vector<TriangleData>& geomData);
 
-	// Set up TLAS after BLASs are all added, TLAS will not be created or be built, we do it in Init
+	// Set up TLAS after all BLASs are added, TLAS will not be created or be built, we do it in Init
 	void SetUpTLAS(const std::vector<InstanceData>& instData);
 	
-	// Build AS after all BLASs are added and TLAS's setup
+	// Build AS after TLAS's setup
 	void Init();
 
 	void Uninit();

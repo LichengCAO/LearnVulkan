@@ -80,10 +80,6 @@ public:
 
 class ComputePipeline
 {
-private:
-	VkPipelineShaderStageCreateInfo m_shaderStageInfo{};
-	std::vector<VkDescriptorSetLayout> m_descriptorSetLayouts;
-
 public:
 	struct PipelineInput
 	{
@@ -94,10 +90,17 @@ public:
 		uint32_t groupCountZ = 1;
 	};
 
+private:
+	VkPipelineShaderStageCreateInfo m_shaderStageInfo{};
+	std::vector<VkDescriptorSetLayout> m_descriptorSetLayouts;
+
 public:
 	VkPipelineLayout vkPipelineLayout = VK_NULL_HANDLE;
 	VkPipeline vkPipeline = VK_NULL_HANDLE;
 
+private:
+
+public:
 	~ComputePipeline();
 
 	void AddShader(const VkPipelineShaderStageCreateInfo& shaderInfo);

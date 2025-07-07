@@ -113,13 +113,13 @@ void TransparentApp::_InitRenderPass()
 	// oit
 	{
 		// TODO: make it attachment less some day
-		AttachmentInformation readOnlyDepthInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::DEPTH);
+		RenderPass::Attachment readOnlyDepthInfo = RenderPass::GetPresetAttachment(RenderPass::AttachmentPreset::DEPTH);
 		readOnlyDepthInfo.attachmentDescription.loadOp = VK_ATTACHMENT_LOAD_OP_LOAD;
 		readOnlyDepthInfo.attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		readOnlyDepthInfo.attachmentDescription.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 		readOnlyDepthInfo.attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 		m_oitRenderPass.AddAttachment(readOnlyDepthInfo);
-		Subpass oitSubpassInfo{};
+		RenderPass::Subpass oitSubpassInfo{};
 		oitSubpassInfo.SetDepthStencilAttachment(0, true);
 		m_oitRenderPass.AddSubpass(oitSubpassInfo);
 		m_oitRenderPass.Init();
@@ -127,7 +127,7 @@ void TransparentApp::_InitRenderPass()
 
 	// distort
 	{
-		AttachmentInformation uvDistortInfo{};
+		RenderPass::Attachment uvDistortInfo{};
 		VkAttachmentDescription info{};
 		VkClearValue clearColor{};
 		info.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
@@ -142,7 +142,7 @@ void TransparentApp::_InitRenderPass()
 		uvDistortInfo.attachmentDescription = info;
 		uvDistortInfo.clearValue = clearColor;
 
-		AttachmentInformation depthInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::DEPTH);
+		RenderPass::Attachment depthInfo = RenderPass::GetPresetAttachment(RenderPass::AttachmentPreset::DEPTH);
 		depthInfo.attachmentDescription.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 		depthInfo.attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 		depthInfo.attachmentDescription.loadOp = VkAttachmentLoadOp::VK_ATTACHMENT_LOAD_OP_LOAD;
@@ -150,7 +150,7 @@ void TransparentApp::_InitRenderPass()
 
 		m_distortRenderPass.AddAttachment(uvDistortInfo);
 		m_distortRenderPass.AddAttachment(depthInfo);
-		Subpass distortSubpassInfo{};
+		RenderPass::Subpass distortSubpassInfo{};
 		distortSubpassInfo.AddColorAttachment(0);
 		distortSubpassInfo.SetDepthStencilAttachment(1, true);
 		m_distortRenderPass.AddSubpass(distortSubpassInfo);
@@ -159,11 +159,11 @@ void TransparentApp::_InitRenderPass()
 
 	// gbuffer
 	{
-		AttachmentInformation albedoInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::GBUFFER_ALBEDO);
-		AttachmentInformation posInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::GBUFFER_POSITION);
-		AttachmentInformation normalInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::GBUFFER_NORMAL);
-		AttachmentInformation gDepthInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::GBUFFER_DEPTH);
-		AttachmentInformation depthInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::DEPTH);
+		RenderPass::Attachment albedoInfo = RenderPass::GetPresetAttachment(RenderPass::AttachmentPreset::GBUFFER_ALBEDO);
+		RenderPass::Attachment posInfo    = RenderPass::GetPresetAttachment(RenderPass::AttachmentPreset::GBUFFER_POSITION);
+		RenderPass::Attachment normalInfo = RenderPass::GetPresetAttachment(RenderPass::AttachmentPreset::GBUFFER_NORMAL);
+		RenderPass::Attachment gDepthInfo = RenderPass::GetPresetAttachment(RenderPass::AttachmentPreset::GBUFFER_DEPTH);
+		RenderPass::Attachment depthInfo  = RenderPass::GetPresetAttachment(RenderPass::AttachmentPreset::DEPTH);
 		depthInfo.attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 		depthInfo.attachmentDescription.storeOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_STORE;
 		m_gbufferRenderPass.AddAttachment(albedoInfo);
@@ -171,7 +171,7 @@ void TransparentApp::_InitRenderPass()
 		m_gbufferRenderPass.AddAttachment(normalInfo);
 		m_gbufferRenderPass.AddAttachment(gDepthInfo);
 		m_gbufferRenderPass.AddAttachment(depthInfo);
-		Subpass gSubpassInfo{};
+		RenderPass::Subpass gSubpassInfo{};
 		gSubpassInfo.AddColorAttachment(0);
 		gSubpassInfo.AddColorAttachment(1);
 		gSubpassInfo.AddColorAttachment(2);
@@ -183,9 +183,9 @@ void TransparentApp::_InitRenderPass()
 
 	// light pass
 	{
-		AttachmentInformation lightInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::GBUFFER_ALBEDO);
+		RenderPass::Attachment lightInfo = RenderPass::GetPresetAttachment(RenderPass::AttachmentPreset::GBUFFER_ALBEDO);
 		m_lightRenderPass.AddAttachment(lightInfo);
-		Subpass subpassInfo{};
+		RenderPass::Subpass subpassInfo{};
 		subpassInfo.AddColorAttachment(0);
 		m_lightRenderPass.AddSubpass(subpassInfo);
 		m_lightRenderPass.Init();
@@ -193,9 +193,9 @@ void TransparentApp::_InitRenderPass()
 
 	// final present
 	{
-		AttachmentInformation swapchainInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::SWAPCHAIN);
+		RenderPass::Attachment swapchainInfo = RenderPass::GetPresetAttachment(RenderPass::AttachmentPreset::SWAPCHAIN);
 		m_renderPass.AddAttachment(swapchainInfo);
-		Subpass subpassInfo{};
+		RenderPass::Subpass subpassInfo{};
 		subpassInfo.AddColorAttachment(0);
 		m_renderPass.AddSubpass(subpassInfo);
 		m_renderPass.Init();

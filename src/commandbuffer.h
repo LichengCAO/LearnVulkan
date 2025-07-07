@@ -23,6 +23,7 @@ public:
 	void SetAspect(VkImageAspectFlags aspectMask);
 	VkImageMemoryBarrier NewBarrier(VkImage _image, VkImageLayout _oldLayout, VkImageLayout _newLayout, VkAccessFlags _srcAccessMask, VkAccessFlags _dstAccessMask) const;
 };
+
 class ImageBlitBuilder
 {
 private:

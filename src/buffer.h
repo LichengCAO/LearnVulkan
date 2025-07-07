@@ -19,8 +19,15 @@ private:
 	Information m_bufferInformation{};
 	void* m_mappedMemory = nullptr; // we store this value, since mapping is not free
 
+public:
+	VkBuffer	   vkBuffer = VK_NULL_HANDLE;
+	VkDeviceMemory vkDeviceMemory = VK_NULL_HANDLE;
+
+private:
 	uint32_t _FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const;
+	
 	void _AllocateMemory();
+	
 	void _FreeMemory();
 
 	// Check if this buffer is host coherent
@@ -33,10 +40,9 @@ private:
 
 public:
 	~Buffer();
-	VkBuffer	   vkBuffer = VK_NULL_HANDLE;
-	VkDeviceMemory vkDeviceMemory = VK_NULL_HANDLE;
 
 	void Init(Information bufferInfo);
+	
 	void Uninit();
 
 	// Copy from host, will use stagging buffer if necessary, use buffer's size as length
@@ -54,7 +60,7 @@ public:
 	// if command buffer is provided, then when does this command finish depends on user
 	void Fill(uint32_t _data, CommandSubmission* pCmd = nullptr);
 
-	Information GetBufferInformation() const;
+	const Information& GetBufferInformation() const;
 	
 	VkDeviceAddress GetDeviceAddress() const;
 
@@ -69,6 +75,10 @@ private:
 public:
 	const Buffer* pBuffer = nullptr;
 	VkBufferView vkBufferView = VK_NULL_HANDLE;
+
+private:
+
+public:
 	~BufferView();
 	void Init();
 	void Uninit();

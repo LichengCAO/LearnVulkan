@@ -172,7 +172,7 @@ void Buffer::Fill(uint32_t _data, CommandSubmission* pCmd)
 	}
 }
 
-Buffer::Information Buffer::GetBufferInformation() const
+const Buffer::Information& Buffer::GetBufferInformation() const
 {
 	return m_bufferInformation;
 }

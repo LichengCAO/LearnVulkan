@@ -47,7 +47,6 @@ void MeshletApp::_Uninit()
 	}
 	
 	_UninitPipelines();
-	//_UninitVertexInputs();
 	_UninitDescriptorSets();
 
 	_UninitFramebuffers();
@@ -65,12 +64,10 @@ void MeshletApp::_InitRenderPass()
 {
 	m_renderPass = RenderPass();
 
-	AttachmentInformation swapchainInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::SWAPCHAIN);
-	AttachmentInformation depthInfo = AttachmentInformation::GetPresetInformation(AttachmentPreset::DEPTH);
-	m_renderPass.AddAttachment(swapchainInfo);
-	m_renderPass.AddAttachment(depthInfo);
+	m_renderPass.AddAttachment(RenderPass::AttachmentPreset::SWAPCHAIN);
+	m_renderPass.AddAttachment(RenderPass::AttachmentPreset::DEPTH);
 
-	Subpass subpassInfo{};
+	RenderPass::Subpass subpassInfo{};
 	subpassInfo.AddColorAttachment(0);
 	subpassInfo.SetDepthStencilAttachment(1);
 	

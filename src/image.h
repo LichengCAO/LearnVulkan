@@ -40,9 +40,10 @@ public:
 	friend class Image;
 };
 
-// vkCreateRenderPass vkMapMemory vkQueuePresentKHR vkQueueSubmit vkCmdCopyImage vkCmdCopyImageToBuffer vkCmdWaitEvents VkCmdPipelineBarrier
 class ImageLayout
 {
+// commands that will change image layout:
+//	vkCreateRenderPass vkMapMemory vkQueuePresentKHR vkQueueSubmit vkCmdCopyImage vkCmdCopyImageToBuffer vkCmdWaitEvents VkCmdPipelineBarrier
 private:
 	class ImageLayoutEntry
 	{

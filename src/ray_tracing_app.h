@@ -43,32 +43,33 @@ private:
 
 	std::vector<Model> m_models;
 
+	// Descriptor set count: MAX_FRAME_COUNT
+	DescriptorSetLayout m_rtDSetLayout;
+	std::vector<std::unique_ptr<DescriptorSet>> m_rtDSets;
+
+	// Descriptor set count: number of swap chains
+	DescriptorSetLayout m_scDSetLayout; // descriptor set to store result images for pass through shader
+	std::vector<std::unique_ptr<DescriptorSet>> m_scDSets;
+
 	// cameraUBO changes across frames, i create buffers for each frame
-	DescriptorSetLayout m_cameraDSetLayout;
-	std::vector<std::unique_ptr<DescriptorSet>> m_cameraDSets;
 	std::vector<std::unique_ptr<Buffer>>        m_cameraBuffers;
 
-	// following buffers can be used cross frames, so i just create one buffer for one mesh instead of multiple buffers for each frame
-	DescriptorSetLayout m_modelDSetLayout;
-	std::unique_ptr<DescriptorSet> m_ASDSet;
+	// following buffers can be used cross frames, 
+	// so i just create one buffer for one mesh instead of multiple buffers for each frame
+	RayTracingAccelerationStructure m_rayTracingAS;
+	std::unique_ptr<Buffer> m_instanceBuffer;
 	std::vector<std::unique_ptr<Buffer>> m_vertexBuffers;
 	std::vector<std::unique_ptr<Buffer>> m_indexBuffers;
-	RayTracingAccelerationStructure m_rayTracingAS;
-
-	// descriptor sets to write to swapchain images
-	DescriptorSetLayout m_swapchainImageDSetLayout;
-	std::vector<std::unique_ptr<DescriptorSet>> m_swapchainImageDSets;
-	std::unique_ptr<Buffer> m_quadVertexBuffer;
-	std::unique_ptr<Buffer> m_quadIndexBuffer;
 
 	// Samplers
 	VkSampler m_vkSampler = VK_NULL_HANDLE;
 
 	// Render passes
-	RenderPass m_rtRenderPass; // store the result of ray tracing and then present it to swap chain images
+	RenderPass m_scRenderPass; // draw result to swapchain for presentation
+
+	// images
 	std::vector<Image> m_rtImages;
 	std::vector<std::unique_ptr<ImageView>> m_rtImageViews;
-	RenderPass m_scRenderPass; // draw result to swapchain for presentation
 	std::vector<Image> m_scImages;
 	std::vector<std::unique_ptr<ImageView>> m_scImageViews;
 	std::vector<std::unique_ptr<Framebuffer>> m_scFramebuffers;
@@ -79,6 +80,8 @@ private:
 
 	// semaphores
 	std::vector<VkSemaphore>  m_swapchainImageAvailabilities;
+
+	// command buffers
 	std::vector<std::unique_ptr<CommandSubmission>> m_commandSubmissions;
 
 private:
