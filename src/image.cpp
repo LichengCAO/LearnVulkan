@@ -29,7 +29,7 @@ Image::~Image()
 	assert(vkDeviceMemory == VK_NULL_HANDLE);
 }
 
-void Image::SetImageInformation(Information& imageInfo)
+void Image::SetImageInformation(const Information& imageInfo)
 {
 	CHECK_TRUE(vkImage == VK_NULL_HANDLE, "Image is already initialized!");
 	m_imageInformation = imageInfo;
@@ -128,11 +128,12 @@ void Image::TransitionLayout(VkImageLayout newLayout)
 	VkImageLayout oldLayout = _GetImageLayout();
 	if (oldLayout == newLayout) return;
 	CommandSubmission cmdSubmit;
-	cmdSubmit.Init();
-	cmdSubmit.StartOneTimeCommands({});
 	ImageBarrierBuilder barrierBuilder{};
 	VkImageMemoryBarrier barrier{};
 	VkAccessFlags aspect = VK_IMAGE_ASPECT_NONE;
+
+	cmdSubmit.Init();
+	cmdSubmit.StartOneTimeCommands({});
 
 	if (newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) 
 	{
@@ -162,7 +163,6 @@ void Image::TransitionLayout(VkImageLayout newLayout)
 	);
 
 	cmdSubmit.SubmitCommands();
-	//m_imageInformation.initialLayout = newLayout;
 }
 
 void Image::CopyFromBuffer(const Buffer& stagingBuffer)

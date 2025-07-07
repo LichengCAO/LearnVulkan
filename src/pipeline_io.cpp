@@ -161,9 +161,19 @@ void DescriptorSetLayout::Uninit()
 	bindings.clear();
 }
 
-void VertexInputLayout::AddLocation(const VertexInputEntry& _location)
+uint32_t VertexInputLayout::AddLocation(VkFormat _format, uint32_t _offset)
 {
-	locations.push_back(_location);
+	VkVertexInputAttributeDescription attr{};
+	uint32_t ret = static_cast<uint32_t>(m_locations.size());
+
+	attr.binding = ~0; // unset
+	attr.format = _format;
+	attr.offset = _offset;
+	attr.location = ret;
+
+	m_locations.push_back(attr);
+
+	return ret;
 }
 VkVertexInputBindingDescription VertexInputLayout::GetVertexInputBindingDescription(uint32_t _binding) const
 {
@@ -175,15 +185,10 @@ VkVertexInputBindingDescription VertexInputLayout::GetVertexInputBindingDescript
 }
 std::vector<VkVertexInputAttributeDescription> VertexInputLayout::GetVertexInputAttributeDescriptions(uint32_t _binding) const
 {
-	std::vector<VkVertexInputAttributeDescription> ret;
-	for (int i = 0; i < locations.size(); ++i)
+	std::vector<VkVertexInputAttributeDescription> ret = m_locations;
+	for (int i = 0; i < ret.size(); ++i)
 	{
-		VkVertexInputAttributeDescription attr{};
-		attr.binding = _binding;
-		attr.location = static_cast<uint32_t>(i);
-		attr.format = locations[i].format;
-		attr.offset = locations[i].offset;
-		ret.push_back(attr);
+		ret[i].binding = _binding;
 	}
 	return ret;
 }

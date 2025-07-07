@@ -142,7 +142,9 @@ public:
 
 	void WriteAccelerationStructuresProperties(
 		const std::vector<VkAccelerationStructureKHR>& vkAccelerationStructs,
-		VkQueryType queryType, VkQueryPool queryPool, uint32_t firstQuery) const;
+		VkQueryType queryType,
+		VkQueryPool queryPool,
+		uint32_t firstQuery) const;
 
 	void CopyAccelerationStructure(const VkCopyAccelerationStructureInfoKHR& copyInfo) const;
 

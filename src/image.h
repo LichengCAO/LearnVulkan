@@ -92,21 +92,26 @@ public:
 private:
 	bool m_initCalled = false;
 	Information m_imageInformation{};
+
+public:
+	VkImage vkImage = VK_NULL_HANDLE;
+	VkDeviceMemory vkDeviceMemory = VK_NULL_HANDLE;
+
+private:
 	uint32_t _FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const;
 	void _AllocateMemory();
 	void _FreeMemory();
 	void _AddImageLayout() const;
 	void _RemoveImageLayout() const;
 	VkImageLayout _GetImageLayout() const;
-
+	
 public:
 	~Image();
-	VkImage vkImage = VK_NULL_HANDLE;
-	VkDeviceMemory vkDeviceMemory = VK_NULL_HANDLE;
-	
-	void SetImageInformation(Information& imageInfo);
+
+	void SetImageInformation(const Information& imageInfo);
 
 	void Init();
+
 	void Uninit();
 	
 	void TransitionLayout(VkImageLayout newLayout);
@@ -117,6 +122,7 @@ public:
 	// if pCmd is nullptr, it will create a command buffer and wait till this action done,
 	// else, it will record the command in the command buffer, and user need to manage the synchronization
 	void Fill(const VkClearColorValue& clearColor, const VkImageSubresourceRange& range, CommandSubmission* pCmd = nullptr);
+	
 	// Fill range with clear color,
 	// if pCmd is nullptr, it will create a command buffer and wait till this action done,
 	// else, it will record the command in the command buffer, and user need to manage the synchronization

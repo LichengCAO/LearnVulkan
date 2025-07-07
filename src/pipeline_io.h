@@ -100,19 +100,19 @@ public:
 	void Uninit();
 };
 
-// Pipeline can have multiple VertexLayouts, when execute the pipeline we need to provide VertexInputs for each of the VertexLayout
-struct VertexInputEntry // location
-{
-	VkFormat format = VK_FORMAT_R32_SFLOAT;
-	uint32_t offset = 0;
-};
+// Pipeline can have multiple VertexLayouts, 
+// when execute the pipeline we need to provide VertexInputs for each of the VertexLayout
 class VertexInputLayout
 {
+private:
+	std::vector<VkVertexInputAttributeDescription> m_locations;
+
 public:
 	uint32_t stride = 0;
 	VkVertexInputRate inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
-	std::vector<VertexInputEntry> locations;
-	void AddLocation(const VertexInputEntry& _location);
+
+public:
+	uint32_t AddLocation(VkFormat _format, uint32_t _offset);
 	VkVertexInputBindingDescription					GetVertexInputBindingDescription(uint32_t _binding = 0) const;
 	std::vector<VkVertexInputAttributeDescription>	GetVertexInputAttributeDescriptions(uint32_t _binding = 0) const;
 };

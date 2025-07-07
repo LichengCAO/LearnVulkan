@@ -1326,22 +1326,11 @@ void TransparentApp::_InitVertexInputs()
 	};
 	// Setup model vertex input layout
 	{
-		VertexInputEntry location0;
-		VertexInputEntry location1;
-		VertexInputEntry location2;
-
-		location0.format = VkFormat::VK_FORMAT_R32G32B32_SFLOAT;
-		location0.offset = offsetof(NormalVertex, position);
-		location1.format = VkFormat::VK_FORMAT_R32G32B32_SFLOAT;
-		location1.offset = offsetof(NormalVertex, normal);
-		location2.format = VkFormat::VK_FORMAT_R32G32_SFLOAT;
-		location2.offset = offsetof(NormalVertex, uv);
-
-		m_gbufferVertLayout.AddLocation(location0);
-		m_gbufferVertLayout.AddLocation(location1);
-		m_gbufferVertLayout.AddLocation(location2);
+		m_gbufferVertLayout.AddLocation(VK_FORMAT_R32G32B32_SFLOAT, offsetof(NormalVertex, position));
+		m_gbufferVertLayout.AddLocation(VK_FORMAT_R32G32B32_SFLOAT, offsetof(NormalVertex, normal));
+		m_gbufferVertLayout.AddLocation(VK_FORMAT_R32G32_SFLOAT, offsetof(NormalVertex, uv));
 		m_gbufferVertLayout.stride = sizeof(NormalVertex);
-		m_gbufferVertLayout.inputRate = VkVertexInputRate::VK_VERTEX_INPUT_RATE_VERTEX;
+		m_gbufferVertLayout.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
 		// Load models
 		m_gbufferVertBuffers.reserve(m_models.size());
@@ -1389,20 +1378,10 @@ void TransparentApp::_InitVertexInputs()
 	{
 		std::uniform_real_distribution<float> uniformDist;
 		std::default_random_engine            rnd(3625);  // Fixed seed
-		VertexInputEntry location0;
-		VertexInputEntry location1;
-		VertexInputEntry location2;
 
-		location0.format = VK_FORMAT_R32G32B32_SFLOAT;
-		location0.offset = offsetof(TransparentVertex, pos);
-		location1.format = VK_FORMAT_R32G32B32_SFLOAT;
-		location1.offset = offsetof(TransparentVertex, normal);
-		location2.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-		location2.offset = offsetof(TransparentVertex, color);
-
-		m_transModelVertLayout.AddLocation(location0);
-		m_transModelVertLayout.AddLocation(location1);
-		m_transModelVertLayout.AddLocation(location2);
+		m_transModelVertLayout.AddLocation(VK_FORMAT_R32G32B32_SFLOAT, offsetof(TransparentVertex, pos));
+		m_transModelVertLayout.AddLocation(VK_FORMAT_R32G32B32_SFLOAT, offsetof(TransparentVertex, normal));
+		m_transModelVertLayout.AddLocation(VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(TransparentVertex, color));
 		m_transModelVertLayout.stride = sizeof(TransparentVertex);
 		m_transModelVertLayout.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 
@@ -1456,8 +1435,6 @@ void TransparentApp::_InitVertexInputs()
 
 	// setup postprocess vertex input layout
 	{
-		VertexInputEntry location0;
-		VertexInputEntry location1;
 		Buffer::Information localBufferInfo;
 		std::vector<uint32_t> indices = { 2, 1, 0, 0, 3, 2 };
 		std::vector<QuadVertex> vertices = {
@@ -1467,12 +1444,8 @@ void TransparentApp::_InitVertexInputs()
 			{{-1.f,  1.f}, {0.0f, 1.0f}}
 		};
 
-		location0.format = VK_FORMAT_R32G32_SFLOAT;
-		location0.offset = offsetof(QuadVertex, pos);
-		location1.format = VK_FORMAT_R32G32_SFLOAT;
-		location1.offset = offsetof(QuadVertex, uv);
-		m_quadVertLayout.AddLocation(location0);
-		m_quadVertLayout.AddLocation(location1);
+		m_quadVertLayout.AddLocation(VK_FORMAT_R32G32_SFLOAT, offsetof(QuadVertex, pos));
+		m_quadVertLayout.AddLocation(VK_FORMAT_R32G32_SFLOAT, offsetof(QuadVertex, uv));
 		m_quadVertLayout.stride = sizeof(QuadVertex);
 		m_quadVertLayout.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
 

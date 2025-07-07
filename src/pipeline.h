@@ -5,21 +5,6 @@
 
 class GraphicsPipeline
 {
-private:
-	std::vector<VkPipelineShaderStageCreateInfo> m_shaderStageInfos;
-	std::vector<VkVertexInputBindingDescription> m_vertBindingDescriptions;
-	std::vector<VkVertexInputAttributeDescription> m_vertAttributeDescriptions;
-	std::vector<VkDynamicState> m_dynamicStates;
-	VkPipelineViewportStateCreateInfo m_viewportStateInfo{};
-	std::vector<VkPipelineColorBlendAttachmentState> m_colorBlendAttachmentStates;
-	VkPipelineColorBlendStateCreateInfo m_colorBlendStateInfo{};
-	std::vector<VkDescriptorSetLayout> m_descriptorSetLayouts;
-	VkPipelineDepthStencilStateCreateInfo m_depthStencilInfo{};
-	const RenderPass* m_pRenderPass = nullptr;
-	uint32_t m_subpass = 0;
-	void _InitCreateInfos();
-	void _DoCommon(VkCommandBuffer cmd, const VkExtent2D& imageSize, const std::vector<const DescriptorSet*>& pSets);
-
 public:
 	// For pipelines that don't bind vertex buffers, e.g. pass through
 	struct PipelineInput_Draw
@@ -51,13 +36,31 @@ public:
 		uint32_t groupCountZ = 1;
 	};
 
+private:
+	std::vector<VkPipelineShaderStageCreateInfo> m_shaderStageInfos;
+	std::vector<VkVertexInputBindingDescription> m_vertBindingDescriptions;
+	std::vector<VkVertexInputAttributeDescription> m_vertAttributeDescriptions;
+	std::vector<VkDynamicState> m_dynamicStates;
+	VkPipelineViewportStateCreateInfo m_viewportStateInfo{};
+	std::vector<VkPipelineColorBlendAttachmentState> m_colorBlendAttachmentStates;
+	VkPipelineColorBlendStateCreateInfo m_colorBlendStateInfo{};
+	std::vector<VkDescriptorSetLayout> m_descriptorSetLayouts;
+	VkPipelineDepthStencilStateCreateInfo m_depthStencilInfo{};
+	const RenderPass* m_pRenderPass = nullptr;
+	uint32_t m_subpass = 0;
+
 public:
 	VkPipelineLayout vkPipelineLayout = VK_NULL_HANDLE;
 	VkPipeline vkPipeline = VK_NULL_HANDLE;
 	VkPipelineInputAssemblyStateCreateInfo inputAssemblyStateInfo{};
 	VkPipelineRasterizationStateCreateInfo rasterizerStateInfo{};
 	VkPipelineMultisampleStateCreateInfo multisampleStateInfo{};
-	
+
+private:
+	void _InitCreateInfos();
+	void _DoCommon(VkCommandBuffer cmd, const VkExtent2D& imageSize, const std::vector<const DescriptorSet*>& pSets);
+
+public:
 	GraphicsPipeline();
 	~GraphicsPipeline();
 
@@ -139,13 +142,6 @@ private:
 		VkStridedDeviceAddressRegionKHR vkCallRegion{};
 	};
 
-private:
-	std::vector<VkPipelineShaderStageCreateInfo> m_shaderStageInfos;
-	std::vector<VkRayTracingShaderGroupCreateInfoKHR> m_shaderRecords;
-	std::vector<VkDescriptorSetLayout> m_descriptorSetLayouts;
-	ShaderBindingTable m_SBT{};
-	uint32_t m_maxRayRecursionDepth = 1u;
-
 public:
 	struct PipelineInput
 	{
@@ -156,14 +152,23 @@ public:
 		uint32_t uDepth = 1u;
 	};
 
+private:
+	std::vector<VkPipelineShaderStageCreateInfo> m_shaderStageInfos;
+	std::vector<VkRayTracingShaderGroupCreateInfoKHR> m_shaderRecords;
+	std::vector<VkDescriptorSetLayout> m_descriptorSetLayouts;
+	ShaderBindingTable m_SBT{};
+	uint32_t m_maxRayRecursionDepth = 1u;
+
 public:
 	VkPipelineLayout vkPipelineLayout = VK_NULL_HANDLE;
 	VkPipeline vkPipeline = VK_NULL_HANDLE;
 
+public:
 	RayTracingPipeline();
 	~RayTracingPipeline();
 
 	uint32_t AddShader(const VkPipelineShaderStageCreateInfo& shaderInfo);
+	
 	void AddDescriptorSetLayout(VkDescriptorSetLayout vkDSetLayout);
 
 	// https://www.willusher.io/graphics/2019/11/20/the-sbt-three-ways/
