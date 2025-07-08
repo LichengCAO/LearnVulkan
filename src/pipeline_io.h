@@ -30,7 +30,7 @@ public:
 class DescriptorSet
 {
 private:
-	enum class DescriptorType {BUFFER, IMAGE, TEXEL_BUFFER};
+	enum class DescriptorType { BUFFER, IMAGE, TEXEL_BUFFER, ACCELERATION_STRUCTURE };
 	struct DescriptorSetUpdate
 	{
 		uint32_t        binding = 0;
@@ -39,6 +39,7 @@ private:
 		std::vector<VkDescriptorBufferInfo> bufferInfos;
 		std::vector<VkDescriptorImageInfo>  imageInfos;
 		std::vector<VkBufferView>           bufferViews;
+		std::vector<VkAccelerationStructureKHR> accelerationStructures;
 	};
 
 private:
@@ -61,6 +62,7 @@ public:
 	void UpdateBinding(uint32_t bindingId, const VkDescriptorImageInfo& dImageInfo);
 	void UpdateBinding(uint32_t bindingId, const BufferView* bufferView);
 	void UpdateBinding(uint32_t bindingId, const std::vector<VkDescriptorBufferInfo>& bufferInfos);
+	void UpdateBinding(uint32_t bindingId, const std::vector<VkAccelerationStructureKHR>& _accelStructs);
 	void FinishUpdate();
 };
 class DescriptorAllocator

@@ -67,9 +67,18 @@ void DescriptorSet::UpdateBinding(uint32_t bindingId, const std::vector<VkDescri
 	newUpdate.descriptorType = DescriptorType::BUFFER;
 	m_updates.push_back(newUpdate);
 }
+void DescriptorSet::UpdateBinding(uint32_t bindingId, const std::vector<VkAccelerationStructureKHR>& _accelStructs)
+{
+	DescriptorSetUpdate newUpdate{};
+	newUpdate.binding = bindingId;
+	newUpdate.accelerationStructures = _accelStructs;
+	newUpdate.descriptorType = DescriptorType::ACCELERATION_STRUCTURE;
+	m_updates.push_back(newUpdate);
+}
 void DescriptorSet::FinishUpdate()
 {
 	std::vector<VkWriteDescriptorSet> writes;
+	std::vector<std::unique_ptr<VkWriteDescriptorSetAccelerationStructureKHR>> uptrASwrites;
 	CHECK_TRUE(m_pLayout != nullptr, "Layout is not initialized!");
 	for (auto& eUpdate : m_updates)
 	{
@@ -98,6 +107,18 @@ void DescriptorSet::FinishUpdate()
 		{
 			wds.descriptorCount = static_cast<uint32_t>(eUpdate.bufferViews.size());
 			wds.pTexelBufferView = eUpdate.bufferViews.data();
+			break;
+		}
+		case DescriptorType::ACCELERATION_STRUCTURE:
+		{
+			std::unique_ptr<VkWriteDescriptorSetAccelerationStructureKHR> uptrASInfo = std::make_unique<VkWriteDescriptorSetAccelerationStructureKHR>();
+			uptrASInfo->sType = VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET_ACCELERATION_STRUCTURE_KHR;
+			uptrASInfo->accelerationStructureCount = static_cast<uint32_t>(eUpdate.accelerationStructures.size());
+			uptrASInfo->pAccelerationStructures = eUpdate.accelerationStructures.data();
+			uptrASInfo->pNext = nullptr;
+
+			wds.pNext = uptrASInfo.get();
+			uptrASwrites.push_back(std::move(uptrASInfo));
 			break;
 		}
 		default:

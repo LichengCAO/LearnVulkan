@@ -4,6 +4,14 @@
 
 class RayTracingAccelerationStructure
 {
+	// A TLAS has multiple Instances,
+	// each Instance refers to ONE BLAS,
+	// different instances can refer to the same BLAS,
+	// we can use gl_InstanceCustomIndexEXT to refer them in shaders.
+	// Normally each BLAS only holds one Model,
+	// and we can use gl_PrimitiveID to get triangle hit of that model,
+	// but one BLAS holding multiple models is also allowed, 
+	// in that case, gl_PrimitiveID will be the offset plus the triangle ID in the hit model
 private:
 	struct TLASInput
 	{

@@ -1,11 +1,9 @@
 #include "ray_tracing_app.h"
-
+#include "swapchain_pass.h"
 #define MAX_FRAME_COUNT 3
 
 void RayTracingApp::_Init()
 {
-	_InitRenderPass();
-
 	_InitDescriptorSetLayouts();
 
 	_InitSampler();
@@ -17,7 +15,7 @@ void RayTracingApp::_Init()
 
 	_InitImagesAndViews();
 
-	_InitFramebuffers();
+	_InitSwapchainPass();
 
 	_InitDescriptorSets();
 
@@ -26,47 +24,22 @@ void RayTracingApp::_Init()
 
 void RayTracingApp::_Uninit()
 {
-	_UninitRenderPass();
-
-	_UninitDescriptorSetLayouts();
-
-	_UninitSampler();
-
-	_UninitAS();
-	
-	m_models.clear();
-	_UninitBuffers();
-
-	_UninitImagesAndViews();
-
-	_UninitFramebuffers();
+	_UninitPipelines();
 
 	_UninitDescriptorSets();
 
-	_UninitPipelines();
-}
+	_UninitSwapchainPass();
 
-void RayTracingApp::_InitRenderPass()
-{	
-	RenderPass::Subpass subpassInfo{};
-	RenderPass::Subpass attachmentLessSubpassInfo{};
-	m_scRenderPass = RenderPass{};
-	m_scRenderPass.AddAttachment(RenderPass::AttachmentPreset::GBUFFER_ALBEDO);
+	_UninitImagesAndViews();
 
-	subpassInfo.AddColorAttachment(0u);
-	m_scRenderPass.AddSubpass(subpassInfo);
+	_UninitAS();
 
-	m_scRenderPass.Init();
+	_UninitBuffers();
+	m_models.clear();
 
-	m_rtRenderPass = RenderPass{};
-	m_rtRenderPass.AddSubpass(attachmentLessSubpassInfo);
-	m_rtRenderPass.Init();
-}
+	_UninitSampler();
 
-void RayTracingApp::_UninitRenderPass()
-{
-	m_rtRenderPass.Uninit();
-	m_scRenderPass.Uninit();
+	_UninitDescriptorSetLayouts();
 }
 
 void RayTracingApp::_InitDescriptorSetLayouts()
@@ -76,14 +49,10 @@ void RayTracingApp::_InitDescriptorSetLayouts()
 	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_RAYGEN_BIT_KHR); // image output
 	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR); // instance data
 	m_rtDSetLayout.Init();
-
-	m_scDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-	m_scDSetLayout.Init();
 }
 
 void RayTracingApp::_UninitDescriptorSetLayouts()
 {
-	m_scDSetLayout.Uninit();
 	m_rtDSetLayout.Uninit();
 }
 
@@ -111,42 +80,92 @@ void RayTracingApp::_InitModels()
 
 void RayTracingApp::_InitBuffers()
 {
-	Buffer::Information bufferInfo{};
-
-	bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-	bufferInfo.usage = 
-		VK_BUFFER_USAGE_TRANSFER_DST_BIT
-		| VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
-		| VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR
-		| VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-
-	for (auto const& model : m_models)
+	// vertex, index buffers
 	{
-		std::unique_ptr<Buffer> uptrVertexBuffer = std::make_unique<Buffer>();
-		std::unique_ptr<Buffer> uptrIndexBuffer = std::make_unique<Buffer>();
-		std::vector<VBO> vertData{};
+		Buffer::Information vertBufferInfo{};
 
-		vertData.reserve(model.mesh.verts.size());
-		for (auto const& vert : model.mesh.verts)
+		vertBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		vertBufferInfo.usage =
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT
+			| VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+			| VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR
+			| VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+
+		for (auto const& model : m_models)
 		{
-			VBO curData{};
-			curData.pos = vert.position;
-			CHECK_TRUE(vert.normal.has_value(), "We need a normal here!");
-			curData.normal = vert.normal.value();
-			vertData.push_back(curData);
+			std::unique_ptr<Buffer> uptrVertexBuffer = std::make_unique<Buffer>();
+			std::unique_ptr<Buffer> uptrIndexBuffer = std::make_unique<Buffer>();
+			std::vector<VBO> vertData{};
+
+			vertData.reserve(model.mesh.verts.size());
+			for (auto const& vert : model.mesh.verts)
+			{
+				VBO curData{};
+				curData.pos = vert.position;
+				CHECK_TRUE(vert.normal.has_value(), "We need a normal here!");
+				curData.normal = vert.normal.value();
+				vertData.push_back(curData);
+			}
+
+			vertBufferInfo.size = vertData.size() * sizeof(VBO);
+			uptrVertexBuffer->Init(vertBufferInfo);
+
+			vertBufferInfo.size = model.mesh.indices.size() * sizeof(uint32_t);
+			uptrIndexBuffer->Init(vertBufferInfo);
+
+			uptrVertexBuffer->CopyFromHost(vertData.data());
+			uptrIndexBuffer->CopyFromHost(model.mesh.indices.data());
+
+			m_vertexBuffers.push_back(std::move(uptrVertexBuffer));
+			m_indexBuffers.push_back(std::move(uptrIndexBuffer));
+		}
+	}
+
+	// Instance buffer
+	{
+		Buffer::Information instBufferInfo{};
+		std::vector<InstanceInformation> instInfos{};
+		int n = m_models.size();
+
+		instInfos.reserve(n);
+		for (int i = 0; i < n; ++i)
+		{
+			InstanceInformation instInfo{};
+			
+			instInfo.vertexBuffer = m_vertexBuffers[i]->GetDeviceAddress();
+			instInfo.indexBuffer = m_indexBuffers[i]->GetDeviceAddress();
+			
+			instInfos.push_back(instInfo);
 		}
 
-		bufferInfo.size = vertData.size() * sizeof(VBO);
-		uptrVertexBuffer->Init(bufferInfo);
+		instBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		instBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+		instBufferInfo.size = instInfos.size() * sizeof(InstanceInformation);
 
-		bufferInfo.size = model.mesh.indices.size() * sizeof(uint32_t);
-		uptrIndexBuffer->Init(bufferInfo);
+		m_instanceBuffer = std::make_unique<Buffer>();
+		m_instanceBuffer->Init(instBufferInfo);
 
-		uptrVertexBuffer->CopyFromHost(vertData.data());
-		uptrIndexBuffer->CopyFromHost(model.mesh.indices.data());
+		m_instanceBuffer->CopyFromHost(instInfos.data());
+	}
 
-		m_vertexBuffers.push_back(std::move(uptrVertexBuffer));
-		m_indexBuffers.push_back(std::move(uptrIndexBuffer));
+	// Camera buffer
+	{
+		Buffer::Information cameraBufferInfo{};
+
+		cameraBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+		cameraBufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+		cameraBufferInfo.size = sizeof(CameraUBO);
+
+		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+		{
+			std::unique_ptr<Buffer> uptrCamera = std::make_unique<Buffer>();
+			
+			uptrCamera->Init(cameraBufferInfo);
+
+			// the buffer is update every frame, so I don't write to it here
+
+			m_cameraBuffers.push_back(std::move(uptrCamera));
+		}
 	}
 }
 
@@ -162,6 +181,14 @@ void RayTracingApp::_UninitBuffers()
 		uptrBuffer->Uninit();
 	}
 	m_indexBuffers.clear();
+
+	m_instanceBuffer->Uninit();
+
+	for (auto& uptrBuffer : m_cameraBuffers)
+	{
+		uptrBuffer->Uninit();
+	}
+	m_cameraBuffers.clear();
 }
 
 void RayTracingApp::_InitAS()
@@ -185,34 +212,29 @@ void RayTracingApp::_InitAS()
 		trigData.uVertexStride = sizeof(VBO);
 		trigData.vkDeviceAddressVertex = uptrVertexBuffer->GetDeviceAddress();
 
-		instData.uBLASIndex = m_rayTracingAS.AddBLAS({ trigData });
+		instData.uBLASIndex = m_rtAccelStruct.AddBLAS({ trigData });
 		instData.transformMatrix = model.transform.GetModelMatrix();
 
 		instDatas.push_back(instData);
 	}
 
-	m_rayTracingAS.SetUpTLAS(instDatas);
-	m_rayTracingAS.Init();
+	m_rtAccelStruct.SetUpTLAS(instDatas);
+	m_rtAccelStruct.Init();
 }
 
 void RayTracingApp::_UninitAS()
 {
-	m_rayTracingAS.Uninit();
+	m_rtAccelStruct.Uninit();
 }
 
 void RayTracingApp::_InitImagesAndViews()
 {
-	m_scImages = MyDevice::GetInstance().GetSwapchainImages();
-	for (auto const& img : m_scImages)
-	{
-		m_scImageViews.push_back(std::make_unique<ImageView>(img.NewImageView()));
-	}
-
 	m_rtImages.clear();
 	m_rtImages.reserve(MAX_FRAME_COUNT);
 	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 	{
-		Image rtImage{};
+		std::unique_ptr<Image> rtImage = std::make_unique<Image>();
+		std::unique_ptr<ImageView> rtView{};
 		Image::Information imgInfo{};
 
 		imgInfo.arrayLayers = 1u;
@@ -228,21 +250,13 @@ void RayTracingApp::_InitImagesAndViews()
 		imgInfo.width = MyDevice::GetInstance().GetSwapchainExtent().width;
 		imgInfo.height = MyDevice::GetInstance().GetSwapchainExtent().height;
 
-		rtImage.SetImageInformation(imgInfo);
-		rtImage.Init();
+		rtImage->SetImageInformation(imgInfo);
+		rtImage->Init();
+		rtView = std::make_unique<ImageView>(rtImage->NewImageView());
+		rtView->Init();
 
-		m_rtImageViews.push_back(std::make_unique<ImageView>(rtImage.NewImageView()));
+		m_rtImageViews.push_back(std::move(rtView));
 		m_rtImages.push_back(std::move(rtImage));
-	}
-
-	for (auto& imgView : m_scImageViews)
-	{
-		imgView->Init();
-	}
-
-	for (auto& imgView : m_rtImageViews)
-	{
-		imgView->Init();
 	}
 }
 
@@ -254,74 +268,43 @@ void RayTracingApp::_UninitImagesAndViews()
 	}
 	m_rtImageViews.clear();
 
-	for (auto& imgView : m_scImageViews)
-	{
-		imgView->Uninit();
-	}
-	m_scImageViews.clear();
-
 	for (auto& img : m_rtImages)
 	{
-		img.Uninit();
+		img->Uninit();
 	}
 	m_rtImages.clear();
-
-	m_scImages.clear();
-}
-
-void RayTracingApp::_InitFramebuffers()
-{
-	for (auto const& imgView : m_scImageViews)
-	{
-		std::unique_ptr<Framebuffer> uptrFramebuffer = std::make_unique<Framebuffer>(m_scRenderPass.NewFramebuffer({ imgView.get() }));
-
-		uptrFramebuffer->Init();
-
-		m_scFramebuffers.push_back(std::move(uptrFramebuffer));
-	}
-}
-
-void RayTracingApp::_UninitFramebuffers()
-{
-	for (auto& framebuffer : m_scFramebuffers)
-	{
-		framebuffer->Uninit();
-	}
-	m_scFramebuffers.clear();
 }
 
 void RayTracingApp::_InitDescriptorSets()
 {
 	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 	{
-		std::unique_ptr<DescriptorSet> uptrDSet = std::make_unique<DescriptorSet>(m_cameraDSetLayout.NewDescriptorSet());
+		std::unique_ptr<DescriptorSet> uptrDSet = std::make_unique<DescriptorSet>(m_rtDSetLayout.NewDescriptorSet());
+		VkDescriptorImageInfo imageInfo{};
+
+		imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+		imageInfo.imageView = m_rtImageViews[i]->vkImageView;
+		imageInfo.sampler = m_vkSampler;
 
 		uptrDSet->Init();
+		uptrDSet->StartUpdate();
+		uptrDSet->UpdateBinding(0, m_cameraBuffers[i].get());
+		uptrDSet->UpdateBinding(1, { m_rtAccelStruct.vkAccelerationStructure });
+		uptrDSet->UpdateBinding(2, imageInfo);
+		uptrDSet->UpdateBinding(3, m_instanceBuffer.get());
+		uptrDSet->FinishUpdate();
 
-		m_cameraDSets.push_back(std::move(uptrDSet));
-	}
-
-	{
-		m_ASDSet = std::make_unique<DescriptorSet>(m_rtDSetLayout.NewDescriptorSet());
-
-		m_ASDSet->Init();
-	}
-
-	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
-	{
-		std::unique_ptr<DescriptorSet> uptrDSet = std::make_unique<DescriptorSet>(m_scDSetLayout.NewDescriptorSet());
-
-		uptrDSet->Init();
-
-		m_scDSets.push_back(std::move(uptrDSet));
+		m_rtDSets.push_back(std::move(uptrDSet));
 	}
 }
 
 void RayTracingApp::_UninitDescriptorSets() 
 {
-	m_scDSets.clear();
-	m_ASDSet.reset();
-	m_cameraDSets.clear();
+	for (auto& uptrDSet : m_rtDSets)
+	{
+		uptrDSet.reset();
+	}
+	m_rtDSets.clear();
 }
 
 void RayTracingApp::_InitPipelines()
@@ -341,18 +324,17 @@ void RayTracingApp::_InitPipelines()
 	rchit.Init();
 	rmiss.Init();
 
-	m_rayTracingPipeline.AddDescriptorSetLayout(m_cameraDSetLayout.vkDescriptorSetLayout);
-	m_rayTracingPipeline.AddDescriptorSetLayout(m_rtDSetLayout.vkDescriptorSetLayout);
-	rgenId  = m_rayTracingPipeline.AddShader(rgen.GetShaderStageInfo());
-	rchitId = m_rayTracingPipeline.AddShader(rchit.GetShaderStageInfo());
-	rmissId = m_rayTracingPipeline.AddShader(rmiss.GetShaderStageInfo());
+	m_rtPipeline.AddDescriptorSetLayout(m_rtDSetLayout.vkDescriptorSetLayout);
+	rgenId  = m_rtPipeline.AddShader(rgen.GetShaderStageInfo());
+	rchitId = m_rtPipeline.AddShader(rchit.GetShaderStageInfo());
+	rmissId = m_rtPipeline.AddShader(rmiss.GetShaderStageInfo());
 
-	m_rayTracingPipeline.SetRayGenerationShaderRecord(rgenId);
-	m_rayTracingPipeline.AddHitShaderRecord(rchitId);
-	m_rayTracingPipeline.AddMissShaderRecord(rmissId);
-	m_rayTracingPipeline.SetMaxRecursion(1u);
+	m_rtPipeline.SetRayGenerationShaderRecord(rgenId);
+	m_rtPipeline.AddHitShaderRecord(rchitId);
+	m_rtPipeline.AddMissShaderRecord(rmissId);
+	m_rtPipeline.SetMaxRecursion(1u);
 
-	m_rayTracingPipeline.Init();
+	m_rtPipeline.Init();
 
 	rgen.Uninit();
 	rchit.Uninit();
@@ -361,7 +343,34 @@ void RayTracingApp::_InitPipelines()
 
 void RayTracingApp::_UninitPipelines()
 {
-	m_rayTracingPipeline.Uninit();
+	m_rtPipeline.Uninit();
+}
+
+void RayTracingApp::_InitSwapchainPass()
+{
+	_UninitSwapchainPass();
+	std::vector<VkDescriptorImageInfo> imageInfos;
+	imageInfos.reserve(MAX_FRAME_COUNT);
+	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+	{
+		VkDescriptorImageInfo imageInfo{};
+		imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+		imageInfo.imageView = m_rtImageViews[i]->vkImageView;
+		imageInfo.sampler = m_vkSampler;
+		imageInfos.push_back(imageInfo);
+	}
+	m_swapchainPass = std::make_unique<SwapchainPass>();
+	m_swapchainPass->PreSetPassThroughImages(imageInfos);
+	m_swapchainPass->Init();
+}
+
+void RayTracingApp::_UninitSwapchainPass()
+{
+	if (m_swapchainPass.get() != nullptr)
+	{
+		m_swapchainPass->Uninit();
+	}
+	m_swapchainPass.reset();
 }
 
 void RayTracingApp::_MainLoop()

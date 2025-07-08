@@ -13,6 +13,8 @@
 #include "utils.h"
 #include "ray_tracing.h"
 
+class SwapchainPass;
+
 class RayTracingApp
 {
 private:
@@ -21,9 +23,9 @@ private:
 		Mesh mesh;
 		Transform transform;
 	};
-	// no need to use alignas here, since we will use scalarEXT in shader
 	struct VBO
 	{
+		// no need to use alignas here, since we will use scalarEXT in shader
 		/*alignas(16)*/ glm::vec3 pos;
 		/*alignas(16)*/ glm::vec3 normal;
 	};
@@ -32,6 +34,13 @@ private:
 		glm::mat4 view;
 		glm::mat4 proj;
 		glm::vec4 eye;
+	};
+	
+	// Describes information of a model on device side
+	struct InstanceInformation
+	{
+		VkDeviceAddress vertexBuffer;
+		VkDeviceAddress indexBuffer;
 	};
 
 private:
@@ -47,49 +56,36 @@ private:
 	DescriptorSetLayout m_rtDSetLayout;
 	std::vector<std::unique_ptr<DescriptorSet>> m_rtDSets;
 
-	// Descriptor set count: number of swap chains
-	DescriptorSetLayout m_scDSetLayout; // descriptor set to store result images for pass through shader
-	std::vector<std::unique_ptr<DescriptorSet>> m_scDSets;
-
 	// cameraUBO changes across frames, i create buffers for each frame
-	std::vector<std::unique_ptr<Buffer>>        m_cameraBuffers;
+	std::vector<std::unique_ptr<Buffer>> m_cameraBuffers;
 
 	// following buffers can be used cross frames, 
 	// so i just create one buffer for one mesh instead of multiple buffers for each frame
-	RayTracingAccelerationStructure m_rayTracingAS;
 	std::unique_ptr<Buffer> m_instanceBuffer;
 	std::vector<std::unique_ptr<Buffer>> m_vertexBuffers;
 	std::vector<std::unique_ptr<Buffer>> m_indexBuffers;
 
+	RayTracingAccelerationStructure m_rtAccelStruct;
+
 	// Samplers
 	VkSampler m_vkSampler = VK_NULL_HANDLE;
 
-	// Render passes
-	RenderPass m_scRenderPass; // draw result to swapchain for presentation
-
 	// images
-	std::vector<Image> m_rtImages;
+	std::vector<std::unique_ptr<Image>> m_rtImages;
 	std::vector<std::unique_ptr<ImageView>> m_rtImageViews;
-	std::vector<Image> m_scImages;
-	std::vector<std::unique_ptr<ImageView>> m_scImageViews;
-	std::vector<std::unique_ptr<Framebuffer>> m_scFramebuffers;
 
 	//pipelines
-	RayTracingPipeline m_rayTracingPipeline;
-	GraphicsPipeline m_presentPipeline;
-
-	// semaphores
-	std::vector<VkSemaphore>  m_swapchainImageAvailabilities;
+	RayTracingPipeline m_rtPipeline;
 
 	// command buffers
 	std::vector<std::unique_ptr<CommandSubmission>> m_commandSubmissions;
 
+	// swapchain pass
+	std::unique_ptr<SwapchainPass> m_swapchainPass;
+
 private:
 	void _Init();
 	void _Uninit();
-
-	void _InitRenderPass();
-	void _UninitRenderPass();
 
 	void _InitDescriptorSetLayouts();
 	void _UninitDescriptorSetLayouts();
@@ -107,14 +103,14 @@ private:
 	void _InitImagesAndViews();
 	void _UninitImagesAndViews();
 
-	void _InitFramebuffers();
-	void _UninitFramebuffers();
-
 	void _InitDescriptorSets();
 	void _UninitDescriptorSets();
 
 	void _InitPipelines();
 	void _UninitPipelines();
+
+	void _InitSwapchainPass();
+	void _UninitSwapchainPass();
 
 	void _MainLoop();
 	void _UpdateUniformBuffer();
