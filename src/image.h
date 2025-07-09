@@ -119,15 +119,28 @@ public:
 
 	void CopyFromBuffer(const Buffer& stagingBuffer);
 
-	// Fill range with clear color,
+	// Fill image range with clear color,
 	// if pCmd is nullptr, it will create a command buffer and wait till this action done,
 	// else, it will record the command in the command buffer, and user need to manage the synchronization
-	void Fill(const VkClearColorValue& clearColor, const VkImageSubresourceRange& range, CommandSubmission* pCmd = nullptr);
+	void Fill(
+		const VkClearColorValue& clearColor,
+		const VkImageSubresourceRange& range,
+		CommandSubmission* pCmd = nullptr);
 	
-	// Fill range with clear color,
+	// Fill image range with clear color,
 	// if pCmd is nullptr, it will create a command buffer and wait till this action done,
 	// else, it will record the command in the command buffer, and user need to manage the synchronization
-	void Fill(const VkClearColorValue& clearColor, CommandSubmission* pCmd = nullptr);
+	void Fill(
+		const VkClearColorValue& clearColor,
+		CommandSubmission* pCmd = nullptr);
+
+	// Change image's layout and then fill it with clear color,
+	// if pCmd is nullptr, it will create a command buffer and wait till this action done,
+	// else, it will record the command in the command buffer, and user need to manage the synchronization
+	void ChangeLayoutAndFill(
+		VkImageLayout finalLayout,
+		const VkClearColorValue& clearColor,
+		CommandSubmission* pCmd = nullptr);
 
 	// Return a image view of this image, 
 	// the view returned is NOT initialized yet

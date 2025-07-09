@@ -5,40 +5,28 @@
 void RayTracingApp::_Init()
 {
 	_InitDescriptorSetLayouts();
-
 	_InitSampler();
-
 	_InitModels();
 	_InitBuffers();
-
 	_InitAS();
-
 	_InitImagesAndViews();
-
 	_InitSwapchainPass();
-
 	_InitDescriptorSets();
-
 	_InitPipelines();
+	_InitCommandBuffers();
 }
 
 void RayTracingApp::_Uninit()
 {
+	_UninitCommandBuffers();
 	_UninitPipelines();
-
 	_UninitDescriptorSets();
-
 	_UninitSwapchainPass();
-
 	_UninitImagesAndViews();
-
 	_UninitAS();
-
 	_UninitBuffers();
 	m_models.clear();
-
 	_UninitSampler();
-
 	_UninitDescriptorSetLayouts();
 }
 
@@ -373,21 +361,159 @@ void RayTracingApp::_UninitSwapchainPass()
 	m_swapchainPass.reset();
 }
 
-void RayTracingApp::_MainLoop()
+void RayTracingApp::_InitCommandBuffers()
 {
+	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+	{
+		std::unique_ptr<CommandSubmission> uptrCmd = std::make_unique<CommandSubmission>();
+		uptrCmd->Init();
+		m_commandSubmissions.push_back(std::move(uptrCmd));
+	}
+}
 
+void RayTracingApp::_UninitCommandBuffers()
+{
+	for (auto& uptrCmd : m_commandSubmissions)
+	{
+		if (uptrCmd.get() != nullptr)
+		{
+			uptrCmd->Uninit();
+			uptrCmd.reset();
+		}
+	}
+	m_commandSubmissions.clear();
 }
 
 void RayTracingApp::_UpdateUniformBuffer()
 {
+	static std::optional<float> lastX;
+	static std::optional<float> lastY;
+	UserInput userInput = MyDevice::GetInstance().GetUserInput();
+	CameraUBO ubo{};
+	VkExtent2D swapchainExtent = MyDevice::GetInstance().GetSwapchainExtent();
+	if (!userInput.RMB)
+	{
+		lastX = userInput.xPos;
+		lastY = userInput.yPos;
+	}
+	float sensitivity = 0.3f;
+	float xoffset = lastX.has_value() ? static_cast<float>(userInput.xPos) - lastX.value() : 0.0f;
+	float yoffset = lastY.has_value() ? lastY.value() - static_cast<float>(userInput.yPos) : 0.0f;
+	lastX = userInput.xPos;
+	lastY = userInput.yPos;
+	xoffset *= sensitivity;
+	yoffset *= sensitivity;
+	m_camera.RotateAboutWorldUp(glm::radians(-xoffset));
+	m_camera.RotateAboutRight(glm::radians(yoffset));
+	if (userInput.RMB)
+	{
+		glm::vec3 fwd = glm::normalize(glm::cross(m_camera.world_up, m_camera.right));
+		float speed = 0.005 * frameTime;
+		glm::vec3 mov = m_camera.eye;
+		if (userInput.W) mov += (speed * fwd);
+		if (userInput.S) mov += (-speed * fwd);
+		if (userInput.Q) mov += (speed * m_camera.world_up);
+		if (userInput.E) mov += (-speed * m_camera.world_up);
+		if (userInput.A) mov += (-speed * m_camera.right);
+		if (userInput.D) mov += (speed * m_camera.right);
+		m_camera.MoveTo(mov);
+	}
 
+	ubo.proj = m_camera.GetProjectionMatrix();
+	ubo.proj[1][1] *= -1;
+	ubo.view = m_camera.GetViewMatrix();
+	ubo.eye = glm::vec4(m_camera.eye, 1.0f);
+	m_cameraBuffers[m_currentFrame]->CopyFromHost(&ubo);
+}
+
+void RayTracingApp::_MainLoop()
+{
+	lastTime = glfwGetTime();
+	while (!glfwWindowShouldClose(MyDevice::GetInstance().pWindow))
+	{
+		glfwPollEvents();
+		_DrawFrame();
+		double currentTime = glfwGetTime();
+		frameTime = (currentTime - lastTime) * 1000.0;
+		lastTime = currentTime;
+	}
+
+	vkDeviceWaitIdle(MyDevice::GetInstance().vkDevice);
 }
 
 void RayTracingApp::_DrawFrame()
 {
+	std::unique_ptr<CommandSubmission>& cmd = m_commandSubmissions[m_currentFrame];
+	auto& device = MyDevice::GetInstance();
+	RayTracingPipeline::PipelineInput pipelineInput{};
+	CommandSubmission::WaitInformation scPassWait{};
+	ImageBarrierBuilder barrierBuilder{};
+	VkClearColorValue clearColor{};
+	clearColor.uint32[3] = 1.0f;
+	if (device.NeedRecreateSwapchain())
+	{
+		_ResizeWindow();
+	}
 
+	cmd->WaitTillAvailable();
+	_UpdateUniformBuffer();
+	cmd->StartCommands({});
+
+	// transfer image to general and fill it with zero
+	{
+		m_rtImages[m_currentFrame]->ChangeLayoutAndFill(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, clearColor, cmd.get());
+		auto barrier2 = barrierBuilder.NewBarrier(
+			m_rtImages[m_currentFrame]->vkImage,
+			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
+			VK_IMAGE_LAYOUT_GENERAL,
+			VK_ACCESS_TRANSFER_WRITE_BIT,
+			VK_ACCESS_SHADER_WRITE_BIT);
+		cmd->AddPipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, { barrier2 });
+	}
+
+	// run ray tracing pipeline
+	pipelineInput.uDepth = 1u;
+	pipelineInput.uWidth = device.GetSwapchainExtent().width;
+	pipelineInput.uHeight = device.GetSwapchainExtent().height;
+	pipelineInput.pDescriptorSets = { m_rtDSets[m_currentFrame].get() };
+	m_rtPipeline.Do(cmd->vkCommandBuffer, pipelineInput);
+
+	// transfer image to shader read only
+	{
+		auto barrier = barrierBuilder.NewBarrier(
+			m_rtImages[m_currentFrame]->vkImage,
+			VK_IMAGE_LAYOUT_GENERAL,
+			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
+			VK_ACCESS_SHADER_WRITE_BIT,
+			VK_ACCESS_SHADER_READ_BIT);
+		cmd->AddPipelineBarrier(VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, { barrier });
+	}
+
+	scPassWait.waitSamaphore = cmd->SubmitCommands();
+	scPassWait.waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	m_swapchainPass->Do({ scPassWait });
+
+	m_currentFrame = (m_currentFrame + 1) % MAX_FRAME_COUNT;
 }
 
 void RayTracingApp::_ResizeWindow()
 {
+	MyDevice::GetInstance().RecreateSwapchain();
+	std::vector<VkDescriptorImageInfo> imageInfos;
+	
+	_UninitDescriptorSets();
+	_UninitImagesAndViews();
+	_InitImagesAndViews();
+	_InitDescriptorSets();
+
+	imageInfos.reserve(MAX_FRAME_COUNT);
+	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+	{
+		VkDescriptorImageInfo imageInfo{};
+		imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+		imageInfo.imageView = m_rtImageViews[i]->vkImageView;
+		imageInfo.sampler = m_vkSampler;
+		imageInfos.push_back(imageInfo);
+	}
+	m_swapchainPass->RecreateSwapchain(imageInfos);
 }

@@ -112,14 +112,17 @@ private:
 	void _InitSwapchainPass();
 	void _UninitSwapchainPass();
 
-	void _MainLoop();
+	void _InitCommandBuffers();
+	void _UninitCommandBuffers();
+
 	void _UpdateUniformBuffer();
+
+	void _MainLoop();
+	
 	void _DrawFrame();
 
 	void _ResizeWindow();
 
-	VkImageLayout _GetImageLayout(ImageView* pImageView) const;
-	VkImageLayout _GetImageLayout(VkImage vkImage, uint32_t baseArrayLayer, uint32_t layerCount, uint32_t baseMipLevel, uint32_t levelCount, VkImageAspectFlags aspect) const;
 public:
 	void Run();
 };
