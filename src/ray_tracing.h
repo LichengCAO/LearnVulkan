@@ -76,11 +76,11 @@ public:
 	};
 
 private:
-	std::vector<BLASInput>	m_BLASInputs; // hold info temporarily, will be invalid after Init
-	std::vector<BLAS>		m_BLASs;
-	TLASInput				m_TLASInput; // hold info temporarily, will be invalid after Init
-	TLAS					m_TLAS;
-	VkQueryPool				m_vkQueryPool = VK_NULL_HANDLE;
+	std::vector<BLASInput>					m_BLASInputs; // hold info temporarily, will be invalid after Init
+	TLASInput								m_TLASInput; // hold info temporarily, will be invalid after Init
+	std::vector<std::unique_ptr<BLAS>>		m_uptrBLASes;
+	std::unique_ptr<TLAS>					m_uptrTLAS;
+	VkQueryPool								m_vkQueryPool = VK_NULL_HANDLE;
 
 private:
 	// Helper function to initialize scratch buffer, 

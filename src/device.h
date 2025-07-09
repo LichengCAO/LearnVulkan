@@ -37,13 +37,12 @@ private:
 	MyDevice() {};
 
 	std::vector<const char*> _GetInstanceRequiredExtensions() const;
-	std::vector<const char*> _GetPhysicalDeviceRequiredExtensions() const;
 	QueueFamilyIndices		 _GetQueueFamilyIndices(VkPhysicalDevice physicalDevice) const;
 	SwapChainSupportDetails  _QuerySwapchainSupport(VkPhysicalDevice physicalDevice, VkSurfaceKHR surface) const;
 	VkSurfaceFormatKHR		 _ChooseSwapchainFormat(const std::vector<VkSurfaceFormatKHR>& availableFormats) const;
 	VkPresentModeKHR		 _ChooseSwapchainPresentMode(const std::vector<VkPresentModeKHR>& availableModes) const;
 	VkExtent2D				 _ChooseSwapchainExtent(const VkSurfaceCapabilitiesKHR& capabilities) const;
-	
+
 	void _InitVolk();
 	void _InitGLFW();
 	void _CreateInstance();
@@ -55,6 +54,11 @@ private:
 	void _InitDescriptorAllocator();
 	void _CreateSwapchain();
 	void _DestroySwapchain();
+
+	// Add required extensions to the device, before select physical device
+	void _AddBaseExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selector) const;
+	void _AddRayTracingExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selector) const;
+	void _AddMeshShaderExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selector) const;
 
 public:
 	GLFWwindow*			pWindow = nullptr;

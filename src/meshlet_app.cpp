@@ -1,4 +1,5 @@
 #include "meshlet_app.h"
+#include "shader.h"
 #define MAX_FRAME_COUNT 3
 
 void MeshletApp::_Init()

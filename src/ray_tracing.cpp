@@ -45,6 +45,7 @@ void RayTracingAccelerationStructure::_InitScratchBuffer(
 	scratchBufferToInit.Init(scratchBufferInfo);
 
 	// fill slotAddresses
+	slotAddresses.clear();
 	slotAddresses.reserve(uSlotCount);
 	if (fullScratchSize <= maxBudget)
 	{
@@ -54,7 +55,7 @@ void RayTracingAccelerationStructure::_InitScratchBuffer(
 			const auto& sizeInfo = buildSizeInfo[i];
 			VkDeviceSize chunkSizeAligned = CommonUtils::AlignUp(sizeInfo.buildScratchSize, uMinAlignment);
 
-			slotAddresses[i] = curAddress;
+			slotAddresses.push_back(curAddress);
 			curAddress += chunkSizeAligned;
 		}
 	}
@@ -143,7 +144,7 @@ void RayTracingAccelerationStructure::_BuildBLASs()
 			std::vector<VkAccelerationStructureKHR> BLASesToProcess; // stores the created but not built yet BLASes
 			std::vector<const VkAccelerationStructureBuildRangeInfoKHR*> buildRangeInfosToProcess;
 			std::vector<VkAccelerationStructureBuildGeometryInfoKHR> buildGeomInfosToProcess;
-			std::vector<BLAS> BLASesInitInThisIter;
+			std::vector<std::unique_ptr<BLAS>> BLASesInitInThisIter;
 
 			BLASesToProcess.reserve(nAllBLASCount);
 			buildRangeInfosToProcess.reserve(nAllBLASCount);
@@ -153,16 +154,16 @@ void RayTracingAccelerationStructure::_BuildBLASs()
 			// try to create as many BLASes as scratch buffer can hold
 			for (int j = 0; j < scratchAddresses.size() && BLASIndex < nAllBLASCount; ++j)
 			{
-				BLAS curBLAS{};
+				auto curBLAS = std::make_unique<BLAS>();
 
 				// create BLAS
-				curBLAS.Init(buildSizeInfos[BLASIndex].accelerationStructureSize);
+				curBLAS->Init(buildSizeInfos[BLASIndex].accelerationStructureSize);
 
 				// Task1: now we have AS, we can set dstAS for buildGeom
-				buildGeomInfos[BLASIndex].dstAccelerationStructure = curBLAS.vkAccelerationStructure;
+				buildGeomInfos[BLASIndex].dstAccelerationStructure = curBLAS->vkAccelerationStructure;
 
 				// use scratch buffer to build BLAS
-				BLASesToProcess.push_back(curBLAS.vkAccelerationStructure);
+				BLASesToProcess.push_back(curBLAS->vkAccelerationStructure);
 				buildRangeInfosToProcess.push_back(m_BLASInputs[BLASIndex].vkASBuildRangeInfos.data());
 				buildGeomInfosToProcess.push_back(buildGeomInfos[BLASIndex]);
 				BLASesInitInThisIter.push_back(std::move(curBLAS));
@@ -215,18 +216,18 @@ void RayTracingAccelerationStructure::_BuildBLASs()
 					VkDeviceSize compactSize = compactSizes[localIndex];
 					if (compactSize > 0)
 					{
-						BLAS compactBLAS{};
+						auto compactBLAS = std::make_unique<BLAS>();
 						VkCopyAccelerationStructureInfoKHR copyInfo{ VK_STRUCTURE_TYPE_COPY_ACCELERATION_STRUCTURE_INFO_KHR };
 
-						compactBLAS.Init(compactSize);
+						compactBLAS->Init(compactSize);
 
 						copyInfo.pNext = nullptr;
 						copyInfo.mode = VK_COPY_ACCELERATION_STRUCTURE_MODE_COMPACT_KHR;
-						copyInfo.src = BLASesInitInThisIter[localIndex].vkAccelerationStructure;
-						copyInfo.dst = compactBLAS.vkAccelerationStructure;
+						copyInfo.src = BLASesInitInThisIter[localIndex]->vkAccelerationStructure;
+						copyInfo.dst = compactBLAS->vkAccelerationStructure;
 
 						cmd.CopyAccelerationStructure(copyInfo);
-						m_BLASs.push_back(std::move(compactBLAS));
+						m_uptrBLASes.push_back(std::move(compactBLAS));
 					}
 				}
 				queryIndex = BLASIndex;
@@ -240,10 +241,10 @@ void RayTracingAccelerationStructure::_BuildBLASs()
 			// process BLASes Init in this iter
 			if (bNeedCompact)
 			{
-				// we already push the compacted BLAS copy into the m_BLASs, therefore BLASes in BLASesInitInThisIter is useless
+				// we already push the compacted BLAS copy into the m_uptrBLASes, therefore BLASes in BLASesInitInThisIter is useless
 				for (auto& uselessBLAS : BLASesInitInThisIter)
 				{
-					uselessBLAS.Uninit();
+					uselessBLAS->Uninit();
 				}
 				BLASesInitInThisIter.clear();
 			}
@@ -251,7 +252,7 @@ void RayTracingAccelerationStructure::_BuildBLASs()
 			{
 				for (int i = 0; i < BLASesInitInThisIter.size(); ++i)
 				{
-					m_BLASs.push_back(std::move(BLASesInitInThisIter[i]));
+					m_uptrBLASes.push_back(std::move(BLASesInitInThisIter[i]));
 				}
 			}
 		}
@@ -303,8 +304,14 @@ void RayTracingAccelerationStructure::_BuildTLAS()
 
 	_InitScratchBuffer(buildSizeInfo.buildScratchSize, { buildSizeInfo }, scratchBuffer, slotAddresses);
 
-	m_TLAS.Init(buildSizeInfo.accelerationStructureSize);
-	vkAccelerationStructure = m_TLAS.vkAccelerationStructure;
+	if (m_uptrTLAS.get() != nullptr)
+	{
+		m_uptrTLAS->Uninit();
+		m_uptrTLAS.reset();
+	}
+	m_uptrTLAS = std::make_unique<TLAS>();
+	m_uptrTLAS->Init(buildSizeInfo.accelerationStructureSize);
+	vkAccelerationStructure = m_uptrTLAS->vkAccelerationStructure;
 
 	buildGeomInfo.dstAccelerationStructure = vkAccelerationStructure;
 	buildGeomInfo.scratchData.deviceAddress = scratchBuffer.GetDeviceAddress();
@@ -398,7 +405,7 @@ void RayTracingAccelerationStructure::SetUpTLAS(const std::vector<InstanceData>&
 		vkASInst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
 		vkASInst.mask = 0xFF;
 		vkASInst.instanceCustomIndex = gl_InstanceCustomIndex;
-		vkASInst.accelerationStructureReference = m_BLASs[instInfo.uBLASIndex].vkDeviceAddress;
+		vkASInst.accelerationStructureReference = m_uptrBLASes[instInfo.uBLASIndex]->vkDeviceAddress;
 		vkASInst.instanceShaderBindingTableRecordOffset = instInfo.uHitShaderGroupIndex;
 		vkASInst.transform = CommonUtils::ToTransformMatrixKHR(instInfo.transformMatrix);
 
@@ -440,14 +447,18 @@ void RayTracingAccelerationStructure::Uninit()
 		vkDestroyQueryPool(MyDevice::GetInstance().vkDevice, m_vkQueryPool, nullptr);
 		m_vkQueryPool = VK_NULL_HANDLE;
 	}
-	m_TLAS.Uninit();
+	if (m_uptrTLAS.get() != nullptr)
+	{
+		m_uptrTLAS->Uninit();
+	}
+	m_uptrTLAS.reset();
 	vkAccelerationStructure = VK_NULL_HANDLE;
 	m_TLASInput.uptrInstanceBuffer->Uninit();
-	for (auto& curBLAS : m_BLASs)
+	for (auto& curBLAS : m_uptrBLASes)
 	{
-		curBLAS.Uninit();
+		curBLAS->Uninit();
 	}
-	m_BLASs.clear();
+	m_uptrBLASes.clear();
 	m_BLASInputs.clear();
 }
 
@@ -496,6 +507,12 @@ void RayTracingAccelerationStructure::TLAS::Init(VkDeviceSize ASSize)
 	VkAccelerationStructureDeviceAddressInfoKHR addrInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR };
 	Buffer::Information bufferInfo{};
 
+	if (uptrBuffer.get() != nullptr)
+	{
+		uptrBuffer->Uninit();
+		uptrBuffer.reset();
+	}
+	uptrBuffer = std::make_unique<Buffer>();
 	bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 	bufferInfo.size = ASSize;
 	bufferInfo.usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;

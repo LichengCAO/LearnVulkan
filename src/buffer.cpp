@@ -50,14 +50,20 @@ void Buffer::Uninit()
 void Buffer::_AllocateMemory()
 {
 	CHECK_TRUE(vkBuffer != VK_NULL_HANDLE, "Try to allocate for a uninitialized buffer!");
-	VkMemoryRequirements memRequirements;
+	VkMemoryRequirements memRequirements{};
+	VkMemoryAllocateInfo allocInfo{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+	VkMemoryAllocateFlagsInfo allocFlags{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO };
+	
 	vkGetBufferMemoryRequirements(MyDevice::GetInstance().vkDevice, vkBuffer, &memRequirements);
 
-	VkMemoryAllocateInfo allocInfo = {
-		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-		.allocationSize = memRequirements.size, //could be different from size on Host!
-		.memoryTypeIndex = _FindMemoryTypeIndex(memRequirements.memoryTypeBits , m_bufferInformation.memoryProperty),
-	};
+	allocInfo.allocationSize = memRequirements.size; //could be different from size on Host!
+	allocInfo.memoryTypeIndex = _FindMemoryTypeIndex(memRequirements.memoryTypeBits, m_bufferInformation.memoryProperty);
+
+	if ((m_bufferInformation.usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) != 0u)
+	{
+		allocFlags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+		allocInfo.pNext = &allocFlags;
+	}
 
 	VK_CHECK(vkAllocateMemory(MyDevice::GetInstance().vkDevice, &allocInfo, nullptr, &vkDeviceMemory), "Failed to allocate buffer memory!");
 

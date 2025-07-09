@@ -1,9 +1,11 @@
 #include "ray_tracing_app.h"
 #include "swapchain_pass.h"
+#include "shader.h"
 #define MAX_FRAME_COUNT 3
 
 void RayTracingApp::_Init()
 {
+	MyDevice::GetInstance().Init();
 	_InitDescriptorSetLayouts();
 	_InitSampler();
 	_InitModels();
@@ -28,6 +30,7 @@ void RayTracingApp::_Uninit()
 	m_models.clear();
 	_UninitSampler();
 	_UninitDescriptorSetLayouts();
+	MyDevice::GetInstance().Uninit();
 }
 
 void RayTracingApp::_InitDescriptorSetLayouts()
@@ -516,4 +519,19 @@ void RayTracingApp::_ResizeWindow()
 		imageInfos.push_back(imageInfo);
 	}
 	m_swapchainPass->RecreateSwapchain(imageInfos);
+}
+
+RayTracingApp::RayTracingApp()
+{
+}
+
+RayTracingApp::~RayTracingApp()
+{
+}
+
+void RayTracingApp::Run()
+{
+	_Init();
+	_MainLoop();
+	_Uninit();
 }

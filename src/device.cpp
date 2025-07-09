@@ -26,20 +26,6 @@ std::vector<const char*> MyDevice::_GetInstanceRequiredExtensions() const
 	return requiredExtensions;
 }
 
-std::vector<const char*> MyDevice::_GetPhysicalDeviceRequiredExtensions() const
-{
-	return {
-		VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-		VK_KHR_MAINTENANCE1_EXTENSION_NAME,
-		VK_KHR_MAINTENANCE3_EXTENSION_NAME,
-		VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
-		// mesh shader
-		VK_EXT_MESH_SHADER_EXTENSION_NAME, 
-		VK_KHR_SPIRV_1_4_EXTENSION_NAME,
-		VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME
-	};
-}
-
 QueueFamilyIndices MyDevice::_GetQueueFamilyIndices(VkPhysicalDevice physicalDevice) const
 {
 	QueueFamilyIndices indices;
@@ -196,56 +182,28 @@ void MyDevice::_CreateSurface()
 void MyDevice::_SelectPhysicalDevice()
 {
 	vkb::PhysicalDeviceSelector physicalDeviceSelector(m_instance);
-	VkPhysicalDeviceFeatures requiredFeatures{};
-
-	// Mesh shader
-	VkPhysicalDeviceMeshShaderFeaturesEXT meshShaderFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT };
-	VkPhysicalDeviceVulkan12Features vulkan12Featrues{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
-
-	// Ray tracing
-	VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
-	VkPhysicalDeviceRayTracingPipelineFeaturesKHR rayTracingPipelineFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
-
-	requiredFeatures.geometryShader = VK_TRUE;
-	requiredFeatures.samplerAnisotropy = VK_TRUE;
-	requiredFeatures.sampleRateShading = VK_TRUE;
-	requiredFeatures.fragmentStoresAndAtomics = VK_TRUE;
-	meshShaderFeatures.taskShader = VK_TRUE;
-	meshShaderFeatures.meshShader = VK_TRUE;
-	vulkan12Featrues.shaderInt8 = VK_TRUE;
-	vulkan12Featrues.storageBuffer8BitAccess = VK_TRUE;
-	vulkan12Featrues.descriptorIndexing = VK_TRUE;
 
 	physicalDeviceSelector.set_surface(vkSurface);
-	physicalDeviceSelector.set_required_features(requiredFeatures);
-	physicalDeviceSelector.add_required_extension_features(meshShaderFeatures);
-	physicalDeviceSelector.add_required_extension_features(vulkan12Featrues);
-	
-	auto vecRequiredExtensions = _GetPhysicalDeviceRequiredExtensions();
-	for (auto requiredExtension : vecRequiredExtensions)
-	{
-		physicalDeviceSelector.add_required_extension(requiredExtension);
-	}
+	_AddBaseExtensionsAndFeatures(physicalDeviceSelector);
+	_AddMeshShaderExtensionsAndFeatures(physicalDeviceSelector);
+	_AddRayTracingExtensionsAndFeatures(physicalDeviceSelector);
 
-	auto physicalDeviceSelectorReturn = physicalDeviceSelector.select();
-	if (!physicalDeviceSelectorReturn)
+	// select device based on setting
 	{
-		std::cout << physicalDeviceSelectorReturn.error().message() << std::endl;
-		throw std::runtime_error("Failed to find a suitable GPU!");
+		auto physicalDeviceSelectorReturn = physicalDeviceSelector.select();
+		if (!physicalDeviceSelectorReturn)
+		{
+			std::cout << physicalDeviceSelectorReturn.error().message() << std::endl;
+			throw std::runtime_error("Failed to find a suitable GPU!");
+		}
+		m_physicalDevice = physicalDeviceSelectorReturn.value();
+		vkPhysicalDevice = m_physicalDevice.physical_device;
 	}
-	m_physicalDevice = physicalDeviceSelectorReturn.value();
-	vkPhysicalDevice = m_physicalDevice.physical_device;
 }
 
 void MyDevice::_CreateLogicalDevice()
 {
 	vkb::DeviceBuilder deviceBuilder{ m_physicalDevice };
-	VkPhysicalDeviceDescriptorIndexingFeaturesEXT physicalDeviceDescriptorIndexingFeatures{};
-	physicalDeviceDescriptorIndexingFeatures.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT;
-	physicalDeviceDescriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
-	physicalDeviceDescriptorIndexingFeatures.runtimeDescriptorArray = VK_TRUE;
-	physicalDeviceDescriptorIndexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
-	//deviceBuilder.add_pNext(&physicalDeviceDescriptorIndexingFeatures);
 
 	std::vector<vkb::CustomQueueDescription> queueDescription;
 	float priority = 1.0f;
@@ -396,6 +354,75 @@ bool MyDevice::NeedRecreateSwapchain() const
 void MyDevice::_DestroySwapchain()
 {
 	vkb::destroy_swapchain(m_swapchain);
+}
+
+void MyDevice::_AddBaseExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selector) const
+{
+	VkPhysicalDeviceFeatures requiredFeatures{};
+	VkPhysicalDeviceDescriptorIndexingFeaturesEXT physicalDeviceDescriptorIndexingFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT };
+	
+	requiredFeatures.geometryShader = VK_TRUE;
+	requiredFeatures.samplerAnisotropy = VK_TRUE;
+	requiredFeatures.sampleRateShading = VK_TRUE;
+	requiredFeatures.fragmentStoresAndAtomics = VK_TRUE;
+	physicalDeviceDescriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+	physicalDeviceDescriptorIndexingFeatures.runtimeDescriptorArray = VK_TRUE;
+	physicalDeviceDescriptorIndexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
+
+	_selector.add_required_extensions(
+		{ 
+			VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+			VK_KHR_MAINTENANCE1_EXTENSION_NAME,
+			VK_KHR_MAINTENANCE3_EXTENSION_NAME,
+			VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
+		});
+	_selector.set_required_features(requiredFeatures);
+	_selector.add_required_extension_features(physicalDeviceDescriptorIndexingFeatures);
+}
+
+void MyDevice::_AddRayTracingExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selector) const
+{
+	// Ray tracing
+	VkPhysicalDeviceAccelerationStructureFeaturesKHR accelerationStructureFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_ACCELERATION_STRUCTURE_FEATURES_KHR };
+	VkPhysicalDeviceRayTracingPipelineFeaturesKHR rayTracingPipelineFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_FEATURES_KHR };
+	VkPhysicalDeviceHostQueryResetFeatures hostQueryResetFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_HOST_QUERY_RESET_FEATURES };
+	VkPhysicalDeviceVulkan12Features vulkan12Featrues{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
+
+	accelerationStructureFeatures.accelerationStructure = VK_TRUE;
+	rayTracingPipelineFeatures.rayTracingPipeline = VK_TRUE;
+	hostQueryResetFeatures.hostQueryReset = VK_TRUE;
+	vulkan12Featrues.bufferDeviceAddress = VK_TRUE;
+	_selector.add_required_extensions(
+		{ 
+			VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
+			VK_KHR_RAY_TRACING_PIPELINE_EXTENSION_NAME,
+			VK_KHR_DEFERRED_HOST_OPERATIONS_EXTENSION_NAME,
+		});
+	_selector.add_required_extension_features(accelerationStructureFeatures);
+	_selector.add_required_extension_features(rayTracingPipelineFeatures);
+	_selector.add_required_extension_features(hostQueryResetFeatures);
+	_selector.add_required_extension_features(vulkan12Featrues);
+}
+
+void MyDevice::_AddMeshShaderExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selector) const
+{
+	VkPhysicalDeviceMeshShaderFeaturesEXT meshShaderFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_MESH_SHADER_FEATURES_EXT };
+	VkPhysicalDeviceVulkan12Features vulkan12Featrues{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
+
+	meshShaderFeatures.taskShader = VK_TRUE;
+	meshShaderFeatures.meshShader = VK_TRUE;
+	vulkan12Featrues.shaderInt8 = VK_TRUE;
+	vulkan12Featrues.storageBuffer8BitAccess = VK_TRUE;
+	vulkan12Featrues.descriptorIndexing = VK_TRUE;
+
+	_selector.add_required_extensions(
+		{
+			VK_EXT_MESH_SHADER_EXTENSION_NAME,
+			VK_KHR_SPIRV_1_4_EXTENSION_NAME,
+			VK_KHR_SHADER_FLOAT_CONTROLS_EXTENSION_NAME
+		});
+	_selector.add_required_extension_features(meshShaderFeatures);
+	_selector.add_required_extension_features(vulkan12Featrues);
 }
 
 VkExtent2D MyDevice::GetSwapchainExtent() const

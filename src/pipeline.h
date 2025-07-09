@@ -1,7 +1,13 @@
 #pragma once
 #include "common.h"
-#include "shader.h"
-#include "pipeline_io.h"
+
+class Buffer;
+class DescriptorSetLayout;
+class DescriptorSet;
+class VertexInputLayout;
+class VertexIndexInput;
+class VertexInput;
+class RenderPass;
 
 class GraphicsPipeline
 {
@@ -129,7 +135,7 @@ private:
 		ShaderBindingTable& operator=(const ShaderBindingTable& _other) = delete;
 
 	public:
-		ShaderBindingTable() {};
+		ShaderBindingTable();
 
 		void SetRayGenRecord(uint32_t index);
 		void AddMissRecord(uint32_t index);

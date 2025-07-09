@@ -1,6 +1,8 @@
 #include "pipeline.h"
 #include "device.h"
 #include "buffer.h"
+#include "pipeline_io.h"
+
 void GraphicsPipeline::_InitCreateInfos()
 {
 	m_dynamicStates = { VK_DYNAMIC_STATE_VIEWPORT, VK_DYNAMIC_STATE_SCISSOR };
@@ -490,6 +492,10 @@ void RayTracingPipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput& 
 	}
 
 	vkCmdTraceRaysKHR(commandBuffer, &m_SBT.vkRayGenRegion, &m_SBT.vkMissRegion, &m_SBT.vkHitRegion, &m_SBT.vkCallRegion, input.uWidth, input.uHeight, input.uDepth);
+}
+
+RayTracingPipeline::ShaderBindingTable::ShaderBindingTable()
+{
 }
 
 void RayTracingPipeline::ShaderBindingTable::SetRayGenRecord(uint32_t index)

@@ -6,6 +6,7 @@
 #include "gaussian_blur.h"
 #include "commandbuffer.h"
 #include "utils.h"
+#include "shader.h"
 void TransparentApp::_Init()
 {
 	MyDevice::GetInstance().Init();

@@ -1,7 +1,8 @@
 #include "meshlet_app.h"
 #include "transparent_app.h"
+#include "ray_tracing_app.h"
 int main() {
-	MeshletApp app;
+	RayTracingApp app;
 	app.Run(); // easier to debug this way
 	//try {
 	//	app.Run();

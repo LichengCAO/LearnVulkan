@@ -1,5 +1,4 @@
 #pragma once
-#pragma once
 #include "common.h"
 #include "pipeline.h"
 #include "pipeline_io.h"
@@ -124,5 +123,9 @@ private:
 	void _ResizeWindow();
 
 public:
+	// Need to implement these, otherwise default constructor/destructor will need full type of all attributes in header file
+	RayTracingApp();
+	~RayTracingApp();
+	
 	void Run();
 };
