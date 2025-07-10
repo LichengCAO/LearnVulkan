@@ -9,7 +9,16 @@
 #define VOLK_IMPLEMENTATION
 #include <volk.h>
 
-MyDevice* MyDevice::s_pInstance = nullptr;
+std::unique_ptr<MyDevice> MyDevice::s_uptrInstance = nullptr;
+
+MyDevice::MyDevice()
+{
+}
+
+MyDevice::~MyDevice()
+{
+	if (m_initialized) Uninit();
+}
 
 std::vector<const char*> MyDevice::_GetInstanceRequiredExtensions() const
 {
@@ -252,7 +261,7 @@ void MyDevice::_CreateSwapchain()
 	swapchainBuilder.set_composite_alpha_flags(VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR);
 	swapchainBuilder.set_desired_min_image_count(imageCnt);
 	swapchainBuilder.set_desired_extent(extent.width, extent.height);
-	// swapchainBuilder.set_image_array_layer_count(1);
+	swapchainBuilder.set_image_array_layer_count(1);
 	auto swapchainBuilderReturn = swapchainBuilder.build();
 	if (!swapchainBuilderReturn)
 	{
@@ -261,6 +270,7 @@ void MyDevice::_CreateSwapchain()
 	m_swapchain = swapchainBuilderReturn.value();
 	vkSwapchain = m_swapchain.swapchain;
 	m_needRecreate = false;
+	_UpdateSwapchainImages();
 }
 
 void MyDevice::RecreateSwapchain()
@@ -280,14 +290,11 @@ void MyDevice::RecreateSwapchain()
 
 std::vector<Image> MyDevice::GetSwapchainImages() const
 {
-	uint32_t imgCnt = 0;
 	std::vector<VkImage> swapchainImages;
 	std::vector<Image> ret;
-	vkGetSwapchainImagesKHR(vkDevice, vkSwapchain, &imgCnt, nullptr);
-	swapchainImages.resize(imgCnt);
-	ret.reserve(imgCnt);
-	vkGetSwapchainImagesKHR(vkDevice, vkSwapchain, &imgCnt, swapchainImages.data());
-
+	_GetVkSwapchainImages(swapchainImages);
+	
+	ret.reserve(swapchainImages.size());
 	for (const auto& vkImage : swapchainImages)
 	{
 		Image tmpImage{};
@@ -302,6 +309,16 @@ std::vector<Image> MyDevice::GetSwapchainImages() const
 	}
 
 	return ret;
+}
+
+void MyDevice::GetSwapchainImagePointers(std::vector<Image*>& _output) const
+{
+	_output.clear();
+	_output.reserve(m_uptrSwapchainImages.size());
+	for (auto& uptrImage : m_uptrSwapchainImages)
+	{
+		_output.push_back(uptrImage.get());
+	}
 }
 
 std::optional<uint32_t> MyDevice::AquireAvailableSwapchainImageIndex(VkSemaphore finishSignal)
@@ -353,6 +370,15 @@ bool MyDevice::NeedRecreateSwapchain() const
 
 void MyDevice::_DestroySwapchain()
 {
+	for (auto& uptrImage : m_uptrSwapchainImages)
+	{
+		if (uptrImage.get() != nullptr)
+		{
+			uptrImage->Uninit();
+			uptrImage.reset();
+		}
+	}
+	m_uptrSwapchainImages.clear();
 	vkb::destroy_swapchain(m_swapchain);
 }
 
@@ -365,6 +391,7 @@ void MyDevice::_AddBaseExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selec
 	requiredFeatures.samplerAnisotropy = VK_TRUE;
 	requiredFeatures.sampleRateShading = VK_TRUE;
 	requiredFeatures.fragmentStoresAndAtomics = VK_TRUE;
+	requiredFeatures.shaderInt64 = VK_TRUE;
 	physicalDeviceDescriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
 	physicalDeviceDescriptorIndexingFeatures.runtimeDescriptorArray = VK_TRUE;
 	physicalDeviceDescriptorIndexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
@@ -425,10 +452,46 @@ void MyDevice::_AddMeshShaderExtensionsAndFeatures(vkb::PhysicalDeviceSelector& 
 	_selector.add_required_extension_features(vulkan12Featrues);
 }
 
+void MyDevice::_GetVkSwapchainImages(std::vector<VkImage>& _vkImages) const
+{
+	uint32_t uImageCount = 0;
+	_vkImages.clear();
+	vkGetSwapchainImagesKHR(vkDevice, vkSwapchain, &uImageCount, nullptr);
+	_vkImages.resize(static_cast<size_t>(uImageCount));
+	vkGetSwapchainImagesKHR(vkDevice, vkSwapchain, &uImageCount, _vkImages.data());
+}
+
+void MyDevice::_UpdateSwapchainImages()
+{
+	std::vector<VkImage> vkImages;
+	for (std::unique_ptr<Image>& uptrImage : m_uptrSwapchainImages)
+	{
+		if (uptrImage.get() != nullptr)
+		{
+			uptrImage->Uninit();
+			uptrImage.reset();
+		}
+	}
+	_GetVkSwapchainImages(vkImages);
+	m_uptrSwapchainImages.resize(vkImages.size());
+	for (size_t i = 0; i < vkImages.size(); ++i)
+	{
+		std::unique_ptr<Image>& uptrImage = m_uptrSwapchainImages[i];
+		Image::Information imageInfo{};
+		imageInfo.width = m_swapchain.extent.width;
+		imageInfo.height = m_swapchain.extent.height;
+		imageInfo.usage = m_swapchain.image_usage_flags;
+		imageInfo.format = m_swapchain.image_format;
+		imageInfo.inSwapchain = true;
+		uptrImage = std::make_unique<Image>();
+		uptrImage->SetImageInformation(imageInfo);
+		uptrImage->vkImage = vkImages[i];
+		uptrImage->Init();
+	}
+}
+
 VkExtent2D MyDevice::GetSwapchainExtent() const
 {
-	// SwapChainSupportDetails swapChainSupport = _QuerySwapchainSupport(vkPhysicalDevice, vkSurface);
-	// return _ChooseSwapchainExtent(swapChainSupport.capabilities);
 	return m_swapchain.extent;
 }
 
@@ -517,6 +580,7 @@ void MyDevice::Init()
 	_CreateSwapchain();
 	_InitDescriptorAllocator();
 	_CreateCommandPools();
+	m_initialized = true;
 }
 
 void MyDevice::Uninit()
@@ -529,6 +593,7 @@ void MyDevice::Uninit()
 	vkb::destroy_instance(m_instance);
 	glfwDestroyWindow(pWindow);
 	glfwTerminate();
+	m_initialized = false;
 }
 
 UserInput MyDevice::GetUserInput() const
@@ -547,11 +612,11 @@ UserInput MyDevice::GetUserInput() const
 
 MyDevice& MyDevice::GetInstance()
 {
-	if (s_pInstance == nullptr)
+	if (s_uptrInstance.get() == nullptr)
 	{
-		s_pInstance = new MyDevice();
+		s_uptrInstance = std::make_unique<MyDevice>();
 	}
-	return *s_pInstance;
+	return *s_uptrInstance;
 }
 
 void MyDevice::OnFramebufferResized(GLFWwindow* _pWindow, int width, int height)

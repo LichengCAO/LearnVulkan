@@ -88,6 +88,7 @@ public:
 		VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
 		VkMemoryPropertyFlags memoryProperty = 0; // image memory
 		VkImageLayout initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // transfer layout
+		bool inSwapchain = false;
 	};
 
 private:

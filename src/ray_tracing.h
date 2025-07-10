@@ -20,6 +20,8 @@ private:
 		VkBuildAccelerationStructureFlagsKHR			vkBuildFlags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
 
 		std::unique_ptr<Buffer>							uptrInstanceBuffer;
+
+		void Reset();
 	};
 	struct BLASInput
 	{

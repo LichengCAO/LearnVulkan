@@ -342,8 +342,7 @@ void RayTracingAccelerationStructure::_BuildTLAS()
 	// Other implementations may reference the original vertex data at runtime, meaning the vertex buffer must remain valid for as long as the BLAS is used.
 	// Because this behavior depends on the GPU driverand hardware, 
 	// you cannot assume that the vertex buffer can always be destroyed after the BLAS is built unless you¡¯ve confirmed the implementation¡¯s behavior.
-	m_TLASInput.uptrInstanceBuffer->Uninit();
-	m_TLASInput = TLASInput{};
+	m_TLASInput.Reset();
 }
 
 uint32_t RayTracingAccelerationStructure::AddBLAS(const std::vector<TriangleData>& geomData)
@@ -387,7 +386,6 @@ uint32_t RayTracingAccelerationStructure::AddBLAS(const std::vector<TriangleData
 void RayTracingAccelerationStructure::SetUpTLAS(const std::vector<InstanceData>& instData)
 {
 	uint32_t gl_InstanceCustomIndex = 0u;
-	TLASInput& tlasInput = m_TLASInput;
 	std::vector<VkAccelerationStructureInstanceKHR> ASInstances;
 	VkAccelerationStructureGeometryInstancesDataKHR geomInstancesData{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR };
 	VkAccelerationStructureGeometryKHR				geom{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR };
@@ -395,7 +393,7 @@ void RayTracingAccelerationStructure::SetUpTLAS(const std::vector<InstanceData>&
 	
 	_BuildBLASs();
 
-	tlasInput = TLASInput{};
+	m_TLASInput.Reset();
 
 	// prepare instance data
 	ASInstances.reserve(instData.size());
@@ -416,23 +414,23 @@ void RayTracingAccelerationStructure::SetUpTLAS(const std::vector<InstanceData>&
 	// setup instance buffer
 	{
 		Buffer::Information bufferInfo{};
-		tlasInput.uptrInstanceBuffer = std::make_unique<Buffer>();
+		m_TLASInput.uptrInstanceBuffer = std::make_unique<Buffer>();
 
 		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		bufferInfo.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 		bufferInfo.size = ASInstances.size() * sizeof(VkAccelerationStructureInstanceKHR);
 
-		tlasInput.uptrInstanceBuffer->Init(bufferInfo);
-		tlasInput.uptrInstanceBuffer->CopyFromHost(ASInstances.data());
+		m_TLASInput.uptrInstanceBuffer->Init(bufferInfo);
+		m_TLASInput.uptrInstanceBuffer->CopyFromHost(ASInstances.data());
 	}
 
 	buildRangeInfo.primitiveCount = static_cast<uint32_t>(instData.size());
-	geomInstancesData.data.deviceAddress = tlasInput.uptrInstanceBuffer->GetDeviceAddress();
+	geomInstancesData.data.deviceAddress = m_TLASInput.uptrInstanceBuffer->GetDeviceAddress();
 	geom.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
 	geom.geometry.instances = geomInstancesData;
 
-	tlasInput.vkASBuildRangeInfo = buildRangeInfo;
-	tlasInput.vkASGeometry = geom;
+	m_TLASInput.vkASBuildRangeInfo = buildRangeInfo;
+	m_TLASInput.vkASGeometry = geom;
 }
 
 void RayTracingAccelerationStructure::Init()
@@ -453,7 +451,7 @@ void RayTracingAccelerationStructure::Uninit()
 	}
 	m_uptrTLAS.reset();
 	vkAccelerationStructure = VK_NULL_HANDLE;
-	m_TLASInput.uptrInstanceBuffer->Uninit();
+	m_TLASInput.Reset();
 	for (auto& curBLAS : m_uptrBLASes)
 	{
 		curBLAS->Uninit();
@@ -546,3 +544,14 @@ void RayTracingAccelerationStructure::TLAS::Uninit()
 		vkAccelerationStructure = VK_NULL_HANDLE;
 	}
 }
+
+void RayTracingAccelerationStructure::TLASInput::Reset()
+{
+	if (uptrInstanceBuffer.get() != nullptr)
+	{
+		uptrInstanceBuffer->Uninit();
+		uptrInstanceBuffer.reset();
+	}
+	*this = TLASInput{};
+}
+

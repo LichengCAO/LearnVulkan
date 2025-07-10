@@ -13,7 +13,8 @@
 // This is quite unlike the in/out variables used to connect vertex shaders and fragment shaders.
 layout(location = 1) rayPayloadInEXT HitPayload payload;
 
-layout(set = 0, binding = 0, scalar) buffer InstanceAddressData_ {
+layout(set = 0, binding = 1) uniform accelerationStructureEXT accelerationStructure;
+layout(set = 0, binding = 3, scalar) buffer InstanceAddressData_ {
     InstanceAddressData i[];
 } instanceAddressData;
 
@@ -47,7 +48,7 @@ vec3 ObjectNormalToWorldNormal(const vec3 normal)
 }
 vec3 GetRayHitPosition()
 {
-    return gl_RayOriginEXT + gl_HitTEXT * gl_RayDirectionEXT;
+    return gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
 }
 void EmitShadowRay(in vec3 rayOrigin, in vec3 rayDirection)
 {

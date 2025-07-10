@@ -237,7 +237,7 @@ void RayTracingApp::_InitImagesAndViews()
 		imgInfo.mipLevels = 1u;
 		imgInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 		imgInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-		imgInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT;
+		imgInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 		imgInfo.width = MyDevice::GetInstance().GetSwapchainExtent().width;
 		imgInfo.height = MyDevice::GetInstance().GetSwapchainExtent().height;
 

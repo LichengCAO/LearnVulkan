@@ -7,14 +7,13 @@
 
 void SwapchainPass::_InitViews()
 {
-	auto swapchainImages = MyDevice::GetInstance().GetSwapchainImages();
-	int n = swapchainImages.size();
+	std::vector<Image*> pSwapchainImages;
 	_UninitViews();
-
-	m_swapchainViews.reserve(n);
-	for (int i = 0; i < n; ++i)
+	MyDevice::GetInstance().GetSwapchainImagePointers(pSwapchainImages);
+	m_swapchainViews.reserve(pSwapchainImages.size());
+	for (size_t i = 0; i < pSwapchainImages.size(); ++i)
 	{
-		std::unique_ptr<ImageView> uptrView = std::make_unique<ImageView>(swapchainImages[i].NewImageView(VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1));
+		std::unique_ptr<ImageView> uptrView = std::make_unique<ImageView>(pSwapchainImages[i]->NewImageView(VK_IMAGE_ASPECT_COLOR_BIT, 0, 1, 0, 1));
 		uptrView->Init();
 		m_swapchainViews.push_back(std::move(uptrView));
 	}

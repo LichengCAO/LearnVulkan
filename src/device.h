@@ -20,10 +20,10 @@ struct UserInput
 	double yPos = 0.0;
 };
 
-class MyDevice
+class MyDevice final
 {
 private:
-	static MyDevice* s_pInstance;
+	static std::unique_ptr<MyDevice> s_uptrInstance;
 
 	vkb::Instance		m_instance;
 	vkb::PhysicalDevice m_physicalDevice;
@@ -32,9 +32,13 @@ private:
 	vkb::Swapchain		m_swapchain;
 	VkQueue				m_vkPresentQueue = VK_NULL_HANDLE;
 	bool				m_needRecreate = false;
+	bool				m_initialized = false;
 	UserInput			m_userInput{};
+	std::vector<std::unique_ptr<Image>> m_uptrSwapchainImages;
+
 private:
-	MyDevice() {};
+	MyDevice();
+	MyDevice(const MyDevice& _other) = delete;
 
 	std::vector<const char*> _GetInstanceRequiredExtensions() const;
 	QueueFamilyIndices		 _GetQueueFamilyIndices(VkPhysicalDevice physicalDevice) const;
@@ -60,6 +64,12 @@ private:
 	void _AddRayTracingExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selector) const;
 	void _AddMeshShaderExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selector) const;
 
+	// get VkImages in current swapchain
+	void _GetVkSwapchainImages(std::vector<VkImage>& _vkImages) const;
+
+	// update m_uptrSwapchainImages
+	void _UpdateSwapchainImages();
+
 public:
 	GLFWwindow*			pWindow = nullptr;
 	VkInstance			vkInstance = VK_NULL_HANDLE;
@@ -73,11 +83,14 @@ public:
 	std::unordered_map<uint32_t, VkCommandPool>		vkCommandPools;
 	std::unordered_map<VkImage, ImageLayout>        imageLayouts;
 	
+	~MyDevice();
+
 	void Init();
 	void Uninit();
 	
 	void RecreateSwapchain();
-	std::vector<Image> GetSwapchainImages() const;
+	std::vector<Image> GetSwapchainImages() const; //deprecated
+	void GetSwapchainImagePointers(std::vector<Image*>& _output) const;
 	std::optional<uint32_t> AquireAvailableSwapchainImageIndex(VkSemaphore finishSignal);
 	void PresentSwapchainImage(const std::vector<VkSemaphore>& waitSemaphores, uint32_t imageIdx);
 	bool NeedRecreateSwapchain() const;
@@ -91,4 +104,7 @@ public:
 	static MyDevice& GetInstance();
 	static void OnFramebufferResized(GLFWwindow* _pWindow, int width, int height);
 	static void CursorPosCallBack(GLFWwindow* _pWindow, double _xPos, double _yPos);
+
+	// do this or use static std::unique_ptr<MyDevice> instance{ new MyDevice() };
+	friend std::unique_ptr<MyDevice> std::make_unique<MyDevice>();
 };

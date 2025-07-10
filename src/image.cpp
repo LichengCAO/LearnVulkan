@@ -9,8 +9,7 @@
 uint32_t Image::_FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const
 {
 	VkPhysicalDeviceMemoryProperties memProperties;
-	MyDevice gMyDevice = MyDevice::GetInstance();
-	vkGetPhysicalDeviceMemoryProperties(gMyDevice.vkPhysicalDevice, &memProperties);
+	vkGetPhysicalDeviceMemoryProperties(MyDevice::GetInstance().vkPhysicalDevice, &memProperties);
 	for (uint32_t res = 0; res < memProperties.memoryTypeCount; ++res) {
 		bool suitableType = typeBits & (1 << res);
 		bool suitableMemoryProperty = (memProperties.memoryTypes[res].propertyFlags & properties) == properties;
@@ -37,66 +36,86 @@ void Image::SetImageInformation(const Information& imageInfo)
 
 void Image::Init()
 {
+	if (m_initCalled) return;
 	m_initCalled = true;
-	if (vkImage != VK_NULL_HANDLE) return;
-	VkImageCreateInfo imgInfo{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
-	imgInfo.imageType = m_imageInformation.imageType;
-	imgInfo.extent = {
-		.width = m_imageInformation.width,
-		.height = m_imageInformation.height,
-		.depth = m_imageInformation.depth
-	};
-	imgInfo.mipLevels = m_imageInformation.mipLevels;
-	imgInfo.arrayLayers = m_imageInformation.arrayLayers;
-	imgInfo.format = m_imageInformation.format;
-	imgInfo.tiling = m_imageInformation.tiling;
-	CHECK_TRUE(m_imageInformation.initialLayout == VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED || m_imageInformation.initialLayout == VkImageLayout::VK_IMAGE_LAYOUT_PREINITIALIZED,
-		"According to the Vulkan specification, VkImageCreateInfo::initialLayout must be set to VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED at image creation.");
-	imgInfo.initialLayout = m_imageInformation.initialLayout;
-	imgInfo.usage = m_imageInformation.usage;
-	imgInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-	imgInfo.samples = m_imageInformation.samples;
-	imgInfo.flags = 0;
-	CHECK_TRUE(vkImage == VK_NULL_HANDLE, "VkImage is already created!");
-	VK_CHECK(vkCreateImage(MyDevice::GetInstance().vkDevice, &imgInfo, nullptr, &vkImage), "Failed to crate image!");
-
-	_AddImageLayout();
-	_AllocateMemory();
+	if (!m_imageInformation.inSwapchain)
+	{
+		if (vkImage != VK_NULL_HANDLE) return;
+		VkImageCreateInfo imgInfo{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
+		imgInfo.imageType = m_imageInformation.imageType;
+		imgInfo.extent = {
+			.width = m_imageInformation.width,
+			.height = m_imageInformation.height,
+			.depth = m_imageInformation.depth
+		};
+		imgInfo.mipLevels = m_imageInformation.mipLevels;
+		imgInfo.arrayLayers = m_imageInformation.arrayLayers;
+		imgInfo.format = m_imageInformation.format;
+		imgInfo.tiling = m_imageInformation.tiling;
+		CHECK_TRUE(m_imageInformation.initialLayout == VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED || m_imageInformation.initialLayout == VkImageLayout::VK_IMAGE_LAYOUT_PREINITIALIZED,
+			"According to the Vulkan specification, VkImageCreateInfo::initialLayout must be set to VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED at image creation.");
+		imgInfo.initialLayout = m_imageInformation.initialLayout;
+		imgInfo.usage = m_imageInformation.usage;
+		imgInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		imgInfo.samples = m_imageInformation.samples;
+		imgInfo.flags = 0;
+		CHECK_TRUE(vkImage == VK_NULL_HANDLE, "VkImage is already created!");
+		VK_CHECK(vkCreateImage(MyDevice::GetInstance().vkDevice, &imgInfo, nullptr, &vkImage), "Failed to crate image!");
+		_AddImageLayout();
+		_AllocateMemory();
+	}
+	else
+	{
+		CHECK_TRUE(vkImage != VK_NULL_HANDLE, "Set vkImage manually if it's a swapchain image!");
+		_AddImageLayout();
+	}
 }
 
 void Image::Uninit()
 {
-	if (vkImage != VK_NULL_HANDLE)
+	if (!m_initCalled) return;
+	m_initCalled = false;
+	if (m_imageInformation.inSwapchain)
 	{
-		_RemoveImageLayout();
-		vkDestroyImage(MyDevice::GetInstance().vkDevice, vkImage, nullptr);
-		vkImage = VK_NULL_HANDLE;
+		if (vkImage != VK_NULL_HANDLE)
+		{
+			_RemoveImageLayout();
+			vkImage = VK_NULL_HANDLE;
+		}
 	}
-	_FreeMemory();
+	else
+	{
+		if (vkImage != VK_NULL_HANDLE)
+		{
+			_RemoveImageLayout();
+			vkDestroyImage(MyDevice::GetInstance().vkDevice, vkImage, nullptr);
+			vkImage = VK_NULL_HANDLE;
+		}
+		_FreeMemory();
+	}
 }
 
 void Image::_AllocateMemory()
 {
-	MyDevice gMyDevice = MyDevice::GetInstance();
+	VkDevice vkDevice = MyDevice::GetInstance().vkDevice;
 	VkMemoryRequirements memRequirements;
-	vkGetImageMemoryRequirements(gMyDevice.vkDevice, vkImage, &memRequirements);
+	vkGetImageMemoryRequirements(vkDevice, vkImage, &memRequirements);
 	VkMemoryAllocateInfo allocInfo = {
 		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
 		.allocationSize = memRequirements.size,
 		.memoryTypeIndex = _FindMemoryTypeIndex(memRequirements.memoryTypeBits, m_imageInformation.memoryProperty)
 	};
 
-	VK_CHECK(vkAllocateMemory(gMyDevice.vkDevice, &allocInfo, nullptr, &vkDeviceMemory), "Failed to allocate image memory!");
+	VK_CHECK(vkAllocateMemory(vkDevice, &allocInfo, nullptr, &vkDeviceMemory), "Failed to allocate image memory!");
 
-	vkBindImageMemory(gMyDevice.vkDevice, vkImage, vkDeviceMemory, 0);
+	vkBindImageMemory(vkDevice, vkImage, vkDeviceMemory, 0);
 }
 
 void Image::_FreeMemory()
 {
 	if (vkDeviceMemory != VK_NULL_HANDLE)
 	{
-		MyDevice gMyDevice = MyDevice::GetInstance();
-		vkFreeMemory(gMyDevice.vkDevice, vkDeviceMemory, nullptr);
+		vkFreeMemory(MyDevice::GetInstance().vkDevice, vkDeviceMemory, nullptr);
 		vkDeviceMemory = VK_NULL_HANDLE;
 	}
 }

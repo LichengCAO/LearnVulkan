@@ -13,7 +13,6 @@ layout(set = 0, binding = 0) uniform CameraInformation
 } cameraInfo;
 layout(set = 0, binding = 1) uniform accelerationStructureEXT accelerationStructure;
 layout(set = 0, binding = 2, rgba32f) uniform image2D imageOutput;
-+
 layout(location = 0) rayPayloadEXT HitPayload payload;
 
 void GetRayOriginAndDirection(out vec3 rayOrigin, out vec3 rayDirection)

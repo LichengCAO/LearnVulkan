@@ -46,7 +46,7 @@ vec3 ObjectNormalToWorldNormal(const vec3 normal)
 }
 vec3 GetRayHitPosition()
 {
-    return gl_RayOriginEXT + gl_HitTEXT * gl_RayDirectionEXT;
+    return gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
 }
 
 void main()

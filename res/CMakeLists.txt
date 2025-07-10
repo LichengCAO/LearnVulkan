@@ -10,6 +10,9 @@ file(GLOB SHADER_SOURCES
     "shaders/*.tese"
     "shaders/*.mesh"
     "shaders/*.task"
+    "shaders/*.rgen"
+    "shaders/*.rmiss"
+    "shaders/*.rchit"
 )
 
 file(GLOB IMAGES

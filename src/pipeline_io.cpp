@@ -116,7 +116,8 @@ void DescriptorSet::FinishUpdate()
 			uptrASInfo->accelerationStructureCount = static_cast<uint32_t>(eUpdate.accelerationStructures.size());
 			uptrASInfo->pAccelerationStructures = eUpdate.accelerationStructures.data();
 			uptrASInfo->pNext = nullptr;
-
+			// pNext<VkWriteDescriptorSetAccelerationStructureKHR>.accelerationStructureCount must be equal to descriptorCount
+			wds.descriptorCount = static_cast<uint32_t>(eUpdate.accelerationStructures.size());
 			wds.pNext = uptrASInfo.get();
 			uptrASwrites.push_back(std::move(uptrASInfo));
 			break;
