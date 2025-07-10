@@ -13,5 +13,5 @@ layout(location = 1) rayPayloadInEXT HitPayload payload;
 
 void main()
 {
-    payload.hitValue = vec3(0.2f, 0.2f, 0.2f); // Set a default hit value
+    payload.hitValue = vec3(0.0f, 0.0f, 0.05f); // Set a default hit value
 }

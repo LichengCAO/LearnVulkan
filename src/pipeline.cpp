@@ -285,6 +285,7 @@ void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput_Mes
 void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput_Draw& input)
 {
 	_DoCommon(commandBuffer, input.imageSize, input.pDescriptorSets);
+	vkCmdDraw(commandBuffer, input.vertexCount, 1, 0, 0);
 }
 
 ComputePipeline::~ComputePipeline()

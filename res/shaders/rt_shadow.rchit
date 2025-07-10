@@ -74,27 +74,27 @@ void main()
     Vertices vertices = Vertices(instanceData.vertexAddress);
     Indices indices = Indices(instanceData.indexAddress);
 
-    ivec3 ind = indices.i[gl_PrimitiveID];
-    Vertex v0 = vertices.v[ind.x];
-    Vertex v1 = vertices.v[ind.y];
-    Vertex v2 = vertices.v[ind.z];
+    // ivec3 ind = indices.i[gl_PrimitiveID];
+    // Vertex v0 = vertices.v[ind.x];
+    // Vertex v1 = vertices.v[ind.y];
+    // Vertex v2 = vertices.v[ind.z];
 
-    const vec3 barycentrics = GetBarycentrics();
-    const vec3 posObject = v0.position * barycentrics.x + v1.position * barycentrics.y + v2.position * barycentrics.z;
-    const vec3 posWorld = ObjectToWorld(posObject);
-    const vec3 nrmObject = v0.normal * barycentrics.x + v1.normal * barycentrics.y + v2.normal * barycentrics.z;
-    // GetRayHitPosition() can also be used to get the world position, but it is less precise
-    const vec3 nrmWorld = ObjectNormalToWorldNormal(nrmObject);
+    // const vec3 barycentrics = GetBarycentrics();
+    // const vec3 posObject = v0.position * barycentrics.x + v1.position * barycentrics.y + v2.position * barycentrics.z;
+    // const vec3 posWorld = ObjectToWorld(posObject);
+    // const vec3 nrmObject = v0.normal * barycentrics.x + v1.normal * barycentrics.y + v2.normal * barycentrics.z;
+    // // GetRayHitPosition() can also be used to get the world position, but it is less precise
+    // const vec3 nrmWorld = ObjectNormalToWorldNormal(nrmObject);
 
-    const vec3 wi = normalize(posLight - posWorld); // Vector from the hit position to the light source
-    if (dot(nrmWorld, wi) > 0.0f) // Check if the light is visible from the surface
-    {
-        // Emit a shadow ray to check if the light is occluded
-        EmitShadowRay(posWorld + nrmWorld * 0.001f, wi);
-        payload.hitValue = payload.hitValue * dot(nrmWorld, wi);
-    }
-    else
-    {
-        payload.hitValue = vec3(0.0f, 0.0f, 0.0f);
-    }
+    // const vec3 wi = normalize(posLight - posWorld); // Vector from the hit position to the light source
+    // if (dot(nrmWorld, wi) > 0.0f) // Check if the light is visible from the surface
+    // {
+    //     // Emit a shadow ray to check if the light is occluded
+    //     EmitShadowRay(posWorld + nrmWorld * 0.001f, wi);
+    //     payload.hitValue = payload.hitValue * dot(nrmWorld, wi);
+    // }
+    // else
+    // {
+    //     payload.hitValue = vec3(0.0f, 0.0f, 0.0f);
+    // }
 }

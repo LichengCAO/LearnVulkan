@@ -60,10 +60,12 @@ void RayTracingApp::_UninitSampler()
 void RayTracingApp::_InitModels()
 {
 	std::vector<Mesh> outMeshes;
-	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/bunny/bunny.obj", outMeshes);
+	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/sphere/sphere.obj", outMeshes);
 	for (auto const& mesh : outMeshes)
 	{
 		Model model{};
+		model.transform.SetScale({ 0.5, 0.5, 0.5 });
+		//model.transform.SetRotation({ -90, 0, 0 });
 		model.mesh = mesh;
 		m_models.push_back(model);
 	}
@@ -422,9 +424,10 @@ void RayTracingApp::_UpdateUniformBuffer()
 		m_camera.MoveTo(mov);
 	}
 
-	ubo.proj = m_camera.GetProjectionMatrix();
-	ubo.proj[1][1] *= -1;
-	ubo.view = m_camera.GetViewMatrix();
+	//ubo.proj[1][1] *= -1;
+	ubo.F = glm::vec4(glm::normalize(m_camera.ref - m_camera.eye), 1.0f);
+	ubo.V = glm::vec4(m_camera.V, 1.0f);
+	ubo.H = glm::vec4(m_camera.H, 1.0f);
 	ubo.eye = glm::vec4(m_camera.eye, 1.0f);
 	m_cameraBuffers[m_currentFrame]->CopyFromHost(&ubo);
 }

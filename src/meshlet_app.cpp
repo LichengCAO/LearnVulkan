@@ -114,12 +114,11 @@ void MeshletApp::_UninitSampler()
 void MeshletApp::_InitModels()
 {
 	std::vector<Mesh> meshs;
-	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/bunny/bunny.obj", meshs);
+	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/sphere/sphere.obj", meshs);
 	for (auto& mesh : meshs)
 	{
 		Model model{};
-		model.transform.SetScale({ 2.0, 2.0, 2.0 });
-		model.transform.SetRotation({ -90, 0, 0 });
+		model.transform.SetScale({ 0.5, 0.5, 0.5 });
 		model.mesh = mesh;
 		MeshUtility::BuildMeshlets(mesh, model.vecMeshlet, model.vecMeshletBounds, model.vecVertexRemap, model.vecTriangleIndex);
 		m_models.push_back(model);

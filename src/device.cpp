@@ -382,6 +382,25 @@ void MyDevice::_DestroySwapchain()
 	vkb::destroy_swapchain(m_swapchain);
 }
 
+
+// pCreateInfo->pNext chain includes a VkPhysicalDeviceVulkan12Features structure,
+// then it must not include a VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES structure.
+// The Vulkan spec states : 
+// If the pNext chain includes a VkPhysicalDeviceVulkan12Features structure,
+// then it must not include a 
+//	VkPhysicalDevice8BitStorageFeatures,
+//	VkPhysicalDeviceShaderAtomicInt64Features,
+//	VkPhysicalDeviceShaderFloat16Int8Features,
+//	VkPhysicalDeviceDescriptorIndexingFeatures,
+//	VkPhysicalDeviceScalarBlockLayoutFeatures,
+//	VkPhysicalDeviceImagelessFramebufferFeatures,
+//	VkPhysicalDeviceUniformBufferStandardLayoutFeatures,
+//	VkPhysicalDeviceShaderSubgroupExtendedTypesFeatures,
+//	VkPhysicalDeviceSeparateDepthStencilLayoutsFeatures,
+//	VkPhysicalDeviceHostQueryResetFeatures,
+//	VkPhysicalDeviceTimelineSemaphoreFeatures,
+//	VkPhysicalDeviceBufferDeviceAddressFeatures,
+//	or VkPhysicalDeviceVulkanMemoryModelFeatures structure
 void MyDevice::_AddBaseExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selector) const
 {
 	VkPhysicalDeviceFeatures requiredFeatures{};
@@ -404,7 +423,7 @@ void MyDevice::_AddBaseExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selec
 			VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
 		});
 	_selector.set_required_features(requiredFeatures);
-	_selector.add_required_extension_features(physicalDeviceDescriptorIndexingFeatures);
+	//_selector.add_required_extension_features(physicalDeviceDescriptorIndexingFeatures);
 }
 
 void MyDevice::_AddRayTracingExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selector) const
@@ -419,6 +438,10 @@ void MyDevice::_AddRayTracingExtensionsAndFeatures(vkb::PhysicalDeviceSelector& 
 	rayTracingPipelineFeatures.rayTracingPipeline = VK_TRUE;
 	hostQueryResetFeatures.hostQueryReset = VK_TRUE;
 	vulkan12Featrues.bufferDeviceAddress = VK_TRUE;
+	vulkan12Featrues.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
+	vulkan12Featrues.runtimeDescriptorArray = VK_TRUE;
+	vulkan12Featrues.descriptorBindingVariableDescriptorCount = VK_TRUE;
+	vulkan12Featrues.hostQueryReset = VK_TRUE;
 	_selector.add_required_extensions(
 		{ 
 			VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
@@ -427,7 +450,7 @@ void MyDevice::_AddRayTracingExtensionsAndFeatures(vkb::PhysicalDeviceSelector& 
 		});
 	_selector.add_required_extension_features(accelerationStructureFeatures);
 	_selector.add_required_extension_features(rayTracingPipelineFeatures);
-	_selector.add_required_extension_features(hostQueryResetFeatures);
+	//_selector.add_required_extension_features(hostQueryResetFeatures);
 	_selector.add_required_extension_features(vulkan12Featrues);
 }
 

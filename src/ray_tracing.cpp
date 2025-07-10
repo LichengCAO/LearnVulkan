@@ -129,6 +129,7 @@ void RayTracingAccelerationStructure::_BuildBLASs()
 		uint32_t queryIndex = 0u;
 		int loopCount = (nAllBLASCount + scratchAddresses.size() - 1) / scratchAddresses.size();
 		CommandSubmission cmd{};
+		CommandSubmission::WaitInformation waitCmd{ VK_NULL_HANDLE, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT }; // we cannot signal a signaled semaphore, so we need to wait semaphore and unsignaled it
 		
 		// prepare query pool
 		if (bNeedCompact)
@@ -172,7 +173,14 @@ void RayTracingAccelerationStructure::_BuildBLASs()
 			}
 
 			// this will wait till previous commands be done, so that scratch buffer is available
-			cmd.StartCommands({});
+			if (waitCmd.waitSamaphore == VK_NULL_HANDLE)
+			{
+				cmd.StartCommands({});
+			}
+			else
+			{
+				cmd.StartCommands({ waitCmd });
+			}
 
 			// build BLASes
 			cmd.BuildAccelerationStructures(buildGeomInfosToProcess, buildRangeInfosToProcess);
@@ -188,7 +196,7 @@ void RayTracingAccelerationStructure::_BuildBLASs()
 				cmd.WriteAccelerationStructuresProperties(BLASesToProcess, VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR, m_vkQueryPool, queryIndex);
 			}
 
-			cmd.SubmitCommands();
+			waitCmd.waitSamaphore = cmd.SubmitCommands();
 
 			// compact BLAS
 			if (bNeedCompact)
@@ -208,7 +216,14 @@ void RayTracingAccelerationStructure::_BuildBLASs()
 					VK_QUERY_RESULT_WAIT_BIT
 				);
 
-				cmd.StartCommands({});
+				if (waitCmd.waitSamaphore == VK_NULL_HANDLE)
+				{
+					cmd.StartCommands({});
+				}
+				else
+				{
+					cmd.StartCommands({ waitCmd });
+				}
 
 				for (int i = queryIndex; i < BLASIndex; ++i)
 				{

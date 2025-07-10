@@ -22,7 +22,7 @@ layout(buffer_reference, scalar) buffer Vertices {
     Vertex v[];
 }; // Positions of an object
 layout(buffer_reference, scalar) buffer Indices {
-    ivec3 i[];
+    int i[];
 }; // Triangle indices
 
 hitAttributeEXT vec2 attribs; // Barycentric coordinates
@@ -55,16 +55,17 @@ void main()
     Vertices vertices = Vertices(instanceData.vertexAddress);
     Indices indices = Indices(instanceData.indexAddress);
 
-    const ivec3 ind = indices.i[gl_PrimitiveID];
-    Vertex v0 = vertices.v[ind.x];
-    Vertex v1 = vertices.v[ind.y];
-    Vertex v2 = vertices.v[ind.z];
+    // const ivec3 ind = indices.i[gl_PrimitiveID];
+    // Vertex v0 = vertices.v[ind.x];
+    // Vertex v1 = vertices.v[ind.y];
+    // Vertex v2 = vertices.v[ind.z];
 
-    const vec3 barycentrics = GetBarycentrics();
-    const vec3 posObject = v0.position * barycentrics.x + v1.position * barycentrics.y + v2.position * barycentrics.z;
-    const vec3 posWorld = ObjectToWorld(posObject);
-    const vec3 nrmObject = v0.normal * barycentrics.x + v1.normal * barycentrics.y + v2.normal * barycentrics.z;
-    const vec3 nrmWorld = ObjectNormalToWorldNormal(nrmObject); // GetRayHitPosition() can also be used to get the world position, but is less precise
+    // const vec3 barycentrics = GetBarycentrics();
+    // const vec3 posObject = v0.position * barycentrics.x + v1.position * barycentrics.y + v2.position * barycentrics.z;
+    // const vec3 posWorld = ObjectToWorld(posObject);
+    // const vec3 nrmObject = v0.normal * barycentrics.x + v1.normal * barycentrics.y + v2.normal * barycentrics.z;
+    // const vec3 nrmWorld = ObjectNormalToWorldNormal(nrmObject); // GetRayHitPosition() can also be used to get the world position, but is less precise
 
-    payload.hitValue = nrmWorld * 0.5f + vec3(0.5f, 0.5f, 0.5f); // Convert to [0, 1] range for color output
+    // payload.hitValue = nrmWorld * 0.5f + vec3(0.5f, 0.5f, 0.5f); // Convert to [0, 1] range for color output
+    payload.hitValue = vec3(0.8f, 0.0f, 0.5f);
 } 

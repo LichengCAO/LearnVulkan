@@ -72,6 +72,8 @@ void CommandSubmission::Uninit()
 
 void CommandSubmission::StartCommands(const std::vector<WaitInformation>& _waitInfos)
 {
+	VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
+	size_t n = _waitInfos.size();
 	CHECK_TRUE(vkCommandBuffer != VK_NULL_HANDLE, "Command buffer is not initialized!");
 	CHECK_TRUE(!m_isRecording, "Already start commands!");
 	if (vkFence == VK_NULL_HANDLE)
@@ -82,12 +84,11 @@ void CommandSubmission::StartCommands(const std::vector<WaitInformation>& _waitI
 	vkResetFences(MyDevice::GetInstance().vkDevice, 1, &vkFence);
 	vkResetCommandBuffer(vkCommandBuffer, 0);
 	m_isRecording = true;
-	VkCommandBufferBeginInfo beginInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO };
 	VK_CHECK(vkBeginCommandBuffer(vkCommandBuffer, &beginInfo), "Failed to begin command!");
 	m_vkWaitSemaphores.clear();
 	m_vkWaitStages.clear();
-	m_vkWaitSemaphores.reserve(_waitInfos.size());
-	m_vkWaitStages.reserve(_waitInfos.size());
+	m_vkWaitSemaphores.reserve(n);
+	m_vkWaitStages.reserve(n);
 	for (const auto& waitInfo : _waitInfos)
 	{
 		m_vkWaitStages.push_back(waitInfo.waitStage);

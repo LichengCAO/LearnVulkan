@@ -14,6 +14,6 @@ struct InstanceAddressData
 
 struct Vertex
 {
-    vec3 position; // Position of the vertex in object space
-    vec3 normal;   // Normal of the vertex in object space
+    vec4 position; // Position of the vertex in object space
+    vec4 normal;   // Normal of the vertex in object space
 };
