@@ -30,9 +30,7 @@ private:
 	};
 	struct CameraUBO
 	{
-		glm::vec4 H;
-		glm::vec4 V;
-		glm::vec4 F;
+		glm::mat4 inverseViewProj;
 		glm::vec4 eye;
 	};
 	

@@ -347,7 +347,7 @@ void RayTracingApp::_InitSwapchainPass()
 	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 	{
 		VkDescriptorImageInfo imageInfo{};
-		imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
+		imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 		imageInfo.imageView = m_rtImageViews[i]->vkImageView;
 		imageInfo.sampler = m_vkSampler;
 		imageInfos.push_back(imageInfo);
@@ -425,9 +425,10 @@ void RayTracingApp::_UpdateUniformBuffer()
 	}
 
 	//ubo.proj[1][1] *= -1;
-	ubo.F = glm::vec4(glm::normalize(m_camera.ref - m_camera.eye), 1.0f);
-	ubo.V = glm::vec4(m_camera.V, 1.0f);
-	ubo.H = glm::vec4(m_camera.H, 1.0f);
+	//ubo.F = glm::vec4(glm::normalize(m_camera.ref - m_camera.eye), 1.0f);
+	//ubo.V = glm::vec4(m_camera.V, 1.0f);
+	//ubo.H = glm::vec4(m_camera.H, 1.0f);
+	ubo.inverseViewProj = glm::inverse(m_camera.GetViewProjectionMatrix());
 	ubo.eye = glm::vec4(m_camera.eye, 1.0f);
 	m_cameraBuffers[m_currentFrame]->CopyFromHost(&ubo);
 }
@@ -496,7 +497,7 @@ void RayTracingApp::_DrawFrame()
 	}
 
 	scPassWait.waitSamaphore = cmd->SubmitCommands();
-	scPassWait.waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	scPassWait.waitStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 	m_swapchainPass->Do({ scPassWait });
 
 	m_currentFrame = (m_currentFrame + 1) % MAX_FRAME_COUNT;

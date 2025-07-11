@@ -21,7 +21,15 @@ public:
 	void SetMipLevelRange(uint32_t baseMipLevel, uint32_t levelCount = 1);
 	void SetArrayLayerRange(uint32_t baseArrayLayer, uint32_t layerCount = 1);
 	void SetAspect(VkImageAspectFlags aspectMask);
-	VkImageMemoryBarrier NewBarrier(VkImage _image, VkImageLayout _oldLayout, VkImageLayout _newLayout, VkAccessFlags _srcAccessMask, VkAccessFlags _dstAccessMask) const;
+	// _srcAccessMask: when the data is updated (available)
+	// _dstAccessMask: when the data is visible
+	// see: https://themaister.net/blog/2019/08/14/yet-another-blog-explaining-vulkan-synchronization/
+	VkImageMemoryBarrier NewBarrier(
+		VkImage _image,
+		VkImageLayout _oldLayout,
+		VkImageLayout _newLayout,
+		VkAccessFlags _srcAccessMask,
+		VkAccessFlags _dstAccessMask) const;
 };
 
 class ImageBlitBuilder
