@@ -24,7 +24,8 @@ private:
 	};
 	struct VBO
 	{
-		// no need to use alignas here, since we will use scalarEXT in shader
+		// no need to use alignas here, since we will use scalarEXT in shader, 
+		// but it won't work somehow, do not know the reason for it yet
 		alignas(16) glm::vec4 pos;
 		alignas(16) glm::vec4 normal;
 	};

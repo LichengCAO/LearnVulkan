@@ -62,17 +62,25 @@ void RayTracingApp::_InitModels()
 	std::vector<Mesh> outMeshes;
 	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/bunny/bunny.obj", outMeshes);
 	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/wahoo/wahoo.obj", outMeshes);
-	int i = 0;
+	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/ChessBoard/ChessBoard.obj", outMeshes);
+
 	for (auto const& mesh : outMeshes)
 	{
 		Model model{};
-		model.transform.SetScale({ 0.5, 0.5, 0.5 });
-		model.transform.SetPosition(i * 2, 0, 0);
-		++i;
-		model.transform.SetRotation({ -90 * i, 0, 0 });
 		model.mesh = mesh;
 		m_models.push_back(model);
 	}
+	//m_models[0].transform.SetScale(0.5, 0.5, 0.5);
+	m_models[1].transform.SetScale(0.5, 0.5, 0.5);
+	//m_models[2].transform.SetScale(0.1, 0.1, 0.1);
+
+	m_models[0].transform.SetPosition(0, 0, 0);
+	m_models[1].transform.SetPosition(6, 0, 1);
+	m_models[2].transform.SetPosition(0, 0, -2);
+
+	m_models[0].transform.SetRotation(90, 0, 180);
+	m_models[1].transform.SetRotation(90, 0, 180);
+	m_models[2].transform.SetRotation(0, 0, 90);
 }
 
 void RayTracingApp::_InitBuffers()
@@ -309,33 +317,40 @@ void RayTracingApp::_InitPipelines()
 	SimpleShader rgen{};
 	SimpleShader rchit{};
 	SimpleShader rmiss{};
+	SimpleShader rmiss2{};
 	uint32_t rgenId = 0u;
 	uint32_t rchitId = 0u;
 	uint32_t rmissId = 0u;
+	uint32_t rmiss2Id = 0u;
 
 	rgen.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/rt.rgen.spv");
-	rchit.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/rt.rchit.spv");
+	rchit.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/rt_shadow.rchit.spv");
 	rmiss.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/rt.rmiss.spv");
+	rmiss2.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/rt_shadow.rmiss.spv");
 
 	rgen.Init();
 	rchit.Init();
 	rmiss.Init();
+	rmiss2.Init();
 
 	m_rtPipeline.AddDescriptorSetLayout(m_rtDSetLayout.vkDescriptorSetLayout);
 	rgenId  = m_rtPipeline.AddShader(rgen.GetShaderStageInfo());
 	rchitId = m_rtPipeline.AddShader(rchit.GetShaderStageInfo());
 	rmissId = m_rtPipeline.AddShader(rmiss.GetShaderStageInfo());
+	rmiss2Id = m_rtPipeline.AddShader(rmiss2.GetShaderStageInfo());
 
 	m_rtPipeline.SetRayGenerationShaderRecord(rgenId);
 	m_rtPipeline.AddHitShaderRecord(rchitId);
 	m_rtPipeline.AddMissShaderRecord(rmissId);
-	m_rtPipeline.SetMaxRecursion(1u);
+	m_rtPipeline.AddMissShaderRecord(rmiss2Id);
+	m_rtPipeline.SetMaxRecursion(2u);
 
 	m_rtPipeline.Init();
 
 	rgen.Uninit();
 	rchit.Uninit();
 	rmiss.Uninit();
+	rmiss2.Uninit();
 }
 
 void RayTracingApp::_UninitPipelines()
