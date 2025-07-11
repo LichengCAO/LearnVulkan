@@ -25,8 +25,8 @@ private:
 	struct VBO
 	{
 		// no need to use alignas here, since we will use scalarEXT in shader
-		alignas(16) glm::vec3 pos;
-		alignas(16) glm::vec3 normal;
+		alignas(16) glm::vec4 pos;
+		alignas(16) glm::vec4 normal;
 	};
 	struct CameraUBO
 	{

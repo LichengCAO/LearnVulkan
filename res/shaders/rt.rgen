@@ -25,7 +25,6 @@ void GetRayOriginAndDirection(out vec3 rayOrigin, out vec3 rayDirection)
     rayDirection = normalize(refPos.xyz - rayOrigin);
 }
 
-
 void EmitRay(in vec3 rayOrigin, in vec3 rayDirection)
 {
     //uint rayFlags = gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT;

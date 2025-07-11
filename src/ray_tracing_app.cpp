@@ -60,12 +60,16 @@ void RayTracingApp::_UninitSampler()
 void RayTracingApp::_InitModels()
 {
 	std::vector<Mesh> outMeshes;
-	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/sphere/sphere.obj", outMeshes);
+	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/bunny/bunny.obj", outMeshes);
+	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/wahoo/wahoo.obj", outMeshes);
+	int i = 0;
 	for (auto const& mesh : outMeshes)
 	{
 		Model model{};
 		model.transform.SetScale({ 0.5, 0.5, 0.5 });
-		//model.transform.SetRotation({ -90, 0, 0 });
+		model.transform.SetPosition(i * 2, 0, 0);
+		++i;
+		model.transform.SetRotation({ -90 * i, 0, 0 });
 		model.mesh = mesh;
 		m_models.push_back(model);
 	}
@@ -94,9 +98,9 @@ void RayTracingApp::_InitBuffers()
 			for (auto const& vert : model.mesh.verts)
 			{
 				VBO curData{};
-				curData.pos = vert.position;
+				curData.pos = glm::vec4(vert.position, 1.0f);
 				CHECK_TRUE(vert.normal.has_value(), "We need a normal here!");
-				curData.normal = vert.normal.value();
+				curData.normal = glm::vec4(vert.normal.value(), 0.0f);
 				vertData.push_back(curData);
 			}
 
