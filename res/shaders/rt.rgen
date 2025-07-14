@@ -28,12 +28,14 @@ void GetRayOriginAndDirection(out vec3 rayOrigin, out vec3 rayDirection)
 
 void EmitRay(in vec3 rayOrigin, in vec3 rayDirection)
 {
+    uint sbtOffset = 0;
+    //if (rayDirection.x > 0.0f) sbtOffset = 1; // Right
     //uint rayFlags = gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT;
     traceRayEXT(
         accelerationStructure,
         gl_RayFlagsOpaqueEXT,       // Ray flags
         0xFF,                       // object mask
-        0,                          // sbtRecordOffset
+        sbtOffset,                  // sbtRecordOffset
         0,                          // sbtRecordStride
         0,                          // missIndex
         rayOrigin,                  // ray origin

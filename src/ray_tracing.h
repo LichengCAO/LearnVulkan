@@ -2,6 +2,8 @@
 #include "common.h";
 #include "buffer.h"
 
+class CommandSubmission;
+
 class RayTracingAccelerationStructure
 {
 	// A TLAS has multiple Instances,
@@ -17,7 +19,8 @@ private:
 	{
 		VkAccelerationStructureGeometryKHR				vkASGeometry;
 		VkAccelerationStructureBuildRangeInfoKHR		vkASBuildRangeInfo;
-		VkBuildAccelerationStructureFlagsKHR			vkBuildFlags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR;
+		VkBuildAccelerationStructureFlagsKHR			vkBuildFlags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR 
+																	| VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
 
 		std::unique_ptr<Buffer>							uptrInstanceBuffer;
 
@@ -84,18 +87,20 @@ private:
 	std::unique_ptr<TLAS>					m_uptrTLAS;
 	VkQueryPool								m_vkQueryPool = VK_NULL_HANDLE;
 
+public:
+	VkAccelerationStructureKHR vkAccelerationStructure = VK_NULL_HANDLE;
+
 private:
 	// Helper function to initialize scratch buffer, 
 	// maxBudget is the maximum size buffer can be used to build AS concurrently
 	// scratch buffer will be init inside,
 	// scratch addresses are the slot addresses for each of the BLASes to build,
 	// the number of slots may be smaller than the BLAS count, then several loops are required
-	void _InitScratchBuffer(
+	static void _InitScratchBuffer(
 		VkDeviceSize maxBudget,
 		const std::vector<VkAccelerationStructureBuildSizesInfoKHR>& buildSizeInfo,
 		Buffer& scratchBufferToInit,
-		std::vector<VkDeviceAddress>& slotAddresses
-	) const;
+		std::vector<VkDeviceAddress>& slotAddresses);
 
 	// Build all BLASs, after all BLASInputs are added
 	void _BuildBLASs();
@@ -106,9 +111,17 @@ private:
 	// Build TLAS
 	void _BuildTLAS();
 
-public:
-	VkAccelerationStructureKHR vkAccelerationStructure = VK_NULL_HANDLE;
-	
+	// Fill TLAS input with the instance data
+	void _FillTLASInput(const std::vector<InstanceData>& instData, TLASInput& inputToFill) const;
+
+	// Build TLAS if the vkAccelerationStructure of the input TLAS is VK_NULL_HANDLE, else, update it.
+	// If _pCmd is nullptr, the function will create a command buffer and wait till done.
+	// Else, the function will only record the commands to the command buffer, 
+	// and an uninitialized buffer should be provided as scratch buffer output, 
+	// the scratch buffer will be initialized inside and the user needs to destroy(Uninit) it when the build/update done.
+	static void _BuildOrUpdateTLAS(const TLASInput& _input, TLAS* _pTLAS, CommandSubmission* _pCmd = nullptr, Buffer* _pScratchBuffer = nullptr);
+
+public:	
 	~RayTracingAccelerationStructure() { assert(m_vkQueryPool == VK_NULL_HANDLE); assert(vkAccelerationStructure == VK_NULL_HANDLE); };
 
 	// Add a BLAS to this acceleration structure, 
@@ -120,6 +133,10 @@ public:
 	
 	// Build AS after TLAS's setup
 	void Init();
+
+	// Update TLAS in this acceleration structure, 
+	// size of instData vector must be the same as the previous instData that builds this acceleration structure
+	void UpdateTLAS(const std::vector<InstanceData>& instData, CommandSubmission* pCmd);
 
 	void Uninit();
 };

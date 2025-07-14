@@ -122,6 +122,8 @@ private:
 
 	void _ResizeWindow();
 
+	glm::vec3 _GetNextPosition(float _offest);
+
 public:
 	// Need to implement these, otherwise default constructor/destructor will need full type of all attributes in header file
 	RayTracingApp();

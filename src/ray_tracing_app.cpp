@@ -316,20 +316,24 @@ void RayTracingApp::_InitPipelines()
 {
 	SimpleShader rgen{};
 	SimpleShader rchit{};
+	SimpleShader rchit2{};
 	SimpleShader rmiss{};
 	SimpleShader rmiss2{};
 	uint32_t rgenId = 0u;
 	uint32_t rchitId = 0u;
+	uint32_t rchit2Id = 0u;
 	uint32_t rmissId = 0u;
 	uint32_t rmiss2Id = 0u;
 
 	rgen.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/rt.rgen.spv");
 	rchit.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/rt_shadow.rchit.spv");
+	rchit2.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/rt_simple.rchit.spv");
 	rmiss.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/rt.rmiss.spv");
 	rmiss2.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/rt_shadow.rmiss.spv");
 
 	rgen.Init();
 	rchit.Init();
+	rchit2.Init();
 	rmiss.Init();
 	rmiss2.Init();
 
@@ -338,9 +342,11 @@ void RayTracingApp::_InitPipelines()
 	rchitId = m_rtPipeline.AddShader(rchit.GetShaderStageInfo());
 	rmissId = m_rtPipeline.AddShader(rmiss.GetShaderStageInfo());
 	rmiss2Id = m_rtPipeline.AddShader(rmiss2.GetShaderStageInfo());
+	rchit2Id = m_rtPipeline.AddShader(rchit2.GetShaderStageInfo());
 
 	m_rtPipeline.SetRayGenerationShaderRecord(rgenId);
 	m_rtPipeline.AddHitShaderRecord(rchitId);
+	m_rtPipeline.AddHitShaderRecord(rchit2Id);
 	m_rtPipeline.AddMissShaderRecord(rmissId);
 	m_rtPipeline.AddMissShaderRecord(rmiss2Id);
 	m_rtPipeline.SetMaxRecursion(2u);
@@ -349,6 +355,7 @@ void RayTracingApp::_InitPipelines()
 
 	rgen.Uninit();
 	rchit.Uninit();
+	rchit2.Uninit();
 	rmiss.Uninit();
 	rmiss2.Uninit();
 }
@@ -542,6 +549,11 @@ void RayTracingApp::_ResizeWindow()
 		imageInfos.push_back(imageInfo);
 	}
 	m_swapchainPass->RecreateSwapchain(imageInfos);
+}
+
+glm::vec3 RayTracingApp::_GetNextPosition(float _offest)
+{
+	return glm::vec3();
 }
 
 RayTracingApp::RayTracingApp()

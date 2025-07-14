@@ -8,8 +8,7 @@ void RayTracingAccelerationStructure::_InitScratchBuffer(
 	VkDeviceSize maxBudget,
 	const std::vector<VkAccelerationStructureBuildSizesInfoKHR>& buildSizeInfo,
 	Buffer& scratchBufferToInit,
-	std::vector<VkDeviceAddress>& slotAddresses
-) const
+	std::vector<VkDeviceAddress>& slotAddresses)
 {
 	Buffer::Information scratchBufferInfo{};
 	uint32_t	uMinAlignment = 128; /*m_rtASProperties.minAccelerationStructureScratchOffsetAlignment*/
@@ -360,6 +359,109 @@ void RayTracingAccelerationStructure::_BuildTLAS()
 	m_TLASInput.Reset();
 }
 
+void RayTracingAccelerationStructure::_FillTLASInput(const std::vector<InstanceData>& instData, TLASInput& inputToFill) const
+{
+	uint32_t gl_InstanceCustomIndex = 0u;
+	std::vector<VkAccelerationStructureInstanceKHR> ASInstances;
+	VkAccelerationStructureGeometryInstancesDataKHR geomInstancesData{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR };
+	VkAccelerationStructureGeometryKHR				geom{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR };
+	VkAccelerationStructureBuildRangeInfoKHR		buildRangeInfo{};
+
+	inputToFill.Reset();
+
+	// prepare instance data
+	ASInstances.reserve(instData.size());
+	for (const auto& instInfo : instData)
+	{
+		VkAccelerationStructureInstanceKHR vkASInst{};
+		vkASInst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
+		vkASInst.mask = 0xFF;
+		vkASInst.instanceCustomIndex = gl_InstanceCustomIndex;
+		vkASInst.accelerationStructureReference = m_uptrBLASes[instInfo.uBLASIndex]->vkDeviceAddress;
+		vkASInst.instanceShaderBindingTableRecordOffset = instInfo.uHitShaderGroupIndex;
+		vkASInst.transform = CommonUtils::ToTransformMatrixKHR(instInfo.transformMatrix);
+
+		gl_InstanceCustomIndex++;
+		ASInstances.push_back(vkASInst);
+	}
+
+	// setup instance buffer
+	{
+		Buffer::Information bufferInfo{};
+		inputToFill.uptrInstanceBuffer = std::make_unique<Buffer>();
+
+		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		bufferInfo.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+		bufferInfo.size = ASInstances.size() * sizeof(VkAccelerationStructureInstanceKHR);
+
+		inputToFill.uptrInstanceBuffer->Init(bufferInfo);
+		inputToFill.uptrInstanceBuffer->CopyFromHost(ASInstances.data());
+	}
+
+	buildRangeInfo.primitiveCount = static_cast<uint32_t>(instData.size());
+	geomInstancesData.data.deviceAddress = inputToFill.uptrInstanceBuffer->GetDeviceAddress();
+	geom.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
+	geom.geometry.instances = geomInstancesData;
+
+	inputToFill.vkASBuildRangeInfo = buildRangeInfo;
+	inputToFill.vkASGeometry = geom;
+}
+
+void RayTracingAccelerationStructure::_BuildOrUpdateTLAS(const TLASInput& _input, TLAS* _pTLAS, CommandSubmission* _pCmd, Buffer* _pScratchBuffer)
+{
+	Buffer localScratchBuffer{};
+	Buffer* pScratchBufferUsed = _pCmd == nullptr ? &localScratchBuffer : _pScratchBuffer;
+	VkAccelerationStructureBuildGeometryInfoKHR buildGeomInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR };
+	VkAccelerationStructureBuildSizesInfoKHR buildSizeInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR };
+	uint32_t uMaxPrimitiveCount = 0u; // we only have one TLAS here, so I use a uint32_t instead of a vector
+	std::vector<VkDeviceAddress> slotAddresses; // size should be one
+	bool bBuildAS = _pTLAS->vkAccelerationStructure == VK_NULL_HANDLE;
+
+	buildGeomInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
+	buildGeomInfo.flags = _input.vkBuildFlags;
+	buildGeomInfo.mode = bBuildAS ? VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR : VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR;
+	buildGeomInfo.srcAccelerationStructure = VK_NULL_HANDLE;
+	buildGeomInfo.dstAccelerationStructure = VK_NULL_HANDLE;
+	buildGeomInfo.geometryCount = 1u;
+	buildGeomInfo.pGeometries = &_input.vkASGeometry;
+
+	uMaxPrimitiveCount = _input.vkASBuildRangeInfo.primitiveCount;
+
+	vkGetAccelerationStructureBuildSizesKHR(MyDevice::GetInstance().vkDevice, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &buildGeomInfo, &uMaxPrimitiveCount, &buildSizeInfo);
+
+	// init scratch buffer
+	if (bBuildAS)
+	{
+		_InitScratchBuffer(buildSizeInfo.buildScratchSize, { buildSizeInfo }, *pScratchBufferUsed, slotAddresses);
+		_pTLAS->Init(buildSizeInfo.accelerationStructureSize);
+	}
+	else
+	{
+		_InitScratchBuffer(buildSizeInfo.updateScratchSize, { buildSizeInfo }, *pScratchBufferUsed, slotAddresses);
+	}
+
+	buildGeomInfo.dstAccelerationStructure = _pTLAS->vkAccelerationStructure;
+	buildGeomInfo.scratchData.deviceAddress = pScratchBufferUsed->GetDeviceAddress();
+
+	// record command buffer
+	if (_pCmd == nullptr)
+	{
+		CommandSubmission cmd{};
+		cmd.Init();
+		cmd.StartOneTimeCommands({});
+
+		cmd.BuildAccelerationStructures({ buildGeomInfo }, { &_input.vkASBuildRangeInfo });
+
+		cmd.SubmitCommands();
+		cmd.Uninit();
+		pScratchBufferUsed->Uninit();
+	}
+	else
+	{
+		_pCmd->BuildAccelerationStructures({ buildGeomInfo }, { &_input.vkASBuildRangeInfo });
+	}
+}
+
 uint32_t RayTracingAccelerationStructure::AddBLAS(const std::vector<TriangleData>& geomData)
 {
 	uint32_t uRet = static_cast<uint32_t>(m_BLASInputs.size());
@@ -399,58 +501,22 @@ uint32_t RayTracingAccelerationStructure::AddBLAS(const std::vector<TriangleData
 }
 
 void RayTracingAccelerationStructure::SetUpTLAS(const std::vector<InstanceData>& instData)
-{
-	uint32_t gl_InstanceCustomIndex = 0u;
-	std::vector<VkAccelerationStructureInstanceKHR> ASInstances;
-	VkAccelerationStructureGeometryInstancesDataKHR geomInstancesData{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_INSTANCES_DATA_KHR };
-	VkAccelerationStructureGeometryKHR				geom{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR };
-	VkAccelerationStructureBuildRangeInfoKHR		buildRangeInfo{};
-	
+{	
 	_BuildBLASs();
 
-	m_TLASInput.Reset();
-
-	// prepare instance data
-	ASInstances.reserve(instData.size());
-	for (const auto& instInfo : instData)
-	{
-		VkAccelerationStructureInstanceKHR vkASInst{};
-		vkASInst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
-		vkASInst.mask = 0xFF;
-		vkASInst.instanceCustomIndex = gl_InstanceCustomIndex;
-		vkASInst.accelerationStructureReference = m_uptrBLASes[instInfo.uBLASIndex]->vkDeviceAddress;
-		vkASInst.instanceShaderBindingTableRecordOffset = instInfo.uHitShaderGroupIndex;
-		vkASInst.transform = CommonUtils::ToTransformMatrixKHR(instInfo.transformMatrix);
-
-		gl_InstanceCustomIndex++;
-		ASInstances.push_back(vkASInst);
-	}
-
-	// setup instance buffer
-	{
-		Buffer::Information bufferInfo{};
-		m_TLASInput.uptrInstanceBuffer = std::make_unique<Buffer>();
-
-		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		bufferInfo.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-		bufferInfo.size = ASInstances.size() * sizeof(VkAccelerationStructureInstanceKHR);
-
-		m_TLASInput.uptrInstanceBuffer->Init(bufferInfo);
-		m_TLASInput.uptrInstanceBuffer->CopyFromHost(ASInstances.data());
-	}
-
-	buildRangeInfo.primitiveCount = static_cast<uint32_t>(instData.size());
-	geomInstancesData.data.deviceAddress = m_TLASInput.uptrInstanceBuffer->GetDeviceAddress();
-	geom.geometryType = VK_GEOMETRY_TYPE_INSTANCES_KHR;
-	geom.geometry.instances = geomInstancesData;
-
-	m_TLASInput.vkASBuildRangeInfo = buildRangeInfo;
-	m_TLASInput.vkASGeometry = geom;
+	_FillTLASInput(instData, m_TLASInput);
 }
 
 void RayTracingAccelerationStructure::Init()
 {
 	_BuildTLAS();
+}
+
+void RayTracingAccelerationStructure::UpdateTLAS(const std::vector<InstanceData>& instData, CommandSubmission* pCmd, )
+{
+	TLASInput tlasInput{};
+	_FillTLASInput(instData, tlasInput);
+	_BuildOrUpdateTLAS(tlasInput, m_uptrTLAS.get(), pCmd,
 }
 
 void RayTracingAccelerationStructure::Uninit()

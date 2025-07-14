@@ -60,8 +60,8 @@ void EmitShadowRay(in vec3 rayOrigin, in vec3 rayDirection)
         accelerationStructure,
         rayFlags,                   // Ray flags
         0xFF,                       // object mask
-        0,                          // sbtRecordOffset
-        0,                          // sbtRecordStride
+        0,                          // sbtRecordOffset, which hit shader to call in this Hit Shader group
+        0,                          // sbtRecordStride, used in cases where there are multiple objects in one BLAS
         1,                          // missIndex
         rayOrigin,                  // ray origin
         0.001f,                     // ray min range
