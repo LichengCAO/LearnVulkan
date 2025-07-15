@@ -155,7 +155,8 @@ void MyDevice::_CreateInstance()
 	instanceBuilder.set_app_version(VK_MAKE_VERSION(1, 0, 0));
 	instanceBuilder.set_engine_name("No Engine");
 	instanceBuilder.set_engine_version(VK_MAKE_VERSION(1, 0, 0));
-	instanceBuilder.desire_api_version(VK_API_VERSION_1_2);
+	//instanceBuilder.desire_api_version(VK_API_VERSION_1_2);
+	instanceBuilder.desire_api_version(VK_API_VERSION_1_3); // enable vkCmdPipelineBarrier2
 	instanceBuilder.set_debug_callback(
 		[](
 			VkDebugUtilsMessageSeverityFlagBitsEXT messageSeverity,
@@ -405,6 +406,8 @@ void MyDevice::_AddBaseExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selec
 {
 	VkPhysicalDeviceFeatures requiredFeatures{};
 	VkPhysicalDeviceDescriptorIndexingFeaturesEXT physicalDeviceDescriptorIndexingFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT };
+	VkPhysicalDeviceSynchronization2FeaturesKHR sync2Feature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR };
+	
 	
 	requiredFeatures.geometryShader = VK_TRUE;
 	requiredFeatures.samplerAnisotropy = VK_TRUE;
@@ -414,6 +417,8 @@ void MyDevice::_AddBaseExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selec
 	physicalDeviceDescriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
 	physicalDeviceDescriptorIndexingFeatures.runtimeDescriptorArray = VK_TRUE;
 	physicalDeviceDescriptorIndexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
+	sync2Feature.synchronization2 = VK_TRUE;
+	
 
 	_selector.add_required_extensions(
 		{ 
@@ -421,8 +426,10 @@ void MyDevice::_AddBaseExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selec
 			VK_KHR_MAINTENANCE1_EXTENSION_NAME,
 			VK_KHR_MAINTENANCE3_EXTENSION_NAME,
 			VK_EXT_DESCRIPTOR_INDEXING_EXTENSION_NAME,
+			VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME,
 		});
 	_selector.set_required_features(requiredFeatures);
+	_selector.add_required_extension_features(sync2Feature);
 	//_selector.add_required_extension_features(physicalDeviceDescriptorIndexingFeatures);
 }
 

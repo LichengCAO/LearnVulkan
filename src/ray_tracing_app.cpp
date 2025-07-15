@@ -98,59 +98,73 @@ void RayTracingApp::_InitBuffers()
 
 		for (auto const& model : m_models)
 		{
-			std::unique_ptr<Buffer> uptrVertexBuffer = std::make_unique<Buffer>();
-			std::unique_ptr<Buffer> uptrIndexBuffer = std::make_unique<Buffer>();
-			std::vector<VBO> vertData{};
+			std::vector<std::unique_ptr<Buffer>> vecVertexBuffers{};
+			std::vector<std::unique_ptr<Buffer>> vecIndexBuffers{};
 
-			vertData.reserve(model.mesh.verts.size());
-			for (auto const& vert : model.mesh.verts)
+			vecVertexBuffers.reserve(MAX_FRAME_COUNT);
+			vecIndexBuffers.reserve(MAX_FRAME_COUNT);
+			for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 			{
-				VBO curData{};
-				curData.pos = glm::vec4(vert.position, 1.0f);
-				CHECK_TRUE(vert.normal.has_value(), "We need a normal here!");
-				curData.normal = glm::vec4(vert.normal.value(), 0.0f);
-				vertData.push_back(curData);
+				std::unique_ptr<Buffer> uptrVertexBuffer = std::make_unique<Buffer>();
+				std::unique_ptr<Buffer> uptrIndexBuffer = std::make_unique<Buffer>();
+				std::vector<VBO> vertData{};
+
+				vertData.reserve(model.mesh.verts.size());
+				for (auto const& vert : model.mesh.verts)
+				{
+					VBO curData{};
+					curData.pos = glm::vec4(vert.position, 1.0f);
+					CHECK_TRUE(vert.normal.has_value(), "We need a normal here!");
+					curData.normal = glm::vec4(vert.normal.value(), 0.0f);
+					vertData.push_back(curData);
+				}
+
+				vertBufferInfo.size = vertData.size() * sizeof(VBO);
+				uptrVertexBuffer->Init(vertBufferInfo);
+
+				vertBufferInfo.size = model.mesh.indices.size() * sizeof(uint32_t);
+				uptrIndexBuffer->Init(vertBufferInfo);
+
+				uptrVertexBuffer->CopyFromHost(vertData.data());
+				uptrIndexBuffer->CopyFromHost(model.mesh.indices.data());
+
+				vecVertexBuffers.push_back(std::move(uptrVertexBuffer));
+				vecIndexBuffers.push_back(std::move(uptrIndexBuffer));
 			}
 
-			vertBufferInfo.size = vertData.size() * sizeof(VBO);
-			uptrVertexBuffer->Init(vertBufferInfo);
-
-			vertBufferInfo.size = model.mesh.indices.size() * sizeof(uint32_t);
-			uptrIndexBuffer->Init(vertBufferInfo);
-
-			uptrVertexBuffer->CopyFromHost(vertData.data());
-			uptrIndexBuffer->CopyFromHost(model.mesh.indices.data());
-
-			m_vertexBuffers.push_back(std::move(uptrVertexBuffer));
-			m_indexBuffers.push_back(std::move(uptrIndexBuffer));
+			m_vertexBuffers.push_back(std::move(vecVertexBuffers));
+			m_indexBuffers.push_back(std::move(vecIndexBuffers));
 		}
 	}
 
 	// Instance buffer
 	{
-		Buffer::Information instBufferInfo{};
-		std::vector<InstanceInformation> instInfos{};
-		int n = m_models.size();
-
-		instInfos.reserve(n);
-		for (int i = 0; i < n; ++i)
+		for (int j = 0; j < MAX_FRAME_COUNT; ++j)
 		{
-			InstanceInformation instInfo{};
-			
-			instInfo.vertexBuffer = m_vertexBuffers[i]->GetDeviceAddress();
-			instInfo.indexBuffer = m_indexBuffers[i]->GetDeviceAddress();
-			
-			instInfos.push_back(instInfo);
+			int n = m_models.size();
+			Buffer::Information instBufferInfo{};
+			std::vector<InstanceInformation> instInfos{};
+			std::unique_ptr<Buffer> uptrInstanceBuffer = std::make_unique<Buffer>();
+
+			instInfos.reserve(n);
+			for (int i = 0; i < n; ++i)
+			{
+				InstanceInformation instInfo{};
+
+				instInfo.vertexBuffer = m_vertexBuffers[i][j]->GetDeviceAddress();
+				instInfo.indexBuffer = m_indexBuffers[i][j]->GetDeviceAddress();
+
+				instInfos.push_back(instInfo);
+			}
+
+			instBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+			instBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+			instBufferInfo.size = instInfos.size() * sizeof(InstanceInformation);
+			uptrInstanceBuffer->Init(instBufferInfo);
+			uptrInstanceBuffer->CopyFromHost(instInfos.data());
+
+			m_instanceBuffer.push_back(std::move(uptrInstanceBuffer));
 		}
-
-		instBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		instBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-		instBufferInfo.size = instInfos.size() * sizeof(InstanceInformation);
-
-		m_instanceBuffer = std::make_unique<Buffer>();
-		m_instanceBuffer->Init(instBufferInfo);
-
-		m_instanceBuffer->CopyFromHost(instInfos.data());
 	}
 
 	// Camera buffer
@@ -176,18 +190,31 @@ void RayTracingApp::_InitBuffers()
 
 void RayTracingApp::_UninitBuffers()
 {
-	for (auto& uptrBuffer : m_vertexBuffers)
+	for (auto& vertexBuffers : m_vertexBuffers)
 	{
-		uptrBuffer->Uninit();
+		for (auto& uptrBuffer : vertexBuffers)
+		{
+			uptrBuffer->Uninit();
+		}
+		vertexBuffers.clear();
 	}
 	m_vertexBuffers.clear();
-	for (auto& uptrBuffer : m_indexBuffers)
+
+	for (auto& indexBuffers : m_indexBuffers)
 	{
-		uptrBuffer->Uninit();
+		for (auto& uptrBuffer : indexBuffers)
+		{
+			uptrBuffer->Uninit();
+		}
+		indexBuffers.clear();
 	}
 	m_indexBuffers.clear();
 
-	m_instanceBuffer->Uninit();
+	for (auto& uptrBuffer : m_instanceBuffer)
+	{
+		uptrBuffer->Uninit();
+	}
+	m_instanceBuffer.clear();
 
 	for (auto& uptrBuffer : m_cameraBuffers)
 	{
@@ -198,38 +225,49 @@ void RayTracingApp::_UninitBuffers()
 
 void RayTracingApp::_InitAS()
 {
-	std::vector<RayTracingAccelerationStructure::InstanceData> instDatas;
-
-	instDatas.reserve(m_models.size());
-	for (int i = 0; i < m_models.size(); ++i)
+	m_rtAccelStruct.reserve(MAX_FRAME_COUNT);
+	for (int j = 0; j < MAX_FRAME_COUNT; ++j)
 	{
-		RayTracingAccelerationStructure::TriangleData trigData{};
-		RayTracingAccelerationStructure::InstanceData instData{};
-		auto const& model = m_models[i];
-		auto const& uptrIndexBuffer = m_indexBuffers[i];
-		auto const& uptrVertexBuffer = m_vertexBuffers[i];
+		std::vector<RayTracingAccelerationStructure::InstanceData> instDatas;
+		RayTracingAccelerationStructure AS{};
 
-		trigData.uIndexCount = static_cast<uint32_t>(model.mesh.indices.size());
-		trigData.vkIndexType = VK_INDEX_TYPE_UINT32;
-		trigData.vkDeviceAddressIndex = uptrIndexBuffer->GetDeviceAddress();
+		instDatas.reserve(m_models.size());
+		for (int i = 0; i < m_models.size(); ++i)
+		{
+			RayTracingAccelerationStructure::TriangleData trigData{};
+			RayTracingAccelerationStructure::InstanceData instData{};
+			auto const& model = m_models[i];
+			auto const& uptrIndexBuffer = m_indexBuffers[i];
+			auto const& uptrVertexBuffer = m_vertexBuffers[i];
 
-		trigData.uVertexCount = static_cast<uint32_t>(model.mesh.verts.size());
-		trigData.uVertexStride = sizeof(VBO);
-		trigData.vkDeviceAddressVertex = uptrVertexBuffer->GetDeviceAddress();
+			trigData.uIndexCount = static_cast<uint32_t>(model.mesh.indices.size());
+			trigData.vkIndexType = VK_INDEX_TYPE_UINT32;
+			trigData.vkDeviceAddressIndex = uptrIndexBuffer[j]->GetDeviceAddress();
 
-		instData.uBLASIndex = m_rtAccelStruct.AddBLAS({ trigData });
-		instData.transformMatrix = model.transform.GetModelMatrix();
+			trigData.uVertexCount = static_cast<uint32_t>(model.mesh.verts.size());
+			trigData.uVertexStride = sizeof(VBO);
+			trigData.vkDeviceAddressVertex = uptrVertexBuffer[j]->GetDeviceAddress();
 
-		instDatas.push_back(instData);
+			instData.uBLASIndex = AS.AddBLAS({ trigData });
+			instData.transformMatrix = model.transform.GetModelMatrix();
+
+			instDatas.push_back(instData);
+		}
+
+		AS.SetUpTLAS(instDatas);
+		AS.Init();
+		m_rtAccelStruct.push_back(std::move(AS));
+		m_TLASInputs = instDatas;
 	}
-
-	m_rtAccelStruct.SetUpTLAS(instDatas);
-	m_rtAccelStruct.Init();
 }
 
 void RayTracingApp::_UninitAS()
 {
-	m_rtAccelStruct.Uninit();
+	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+	{
+		m_rtAccelStruct[i].Uninit();
+	}
+	m_rtAccelStruct.clear();
 }
 
 void RayTracingApp::_InitImagesAndViews()
@@ -294,9 +332,9 @@ void RayTracingApp::_InitDescriptorSets()
 		uptrDSet->Init();
 		uptrDSet->StartUpdate();
 		uptrDSet->UpdateBinding(0, m_cameraBuffers[i].get());
-		uptrDSet->UpdateBinding(1, { m_rtAccelStruct.vkAccelerationStructure });
+		uptrDSet->UpdateBinding(1, { m_rtAccelStruct[i].vkAccelerationStructure });
 		uptrDSet->UpdateBinding(2, imageInfo);
-		uptrDSet->UpdateBinding(3, m_instanceBuffer.get());
+		uptrDSet->UpdateBinding(3, m_instanceBuffer[i].get());
 		uptrDSet->FinishUpdate();
 
 		m_rtDSets.push_back(std::move(uptrDSet));
@@ -457,6 +495,7 @@ void RayTracingApp::_UpdateUniformBuffer()
 	ubo.inverseViewProj = glm::inverse(m_camera.GetViewProjectionMatrix());
 	ubo.eye = glm::vec4(m_camera.eye, 1.0f);
 	m_cameraBuffers[m_currentFrame]->CopyFromHost(&ubo);
+	m_models[0].transform.SetRotation(0, 0, lastTime * 10);
 }
 
 void RayTracingApp::_MainLoop()
@@ -491,6 +530,14 @@ void RayTracingApp::_DrawFrame()
 	cmd->WaitTillAvailable();
 	_UpdateUniformBuffer();
 	cmd->StartCommands({});
+
+	for (int i = 0; i < m_TLASInputs.size(); ++i)
+	{
+		m_TLASInputs[i].transformMatrix = m_models[i].transform.GetModelMatrix();
+	}
+
+	m_rtAccelStruct[m_currentFrame].UpdateTLAS(m_TLASInputs, cmd.get());
+	RayTracingAccelerationStructure::RecordPipelineBarrier(cmd.get());
 
 	// transfer image to general and fill it with zero
 	{

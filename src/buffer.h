@@ -1,6 +1,8 @@
 #pragma once
 #include "common.h"
 
+// TODO: use VMA
+// ref: https://stackoverflow.com/questions/73512602/using-vulkan-memory-allocator-with-volk
 class BufferView;
 class CommandSubmission;
 

@@ -92,13 +92,15 @@ public:
 
 private:
 	// Helper function to initialize scratch buffer, 
-	// maxBudget is the maximum size buffer can be used to build AS concurrently
+	// maxBudget is the maximum size buffer can be used to build AS concurrently,
+	// bForBuild is used to check whether this scratch buffer is used for build or update,
 	// scratch buffer will be init inside,
 	// scratch addresses are the slot addresses for each of the BLASes to build,
 	// the number of slots may be smaller than the BLAS count, then several loops are required
 	static void _InitScratchBuffer(
 		VkDeviceSize maxBudget,
 		const std::vector<VkAccelerationStructureBuildSizesInfoKHR>& buildSizeInfo,
+		bool bForBuild,
 		Buffer& scratchBufferToInit,
 		std::vector<VkDeviceAddress>& slotAddresses);
 
@@ -119,8 +121,11 @@ private:
 	// Else, the function will only record the commands to the command buffer and manage scratch buffers.
 	void _BuildOrUpdateTLAS(const TLASInput& _input, TLAS* _pTLAS, CommandSubmission* _pCmd = nullptr) const;
 
-public:	
-	~RayTracingAccelerationStructure() { assert(m_vkQueryPool == VK_NULL_HANDLE); assert(vkAccelerationStructure == VK_NULL_HANDLE); };
+public:
+	RayTracingAccelerationStructure();
+	RayTracingAccelerationStructure(RayTracingAccelerationStructure&& _other);
+	RayTracingAccelerationStructure(const RayTracingAccelerationStructure& _other) = delete;
+	~RayTracingAccelerationStructure();
 
 	// Add a BLAS to this acceleration structure, 
 	// return the index of this BLAS in the vector of BLASs this acceleration structure holds
@@ -138,4 +143,7 @@ public:
 	void UpdateTLAS(const std::vector<InstanceData>& instData, CommandSubmission* pCmd = nullptr);
 
 	void Uninit();
+
+	// Record pipeline barrier to wait build/update AS done
+	static void RecordPipelineBarrier(CommandSubmission* pCmd);
 };

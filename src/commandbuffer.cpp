@@ -39,6 +39,11 @@ void CommandSubmission::_DoCallbacks(CALLBACK_BINDING_POINT _bindingPoint)
 	}
 }
 
+void CommandSubmission::_AddPipelineBarrier2(const VkDependencyInfo& _dependency)
+{
+	vkCmdPipelineBarrier2KHR(vkCommandBuffer, &_dependency);
+}
+
 void CommandSubmission::SetQueueFamilyIndex(uint32_t _queueFamilyIndex)
 {
 	m_optQueueFamilyIndex = _queueFamilyIndex;
@@ -62,6 +67,7 @@ void CommandSubmission::Init()
 
 void CommandSubmission::Uninit()
 {
+	WaitTillAvailable();
 	if (vkCommandBuffer != VK_NULL_HANDLE)
 	{
 		// vkFreeCommandBuffers(MyDevice::GetInstance().vkDevice, MyDevice::GetInstance().vkCommandPools[m_optQueueFamilyIndex.value()], 1, &vkCommandBuffer);

@@ -83,11 +83,14 @@ private:
 
 	void _UpdateImageLayout(VkImage vkImage, VkImageSubresourceRange range, VkImageLayout layout) const;
 
-	// I want this function to be called by Renderpass only
+	// Called by RenderPass only
 	void _BeginRenderPass(const VkRenderPassBeginInfo& info, VkSubpassContents content = VK_SUBPASS_CONTENTS_INLINE);
 
 	// Do all callbacks in the queue and remove them
 	void _DoCallbacks(CALLBACK_BINDING_POINT _bindingPoint);
+
+	// Called by RayTracingAccelerationStructure
+	void _AddPipelineBarrier2(const VkDependencyInfo& _dependency);
 
 public:
 	void SetQueueFamilyIndex(uint32_t _queueFamilyIndex);
@@ -168,4 +171,5 @@ public:
 
 	friend class RenderPass;
 	friend class GraphicsPipeline;
+	friend class RayTracingAccelerationStructure;
 };

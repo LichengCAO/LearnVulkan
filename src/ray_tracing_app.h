@@ -58,13 +58,11 @@ private:
 	// cameraUBO changes across frames, i create buffers for each frame
 	std::vector<std::unique_ptr<Buffer>> m_cameraBuffers;
 
-	// following buffers can be used cross frames, 
-	// so i just create one buffer for one mesh instead of multiple buffers for each frame
-	std::unique_ptr<Buffer> m_instanceBuffer;
-	std::vector<std::unique_ptr<Buffer>> m_vertexBuffers;
-	std::vector<std::unique_ptr<Buffer>> m_indexBuffers;
+	std::vector<std::unique_ptr<Buffer>> m_instanceBuffer;
+	std::vector<std::vector<std::unique_ptr<Buffer>>> m_vertexBuffers;
+	std::vector<std::vector<std::unique_ptr<Buffer>>> m_indexBuffers;
 
-	RayTracingAccelerationStructure m_rtAccelStruct;
+	std::vector<RayTracingAccelerationStructure> m_rtAccelStruct;
 
 	// Samplers
 	VkSampler m_vkSampler = VK_NULL_HANDLE;
@@ -81,6 +79,9 @@ private:
 
 	// swapchain pass
 	std::unique_ptr<SwapchainPass> m_swapchainPass;
+
+	// TLAS inputs to update TLAS
+	std::vector<RayTracingAccelerationStructure::InstanceData> m_TLASInputs;
 
 private:
 	void _Init();

@@ -7,6 +7,7 @@
 void RayTracingAccelerationStructure::_InitScratchBuffer(
 	VkDeviceSize maxBudget,
 	const std::vector<VkAccelerationStructureBuildSizesInfoKHR>& buildSizeInfo,
+	bool bForBuild,
 	Buffer& scratchBufferToInit,
 	std::vector<VkDeviceAddress>& slotAddresses)
 {
@@ -21,7 +22,7 @@ void RayTracingAccelerationStructure::_InitScratchBuffer(
 	// setup maxScratchChunk, fullScratchSize
 	for (const auto& sizeInfo : buildSizeInfo)
 	{
-		VkDeviceSize chunkSizeAligned = CommonUtils::AlignUp(sizeInfo.buildScratchSize, uMinAlignment);
+		VkDeviceSize chunkSizeAligned = bForBuild ? CommonUtils::AlignUp(sizeInfo.buildScratchSize, uMinAlignment) : CommonUtils::AlignUp(sizeInfo.updateScratchSize, uMinAlignment);
 
 		maxScratchChunk = std::max(maxScratchChunk, chunkSizeAligned);
 		fullScratchSize += chunkSizeAligned;
@@ -52,7 +53,7 @@ void RayTracingAccelerationStructure::_InitScratchBuffer(
 		for (int i = 0; i < buildSizeInfo.size(); ++i)
 		{
 			const auto& sizeInfo = buildSizeInfo[i];
-			VkDeviceSize chunkSizeAligned = CommonUtils::AlignUp(sizeInfo.buildScratchSize, uMinAlignment);
+			VkDeviceSize chunkSizeAligned = bForBuild ? CommonUtils::AlignUp(sizeInfo.buildScratchSize, uMinAlignment) : CommonUtils::AlignUp(sizeInfo.updateScratchSize, uMinAlignment);
 
 			slotAddresses.push_back(curAddress);
 			curAddress += chunkSizeAligned;
@@ -113,7 +114,7 @@ void RayTracingAccelerationStructure::_BuildBLASs()
 		buildGeomInfos.push_back(buildGeomInfo);
 		buildSizeInfos.push_back(buildSizeInfo);
 	}
-	_InitScratchBuffer(maxBudget, buildSizeInfos, scratchBuffer, scratchAddresses);
+	_InitScratchBuffer(maxBudget, buildSizeInfos, true, scratchBuffer, scratchAddresses);
 
 	// Task2: now we have scratch buffer, we can set scratch data for buildGeomInfos
 	for (int i = 0; i < nAllBLASCount; ++i)
@@ -316,7 +317,7 @@ void RayTracingAccelerationStructure::_BuildTLAS()
 
 	vkGetAccelerationStructureBuildSizesKHR(MyDevice::GetInstance().vkDevice, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &buildGeomInfo, &uMaxPrimitiveCount, &buildSizeInfo);
 
-	_InitScratchBuffer(buildSizeInfo.buildScratchSize, { buildSizeInfo }, scratchBuffer, slotAddresses);
+	_InitScratchBuffer(buildSizeInfo.buildScratchSize, { buildSizeInfo }, true, scratchBuffer, slotAddresses);
 
 	if (m_uptrTLAS.get() != nullptr)
 	{
@@ -431,14 +432,14 @@ void RayTracingAccelerationStructure::_BuildOrUpdateTLAS(const TLASInput& _input
 	// init scratch buffer
 	if (bBuildAS)
 	{
-		_InitScratchBuffer(buildSizeInfo.buildScratchSize, { buildSizeInfo }, *pScratchBufferUsed, slotAddresses);
+		_InitScratchBuffer(buildSizeInfo.buildScratchSize, { buildSizeInfo }, bBuildAS, *pScratchBufferUsed, slotAddresses);
 		_pTLAS->Init(buildSizeInfo.accelerationStructureSize);
 		buildGeomInfo.dstAccelerationStructure = _pTLAS->vkAccelerationStructure;
 		buildGeomInfo.scratchData.deviceAddress = pScratchBufferUsed->GetDeviceAddress();
 	}
 	else
 	{
-		_InitScratchBuffer(buildSizeInfo.updateScratchSize, { buildSizeInfo }, *pScratchBufferUsed, slotAddresses);
+		_InitScratchBuffer(buildSizeInfo.updateScratchSize, { buildSizeInfo }, bBuildAS, *pScratchBufferUsed, slotAddresses);
 		buildGeomInfo.srcAccelerationStructure = _pTLAS->vkAccelerationStructure;
 		buildGeomInfo.dstAccelerationStructure = _pTLAS->vkAccelerationStructure;
 		buildGeomInfo.scratchData.deviceAddress = pScratchBufferUsed->GetDeviceAddress();
@@ -458,7 +459,6 @@ void RayTracingAccelerationStructure::_BuildOrUpdateTLAS(const TLASInput& _input
 			[sptr = std::move(pScratchBufferUsed)](CommandSubmission* pCmd)
 			mutable {
 			sptr->Uninit();
-			std::cout << "Scratch buffer destroyed." << std::endl;
 		});
 
 		cmd.SubmitCommands();
@@ -473,9 +473,32 @@ void RayTracingAccelerationStructure::_BuildOrUpdateTLAS(const TLASInput& _input
 			[sptr = std::move(pScratchBufferUsed)](CommandSubmission* pCmd)
 			mutable {
 			sptr->Uninit();
-			std::cout << "Scratch buffer destroyed." << std::endl;
+			//std::cout << "Scratch buffer destroyed when updated." << std::endl;
 		});
 	}
+}
+
+RayTracingAccelerationStructure::RayTracingAccelerationStructure()
+{
+}
+
+RayTracingAccelerationStructure::RayTracingAccelerationStructure(RayTracingAccelerationStructure&& _other)
+{
+	this->m_BLASInputs = std::move(_other.m_BLASInputs);
+	this->m_TLASInput = std::move(_other.m_TLASInput);
+	this->m_uptrBLASes = std::move(_other.m_uptrBLASes);
+	this->m_uptrTLAS = std::move(_other.m_uptrTLAS);
+	this->m_vkQueryPool = _other.m_vkQueryPool;
+	_other.m_vkQueryPool = VK_NULL_HANDLE;
+	this->vkAccelerationStructure = _other.vkAccelerationStructure;
+	_other.vkAccelerationStructure = VK_NULL_HANDLE;
+	_other.Uninit();
+}
+
+RayTracingAccelerationStructure::~RayTracingAccelerationStructure()
+{
+	assert(m_vkQueryPool == VK_NULL_HANDLE); 
+	assert(vkAccelerationStructure == VK_NULL_HANDLE);
 }
 
 uint32_t RayTracingAccelerationStructure::AddBLAS(const std::vector<TriangleData>& geomData)
@@ -538,9 +561,14 @@ void RayTracingAccelerationStructure::Init()
 
 void RayTracingAccelerationStructure::UpdateTLAS(const std::vector<InstanceData>& instData, CommandSubmission* pCmd)
 {
-	TLASInput tlasInput{};
-	_FillTLASInput(instData, tlasInput);
-	_BuildOrUpdateTLAS(tlasInput, m_uptrTLAS.get(), pCmd);
+	std::shared_ptr<TLASInput> tlasInput = std::make_shared<TLASInput>();
+	_FillTLASInput(instData, *tlasInput);
+	_BuildOrUpdateTLAS(*tlasInput, m_uptrTLAS.get(), pCmd);
+	pCmd->BindCallback(CommandSubmission::CALLBACK_BINDING_POINT::COMMANDS_DONE, 
+		[sptr = std::move(tlasInput)](CommandSubmission* _pCmd)
+		mutable{
+		sptr->Reset();
+		});
 }
 
 void RayTracingAccelerationStructure::Uninit()
@@ -563,6 +591,24 @@ void RayTracingAccelerationStructure::Uninit()
 	}
 	m_uptrBLASes.clear();
 	m_BLASInputs.clear();
+}
+
+void RayTracingAccelerationStructure::RecordPipelineBarrier(CommandSubmission* pCmd)
+{
+	VkDependencyInfo dependencyInfo = {};
+	dependencyInfo.sType = VK_STRUCTURE_TYPE_DEPENDENCY_INFO;
+
+	VkMemoryBarrier2 bufferMemoryBarrier = {};
+	bufferMemoryBarrier.sType = VK_STRUCTURE_TYPE_MEMORY_BARRIER_2;
+	bufferMemoryBarrier.srcStageMask = VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR;
+	bufferMemoryBarrier.dstStageMask = VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR;
+	bufferMemoryBarrier.srcAccessMask = VK_ACCESS_2_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+	bufferMemoryBarrier.dstAccessMask = VK_ACCESS_2_ACCELERATION_STRUCTURE_READ_BIT_KHR;
+
+	dependencyInfo.memoryBarrierCount = 1;
+	dependencyInfo.pMemoryBarriers = &bufferMemoryBarrier;
+
+	pCmd->_AddPipelineBarrier2(dependencyInfo);
 }
 
 void RayTracingAccelerationStructure::BLAS::Init(VkDeviceSize size)
