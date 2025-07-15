@@ -407,10 +407,9 @@ void RayTracingAccelerationStructure::_FillTLASInput(const std::vector<InstanceD
 	inputToFill.vkASGeometry = geom;
 }
 
-void RayTracingAccelerationStructure::_BuildOrUpdateTLAS(const TLASInput& _input, TLAS* _pTLAS, CommandSubmission* _pCmd, Buffer* _pScratchBuffer)
+void RayTracingAccelerationStructure::_BuildOrUpdateTLAS(const TLASInput& _input, TLAS* _pTLAS, CommandSubmission* _pCmd) const
 {
-	Buffer localScratchBuffer{};
-	Buffer* pScratchBufferUsed = _pCmd == nullptr ? &localScratchBuffer : _pScratchBuffer;
+	std::shared_ptr<Buffer> pScratchBufferUsed = std::make_shared<Buffer>();
 	VkAccelerationStructureBuildGeometryInfoKHR buildGeomInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR };
 	VkAccelerationStructureBuildSizesInfoKHR buildSizeInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR };
 	uint32_t uMaxPrimitiveCount = 0u; // we only have one TLAS here, so I use a uint32_t instead of a vector
@@ -434,14 +433,16 @@ void RayTracingAccelerationStructure::_BuildOrUpdateTLAS(const TLASInput& _input
 	{
 		_InitScratchBuffer(buildSizeInfo.buildScratchSize, { buildSizeInfo }, *pScratchBufferUsed, slotAddresses);
 		_pTLAS->Init(buildSizeInfo.accelerationStructureSize);
+		buildGeomInfo.dstAccelerationStructure = _pTLAS->vkAccelerationStructure;
+		buildGeomInfo.scratchData.deviceAddress = pScratchBufferUsed->GetDeviceAddress();
 	}
 	else
 	{
 		_InitScratchBuffer(buildSizeInfo.updateScratchSize, { buildSizeInfo }, *pScratchBufferUsed, slotAddresses);
+		buildGeomInfo.srcAccelerationStructure = _pTLAS->vkAccelerationStructure;
+		buildGeomInfo.dstAccelerationStructure = _pTLAS->vkAccelerationStructure;
+		buildGeomInfo.scratchData.deviceAddress = pScratchBufferUsed->GetDeviceAddress();
 	}
-
-	buildGeomInfo.dstAccelerationStructure = _pTLAS->vkAccelerationStructure;
-	buildGeomInfo.scratchData.deviceAddress = pScratchBufferUsed->GetDeviceAddress();
 
 	// record command buffer
 	if (_pCmd == nullptr)
@@ -452,13 +453,28 @@ void RayTracingAccelerationStructure::_BuildOrUpdateTLAS(const TLASInput& _input
 
 		cmd.BuildAccelerationStructures({ buildGeomInfo }, { &_input.vkASBuildRangeInfo });
 
+		cmd.BindCallback(
+			CommandSubmission::CALLBACK_BINDING_POINT::COMMANDS_DONE,
+			[sptr = std::move(pScratchBufferUsed)](CommandSubmission* pCmd)
+			mutable {
+			sptr->Uninit();
+			std::cout << "Scratch buffer destroyed." << std::endl;
+		});
+
 		cmd.SubmitCommands();
 		cmd.Uninit();
-		pScratchBufferUsed->Uninit();
+		//pScratchBufferUsed->Uninit();
 	}
 	else
 	{
 		_pCmd->BuildAccelerationStructures({ buildGeomInfo }, { &_input.vkASBuildRangeInfo });
+		_pCmd->BindCallback(
+			CommandSubmission::CALLBACK_BINDING_POINT::COMMANDS_DONE,
+			[sptr = std::move(pScratchBufferUsed)](CommandSubmission* pCmd)
+			mutable {
+			sptr->Uninit();
+			std::cout << "Scratch buffer destroyed." << std::endl;
+		});
 	}
 }
 
@@ -509,14 +525,22 @@ void RayTracingAccelerationStructure::SetUpTLAS(const std::vector<InstanceData>&
 
 void RayTracingAccelerationStructure::Init()
 {
-	_BuildTLAS();
+	if (m_uptrTLAS.get() != nullptr)
+	{
+		m_uptrTLAS->Uninit();
+		m_uptrTLAS.reset();
+	}
+	m_uptrTLAS = std::make_unique<TLAS>();
+	_BuildOrUpdateTLAS(m_TLASInput, m_uptrTLAS.get());
+	this->vkAccelerationStructure = m_uptrTLAS->vkAccelerationStructure;
+	//_BuildTLAS();
 }
 
-void RayTracingAccelerationStructure::UpdateTLAS(const std::vector<InstanceData>& instData, CommandSubmission* pCmd, )
+void RayTracingAccelerationStructure::UpdateTLAS(const std::vector<InstanceData>& instData, CommandSubmission* pCmd)
 {
 	TLASInput tlasInput{};
 	_FillTLASInput(instData, tlasInput);
-	_BuildOrUpdateTLAS(tlasInput, m_uptrTLAS.get(), pCmd,
+	_BuildOrUpdateTLAS(tlasInput, m_uptrTLAS.get(), pCmd);
 }
 
 void RayTracingAccelerationStructure::Uninit()

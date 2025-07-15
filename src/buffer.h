@@ -4,7 +4,7 @@
 class BufferView;
 class CommandSubmission;
 
-class Buffer
+class Buffer final
 {
 public:
 	struct Information
@@ -39,6 +39,9 @@ private:
 	void _CopyFromHostWithStaggingBuffer(const void* src, size_t size);
 
 public:
+	Buffer();
+	Buffer(Buffer&& _toMove);
+	Buffer(Buffer& _toCopy) = delete;
 	~Buffer();
 
 	void Init(Information bufferInfo);

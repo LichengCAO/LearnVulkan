@@ -120,6 +120,21 @@ void Buffer::_CopyFromHostWithStaggingBuffer(const void* src, size_t size)
 	stagBuf.Uninit();
 }
 
+Buffer::Buffer()
+{
+}
+
+Buffer::Buffer(Buffer&& _toMove)
+{
+	vkBuffer = _toMove.vkBuffer;
+	vkDeviceMemory = _toMove.vkDeviceMemory;
+	m_mappedMemory = _toMove.m_mappedMemory;
+	m_bufferInformation = _toMove.m_bufferInformation;
+	_toMove.vkBuffer = VK_NULL_HANDLE;
+	_toMove.vkDeviceMemory = VK_NULL_HANDLE;
+	_toMove.m_mappedMemory = nullptr;
+}
+
 void Buffer::CopyFromHost(const void* src)
 {
 	CopyFromHost(src, static_cast<size_t>(m_bufferInformation.size));

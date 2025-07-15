@@ -4,7 +4,7 @@
 
 class CommandSubmission;
 
-class RayTracingAccelerationStructure
+class RayTracingAccelerationStructure final
 {
 	// A TLAS has multiple Instances,
 	// each Instance refers to ONE BLAS,
@@ -116,10 +116,8 @@ private:
 
 	// Build TLAS if the vkAccelerationStructure of the input TLAS is VK_NULL_HANDLE, else, update it.
 	// If _pCmd is nullptr, the function will create a command buffer and wait till done.
-	// Else, the function will only record the commands to the command buffer, 
-	// and an uninitialized buffer should be provided as scratch buffer output, 
-	// the scratch buffer will be initialized inside and the user needs to destroy(Uninit) it when the build/update done.
-	static void _BuildOrUpdateTLAS(const TLASInput& _input, TLAS* _pTLAS, CommandSubmission* _pCmd = nullptr, Buffer* _pScratchBuffer = nullptr);
+	// Else, the function will only record the commands to the command buffer and manage scratch buffers.
+	void _BuildOrUpdateTLAS(const TLASInput& _input, TLAS* _pTLAS, CommandSubmission* _pCmd = nullptr) const;
 
 public:	
 	~RayTracingAccelerationStructure() { assert(m_vkQueryPool == VK_NULL_HANDLE); assert(vkAccelerationStructure == VK_NULL_HANDLE); };
@@ -135,8 +133,9 @@ public:
 	void Init();
 
 	// Update TLAS in this acceleration structure, 
-	// size of instData vector must be the same as the previous instData that builds this acceleration structure
-	void UpdateTLAS(const std::vector<InstanceData>& instData, CommandSubmission* pCmd);
+	// size of instData vector must be the same as the previous instData that builds this acceleration structure,
+	// if pCmd is provided, the user needs to synchronize commands
+	void UpdateTLAS(const std::vector<InstanceData>& instData, CommandSubmission* pCmd = nullptr);
 
 	void Uninit();
 };

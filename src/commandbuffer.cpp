@@ -28,6 +28,17 @@ void CommandSubmission::_BeginRenderPass(const VkRenderPassBeginInfo& info, VkSu
 	vkCmdBeginRenderPass(vkCommandBuffer, &info, content);
 }
 
+void CommandSubmission::_DoCallbacks(CALLBACK_BINDING_POINT _bindingPoint)
+{
+	auto& queue = m_callbacks[_bindingPoint];
+	while (!queue.empty())
+	{
+		auto& func = queue.front();
+		func(this);
+		queue.pop();
+	}
+}
+
 void CommandSubmission::SetQueueFamilyIndex(uint32_t _queueFamilyIndex)
 {
 	m_optQueueFamilyIndex = _queueFamilyIndex;
@@ -76,11 +87,12 @@ void CommandSubmission::StartCommands(const std::vector<WaitInformation>& _waitI
 	size_t n = _waitInfos.size();
 	CHECK_TRUE(vkCommandBuffer != VK_NULL_HANDLE, "Command buffer is not initialized!");
 	CHECK_TRUE(!m_isRecording, "Already start commands!");
+	
+	WaitTillAvailable(); // To make sure that the first time we call start commands won't trigger COMMANDS_DONE
 	if (vkFence == VK_NULL_HANDLE)
 	{
 		_CreateSynchronizeObjects();
 	}
-	vkWaitForFences(MyDevice::GetInstance().vkDevice, 1, &vkFence, VK_TRUE, UINT64_MAX);
 	vkResetFences(MyDevice::GetInstance().vkDevice, 1, &vkFence);
 	vkResetCommandBuffer(vkCommandBuffer, 0);
 	m_isRecording = true;
@@ -137,13 +149,7 @@ void CommandSubmission::EndRenderPass()
 	CHECK_TRUE(m_isInRenderpass, "Not in render pass!");
 	m_isInRenderpass = false;
 	vkCmdEndRenderPass(vkCommandBuffer);
-	auto& queue = m_callbacks[CALLBACK_BINDING_POINT::END_RENDER_PASS];
-	while (!queue.empty())
-	{
-		auto& func = queue.front();
-		func(this);
-		queue.pop();
-	}
+	_DoCallbacks(CALLBACK_BINDING_POINT::END_RENDER_PASS);
 }
 
 VkSemaphore CommandSubmission::SubmitCommands()
@@ -161,6 +167,7 @@ VkSemaphore CommandSubmission::SubmitCommands()
 		m_isRecording = false;
 		VK_CHECK(vkQueueSubmit(m_vkQueue, 1, &submitInfo, vkFence), "Failed to submit single time commands to queue!");
 		vkQueueWaitIdle(m_vkQueue);
+		_DoCallbacks(CALLBACK_BINDING_POINT::COMMANDS_DONE);
 		Uninit(); // destroy the command buffer after one submission
 	}
 	else
@@ -288,16 +295,17 @@ void CommandSubmission::CopyAccelerationStructure(const VkCopyAccelerationStruct
 	vkCmdCopyAccelerationStructureKHR(vkCommandBuffer, &copyInfo);
 }
 
-void CommandSubmission::BindCallback(CALLBACK_BINDING_POINT bindPoint, std::function<void(CommandSubmission*)> callback)
+void CommandSubmission::BindCallback(CALLBACK_BINDING_POINT bindPoint, std::function<void(CommandSubmission*)>&& callback)
 {
-	m_callbacks[bindPoint].push(callback);
+	m_callbacks[bindPoint].push(std::move(callback));
 }
 
-void CommandSubmission::WaitTillAvailable()const
+void CommandSubmission::WaitTillAvailable()
 {
 	if (vkFence != VK_NULL_HANDLE && !m_isRecording)
 	{
 		vkWaitForFences(MyDevice::GetInstance().vkDevice, 1, &vkFence, VK_TRUE, UINT64_MAX);
+		_DoCallbacks(CALLBACK_BINDING_POINT::COMMANDS_DONE);
 	}
 }
 

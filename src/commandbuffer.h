@@ -56,6 +56,7 @@ public:
 	enum class CALLBACK_BINDING_POINT
 	{
 		END_RENDER_PASS,
+		COMMANDS_DONE,
 	};
 	struct WaitInformation
 	{
@@ -69,22 +70,26 @@ private:
 	std::vector<VkPipelineStageFlags> m_vkWaitStages;
 	std::optional<uint32_t> m_optQueueFamilyIndex;
 	std::unordered_map<CALLBACK_BINDING_POINT, std::queue<std::function<void(CommandSubmission*)>>> m_callbacks;
-
 	VkQueue m_vkQueue = VK_NULL_HANDLE;
 	bool m_isRecording = false;
 	bool m_isInRenderpass = false;
-
-	void _CreateSynchronizeObjects();
-	
-	void _UpdateImageLayout(VkImage vkImage, VkImageSubresourceRange range, VkImageLayout layout) const;
-
-	// I want this function to be called by Renderpass only
-	void _BeginRenderPass(const VkRenderPassBeginInfo& info, VkSubpassContents content = VK_SUBPASS_CONTENTS_INLINE);
 
 public:
 	VkCommandBuffer vkCommandBuffer = VK_NULL_HANDLE;
 	VkFence vkFence = VK_NULL_HANDLE;
 
+private:
+	void _CreateSynchronizeObjects();
+
+	void _UpdateImageLayout(VkImage vkImage, VkImageSubresourceRange range, VkImageLayout layout) const;
+
+	// I want this function to be called by Renderpass only
+	void _BeginRenderPass(const VkRenderPassBeginInfo& info, VkSubpassContents content = VK_SUBPASS_CONTENTS_INLINE);
+
+	// Do all callbacks in the queue and remove them
+	void _DoCallbacks(CALLBACK_BINDING_POINT _bindingPoint);
+
+public:
 	void SetQueueFamilyIndex(uint32_t _queueFamilyIndex);
 	
 	std::optional<uint32_t> GetQueueFamilyIndex() const;
@@ -95,7 +100,7 @@ public:
 	
 	void Uninit();
 
-	void WaitTillAvailable() const; // make sure ALL values used in this command is update AFTER this call or we may access the value while the device still using it
+	void WaitTillAvailable(); // make sure ALL values used in this command is update AFTER this call or we may access the value while the device still using it
 	
 	void StartCommands(const std::vector<WaitInformation>& _waitInfos);	
 	
@@ -159,7 +164,7 @@ public:
 
 	// Bind callback to a function,
 	// the callback will be called only once
-	void BindCallback(CALLBACK_BINDING_POINT bindPoint, std::function<void(CommandSubmission*)> callback);
+	void BindCallback(CALLBACK_BINDING_POINT bindPoint, std::function<void(CommandSubmission*)>&& callback);
 
 	friend class RenderPass;
 	friend class GraphicsPipeline;
