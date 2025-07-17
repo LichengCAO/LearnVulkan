@@ -72,15 +72,18 @@ void RayTracingAccelerationStructure::_InitScratchBuffer(
 
 void RayTracingAccelerationStructure::_BuildBLASs()
 {
+	if (m_compactBLAS)
+	{
+		for (auto& _BLASInput : m_BLASInputs)
+		{
+			_BLASInput.vkBuildFlags = _BLASInput.vkBuildFlags | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR;
+		}
+	}
 	_BuildOrUpdateBLASes(m_BLASInputs, m_uptrBLASes, nullptr);
 }
 
 void RayTracingAccelerationStructure::_BuildOrUpdateBLASes(const std::vector<BLASInput>& _inputs, std::vector<std::unique_ptr<BLAS>>& _BLASes, CommandSubmission* _pCmd, VkDeviceSize maxBudget)
 {
-	VkBuildAccelerationStructureFlagsKHR vkBuildASFlags = 
-		VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR 
-		| VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR
-		| VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
 	std::vector<VkAccelerationStructureBuildGeometryInfoKHR> buildGeomInfos;
 	std::vector<VkAccelerationStructureBuildSizesInfoKHR> buildSizeInfos;
 	std::vector<VkDeviceAddress> scratchAddresses;
@@ -99,7 +102,7 @@ void RayTracingAccelerationStructure::_BuildOrUpdateBLASes(const std::vector<BLA
 		VkAccelerationStructureBuildGeometryInfoKHR buildGeomInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR };
 		buildGeomInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
 		buildGeomInfo.mode = bBuildAS ? VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR : VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR;
-		buildGeomInfo.flags = vkBuildASFlags | _inputs[i].vkBuildFlags;
+		buildGeomInfo.flags = bBuildAS ? _inputs[i].vkBuildFlags : _BLASes[i]->vkBuildFlags;
 		buildGeomInfo.geometryCount = static_cast<uint32_t>(_inputs[i].vkASGeometries.size());
 		buildGeomInfo.pGeometries = _inputs[i].vkASGeometries.data();
 		buildGeomInfo.ppGeometries = nullptr;
@@ -162,6 +165,8 @@ void RayTracingAccelerationStructure::_BuildOrUpdateBLASes(const std::vector<BLA
 
 				// create BLAS
 				curBLAS->Init(buildSizeInfos[BLASIndex].accelerationStructureSize);
+
+				curBLAS->vkBuildFlags = _inputs[BLASIndex].vkBuildFlags;
 
 				// Task1: now we have AS, we can set dstAS for buildGeom
 				buildGeomInfos[BLASIndex].dstAccelerationStructure = curBLAS->vkAccelerationStructure;
@@ -237,6 +242,8 @@ void RayTracingAccelerationStructure::_BuildOrUpdateBLASes(const std::vector<BLA
 					VkCopyAccelerationStructureInfoKHR copyInfo{ VK_STRUCTURE_TYPE_COPY_ACCELERATION_STRUCTURE_INFO_KHR };
 
 					compactBLAS->Init(compactSize);
+
+					compactBLAS->vkBuildFlags = sparseBLASes[i]->vkBuildFlags;
 
 					copyInfo.pNext = nullptr;
 					copyInfo.mode = VK_COPY_ACCELERATION_STRUCTURE_MODE_COMPACT_KHR;
@@ -438,7 +445,7 @@ void RayTracingAccelerationStructure::_BuildOrUpdateTLAS(const TLASInput& _input
 	bool bBuildAS = _pTLAS->vkAccelerationStructure == VK_NULL_HANDLE;
 
 	buildGeomInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
-	buildGeomInfo.flags = _input.vkBuildFlags;
+	buildGeomInfo.flags = bBuildAS ? _input.vkBuildFlags : _pTLAS->vkBuildFlags;
 	buildGeomInfo.mode = bBuildAS ? VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR : VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR;
 	buildGeomInfo.srcAccelerationStructure = VK_NULL_HANDLE;
 	buildGeomInfo.dstAccelerationStructure = VK_NULL_HANDLE;
@@ -454,6 +461,7 @@ void RayTracingAccelerationStructure::_BuildOrUpdateTLAS(const TLASInput& _input
 	{
 		_InitScratchBuffer(buildSizeInfo.buildScratchSize, { buildSizeInfo }, bBuildAS, *pScratchBufferUsed, slotAddresses);
 		_pTLAS->Init(buildSizeInfo.accelerationStructureSize);
+		_pTLAS->vkBuildFlags = _input.vkBuildFlags;
 		buildGeomInfo.dstAccelerationStructure = _pTLAS->vkAccelerationStructure;
 		buildGeomInfo.scratchData.deviceAddress = pScratchBufferUsed->GetDeviceAddress();
 	}
@@ -532,24 +540,31 @@ RayTracingAccelerationStructure::~RayTracingAccelerationStructure()
 	assert(vkAccelerationStructure == VK_NULL_HANDLE);
 }
 
-uint32_t RayTracingAccelerationStructure::AddBLAS(const std::vector<TriangleData>& geomData)
+uint32_t RayTracingAccelerationStructure::AddBLAS(const std::vector<TriangleData>& geomData, VkBuildAccelerationStructureFlagsKHR flags)
 {
 	uint32_t uRet = static_cast<uint32_t>(m_BLASInputs.size());
 	BLASInput blas{};
 
 	_FillBLASInput(geomData, blas);
+	blas.vkBuildFlags = flags;
+
+	if ((flags & VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR) != 0)
+	{
+		m_compactBLAS = true;
+	}
 
 	m_BLASInputs.push_back(blas);
 
     return uRet;
 }
 
-void RayTracingAccelerationStructure::SetUpTLAS(const std::vector<InstanceData>& instData)
+void RayTracingAccelerationStructure::SetUpTLAS(const std::vector<InstanceData>& instData, VkBuildAccelerationStructureFlagsKHR flags)
 {	
 	_BuildBLASs();
 	m_BLASInputs.clear();
 
 	_FillTLASInput(instData, m_TLASInput);
+	m_TLASInput.vkBuildFlags = flags;
 }
 
 void RayTracingAccelerationStructure::Init()

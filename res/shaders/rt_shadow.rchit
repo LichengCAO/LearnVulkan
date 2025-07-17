@@ -95,5 +95,5 @@ void main()
     payload.hitValue = vec3(clamp(dot(wi, nrmWorld), 0.0f, 1.0f)); // Convert to [0, 1] range for color output
     vec3 posShadowRay = posWorld + nrmWorld * 0.01f; // Offset the shadow ray origin slightly to avoid self-intersection
     EmitShadowRay(posShadowRay, wi);
-    if (bHitObject) payload.hitValue = vec3(0.0f, 0.0f, 0.0f); // If the shadow ray hit an object, set the hit value to black
+    //if (bHitObject) payload.hitValue = vec3(0.0f, 0.0f, 0.0f); // If the shadow ray hit an object, set the hit value to black
 }

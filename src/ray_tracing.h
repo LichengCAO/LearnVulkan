@@ -32,9 +32,7 @@ private:
 	{
 		VkAccelerationStructureGeometryKHR				vkASGeometry;
 		VkAccelerationStructureBuildRangeInfoKHR		vkASBuildRangeInfo;
-		VkBuildAccelerationStructureFlagsKHR			vkBuildFlags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR 
-																	| VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
-
+		VkBuildAccelerationStructureFlagsKHR			vkBuildFlags = 0;
 		std::unique_ptr<Buffer>							uptrInstanceBuffer;
 
 		void Reset();
@@ -49,13 +47,15 @@ private:
 	{
 		std::unique_ptr<Buffer> uptrBuffer;
 		VkAccelerationStructureKHR vkAccelerationStructure = VK_NULL_HANDLE;
-		VkDeviceAddress vkDeviceAddress;
+		VkDeviceAddress vkDeviceAddress = 0;
+		VkBuildAccelerationStructureFlagsKHR vkBuildFlags = 0; // used later in update, it must be the same as it when the BLAS is built
 
 		BLAS() {};
 		BLAS(BLAS&& other) { 
 			uptrBuffer = std::move(other.uptrBuffer);
 			vkAccelerationStructure = other.vkAccelerationStructure;
 			vkDeviceAddress = other.vkDeviceAddress;
+			vkBuildFlags = other.vkBuildFlags;
 		};
 		~BLAS() { assert(vkAccelerationStructure == VK_NULL_HANDLE); };
 
@@ -66,7 +66,8 @@ private:
 	struct TLAS {
 		std::unique_ptr<Buffer> uptrBuffer;
 		VkAccelerationStructureKHR vkAccelerationStructure = VK_NULL_HANDLE;
-		VkDeviceAddress vkDeviceAddress;
+		VkDeviceAddress vkDeviceAddress = 0;
+		VkBuildAccelerationStructureFlagsKHR vkBuildFlags = 0; // used later in update, it must be the same as it when the BLAS is built
 
 		~TLAS() { assert(vkAccelerationStructure == VK_NULL_HANDLE); };
 		
@@ -98,6 +99,7 @@ private:
 	TLASInput								m_TLASInput; // hold info temporarily, will be invalid after Init
 	std::vector<std::unique_ptr<BLAS>>		m_uptrBLASes;
 	std::unique_ptr<TLAS>					m_uptrTLAS;
+	bool									m_compactBLAS = false; // if one of BLASes allows compact, we build all BLASes compacted
 
 public:
 	VkAccelerationStructureKHR vkAccelerationStructure = VK_NULL_HANDLE;
@@ -123,7 +125,11 @@ private:
 	// If this function is used for build, then _pCmd will not be used, 
 	// an internal command buffer will be created and this function will wait till the output BLASes is ready to use.
 	// If this function is used for update, then _pCmd must not be nullptr
-	static void _BuildOrUpdateBLASes(const std::vector<BLASInput>& _inputs, std::vector<std::unique_ptr<BLAS>>& _BLASes, CommandSubmission* _pCmd = nullptr, VkDeviceSize maxBudget = 256'000'000);
+	static void _BuildOrUpdateBLASes(
+		const std::vector<BLASInput>& _inputs, 
+		std::vector<std::unique_ptr<BLAS>>& _BLASes,
+		CommandSubmission* _pCmd = nullptr,
+		VkDeviceSize maxBudget = 256'000'000);
 
 	// Build TLAS
 	void _BuildTLAS();
@@ -147,10 +153,19 @@ public:
 
 	// Add a BLAS to this acceleration structure, 
 	// return the index of this BLAS in the vector of BLASs this acceleration structure holds
-	uint32_t AddBLAS(const std::vector<TriangleData>& geomData);
+	uint32_t AddBLAS(
+		const std::vector<TriangleData>& geomData,
+		VkBuildAccelerationStructureFlagsKHR flags = 
+		VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR 
+		| VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR 
+		| VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
 
 	// Set up TLAS after all BLASs are added, TLAS will not be created or be built, we do it in Init
-	void SetUpTLAS(const std::vector<InstanceData>& instData);
+	void SetUpTLAS(
+		const std::vector<InstanceData>& instData, 
+		VkBuildAccelerationStructureFlagsKHR flags = 
+		VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR 
+		| VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR);
 	
 	// Build AS after TLAS's setup
 	void Init();
