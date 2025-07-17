@@ -20,6 +20,7 @@ public:
 private:
 	Information m_bufferInformation{};
 	void* m_mappedMemory = nullptr; // we store this value, since mapping is not free
+	VkDeviceSize m_memoryOffset = 0;
 
 public:
 	VkBuffer	   vkBuffer = VK_NULL_HANDLE;

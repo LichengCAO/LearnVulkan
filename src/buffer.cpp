@@ -98,7 +98,7 @@ void Buffer::_CopyFromHostWithMappedMemory(const void* src, size_t size)
 {
 	if (m_mappedMemory == nullptr)
 	{
-		vkMapMemory(MyDevice::GetInstance().vkDevice, vkDeviceMemory, 0, m_bufferInformation.size, 0, &m_mappedMemory);
+		vkMapMemory(MyDevice::GetInstance().vkDevice, vkDeviceMemory, m_memoryOffset, m_bufferInformation.size, 0, &m_mappedMemory);
 	}
 	memcpy(m_mappedMemory, src, size);
 }
