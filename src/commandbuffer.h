@@ -115,6 +115,10 @@ public:
 	
 	VkSemaphore SubmitCommands();
 
+	void SubmitCommands(const std::vector<VkSemaphore>& _semaphoresToSignal);
+
+	void SubmitCommandsAndWait();
+
 	void AddPipelineBarrier(
 		VkPipelineStageFlags srcStageMask,
 		VkPipelineStageFlags dstStageMask,

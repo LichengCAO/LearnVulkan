@@ -14,6 +14,19 @@ class RayTracingAccelerationStructure final
 	// and we can use gl_PrimitiveID to get triangle hit of that model,
 	// but one BLAS holding multiple models is also allowed, 
 	// in that case, gl_PrimitiveID will be the offset plus the triangle ID in the hit model
+
+	// rules for update
+	// An update operation imposes certain constraints on the input, in exchange for considerably faster execution.When performing an update,
+	// the application is required to provide a full description of the acceleration structure, but is prohibited from changing anything other than instance definitions, transform matrices, 
+	// and vertex or AABB positions.All other aspects of the description must exactly match the one from the original build.
+	// 
+	// More precisely, the application must not use an update operation to do any of the following :
+	//  Change primitives or instances from active to inactive, or vice versa(as defined in Inactive Primitives and Instances).
+	//	Change the index or vertex formats of triangle geometry.
+	//	Change triangle geometry transform pointers from null to non - null or vice versa.
+	//	Change the number of geometries or instances in the structure.
+	//	Change the geometry flags for any geometry in the structure.
+	//	Change the number of vertices or primitives for any geometry in the structure.
 private:
 	struct TLASInput
 	{
@@ -66,7 +79,7 @@ public:
 	struct TriangleData
 	{
 		VkDeviceAddress vkDeviceAddressVertex;
-		uint32_t		uVertexStride;
+		uint32_t		uVertexStride; // first 3 floats must be position
 		uint32_t		uVertexCount;
 		VkDeviceAddress vkDeviceAddressIndex;
 		VkIndexType		vkIndexType;
@@ -85,7 +98,6 @@ private:
 	TLASInput								m_TLASInput; // hold info temporarily, will be invalid after Init
 	std::vector<std::unique_ptr<BLAS>>		m_uptrBLASes;
 	std::unique_ptr<TLAS>					m_uptrTLAS;
-	VkQueryPool								m_vkQueryPool = VK_NULL_HANDLE;
 
 public:
 	VkAccelerationStructureKHR vkAccelerationStructure = VK_NULL_HANDLE;
@@ -107,19 +119,25 @@ private:
 	// Build all BLASs, after all BLASInputs are added
 	void _BuildBLASs();
 
-	// Create m_vkQueryPool if not have one with given size, or reset current pool to given size
-	void _PrepareQueryPool(uint32_t uQueryCount);
+	// Build BLASes if the _BLASes is empty, otherwise, update it.
+	// If this function is used for build, then _pCmd will not be used, 
+	// an internal command buffer will be created and this function will wait till the output BLASes is ready to use.
+	// If this function is used for update, then _pCmd must not be nullptr
+	static void _BuildOrUpdateBLASes(const std::vector<BLASInput>& _inputs, std::vector<std::unique_ptr<BLAS>>& _BLASes, CommandSubmission* _pCmd = nullptr, VkDeviceSize maxBudget = 256'000'000);
 
 	// Build TLAS
 	void _BuildTLAS();
 
-	// Fill TLAS input with the instance data
+	// Fill TLAS input with the instance data, PS. cannot be static
 	void _FillTLASInput(const std::vector<InstanceData>& instData, TLASInput& inputToFill) const;
 
 	// Build TLAS if the vkAccelerationStructure of the input TLAS is VK_NULL_HANDLE, else, update it.
-	// If _pCmd is nullptr, the function will create a command buffer and wait till done.
-	// Else, the function will only record the commands to the command buffer and manage scratch buffers.
-	void _BuildOrUpdateTLAS(const TLASInput& _input, TLAS* _pTLAS, CommandSubmission* _pCmd = nullptr) const;
+	// The function will only record the commands to the command buffer and manage scratch buffers,
+	// so TLASInput should be reset manually after the commands done.
+	static void _BuildOrUpdateTLAS(const TLASInput& _input, TLAS* _pTLAS, CommandSubmission* _pCmd);
+
+	// Fill BLAS input with the triangle data
+	static void _FillBLASInput(const std::vector<TriangleData>& _trigData, BLASInput& _inputToFill);
 
 public:
 	RayTracingAccelerationStructure();
@@ -136,6 +154,12 @@ public:
 	
 	// Build AS after TLAS's setup
 	void Init();
+
+	// Update BLAS in this acceleration structure, 
+	// user needs to update TLAS after update BLASes,
+	// no need to synchronize TLAS update and BLASes update,
+	// it is done inside
+	void UpdateBLAS(const std::vector<TriangleData>& _geomData, uint32_t _BLASIndex, CommandSubmission* _pCmd = nullptr);
 
 	// Update TLAS in this acceleration structure, 
 	// size of instData vector must be the same as the previous instData that builds this acceleration structure,

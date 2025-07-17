@@ -40,10 +40,15 @@ void RayTracingApp::_InitDescriptorSetLayouts()
 	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_RAYGEN_BIT_KHR); // image output
 	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR); // instance data
 	m_rtDSetLayout.Init();
+
+	//m_compDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT); // time
+	m_compDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT); // vertex buffer
+	m_compDSetLayout.Init();
 }
 
 void RayTracingApp::_UninitDescriptorSetLayouts()
 {
+	m_compDSetLayout.Uninit();
 	m_rtDSetLayout.Uninit();
 }
 
@@ -60,6 +65,7 @@ void RayTracingApp::_UninitSampler()
 void RayTracingApp::_InitModels()
 {
 	std::vector<Mesh> outMeshes;
+	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/sphere/sphere.obj", outMeshes);
 	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/bunny/bunny.obj", outMeshes);
 	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/wahoo/wahoo.obj", outMeshes);
 	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/ChessBoard/ChessBoard.obj", outMeshes);
@@ -71,16 +77,16 @@ void RayTracingApp::_InitModels()
 		m_models.push_back(model);
 	}
 	//m_models[0].transform.SetScale(0.5, 0.5, 0.5);
-	m_models[1].transform.SetScale(0.5, 0.5, 0.5);
+	m_models[2].transform.SetScale(0.5, 0.5, 0.5);
 	//m_models[2].transform.SetScale(0.1, 0.1, 0.1);
 
-	m_models[0].transform.SetPosition(0, 0, 0);
-	m_models[1].transform.SetPosition(6, 0, 1);
-	m_models[2].transform.SetPosition(0, 0, -2);
+	m_models[0 + 1].transform.SetPosition(0, 0, 0);
+	m_models[1 + 1].transform.SetPosition(6, 0, 1);
+	m_models[2 + 1].transform.SetPosition(0, 0, -2);
 
-	m_models[0].transform.SetRotation(90, 0, 180);
-	m_models[1].transform.SetRotation(90, 0, 180);
-	m_models[2].transform.SetRotation(0, 0, 90);
+	m_models[0 + 1].transform.SetRotation(90, 0, 180);
+	m_models[1 + 1].transform.SetRotation(90, 0, 180);
+	m_models[2 + 1].transform.SetRotation(0, 0, 90);
 }
 
 void RayTracingApp::_InitBuffers()
@@ -250,6 +256,10 @@ void RayTracingApp::_InitAS()
 
 			instData.uBLASIndex = AS.AddBLAS({ trigData });
 			instData.transformMatrix = model.transform.GetModelMatrix();
+			if (i == 0)
+			{
+				m_BLASInputs = { trigData };
+			}
 
 			instDatas.push_back(instData);
 		}
@@ -339,10 +349,29 @@ void RayTracingApp::_InitDescriptorSets()
 
 		m_rtDSets.push_back(std::move(uptrDSet));
 	}
+
+	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+	{
+		std::unique_ptr<DescriptorSet> uptrDSet = std::make_unique<DescriptorSet>(m_compDSetLayout.NewDescriptorSet());
+
+		uptrDSet->Init();
+		uptrDSet->StartUpdate();
+		//uptrDSet->UpdateBinding(0, m_cameraBuffers[i].get());
+		uptrDSet->UpdateBinding(0, m_vertexBuffers[0][i].get()); // sphere
+		uptrDSet->FinishUpdate();
+
+		m_compDSets.push_back(std::move(uptrDSet));
+	}
 }
 
 void RayTracingApp::_UninitDescriptorSets() 
 {
+	for (auto& uptrDSet : m_compDSets)
+	{
+		uptrDSet.reset();
+	}
+	m_compDSets.clear();
+
 	for (auto& uptrDSet : m_rtDSets)
 	{
 		uptrDSet.reset();
@@ -357,6 +386,7 @@ void RayTracingApp::_InitPipelines()
 	SimpleShader rchit2{};
 	SimpleShader rmiss{};
 	SimpleShader rmiss2{};
+	SimpleShader anim{};
 	uint32_t rgenId = 0u;
 	uint32_t rchitId = 0u;
 	uint32_t rchit2Id = 0u;
@@ -368,12 +398,14 @@ void RayTracingApp::_InitPipelines()
 	rchit2.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/rt_simple.rchit.spv");
 	rmiss.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/rt.rmiss.spv");
 	rmiss2.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/rt_shadow.rmiss.spv");
+	anim.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/rt_anim.comp.spv");
 
 	rgen.Init();
 	rchit.Init();
 	rchit2.Init();
 	rmiss.Init();
 	rmiss2.Init();
+	anim.Init();
 
 	m_rtPipeline.AddDescriptorSetLayout(m_rtDSetLayout.vkDescriptorSetLayout);
 	rgenId  = m_rtPipeline.AddShader(rgen.GetShaderStageInfo());
@@ -381,6 +413,10 @@ void RayTracingApp::_InitPipelines()
 	rmissId = m_rtPipeline.AddShader(rmiss.GetShaderStageInfo());
 	rmiss2Id = m_rtPipeline.AddShader(rmiss2.GetShaderStageInfo());
 	rchit2Id = m_rtPipeline.AddShader(rchit2.GetShaderStageInfo());
+
+	m_compPipeline.AddDescriptorSetLayout(&m_compDSetLayout);
+	m_compPipeline.AddShader(anim.GetShaderStageInfo());
+	m_compPipeline.AddPushConstant(VK_SHADER_STAGE_COMPUTE_BIT, sizeof(float));
 
 	m_rtPipeline.SetRayGenerationShaderRecord(rgenId);
 	m_rtPipeline.AddHitShaderRecord(rchitId);
@@ -390,16 +426,19 @@ void RayTracingApp::_InitPipelines()
 	m_rtPipeline.SetMaxRecursion(2u);
 
 	m_rtPipeline.Init();
+	m_compPipeline.Init();
 
 	rgen.Uninit();
 	rchit.Uninit();
 	rchit2.Uninit();
 	rmiss.Uninit();
 	rmiss2.Uninit();
+	anim.Uninit();
 }
 
 void RayTracingApp::_UninitPipelines()
 {
+	m_compPipeline.Uninit();
 	m_rtPipeline.Uninit();
 }
 
@@ -495,7 +534,7 @@ void RayTracingApp::_UpdateUniformBuffer()
 	ubo.inverseViewProj = glm::inverse(m_camera.GetViewProjectionMatrix());
 	ubo.eye = glm::vec4(m_camera.eye, 1.0f);
 	m_cameraBuffers[m_currentFrame]->CopyFromHost(&ubo);
-	m_models[0].transform.SetRotation(0, 0, lastTime * 10);
+	m_models[1].transform.SetRotation(0, 0, lastTime * 10);
 }
 
 void RayTracingApp::_MainLoop()
@@ -536,6 +575,25 @@ void RayTracingApp::_DrawFrame()
 		m_TLASInputs[i].transformMatrix = m_models[i].transform.GetModelMatrix();
 	}
 
+	// update vertex buffer with compute shader
+	{
+		ComputePipeline::PipelineInput input{};
+		VkMemoryBarrier barrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+		float time = static_cast<float>(lastTime);
+		input.groupCountX = m_models[0].mesh.verts.size();
+		input.groupCountY = 1;
+		input.groupCountZ = 1;
+		input.pDescriptorSets = { m_compDSets[m_currentFrame].get() };
+		input.pushConstants = { {VK_SHADER_STAGE_COMPUTE_BIT, &time} };
+		m_compPipeline.Do(cmd->vkCommandBuffer, input);
+
+		barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
+		barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+		
+		cmd->AddPipelineBarrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, { barrier });
+	}
+
+	m_rtAccelStruct[m_currentFrame].UpdateBLAS(m_BLASInputs, 0, cmd.get());
 	m_rtAccelStruct[m_currentFrame].UpdateTLAS(m_TLASInputs, cmd.get());
 	RayTracingAccelerationStructure::RecordPipelineBarrier(cmd.get());
 

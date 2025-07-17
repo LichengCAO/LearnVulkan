@@ -8,6 +8,35 @@ class VertexInputLayout;
 class VertexIndexInput;
 class VertexInput;
 class RenderPass;
+class GraphicsPipeline;
+class ComputePipeline;
+class RayTracingPipeline;
+
+class PushConstantManager
+{
+private:
+	uint32_t m_currentSize = 0u;
+	std::unordered_map<VkShaderStageFlagBits, std::pair<uint32_t, uint32_t>> m_mapRange;
+
+private:
+	PushConstantManager();
+
+	static std::vector<VkShaderStageFlagBits> _GetBitsFromStageFlags(VkShaderStageFlags _flags);
+
+public:
+	// Add a push constant in the input stage, the stage is not allowed to assigned twice
+	void AddConstantRange(VkShaderStageFlags _stages, uint32_t _size);
+
+	// Push constant to the input stage
+	void PushConstant(VkCommandBuffer _cmd, VkPipelineLayout _layout, VkShaderStageFlagBits _stage, const void* _data) const;
+
+	// Get VkPushConstantRanges managed
+	void GetVkPushConstantRanges(std::vector<VkPushConstantRange>& _outRanges) const;
+
+	friend class GraphicsPipeline;
+	friend class ComputePipeline;
+	friend class RayTracingPipeline;
+};
 
 class GraphicsPipeline
 {
@@ -17,6 +46,7 @@ public:
 	{
 		VkExtent2D imageSize{};
 		std::vector<const DescriptorSet*> pDescriptorSets;
+		std::vector<std::pair<VkShaderStageFlagBits, const void*>> pushConstants;
 
 		uint32_t vertexCount = 0u;
 	};
@@ -26,6 +56,7 @@ public:
 	{
 		VkExtent2D imageSize{};
 		std::vector<const DescriptorSet*> pDescriptorSets;
+		std::vector<std::pair<VkShaderStageFlagBits, const void*>> pushConstants;
 
 		const VertexIndexInput* pVertexIndexInput = nullptr;
 		std::vector<const VertexInput*> pVertexInputs;
@@ -36,6 +67,7 @@ public:
 	{
 		VkExtent2D imageSize{};
 		std::vector<const DescriptorSet*> pDescriptorSets;
+		std::vector<std::pair<VkShaderStageFlagBits, const void*>> pushConstants;
 
 		uint32_t groupCountX = 1;
 		uint32_t groupCountY = 1;
@@ -54,6 +86,7 @@ private:
 	VkPipelineDepthStencilStateCreateInfo m_depthStencilInfo{};
 	const RenderPass* m_pRenderPass = nullptr;
 	uint32_t m_subpass = 0;
+	PushConstantManager m_pushConstant;
 
 public:
 	VkPipelineLayout vkPipelineLayout = VK_NULL_HANDLE;
@@ -64,7 +97,11 @@ public:
 
 private:
 	void _InitCreateInfos();
-	void _DoCommon(VkCommandBuffer cmd, const VkExtent2D& imageSize, const std::vector<const DescriptorSet*>& pSets);
+	void _DoCommon(
+		VkCommandBuffer cmd,
+		const VkExtent2D& imageSize,
+		const std::vector<const DescriptorSet*>& pSets,
+		const std::vector<std::pair<VkShaderStageFlagBits, const void*>> pushConstants);
 
 public:
 	GraphicsPipeline();
@@ -76,6 +113,7 @@ public:
 	void AddDescriptorSetLayout(VkDescriptorSetLayout vkDSetLayout);
 	void BindToSubpass(const RenderPass* pRenderPass, uint32_t subpass);
 	void SetColorAttachmentAsAdd(int idx);
+	void AddPushConstant(VkShaderStageFlags _stages, uint32_t _size);
 	void Init();
 	void Uninit();
 
@@ -90,6 +128,7 @@ public:
 	struct PipelineInput
 	{
 		std::vector<const DescriptorSet*> pDescriptorSets;
+		std::vector<std::pair<VkShaderStageFlagBits, const void*>> pushConstants;
 
 		uint32_t groupCountX = 1;
 		uint32_t groupCountY = 1;
@@ -99,6 +138,7 @@ public:
 private:
 	VkPipelineShaderStageCreateInfo m_shaderStageInfo{};
 	std::vector<VkDescriptorSetLayout> m_descriptorSetLayouts;
+	PushConstantManager m_pushConstant;
 
 public:
 	VkPipelineLayout vkPipelineLayout = VK_NULL_HANDLE;
@@ -111,6 +151,7 @@ public:
 
 	void AddShader(const VkPipelineShaderStageCreateInfo& shaderInfo);
 	void AddDescriptorSetLayout(const DescriptorSetLayout* pSetLayout);
+	void AddPushConstant(VkShaderStageFlags _stages, uint32_t _size);
 
 	void Init();
 	void Uninit();
@@ -155,6 +196,8 @@ public:
 	struct PipelineInput
 	{
 		std::vector<const DescriptorSet*> pDescriptorSets;
+		std::vector<std::pair<VkShaderStageFlagBits, const void*>> pushConstants;
+
 		// for simplicity, i bind SBT in RT pipeline
 		uint32_t uWidth = 0u;
 		uint32_t uHeight = 0u;
@@ -167,6 +210,7 @@ private:
 	std::vector<VkDescriptorSetLayout> m_descriptorSetLayouts;
 	ShaderBindingTable m_SBT{};
 	uint32_t m_maxRayRecursionDepth = 1u;
+	PushConstantManager m_pushConstant;
 
 public:
 	VkPipelineLayout vkPipelineLayout = VK_NULL_HANDLE;
@@ -179,6 +223,7 @@ public:
 	uint32_t AddShader(const VkPipelineShaderStageCreateInfo& shaderInfo);
 	
 	void AddDescriptorSetLayout(VkDescriptorSetLayout vkDSetLayout);
+	void AddPushConstant(VkShaderStageFlags _stages, uint32_t _size);
 
 	// https://www.willusher.io/graphics/2019/11/20/the-sbt-three-ways/
 	

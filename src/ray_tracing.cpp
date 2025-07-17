@@ -72,39 +72,47 @@ void RayTracingAccelerationStructure::_InitScratchBuffer(
 
 void RayTracingAccelerationStructure::_BuildBLASs()
 {
-	VkBuildAccelerationStructureFlagsKHR vkBuildASFlags = VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR;
-	VkDeviceSize maxBudget = 256'000'000;
+	_BuildOrUpdateBLASes(m_BLASInputs, m_uptrBLASes, nullptr);
+}
+
+void RayTracingAccelerationStructure::_BuildOrUpdateBLASes(const std::vector<BLASInput>& _inputs, std::vector<std::unique_ptr<BLAS>>& _BLASes, CommandSubmission* _pCmd, VkDeviceSize maxBudget)
+{
+	VkBuildAccelerationStructureFlagsKHR vkBuildASFlags = 
+		VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR 
+		| VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR
+		| VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR;
 	std::vector<VkAccelerationStructureBuildGeometryInfoKHR> buildGeomInfos;
 	std::vector<VkAccelerationStructureBuildSizesInfoKHR> buildSizeInfos;
 	std::vector<VkDeviceAddress> scratchAddresses;
-	Buffer scratchBuffer{};
+	std::shared_ptr<Buffer> scratchBuffer = std::make_shared<Buffer>();
 	bool bNeedCompact = false;
-	int  nAllBLASCount = m_BLASInputs.size();
+	bool bBuildAS = _BLASes.size() == 0;
+	size_t  nAllBLASCount = _inputs.size();
 
 	// setup scratch buffer that doesn't exceed maxBudget
 	buildGeomInfos.reserve(nAllBLASCount);
 	buildSizeInfos.reserve(nAllBLASCount);
-	for (int i = 0; i < nAllBLASCount; ++i)
+	for (size_t i = 0; i < nAllBLASCount; ++i)
 	{
-		std::vector<uint32_t> maxPrimCount(m_BLASInputs[i].vkASBuildRangeInfos.size());
+		std::vector<uint32_t> maxPrimCount(_inputs[i].vkASBuildRangeInfos.size());
 		VkAccelerationStructureBuildSizesInfoKHR	buildSizeInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR };
 		VkAccelerationStructureBuildGeometryInfoKHR buildGeomInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR };
 		buildGeomInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_BOTTOM_LEVEL_KHR;
-		buildGeomInfo.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
-		buildGeomInfo.flags = vkBuildASFlags  |  m_BLASInputs[i].vkBuildFlags;
-		buildGeomInfo.geometryCount = static_cast<uint32_t>(m_BLASInputs[i].vkASGeometries.size());
-		buildGeomInfo.pGeometries = m_BLASInputs[i].vkASGeometries.data();
+		buildGeomInfo.mode = bBuildAS ? VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR : VK_BUILD_ACCELERATION_STRUCTURE_MODE_UPDATE_KHR;
+		buildGeomInfo.flags = vkBuildASFlags | _inputs[i].vkBuildFlags;
+		buildGeomInfo.geometryCount = static_cast<uint32_t>(_inputs[i].vkASGeometries.size());
+		buildGeomInfo.pGeometries = _inputs[i].vkASGeometries.data();
 		buildGeomInfo.ppGeometries = nullptr;
 		buildGeomInfo.srcAccelerationStructure = VK_NULL_HANDLE;
 		buildGeomInfo.dstAccelerationStructure = VK_NULL_HANDLE; // we don't have AS yet, so we do this later, see Task1
 		// buildGeomInfo.scratchData: we don't have scratch buffer yet, so we do this later, see Task2
-		
+
 		// setup maxPrimCount
-		for (int j = 0; j < m_BLASInputs[i].vkASBuildRangeInfos.size(); ++j)
+		for (size_t j = 0; j < _inputs[i].vkASBuildRangeInfos.size(); ++j)
 		{
-			maxPrimCount[j] = m_BLASInputs[i].vkASBuildRangeInfos[j].primitiveCount;
+			maxPrimCount[j] = _inputs[i].vkASBuildRangeInfos[j].primitiveCount;
 		}
-		
+
 		// https://registry.khronos.org/vulkan/specs/latest/man/html/vkGetAccelerationStructureBuildSizesKHR.html
 		assert(maxPrimCount.size() == buildGeomInfo.geometryCount);
 		vkGetAccelerationStructureBuildSizesKHR(MyDevice::GetInstance().vkDevice, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &buildGeomInfo, maxPrimCount.data(), &buildSizeInfo);
@@ -114,46 +122,41 @@ void RayTracingAccelerationStructure::_BuildBLASs()
 		buildGeomInfos.push_back(buildGeomInfo);
 		buildSizeInfos.push_back(buildSizeInfo);
 	}
-	_InitScratchBuffer(maxBudget, buildSizeInfos, true, scratchBuffer, scratchAddresses);
+	_InitScratchBuffer(maxBudget, buildSizeInfos, bBuildAS, *scratchBuffer, scratchAddresses);
 
 	// Task2: now we have scratch buffer, we can set scratch data for buildGeomInfos
-	for (int i = 0; i < nAllBLASCount; ++i)
+	for (size_t i = 0; i < nAllBLASCount; ++i)
 	{
 		auto& buildGeomInfo = buildGeomInfos[i];
 		buildGeomInfo.scratchData.deviceAddress = scratchAddresses[i % scratchAddresses.size()];
 	}
 
 	// create BLASes and build them
+	if (bBuildAS)
 	{
-		int BLASIndex = 0;
-		uint32_t queryIndex = 0u;
-		int loopCount = (nAllBLASCount + scratchAddresses.size() - 1) / scratchAddresses.size();
-		CommandSubmission cmd{};
-		CommandSubmission::WaitInformation waitCmd{ VK_NULL_HANDLE, VK_PIPELINE_STAGE_BOTTOM_OF_PIPE_BIT }; // we cannot signal a signaled semaphore, so we need to wait semaphore and unsignaled it
+		size_t BLASIndex = 0;
+		size_t loopCount = (nAllBLASCount + scratchAddresses.size() - 1) / scratchAddresses.size();
+		std::vector<std::unique_ptr<BLAS>> sparseBLASes;
+		CommandSubmission localCmd{};
+
+		localCmd.Init();
+		localCmd.StartCommands({});
 		
-		// prepare query pool
-		if (bNeedCompact)
-		{
-			_PrepareQueryPool(nAllBLASCount);
-		}
+		_BLASes.reserve(nAllBLASCount);
+		sparseBLASes.reserve(nAllBLASCount);
 
-		cmd.Init();
-
-		for (int i = 0; i < loopCount; ++i)
+		// build BLASes
+		for (size_t i = 0; i < loopCount; ++i)
 		{
 			VkMemoryBarrier vkMemBarrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
-			std::vector<VkAccelerationStructureKHR> BLASesToProcess; // stores the created but not built yet BLASes
 			std::vector<const VkAccelerationStructureBuildRangeInfoKHR*> buildRangeInfosToProcess;
 			std::vector<VkAccelerationStructureBuildGeometryInfoKHR> buildGeomInfosToProcess;
-			std::vector<std::unique_ptr<BLAS>> BLASesInitInThisIter;
 
-			BLASesToProcess.reserve(nAllBLASCount);
-			buildRangeInfosToProcess.reserve(nAllBLASCount);
-			buildGeomInfosToProcess.reserve(nAllBLASCount);
-			BLASesInitInThisIter.reserve(nAllBLASCount);
+			buildRangeInfosToProcess.reserve(scratchAddresses.size());
+			buildGeomInfosToProcess.reserve(scratchAddresses.size());
 
 			// try to create as many BLASes as scratch buffer can hold
-			for (int j = 0; j < scratchAddresses.size() && BLASIndex < nAllBLASCount; ++j)
+			for (size_t j = 0; j < scratchAddresses.size() && BLASIndex < nAllBLASCount; ++j)
 			{
 				auto curBLAS = std::make_unique<BLAS>();
 
@@ -164,135 +167,152 @@ void RayTracingAccelerationStructure::_BuildBLASs()
 				buildGeomInfos[BLASIndex].dstAccelerationStructure = curBLAS->vkAccelerationStructure;
 
 				// use scratch buffer to build BLAS
-				BLASesToProcess.push_back(curBLAS->vkAccelerationStructure);
-				buildRangeInfosToProcess.push_back(m_BLASInputs[BLASIndex].vkASBuildRangeInfos.data());
+				buildRangeInfosToProcess.push_back(_inputs[BLASIndex].vkASBuildRangeInfos.data());
 				buildGeomInfosToProcess.push_back(buildGeomInfos[BLASIndex]);
-				BLASesInitInThisIter.push_back(std::move(curBLAS));
+				sparseBLASes.push_back(std::move(curBLAS));
 
 				BLASIndex++;
 			}
 
-			// this will wait till previous commands be done, so that scratch buffer is available
-			if (waitCmd.waitSamaphore == VK_NULL_HANDLE)
-			{
-				cmd.StartCommands({});
-			}
-			else
-			{
-				cmd.StartCommands({ waitCmd });
-			}
-
 			// build BLASes
-			cmd.BuildAccelerationStructures(buildGeomInfosToProcess, buildRangeInfosToProcess);
+			localCmd.BuildAccelerationStructures(buildGeomInfosToProcess, buildRangeInfosToProcess);
 
 			// wait build to be done
 			vkMemBarrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
 			vkMemBarrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR;
-			cmd.AddPipelineBarrier(VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, { vkMemBarrier });
+			localCmd.AddPipelineBarrier(VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, { vkMemBarrier });
+		}
 
-			// store compact info in the query pool
-			if (bNeedCompact)
+		// when build finish scratch buffer should be no longer useful
+		localCmd.BindCallback(CommandSubmission::CALLBACK_BINDING_POINT::COMMANDS_DONE,
+			[sptr = std::move(scratchBuffer)](CommandSubmission* _cmd) mutable
 			{
-				cmd.WriteAccelerationStructuresProperties(BLASesToProcess, VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR, m_vkQueryPool, queryIndex);
+				sptr->Uninit();
+			});
+
+		// Wait BLASes to be ready and fill the output BLASes
+		if (bNeedCompact)
+		{
+			VkQueryPool vkQueryPool = VK_NULL_HANDLE;
+			std::vector<VkAccelerationStructureKHR> BLASesToQuery;
+			std::vector<VkDeviceSize> compactSizes(nAllBLASCount);
+			VkQueryPoolCreateInfo qpci = { VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO };
+
+			qpci.queryType = VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR;
+			qpci.queryCount = nAllBLASCount;
+			vkCreateQueryPool(MyDevice::GetInstance().vkDevice, &qpci, nullptr, &vkQueryPool);
+			vkResetQueryPool(MyDevice::GetInstance().vkDevice, vkQueryPool, 0, nAllBLASCount);
+
+			BLASesToQuery.reserve(nAllBLASCount);
+			for (auto& uptrBLAS : sparseBLASes)
+			{
+				BLASesToQuery.push_back(uptrBLAS->vkAccelerationStructure);
 			}
 
-			waitCmd.waitSamaphore = cmd.SubmitCommands();
+			// previous memory barrier ensures the build done, so we query here
+			localCmd.WriteAccelerationStructuresProperties(BLASesToQuery, VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR, vkQueryPool, 0u);
+			
+			// wait query to be finished
+			localCmd.SubmitCommandsAndWait();
 
-			// compact BLAS
-			if (bNeedCompact)
+			vkGetQueryPoolResults(
+				MyDevice::GetInstance().vkDevice,
+				vkQueryPool,
+				0,
+				static_cast<uint32_t>(compactSizes.size()),
+				compactSizes.size() * sizeof(VkDeviceSize),
+				compactSizes.data(),
+				sizeof(VkDeviceSize),
+				VK_QUERY_RESULT_WAIT_BIT
+			);
+
+			localCmd.StartCommands({});
+
+			for (size_t i = 0; i < nAllBLASCount; ++i)
 			{
-				std::vector<VkDeviceSize> compactSizes(BLASesToProcess.size());
-
-				// wait query pool write to be done
-				cmd.WaitTillAvailable();
-				vkGetQueryPoolResults(
-					MyDevice::GetInstance().vkDevice,
-					m_vkQueryPool,
-					queryIndex,
-					static_cast<uint32_t>(compactSizes.size()),
-					compactSizes.size() * sizeof(VkDeviceSize),
-					compactSizes.data(),
-					sizeof(VkDeviceSize),
-					VK_QUERY_RESULT_WAIT_BIT
-				);
-
-				if (waitCmd.waitSamaphore == VK_NULL_HANDLE)
+				VkDeviceSize compactSize = compactSizes[i];
+				if (compactSize > 0)
 				{
-					cmd.StartCommands({});
+					auto compactBLAS = std::make_unique<BLAS>();
+					VkCopyAccelerationStructureInfoKHR copyInfo{ VK_STRUCTURE_TYPE_COPY_ACCELERATION_STRUCTURE_INFO_KHR };
+
+					compactBLAS->Init(compactSize);
+
+					copyInfo.pNext = nullptr;
+					copyInfo.mode = VK_COPY_ACCELERATION_STRUCTURE_MODE_COMPACT_KHR;
+					copyInfo.src = sparseBLASes[i]->vkAccelerationStructure;
+					copyInfo.dst = compactBLAS->vkAccelerationStructure;
+
+					localCmd.CopyAccelerationStructure(copyInfo);
+					_BLASes.push_back(std::move(compactBLAS));
 				}
-				else
-				{
-					cmd.StartCommands({ waitCmd });
-				}
-
-				for (int i = queryIndex; i < BLASIndex; ++i)
-				{
-					size_t localIndex = i - queryIndex;
-					VkDeviceSize compactSize = compactSizes[localIndex];
-					if (compactSize > 0)
-					{
-						auto compactBLAS = std::make_unique<BLAS>();
-						VkCopyAccelerationStructureInfoKHR copyInfo{ VK_STRUCTURE_TYPE_COPY_ACCELERATION_STRUCTURE_INFO_KHR };
-
-						compactBLAS->Init(compactSize);
-
-						copyInfo.pNext = nullptr;
-						copyInfo.mode = VK_COPY_ACCELERATION_STRUCTURE_MODE_COMPACT_KHR;
-						copyInfo.src = BLASesInitInThisIter[localIndex]->vkAccelerationStructure;
-						copyInfo.dst = compactBLAS->vkAccelerationStructure;
-
-						cmd.CopyAccelerationStructure(copyInfo);
-						m_uptrBLASes.push_back(std::move(compactBLAS));
-					}
-				}
-				queryIndex = BLASIndex;
-
-				cmd.SubmitCommands();
 			}
 
-			// wait build to be finished
-			cmd.WaitTillAvailable();
+			localCmd.SubmitCommandsAndWait();
 
-			// process BLASes Init in this iter
-			if (bNeedCompact)
+			// we already push the compacted BLAS copy into the m_uptrBLASes, therefore BLASes in sparseBLASes is useless
+			for (auto& uselessBLAS : sparseBLASes)
 			{
-				// we already push the compacted BLAS copy into the m_uptrBLASes, therefore BLASes in BLASesInitInThisIter is useless
-				for (auto& uselessBLAS : BLASesInitInThisIter)
-				{
-					uselessBLAS->Uninit();
-				}
-				BLASesInitInThisIter.clear();
+				uselessBLAS->Uninit();
 			}
-			else
+			sparseBLASes.clear();
+			vkDestroyQueryPool(MyDevice::GetInstance().vkDevice, vkQueryPool, nullptr);
+			vkQueryPool = VK_NULL_HANDLE;
+		}
+		else
+		{
+			localCmd.SubmitCommandsAndWait();
+			for (size_t i = 0; i < sparseBLASes.size(); ++i)
 			{
-				for (int i = 0; i < BLASesInitInThisIter.size(); ++i)
-				{
-					m_uptrBLASes.push_back(std::move(BLASesInitInThisIter[i]));
-				}
+				_BLASes.push_back(std::move(sparseBLASes[i]));
 			}
 		}
 
-		cmd.Uninit();
+		localCmd.Uninit();
 	}
-	
-	scratchBuffer.Uninit();
-	m_BLASInputs.clear();
-}
+	else
+	{
+		size_t BLASIndex = 0;
+		size_t loopCount = (nAllBLASCount + scratchAddresses.size() - 1) / scratchAddresses.size();
+		for (size_t i = 0; i < loopCount; ++i)
+		{
+			VkMemoryBarrier vkMemBarrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
+			std::vector<const VkAccelerationStructureBuildRangeInfoKHR*> buildRangeInfosToProcess;
+			std::vector<VkAccelerationStructureBuildGeometryInfoKHR> buildGeomInfosToProcess;
 
-void RayTracingAccelerationStructure::_PrepareQueryPool(uint32_t uQueryCount)
-{
-	VkDevice vkDevice = MyDevice::GetInstance().vkDevice;
-	if (m_vkQueryPool == VK_NULL_HANDLE)
-	{
-		VkQueryPoolCreateInfo qpci = { VK_STRUCTURE_TYPE_QUERY_POOL_CREATE_INFO };
-		qpci.queryType = VK_QUERY_TYPE_ACCELERATION_STRUCTURE_COMPACTED_SIZE_KHR;
-		qpci.queryCount = uQueryCount;
-		vkCreateQueryPool(vkDevice, &qpci, nullptr, &m_vkQueryPool);
-	}
-	
-	if (m_vkQueryPool)
-	{
-		vkResetQueryPool(vkDevice, m_vkQueryPool, 0, uQueryCount);
+			buildRangeInfosToProcess.reserve(nAllBLASCount);
+			buildGeomInfosToProcess.reserve(nAllBLASCount);
+
+			// try to update as many BLASes as scratch buffer can hold
+			for (size_t j = 0; j < scratchAddresses.size() && BLASIndex < nAllBLASCount; ++j)
+			{
+				auto& curBLAS = _BLASes[BLASIndex];
+
+				// Task1: now we have AS, we can set dstAS for buildGeom
+				buildGeomInfos[BLASIndex].srcAccelerationStructure = curBLAS->vkAccelerationStructure;
+				buildGeomInfos[BLASIndex].dstAccelerationStructure = curBLAS->vkAccelerationStructure;
+
+				// use scratch buffer to build BLAS
+				buildRangeInfosToProcess.push_back(_inputs[BLASIndex].vkASBuildRangeInfos.data());
+				buildGeomInfosToProcess.push_back(buildGeomInfos[BLASIndex]);
+
+				BLASIndex++;
+			}
+
+			// build BLASes
+			_pCmd->BuildAccelerationStructures(buildGeomInfosToProcess, buildRangeInfosToProcess);
+
+			// wait build to be done, this will wait till previous commands be done, so that scratch buffer is available
+			vkMemBarrier.srcAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
+			vkMemBarrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_READ_BIT_KHR;
+			_pCmd->AddPipelineBarrier(VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, { vkMemBarrier });
+		}
+		_pCmd->BindCallback(
+			CommandSubmission::CALLBACK_BINDING_POINT::COMMANDS_DONE,
+			[sptr = std::move(scratchBuffer)](CommandSubmission* _cmd) mutable
+		{
+			sptr->Uninit();
+		});
 	}
 }
 
@@ -408,7 +428,7 @@ void RayTracingAccelerationStructure::_FillTLASInput(const std::vector<InstanceD
 	inputToFill.vkASGeometry = geom;
 }
 
-void RayTracingAccelerationStructure::_BuildOrUpdateTLAS(const TLASInput& _input, TLAS* _pTLAS, CommandSubmission* _pCmd) const
+void RayTracingAccelerationStructure::_BuildOrUpdateTLAS(const TLASInput& _input, TLAS* _pTLAS, CommandSubmission* _pCmd)
 {
 	std::shared_ptr<Buffer> pScratchBufferUsed = std::make_shared<Buffer>();
 	VkAccelerationStructureBuildGeometryInfoKHR buildGeomInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR };
@@ -446,26 +466,7 @@ void RayTracingAccelerationStructure::_BuildOrUpdateTLAS(const TLASInput& _input
 	}
 
 	// record command buffer
-	if (_pCmd == nullptr)
-	{
-		CommandSubmission cmd{};
-		cmd.Init();
-		cmd.StartOneTimeCommands({});
-
-		cmd.BuildAccelerationStructures({ buildGeomInfo }, { &_input.vkASBuildRangeInfo });
-
-		cmd.BindCallback(
-			CommandSubmission::CALLBACK_BINDING_POINT::COMMANDS_DONE,
-			[sptr = std::move(pScratchBufferUsed)](CommandSubmission* pCmd)
-			mutable {
-			sptr->Uninit();
-		});
-
-		cmd.SubmitCommands();
-		cmd.Uninit();
-		//pScratchBufferUsed->Uninit();
-	}
-	else
+	CHECK_TRUE(_pCmd != nullptr, "A valid command buffer pointer needs to be set here!");
 	{
 		_pCmd->BuildAccelerationStructures({ buildGeomInfo }, { &_input.vkASBuildRangeInfo });
 		_pCmd->BindCallback(
@@ -478,35 +479,11 @@ void RayTracingAccelerationStructure::_BuildOrUpdateTLAS(const TLASInput& _input
 	}
 }
 
-RayTracingAccelerationStructure::RayTracingAccelerationStructure()
+void RayTracingAccelerationStructure::_FillBLASInput(const std::vector<TriangleData>& _trigData, BLASInput& _inputToFill)
 {
-}
-
-RayTracingAccelerationStructure::RayTracingAccelerationStructure(RayTracingAccelerationStructure&& _other)
-{
-	this->m_BLASInputs = std::move(_other.m_BLASInputs);
-	this->m_TLASInput = std::move(_other.m_TLASInput);
-	this->m_uptrBLASes = std::move(_other.m_uptrBLASes);
-	this->m_uptrTLAS = std::move(_other.m_uptrTLAS);
-	this->m_vkQueryPool = _other.m_vkQueryPool;
-	_other.m_vkQueryPool = VK_NULL_HANDLE;
-	this->vkAccelerationStructure = _other.vkAccelerationStructure;
-	_other.vkAccelerationStructure = VK_NULL_HANDLE;
-	_other.Uninit();
-}
-
-RayTracingAccelerationStructure::~RayTracingAccelerationStructure()
-{
-	assert(m_vkQueryPool == VK_NULL_HANDLE); 
-	assert(vkAccelerationStructure == VK_NULL_HANDLE);
-}
-
-uint32_t RayTracingAccelerationStructure::AddBLAS(const std::vector<TriangleData>& geomData)
-{
-	uint32_t uRet = static_cast<uint32_t>(m_BLASInputs.size());
-	BLASInput blas{};
-
-	for (const auto& geom : geomData)
+	_inputToFill.vkASBuildRangeInfos.clear();
+	_inputToFill.vkASGeometries.clear();
+	for (const auto& geom : _trigData)
 	{
 		VkAccelerationStructureGeometryTrianglesDataKHR triangles{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR };
 		triangles.vertexFormat = VK_FORMAT_R32G32B32_SFLOAT;
@@ -530,9 +507,37 @@ uint32_t RayTracingAccelerationStructure::AddBLAS(const std::vector<TriangleData
 		offset.primitiveCount = geom.uIndexCount / 3u;
 		offset.transformOffset = 0u;
 
-		blas.vkASGeometries.push_back(asGeom);
-		blas.vkASBuildRangeInfos.push_back(offset);
+		_inputToFill.vkASGeometries.push_back(asGeom);
+		_inputToFill.vkASBuildRangeInfos.push_back(offset);
 	}
+}
+
+RayTracingAccelerationStructure::RayTracingAccelerationStructure()
+{
+}
+
+RayTracingAccelerationStructure::RayTracingAccelerationStructure(RayTracingAccelerationStructure&& _other)
+{
+	this->m_BLASInputs = std::move(_other.m_BLASInputs);
+	this->m_TLASInput = std::move(_other.m_TLASInput);
+	this->m_uptrBLASes = std::move(_other.m_uptrBLASes);
+	this->m_uptrTLAS = std::move(_other.m_uptrTLAS);
+	this->vkAccelerationStructure = _other.vkAccelerationStructure;
+	_other.vkAccelerationStructure = VK_NULL_HANDLE;
+	_other.Uninit();
+}
+
+RayTracingAccelerationStructure::~RayTracingAccelerationStructure()
+{
+	assert(vkAccelerationStructure == VK_NULL_HANDLE);
+}
+
+uint32_t RayTracingAccelerationStructure::AddBLAS(const std::vector<TriangleData>& geomData)
+{
+	uint32_t uRet = static_cast<uint32_t>(m_BLASInputs.size());
+	BLASInput blas{};
+
+	_FillBLASInput(geomData, blas);
 
 	m_BLASInputs.push_back(blas);
 
@@ -542,42 +547,77 @@ uint32_t RayTracingAccelerationStructure::AddBLAS(const std::vector<TriangleData
 void RayTracingAccelerationStructure::SetUpTLAS(const std::vector<InstanceData>& instData)
 {	
 	_BuildBLASs();
+	m_BLASInputs.clear();
 
 	_FillTLASInput(instData, m_TLASInput);
 }
 
 void RayTracingAccelerationStructure::Init()
 {
+	CommandSubmission tmpCmd{};
 	if (m_uptrTLAS.get() != nullptr)
 	{
 		m_uptrTLAS->Uninit();
 		m_uptrTLAS.reset();
 	}
 	m_uptrTLAS = std::make_unique<TLAS>();
-	_BuildOrUpdateTLAS(m_TLASInput, m_uptrTLAS.get());
+	tmpCmd.Init();
+	tmpCmd.StartOneTimeCommands({});
+	_BuildOrUpdateTLAS(m_TLASInput, m_uptrTLAS.get(), &tmpCmd);
+	tmpCmd.SubmitCommands();
 	this->vkAccelerationStructure = m_uptrTLAS->vkAccelerationStructure;
+	m_TLASInput.Reset();
 	//_BuildTLAS();
+}
+
+void RayTracingAccelerationStructure::UpdateBLAS(const std::vector<TriangleData>& _geomData, uint32_t _BLASIndex, CommandSubmission* _pCmd)
+{
+	BLASInput input{};
+	std::vector<std::unique_ptr<BLAS>> BLASesToUpdate{};
+	BLASesToUpdate.push_back(std::move(m_uptrBLASes[_BLASIndex]));
+	_FillBLASInput(_geomData, input);
+	if (_pCmd == nullptr)
+	{
+		CommandSubmission tmpCmd{};
+		tmpCmd.Init();
+		tmpCmd.StartCommands({});
+		_BuildOrUpdateBLASes({ input }, BLASesToUpdate, &tmpCmd);
+		tmpCmd.SubmitCommandsAndWait();
+		tmpCmd.Uninit();
+	}
+	else
+	{
+		_BuildOrUpdateBLASes({ input }, BLASesToUpdate, _pCmd);
+	}
+	m_uptrBLASes[_BLASIndex] = std::move(BLASesToUpdate[0]);
 }
 
 void RayTracingAccelerationStructure::UpdateTLAS(const std::vector<InstanceData>& instData, CommandSubmission* pCmd)
 {
 	std::shared_ptr<TLASInput> tlasInput = std::make_shared<TLASInput>();
 	_FillTLASInput(instData, *tlasInput);
-	_BuildOrUpdateTLAS(*tlasInput, m_uptrTLAS.get(), pCmd);
-	pCmd->BindCallback(CommandSubmission::CALLBACK_BINDING_POINT::COMMANDS_DONE, 
-		[sptr = std::move(tlasInput)](CommandSubmission* _pCmd)
-		mutable{
-		sptr->Reset();
+	if (pCmd != nullptr)
+	{
+		_BuildOrUpdateTLAS(*tlasInput, m_uptrTLAS.get(), pCmd);
+		pCmd->BindCallback(CommandSubmission::CALLBACK_BINDING_POINT::COMMANDS_DONE,
+			[sptr = std::move(tlasInput)](CommandSubmission* _pCmd)
+			mutable{
+			sptr->Reset();
 		});
+	}
+	else
+	{
+		CommandSubmission tmpCmd{};
+		tmpCmd.Init();
+		tmpCmd.StartOneTimeCommands({});
+		_BuildOrUpdateTLAS(*tlasInput, m_uptrTLAS.get(), &tmpCmd);
+		tmpCmd.SubmitCommands();
+		tlasInput->Reset();
+	}
 }
 
 void RayTracingAccelerationStructure::Uninit()
 {
-	if (m_vkQueryPool != VK_NULL_HANDLE)
-	{
-		vkDestroyQueryPool(MyDevice::GetInstance().vkDevice, m_vkQueryPool, nullptr);
-		m_vkQueryPool = VK_NULL_HANDLE;
-	}
 	if (m_uptrTLAS.get() != nullptr)
 	{
 		m_uptrTLAS->Uninit();

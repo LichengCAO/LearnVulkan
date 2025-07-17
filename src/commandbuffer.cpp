@@ -169,22 +169,59 @@ VkSemaphore CommandSubmission::SubmitCommands()
 	submitInfo.pWaitDstStageMask = m_vkWaitStages.data();
 	if (vkFence == VK_NULL_HANDLE)
 	{
-		VK_CHECK(vkEndCommandBuffer(vkCommandBuffer), "Failed to end command buffer!");
-		m_isRecording = false;
-		VK_CHECK(vkQueueSubmit(m_vkQueue, 1, &submitInfo, vkFence), "Failed to submit single time commands to queue!");
-		vkQueueWaitIdle(m_vkQueue);
-		_DoCallbacks(CALLBACK_BINDING_POINT::COMMANDS_DONE);
+		SubmitCommandsAndWait();
 		Uninit(); // destroy the command buffer after one submission
 	}
 	else
 	{
 		submitInfo.signalSemaphoreCount = 1;
 		submitInfo.pSignalSemaphores = &m_vkSemaphore;
-		VK_CHECK(vkEndCommandBuffer(vkCommandBuffer), "Failed to end command buffer!");
 		m_isRecording = false;
+		VK_CHECK(vkEndCommandBuffer(vkCommandBuffer), "Failed to end command buffer!");
 		VK_CHECK(vkQueueSubmit(m_vkQueue, 1, &submitInfo, vkFence), "Failed to submit commands to queue!");
 	}
 	return m_vkSemaphore;
+}
+
+void CommandSubmission::SubmitCommands(const std::vector<VkSemaphore>& _semaphoresToSignal)
+{
+	CHECK_TRUE(m_isRecording, "Do not start commands yet!");
+	VkSubmitInfo submitInfo = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &vkCommandBuffer;
+	submitInfo.waitSemaphoreCount = static_cast<uint32_t>(m_vkWaitSemaphores.size());
+	submitInfo.pWaitSemaphores = m_vkWaitSemaphores.data();
+	submitInfo.pWaitDstStageMask = m_vkWaitStages.data();
+	if (vkFence == VK_NULL_HANDLE)
+	{
+		SubmitCommandsAndWait();
+		Uninit(); // destroy the command buffer after one submission
+	}
+	else
+	{
+		submitInfo.signalSemaphoreCount = static_cast<uint32_t>(_semaphoresToSignal.size());
+		submitInfo.pSignalSemaphores = _semaphoresToSignal.data();
+		m_isRecording = false;
+		VK_CHECK(vkEndCommandBuffer(vkCommandBuffer), "Failed to end command buffer!");
+		VK_CHECK(vkQueueSubmit(m_vkQueue, 1, &submitInfo, vkFence), "Failed to submit commands to queue!");
+	}
+}
+
+void CommandSubmission::SubmitCommandsAndWait()
+{
+	CHECK_TRUE(m_isRecording, "Do not start commands yet!");
+	VkSubmitInfo submitInfo = { VK_STRUCTURE_TYPE_SUBMIT_INFO };
+	submitInfo.commandBufferCount = 1;
+	submitInfo.pCommandBuffers = &vkCommandBuffer;
+	submitInfo.waitSemaphoreCount = static_cast<uint32_t>(m_vkWaitSemaphores.size());
+	submitInfo.pWaitSemaphores = m_vkWaitSemaphores.data();
+	submitInfo.pWaitDstStageMask = m_vkWaitStages.data();
+
+	VK_CHECK(vkEndCommandBuffer(vkCommandBuffer), "Failed to end command buffer!");
+	m_isRecording = false;
+	VK_CHECK(vkQueueSubmit(m_vkQueue, 1, &submitInfo, vkFence), "Failed to submit single time commands to queue!");
+	vkQueueWaitIdle(m_vkQueue);
+	_DoCallbacks(CALLBACK_BINDING_POINT::COMMANDS_DONE);
 }
 
 void CommandSubmission::AddPipelineBarrier(

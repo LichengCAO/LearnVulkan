@@ -54,6 +54,8 @@ private:
 	// Descriptor set count: MAX_FRAME_COUNT
 	DescriptorSetLayout m_rtDSetLayout;
 	std::vector<std::unique_ptr<DescriptorSet>> m_rtDSets;
+	DescriptorSetLayout m_compDSetLayout;
+	std::vector<std::unique_ptr<DescriptorSet>> m_compDSets;
 
 	// cameraUBO changes across frames, i create buffers for each frame
 	std::vector<std::unique_ptr<Buffer>> m_cameraBuffers;
@@ -73,6 +75,7 @@ private:
 
 	//pipelines
 	RayTracingPipeline m_rtPipeline;
+	ComputePipeline m_compPipeline;
 
 	// command buffers
 	std::vector<std::unique_ptr<CommandSubmission>> m_commandSubmissions;
@@ -82,6 +85,7 @@ private:
 
 	// TLAS inputs to update TLAS
 	std::vector<RayTracingAccelerationStructure::InstanceData> m_TLASInputs;
+	std::vector<RayTracingAccelerationStructure::TriangleData> m_BLASInputs;
 
 private:
 	void _Init();
