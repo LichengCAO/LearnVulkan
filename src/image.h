@@ -5,6 +5,7 @@ class Buffer;
 class Image;
 class Texture;
 class CommandSubmission;
+class MemoryAllocator;
 
 class ImageView
 {
@@ -97,16 +98,20 @@ private:
 
 public:
 	VkImage vkImage = VK_NULL_HANDLE;
-	VkDeviceMemory vkDeviceMemory = VK_NULL_HANDLE;
 
 private:
-	uint32_t _FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const;
 	void _AllocateMemory();
+	
 	void _FreeMemory();
+	
 	void _AddImageLayout() const;
+	
 	void _RemoveImageLayout() const;
+	
 	VkImageLayout _GetImageLayout() const;
 	
+	MemoryAllocator* _GetMemoryAllocator() const;
+
 public:
 	~Image();
 

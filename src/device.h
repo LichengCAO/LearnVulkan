@@ -6,6 +6,8 @@
 #include "image.h"
 #include "sampler.h"
 
+class MemoryAllocator;
+
 struct UserInput
 {
 	bool W = false;
@@ -35,6 +37,7 @@ private:
 	bool				m_initialized = false;
 	UserInput			m_userInput{};
 	std::vector<std::unique_ptr<Image>> m_uptrSwapchainImages;
+	std::unique_ptr<MemoryAllocator> m_uptrMemoryAllocator;
 
 private:
 	MyDevice();
@@ -58,6 +61,8 @@ private:
 	void _InitDescriptorAllocator();
 	void _CreateSwapchain();
 	void _DestroySwapchain();
+	void _CreateMemoryAllocator();
+	void _DestroyMemoryAllocator();
 
 	// Add required extensions to the device, before select physical device
 	void _AddBaseExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selector) const;
@@ -99,6 +104,8 @@ public:
 	VkFormat GetDepthFormat() const;
 	VkFormat GetSwapchainFormat() const;
 	UserInput GetUserInput() const;
+
+	MemoryAllocator* GetMemoryAllocator();
 
 public:
 	static MyDevice& GetInstance();

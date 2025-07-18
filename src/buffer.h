@@ -5,6 +5,7 @@
 // ref: https://stackoverflow.com/questions/73512602/using-vulkan-memory-allocator-with-volk
 class BufferView;
 class CommandSubmission;
+class MemoryAllocator;
 
 class Buffer final
 {
@@ -20,21 +21,23 @@ public:
 private:
 	Information m_bufferInformation{};
 	void* m_mappedMemory = nullptr; // we store this value, since mapping is not free
-	VkDeviceSize m_memoryOffset = 0;
 
 public:
 	VkBuffer	   vkBuffer = VK_NULL_HANDLE;
-	VkDeviceMemory vkDeviceMemory = VK_NULL_HANDLE;
+	//VkDeviceMemory vkDeviceMemory = VK_NULL_HANDLE;
 
 private:
-	uint32_t _FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const;
+	//uint32_t _FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const;
+
+	MemoryAllocator* _GetMemoryAllocator() const;
 	
 	void _AllocateMemory();
 	
 	void _FreeMemory();
 
-	// Check if this buffer is host coherent
-	bool _IsHostCoherent() const;
+	void _MapHostMemory();
+
+	void _UnmapHostMemory();
 
 	// Map the memory and copy, if this buffer is host coherent
 	void _CopyFromHostWithMappedMemory(const void* src, size_t size);

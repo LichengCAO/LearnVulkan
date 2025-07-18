@@ -1,36 +1,35 @@
 #include "buffer.h"
 #include "device.h"
 #include "commandbuffer.h"
-uint32_t Buffer::_FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const
-{
-	VkPhysicalDeviceMemoryProperties memProperties;
-	vkGetPhysicalDeviceMemoryProperties(MyDevice::GetInstance().vkPhysicalDevice, &memProperties);
-	for (uint32_t res = 0; res < memProperties.memoryTypeCount; ++res) {
-		bool suitableType = typeBits & (1 << res);
-		bool suitableMemoryProperty = (memProperties.memoryTypes[res].propertyFlags & properties) == properties;
-		if (suitableType && suitableMemoryProperty) {
-			return res;
-		}
-	}
-	throw std::runtime_error("Failed to find suitable memory type!");
-	return ~0;
-}
+#include "memory_allocator.h"
+
+//uint32_t Buffer::_FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const
+//{
+//	VkPhysicalDeviceMemoryProperties memProperties;
+//	vkGetPhysicalDeviceMemoryProperties(MyDevice::GetInstance().vkPhysicalDevice, &memProperties);
+//	for (uint32_t res = 0; res < memProperties.memoryTypeCount; ++res) {
+//		bool suitableType = typeBits & (1 << res);
+//		bool suitableMemoryProperty = (memProperties.memoryTypes[res].propertyFlags & properties) == properties;
+//		if (suitableType && suitableMemoryProperty) {
+//			return res;
+//		}
+//	}
+//	throw std::runtime_error("Failed to find suitable memory type!");
+//	return ~0;
+//}
 
 Buffer::~Buffer()
 {
 	assert(vkBuffer == VK_NULL_HANDLE);
-	assert(vkDeviceMemory == VK_NULL_HANDLE);
 	assert(m_mappedMemory == nullptr);
 }
 
 void Buffer::Init(Information info)
 {
-	VkBufferCreateInfo bufferInfo = {
-		.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO,
-		.size = info.size,
-		.usage = info.usage,
-		.sharingMode = info.sharingMode,
-	};
+	VkBufferCreateInfo bufferInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
+	bufferInfo.size = info.size;
+	bufferInfo.usage = info.usage;
+	bufferInfo.sharingMode = info.sharingMode;
 	m_bufferInformation = info;
 	CHECK_TRUE(vkBuffer == VK_NULL_HANDLE, "VkBuffer is already created!");
 	VK_CHECK(vkCreateBuffer(MyDevice::GetInstance().vkDevice, &bufferInfo, nullptr, &vkBuffer), "Failed to create buffer!");
@@ -41,64 +40,82 @@ void Buffer::Uninit()
 {
 	if (vkBuffer != VK_NULL_HANDLE)
 	{
+		_FreeMemory();
 		vkDestroyBuffer(MyDevice::GetInstance().vkDevice, vkBuffer, nullptr);
 		vkBuffer = VK_NULL_HANDLE;
 	}
-	_FreeMemory();
+}
+
+MemoryAllocator* Buffer::_GetMemoryAllocator() const
+{
+	return MyDevice::GetInstance().GetMemoryAllocator();
 }
 
 void Buffer::_AllocateMemory()
 {
-	CHECK_TRUE(vkBuffer != VK_NULL_HANDLE, "Try to allocate for a uninitialized buffer!");
-	VkMemoryRequirements memRequirements{};
-	VkMemoryAllocateInfo allocInfo{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
-	VkMemoryAllocateFlagsInfo allocFlags{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO };
-	
-	vkGetBufferMemoryRequirements(MyDevice::GetInstance().vkDevice, vkBuffer, &memRequirements);
+	//CHECK_TRUE(vkBuffer != VK_NULL_HANDLE, "Try to allocate for a uninitialized buffer!");
+	//VkMemoryRequirements memRequirements{};
+	//VkMemoryAllocateInfo allocInfo{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO };
+	//VkMemoryAllocateFlagsInfo allocFlags{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO };
+	//
+	//vkGetBufferMemoryRequirements(MyDevice::GetInstance().vkDevice, vkBuffer, &memRequirements);
 
-	allocInfo.allocationSize = memRequirements.size; //could be different from size on Host!
-	allocInfo.memoryTypeIndex = _FindMemoryTypeIndex(memRequirements.memoryTypeBits, m_bufferInformation.memoryProperty);
+	//allocInfo.allocationSize = memRequirements.size; //could be different from size on Host!
+	//allocInfo.memoryTypeIndex = _FindMemoryTypeIndex(memRequirements.memoryTypeBits, m_bufferInformation.memoryProperty);
 
-	if ((m_bufferInformation.usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) != 0u)
-	{
-		allocFlags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
-		allocInfo.pNext = &allocFlags;
-	}
+	//if ((m_bufferInformation.usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) != 0u)
+	//{
+	//	allocFlags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
+	//	allocInfo.pNext = &allocFlags;
+	//}
 
-	VK_CHECK(vkAllocateMemory(MyDevice::GetInstance().vkDevice, &allocInfo, nullptr, &vkDeviceMemory), "Failed to allocate buffer memory!");
+	//VK_CHECK(vkAllocateMemory(MyDevice::GetInstance().vkDevice, &allocInfo, nullptr, &vkDeviceMemory), "Failed to allocate buffer memory!");
 
-	VkDeviceSize offset = 0; // should be divisible by memRequirements.alignment
-	vkBindBufferMemory(MyDevice::GetInstance().vkDevice, vkBuffer, vkDeviceMemory, offset);
+	//VkDeviceSize offset = 0; // should be divisible by memRequirements.alignment
+	//vkBindBufferMemory(MyDevice::GetInstance().vkDevice, vkBuffer, vkDeviceMemory, offset);
+	MemoryAllocator* pAllocator = _GetMemoryAllocator();
+	pAllocator->AllocateForVkBuffer(vkBuffer, m_bufferInformation.memoryProperty);
 }
 
 void Buffer::_FreeMemory()
 {
-	if (vkDeviceMemory != VK_NULL_HANDLE)
+	//if (vkDeviceMemory != VK_NULL_HANDLE)
+	//{
+	//	if (m_mappedMemory != nullptr)
+	//	{
+	//		vkUnmapMemory(MyDevice::GetInstance().vkDevice, vkDeviceMemory);
+	//		m_mappedMemory = nullptr;
+	//	}
+	//	vkFreeMemory(MyDevice::GetInstance().vkDevice, vkDeviceMemory, nullptr);
+	//	vkDeviceMemory = VK_NULL_HANDLE;
+	//}
+	MemoryAllocator* pAllocator = _GetMemoryAllocator();
+	if (m_mappedMemory != nullptr)
 	{
-		if (m_mappedMemory != nullptr)
-		{
-			vkUnmapMemory(MyDevice::GetInstance().vkDevice, vkDeviceMemory);
-			m_mappedMemory = nullptr;
-		}
-		vkFreeMemory(MyDevice::GetInstance().vkDevice, vkDeviceMemory, nullptr);
-		vkDeviceMemory = VK_NULL_HANDLE;
+		pAllocator->UnmapVkBuffer(vkBuffer);
+		m_mappedMemory = nullptr;
 	}
+	pAllocator->FreeMemory(vkBuffer);
 }
 
-bool Buffer::_IsHostCoherent() const
+void Buffer::_MapHostMemory()
 {
-	bool bResult = false;
+	MemoryAllocator* pAllocator = _GetMemoryAllocator();
+	pAllocator->MapVkBufferToHost(vkBuffer, m_mappedMemory);
+}
 
-	bResult = ((m_bufferInformation.memoryProperty & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) != 0);
-
-	return bResult;
+void Buffer::_UnmapHostMemory()
+{
+	MemoryAllocator* pAllocator = _GetMemoryAllocator();
+	pAllocator->UnmapVkBuffer(vkBuffer);
 }
 
 void Buffer::_CopyFromHostWithMappedMemory(const void* src, size_t size)
 {
 	if (m_mappedMemory == nullptr)
 	{
-		vkMapMemory(MyDevice::GetInstance().vkDevice, vkDeviceMemory, m_memoryOffset, m_bufferInformation.size, 0, &m_mappedMemory);
+		MemoryAllocator* pAllocator = _GetMemoryAllocator();
+		pAllocator->MapVkBufferToHost(vkBuffer, m_mappedMemory);
 	}
 	memcpy(m_mappedMemory, src, size);
 }
@@ -127,11 +144,9 @@ Buffer::Buffer()
 Buffer::Buffer(Buffer&& _toMove)
 {
 	vkBuffer = _toMove.vkBuffer;
-	vkDeviceMemory = _toMove.vkDeviceMemory;
 	m_mappedMemory = _toMove.m_mappedMemory;
 	m_bufferInformation = _toMove.m_bufferInformation;
 	_toMove.vkBuffer = VK_NULL_HANDLE;
-	_toMove.vkDeviceMemory = VK_NULL_HANDLE;
 	_toMove.m_mappedMemory = nullptr;
 }
 
@@ -142,9 +157,8 @@ void Buffer::CopyFromHost(const void* src)
 
 void Buffer::CopyFromHost(const void* src, size_t size)
 {
-	CHECK_TRUE(vkDeviceMemory != VK_NULL_HANDLE, "Not allocate memory yet!");
 	CHECK_TRUE(size <= static_cast<size_t>(m_bufferInformation.size), "Try to copy too much data from host!");
-	if (_IsHostCoherent())
+	if ((m_bufferInformation.memoryProperty & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
 	{
 		_CopyFromHostWithMappedMemory(src, size);
 	}

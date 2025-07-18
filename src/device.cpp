@@ -3,8 +3,10 @@
 #include <cstdint>
 #include <unordered_set>
 #include <algorithm>
+#include <limits>
 #include "image.h"
 #include "pipeline_io.h"
+#include "memory_allocator.h"
 #include <iomanip>
 #define VOLK_IMPLEMENTATION
 #include <volk.h>
@@ -383,6 +385,16 @@ void MyDevice::_DestroySwapchain()
 	vkb::destroy_swapchain(m_swapchain);
 }
 
+void MyDevice::_CreateMemoryAllocator()
+{
+	m_uptrMemoryAllocator = std::move(std::unique_ptr<MemoryAllocator>{ new MemoryAllocator() });
+}
+
+void MyDevice::_DestroyMemoryAllocator()
+{
+	m_uptrMemoryAllocator.reset();
+}
+
 
 // pCreateInfo->pNext chain includes a VkPhysicalDeviceVulkan12Features structure,
 // then it must not include a VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES structure.
@@ -607,6 +619,7 @@ void MyDevice::Init()
 	_CreateSurface();
 	_SelectPhysicalDevice();
 	_CreateLogicalDevice();
+	_CreateMemoryAllocator();
 	_CreateSwapchain();
 	_InitDescriptorAllocator();
 	_CreateCommandPools();
@@ -618,6 +631,7 @@ void MyDevice::Uninit()
 	_DestroyCommandPools();
 	descriptorAllocator.Uninit();
 	_DestroySwapchain();
+	_DestroyMemoryAllocator();
 	vkb::destroy_device(m_device);
 	vkb::destroy_surface(m_instance, vkSurface);
 	vkb::destroy_instance(m_instance);
@@ -638,6 +652,11 @@ UserInput MyDevice::GetUserInput() const
 	ret.LMB = (glfwGetMouseButton(pWindow, GLFW_MOUSE_BUTTON_LEFT) == GLFW_PRESS);
 	ret.RMB = (glfwGetMouseButton(pWindow, GLFW_MOUSE_BUTTON_RIGHT) == GLFW_PRESS);
 	return ret;
+}
+
+MemoryAllocator* MyDevice::GetMemoryAllocator()
+{
+	return m_uptrMemoryAllocator.get();
 }
 
 MyDevice& MyDevice::GetInstance()

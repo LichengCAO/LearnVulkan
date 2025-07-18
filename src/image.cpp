@@ -2,30 +2,17 @@
 #include "device.h"
 #include "buffer.h"
 #include "commandbuffer.h"
+#include "memory_allocator.h"
 #ifndef STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_IMPLEMENTATION
 #endif
 #include "stb_image.h"
-uint32_t Image::_FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const
-{
-	VkPhysicalDeviceMemoryProperties memProperties;
-	vkGetPhysicalDeviceMemoryProperties(MyDevice::GetInstance().vkPhysicalDevice, &memProperties);
-	for (uint32_t res = 0; res < memProperties.memoryTypeCount; ++res) {
-		bool suitableType = typeBits & (1 << res);
-		bool suitableMemoryProperty = (memProperties.memoryTypes[res].propertyFlags & properties) == properties;
-		if (suitableType && suitableMemoryProperty) {
-			return res;
-		}
-	}
-	throw std::runtime_error("Failed to find suitable memory type!");
-	return uint32_t();
-}
 
 Image::~Image()
 {
 	if (!m_initCalled) return;
 	assert(vkImage == VK_NULL_HANDLE);
-	assert(vkDeviceMemory == VK_NULL_HANDLE);
+	//assert(vkDeviceMemory == VK_NULL_HANDLE);
 }
 
 void Image::SetImageInformation(const Information& imageInfo)
@@ -97,27 +84,14 @@ void Image::Uninit()
 
 void Image::_AllocateMemory()
 {
-	VkDevice vkDevice = MyDevice::GetInstance().vkDevice;
-	VkMemoryRequirements memRequirements;
-	vkGetImageMemoryRequirements(vkDevice, vkImage, &memRequirements);
-	VkMemoryAllocateInfo allocInfo = {
-		.sType = VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_INFO,
-		.allocationSize = memRequirements.size,
-		.memoryTypeIndex = _FindMemoryTypeIndex(memRequirements.memoryTypeBits, m_imageInformation.memoryProperty)
-	};
-
-	VK_CHECK(vkAllocateMemory(vkDevice, &allocInfo, nullptr, &vkDeviceMemory), "Failed to allocate image memory!");
-
-	vkBindImageMemory(vkDevice, vkImage, vkDeviceMemory, 0);
+	MemoryAllocator* pAllocator = _GetMemoryAllocator();
+	pAllocator->AllocateForVkImage(vkImage, m_imageInformation.memoryProperty);
 }
 
 void Image::_FreeMemory()
 {
-	if (vkDeviceMemory != VK_NULL_HANDLE)
-	{
-		vkFreeMemory(MyDevice::GetInstance().vkDevice, vkDeviceMemory, nullptr);
-		vkDeviceMemory = VK_NULL_HANDLE;
-	}
+	MemoryAllocator* pAllocator = _GetMemoryAllocator();
+	pAllocator->FreeMemory(vkImage);
 }
 
 void Image::_AddImageLayout() const
@@ -140,6 +114,11 @@ VkImageLayout Image::_GetImageLayout() const
 	auto itr = device.imageLayouts.find(vkImage);
 	CHECK_TRUE(itr != device.imageLayouts.end(), "Layout is not recorded!");
 	return itr->second.GetLayout(0, m_imageInformation.arrayLayers, 0, m_imageInformation.mipLevels);
+}
+
+MemoryAllocator* Image::_GetMemoryAllocator() const
+{
+	return MyDevice::GetInstance().GetMemoryAllocator();
 }
 
 void Image::TransitionLayout(VkImageLayout newLayout)
