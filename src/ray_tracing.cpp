@@ -42,6 +42,8 @@ void RayTracingAccelerationStructure::_InitScratchBuffer(
 		uSlotCount = nChunkCount;
 	}
 
+	scratchBufferInfo.optAlignment = static_cast<VkDeviceSize>(uMinAlignment);
+
 	scratchBufferToInit.Init(scratchBufferInfo);
 
 	// fill slotAddresses

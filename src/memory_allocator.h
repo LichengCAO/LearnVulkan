@@ -27,11 +27,12 @@ public:
 
 	virtual ~MemoryAllocator();
 
-	// Allocate memory and then bind it with vkImage
+	// Allocate memory and then bind it to vkImage
 	void AllocateForVkImage(VkImage _vkImage, VkMemoryPropertyFlags _flags);
 
-	// Allocate memory and then bind it with vkBuffer
-	void AllocateForVkBuffer(VkBuffer _vkBuffer, VkMemoryPropertyFlags _flags);
+	// Allocate memory and then bind it to vkBuffer, 
+	// the address of the buffer will align with _alignment if it's not 0
+	void AllocateForVkBuffer(VkBuffer _vkBuffer, VkMemoryPropertyFlags _flags, VkDeviceSize _alignment = 0);
 
 	// Map vkBuffer(host coherent) to host
 	void MapVkBufferToHost(VkBuffer _vkBuffer, void*& _outHostAddress);

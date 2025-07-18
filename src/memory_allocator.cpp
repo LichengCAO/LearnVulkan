@@ -2,6 +2,7 @@
 #include "device.h"
 #define VMA_IMPLEMENTATION
 #include "vk_mem_alloc.h"
+#include "utils.h"
 
 VmaMemoryUsage MemoryAllocator::_ToVmaMemoryUsage(VkMemoryPropertyFlags _propertyFlags)
 {
@@ -87,18 +88,25 @@ void MemoryAllocator::AllocateForVkImage(VkImage _vkImage, VkMemoryPropertyFlags
 	m_mapVkImageToAllocation.insert({ _vkImage, allocResult });
 }
 
-void MemoryAllocator::AllocateForVkBuffer(VkBuffer _vkBuffer, VkMemoryPropertyFlags _flags)
+void MemoryAllocator::AllocateForVkBuffer(VkBuffer _vkBuffer, VkMemoryPropertyFlags _flags, VkDeviceSize _alignment)
 {
 	VmaAllocationCreateInfo allocCreateInfo{};
 	VmaAllocation allocResult = nullptr;
 	VmaAllocationInfo allocInfo{};
-	VkMemoryRequirements req;
 
 	allocCreateInfo.usage = _ToVmaMemoryUsage(_flags);
-	vkGetBufferMemoryRequirements(_GetVkDevice(), _vkBuffer, &req);
-	req.alignment = 128;
-	vmaAllocateMemory(*_GetPtrVmaAllocator(), &req, &allocCreateInfo, &allocResult, &allocInfo);
-	//VK_CHECK(vmaAllocateMemoryForBuffer(*_GetPtrVmaAllocator(), _vkBuffer, &allocCreateInfo, &allocResult, &allocInfo), "Failed to allocate memory!");
+
+	if (_alignment > 0)
+	{
+		VkMemoryRequirements req;
+		vkGetBufferMemoryRequirements(_GetVkDevice(), _vkBuffer, &req);
+		req.alignment = std::max(CommonUtils::AlignUp(req.alignment, _alignment), _alignment);
+		VK_CHECK(vmaAllocateMemory(*_GetPtrVmaAllocator(), &req, &allocCreateInfo, &allocResult, &allocInfo), "Failed to allocate memory!");
+	}
+	else
+	{
+		VK_CHECK(vmaAllocateMemoryForBuffer(*_GetPtrVmaAllocator(), _vkBuffer, &allocCreateInfo, &allocResult, &allocInfo), "Failed to allocate memory!");
+	}
 
 	vmaBindBufferMemory(*_GetPtrVmaAllocator(), allocResult, _vkBuffer);
 	m_mapVkBufferToAllocation.insert({ _vkBuffer, allocResult });

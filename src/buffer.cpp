@@ -74,7 +74,14 @@ void Buffer::_AllocateMemory()
 	//VkDeviceSize offset = 0; // should be divisible by memRequirements.alignment
 	//vkBindBufferMemory(MyDevice::GetInstance().vkDevice, vkBuffer, vkDeviceMemory, offset);
 	MemoryAllocator* pAllocator = _GetMemoryAllocator();
-	pAllocator->AllocateForVkBuffer(vkBuffer, m_bufferInformation.memoryProperty);
+	if (m_bufferInformation.optAlignment.has_value())
+	{
+		pAllocator->AllocateForVkBuffer(vkBuffer, m_bufferInformation.memoryProperty, m_bufferInformation.optAlignment.value());
+	}
+	else
+	{
+		pAllocator->AllocateForVkBuffer(vkBuffer, m_bufferInformation.memoryProperty);
+	}
 }
 
 void Buffer::_FreeMemory()

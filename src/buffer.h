@@ -16,6 +16,7 @@ public:
 		VkBufferUsageFlags usage = 0;
 		VkSharingMode sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		VkMemoryPropertyFlags memoryProperty = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		std::optional<VkDeviceSize> optAlignment; // buffer may have alignment requirements, i.e. Scratch Buffer
 	};
 
 private:

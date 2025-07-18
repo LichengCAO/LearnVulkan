@@ -75,10 +75,10 @@ void Image::Uninit()
 		if (vkImage != VK_NULL_HANDLE)
 		{
 			_RemoveImageLayout();
+			_FreeMemory();
 			vkDestroyImage(MyDevice::GetInstance().vkDevice, vkImage, nullptr);
 			vkImage = VK_NULL_HANDLE;
 		}
-		_FreeMemory();
 	}
 }
 
