@@ -86,6 +86,12 @@ public:
 		VkIndexType		vkIndexType;
 		uint32_t		uIndexCount;
 	};
+	struct AABBData
+	{
+		VkDeviceAddress vkDeviceAddressAABB;
+		uint32_t		uAABBStride; // first must be VkAabbPositionsKHR
+		uint32_t		uAABBCount;
+	};
 	struct InstanceData
 	{
 		uint32_t	uBLASIndex;
@@ -142,8 +148,13 @@ private:
 	// so TLASInput should be reset manually after the commands done.
 	static void _BuildOrUpdateTLAS(const TLASInput& _input, TLAS* _pTLAS, CommandSubmission* _pCmd);
 
-	// Fill BLAS input with the triangle data
+	// Put triangle data into the BLASInput. 
+	// The function only adds geometry to the BLASInput, and will not clear it even if the BLASInput already has some geometries inside.
 	static void _FillBLASInput(const std::vector<TriangleData>& _trigData, BLASInput& _inputToFill);
+
+	// Put AABB data into the BLASInput. 
+	// The function only adds geometry to the BLASInput, and will not clear it even if the BLASInput already has some geometries inside.
+	static void _FillBLASInput(const std::vector<AABBData>& _AABBData, BLASInput& _inputToFill);
 
 public:
 	RayTracingAccelerationStructure();
@@ -158,6 +169,13 @@ public:
 		VkBuildAccelerationStructureFlagsKHR flags = 
 		VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR 
 		| VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR 
+		| VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
+
+	uint32_t AddBLAS(
+		const std::vector<AABBData>& geomData,
+		VkBuildAccelerationStructureFlagsKHR flags =
+		VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR
+		| VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR
 		| VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
 
 	// Set up TLAS after all BLASs are added, TLAS will not be created or be built, we do it in Init

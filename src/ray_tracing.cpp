@@ -491,8 +491,6 @@ void RayTracingAccelerationStructure::_BuildOrUpdateTLAS(const TLASInput& _input
 
 void RayTracingAccelerationStructure::_FillBLASInput(const std::vector<TriangleData>& _trigData, BLASInput& _inputToFill)
 {
-	_inputToFill.vkASBuildRangeInfos.clear();
-	_inputToFill.vkASGeometries.clear();
 	for (const auto& geom : _trigData)
 	{
 		VkAccelerationStructureGeometryTrianglesDataKHR triangles{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_TRIANGLES_DATA_KHR };
@@ -515,6 +513,31 @@ void RayTracingAccelerationStructure::_FillBLASInput(const std::vector<TriangleD
 		offset.firstVertex = 0u;
 		offset.primitiveOffset = 0u;
 		offset.primitiveCount = geom.uIndexCount / 3u;
+		offset.transformOffset = 0u;
+
+		_inputToFill.vkASGeometries.push_back(asGeom);
+		_inputToFill.vkASBuildRangeInfos.push_back(offset);
+	}
+}
+
+void RayTracingAccelerationStructure::_FillBLASInput(const std::vector<AABBData>& _AABBData, BLASInput& _inputToFill)
+{
+	for (const auto& geom : _AABBData)
+	{
+		VkAccelerationStructureGeometryAabbsDataKHR aabb{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_AABBS_DATA_KHR };
+		aabb.data.deviceAddress = geom.vkDeviceAddressAABB;
+		aabb.stride = geom.uAABBStride;
+
+		VkAccelerationStructureGeometryKHR asGeom{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_GEOMETRY_KHR };
+		asGeom.geometryType = VK_GEOMETRY_TYPE_AABBS_KHR;
+		asGeom.flags = VK_GEOMETRY_OPAQUE_BIT_KHR;
+		asGeom.geometry.aabbs = aabb;
+		asGeom.pNext = nullptr;
+
+		VkAccelerationStructureBuildRangeInfoKHR offset;
+		offset.firstVertex = 0u;
+		offset.primitiveOffset = 0u;
+		offset.primitiveCount = geom.uAABBCount;
 		offset.transformOffset = 0u;
 
 		_inputToFill.vkASGeometries.push_back(asGeom);

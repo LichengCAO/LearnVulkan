@@ -33,7 +33,8 @@ void SimpleShader::SetSPVFile(const std::string& file)
 		VkShaderStageFlagBits::VK_SHADER_STAGE_MESH_BIT_EXT,
 		VkShaderStageFlagBits::VK_SHADER_STAGE_RAYGEN_BIT_KHR,
 		VkShaderStageFlagBits::VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR,
-		VkShaderStageFlagBits::VK_SHADER_STAGE_MISS_BIT_KHR
+		VkShaderStageFlagBits::VK_SHADER_STAGE_MISS_BIT_KHR,
+		VkShaderStageFlagBits::VK_SHADER_STAGE_INTERSECTION_BIT_KHR,
 	};
 	std::vector<std::string> stageStrings =
 	{
@@ -45,6 +46,7 @@ void SimpleShader::SetSPVFile(const std::string& file)
 		".rgen.",
 		".rchit.",
 		".rmiss.",
+		".rint.",
 	};
 	for (int i = 0; i < stages.size(); ++i)
 	{
