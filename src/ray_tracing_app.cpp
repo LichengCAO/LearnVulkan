@@ -420,8 +420,8 @@ void RayTracingApp::_InitPipelines()
 	m_compPipeline.AddPushConstant(VK_SHADER_STAGE_COMPUTE_BIT, sizeof(float));
 
 	m_rtPipeline.SetRayGenerationShaderRecord(rgenId);
-	m_rtPipeline.AddHitShaderRecord(rchitId);
-	m_rtPipeline.AddHitShaderRecord(rchit2Id);
+	m_rtPipeline.AddTriangleHitShaderRecord(rchitId);
+	m_rtPipeline.AddTriangleHitShaderRecord(rchit2Id);
 	m_rtPipeline.AddMissShaderRecord(rmissId);
 	m_rtPipeline.AddMissShaderRecord(rmiss2Id);
 	m_rtPipeline.SetMaxRecursion(2u);
@@ -1047,8 +1047,8 @@ void RayTracingManyApp::_InitPipelines()
 	rchit2Id = m_rtPipeline.AddShader(rchit2.GetShaderStageInfo());
 
 	m_rtPipeline.SetRayGenerationShaderRecord(rgenId);
-	m_rtPipeline.AddHitShaderRecord(rchitId);
-	m_rtPipeline.AddHitShaderRecord(rchit2Id);
+	m_rtPipeline.AddTriangleHitShaderRecord(rchitId);
+	m_rtPipeline.AddTriangleHitShaderRecord(rchit2Id);
 	m_rtPipeline.AddMissShaderRecord(rmissId);
 	m_rtPipeline.AddMissShaderRecord(rmiss2Id);
 	m_rtPipeline.SetMaxRecursion(2u);

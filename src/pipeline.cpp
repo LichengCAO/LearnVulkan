@@ -507,13 +507,31 @@ uint32_t RayTracingPipeline::SetRayGenerationShaderRecord(uint32_t rayGen)
 	return uRet;
 }
 
-uint32_t RayTracingPipeline::AddHitShaderRecord(uint32_t closestHit, uint32_t anyHit, uint32_t intersection)
+uint32_t RayTracingPipeline::AddTriangleHitShaderRecord(uint32_t closestHit, uint32_t anyHit)
 {
 	VkRayTracingShaderGroupCreateInfoKHR shaderRecord{ VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR };
 	uint32_t uRet = static_cast<uint32_t>(m_shaderRecords.size());
 
 	shaderRecord.pNext = nullptr;
 	shaderRecord.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_TRIANGLES_HIT_GROUP_KHR;
+	shaderRecord.generalShader = VK_SHADER_UNUSED_KHR;
+	shaderRecord.closestHitShader = closestHit;
+	shaderRecord.anyHitShader = anyHit;
+	shaderRecord.intersectionShader = VK_SHADER_UNUSED_KHR;
+	shaderRecord.pShaderGroupCaptureReplayHandle = nullptr;
+
+	m_shaderRecords.push_back(shaderRecord);
+	m_SBT.AddHitRecord(uRet);
+	return uRet;
+}
+
+uint32_t RayTracingPipeline::AddProceduralHitShaderRecord(uint32_t closestHit, uint32_t intersection, uint32_t anyHit)
+{
+	VkRayTracingShaderGroupCreateInfoKHR shaderRecord{ VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR };
+	uint32_t uRet = static_cast<uint32_t>(m_shaderRecords.size());
+
+	shaderRecord.pNext = nullptr;
+	shaderRecord.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_PROCEDURAL_HIT_GROUP_KHR;
 	shaderRecord.generalShader = VK_SHADER_UNUSED_KHR;
 	shaderRecord.closestHitShader = closestHit;
 	shaderRecord.anyHitShader = anyHit;

@@ -235,7 +235,12 @@ public:
 	// Add Hit shader record in self shader binding table,
 	// return the index of this record in all ShaderRecords,
 	// i.e. index of element in pGroups of VkRayTracingPipelineCreateInfoKHR
-	uint32_t AddHitShaderRecord(uint32_t closestHit, uint32_t anyHit = VK_SHADER_UNUSED_KHR, uint32_t intersection = VK_SHADER_UNUSED_KHR);
+	uint32_t AddTriangleHitShaderRecord(uint32_t closestHit, uint32_t anyHit = VK_SHADER_UNUSED_KHR);
+
+	// Add Hit shader record in self shader binding table,
+	// return the index of this record in all ShaderRecords,
+	// i.e. index of element in pGroups of VkRayTracingPipelineCreateInfoKHR
+	uint32_t AddProceduralHitShaderRecord(uint32_t closestHit, uint32_t intersection, uint32_t anyHit = VK_SHADER_UNUSED_KHR);
 	
 	// Add Miss shader record in self shader binding table,
 	// return the index of this record in all ShaderRecords,

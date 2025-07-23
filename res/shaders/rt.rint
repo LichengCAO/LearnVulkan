@@ -1,0 +1,70 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+#include "raycommon.glsl"
+#include "wavefront.glsl"
+
+layout(set = 1, binding = eImplicit, scalar) buffer allSpheres_
+{
+  vec4 allSpheres[];
+};
+
+// Ray-Sphere intersection
+// http://viclw17.github.io/2018/07/16/raytracing-ray-sphere-intersection/
+float hitSphere(const vec4 s, const vec3 rayOrigin, const vec3 rayDirection)
+{
+  vec3  oc           = rayOrigin - s.xyz;
+  float a            = dot(rayDirection, rayDirection);
+  float b            = 2.0 * dot(oc, rayDirection);
+  float c            = dot(oc, oc) - s.w * s.w;
+  float discriminant = b * b - 4 * a * c;
+  if(discriminant < 0)
+  {
+    return -1.0;
+  }
+  else
+  {
+    return (-b - sqrt(discriminant)) / (2.0 * a);
+  }
+}
+
+// Ray-AABB intersection
+float hitAABB(const vec3 minimum, const vec3 maximum, const vec3 rayOrigin, const vec3 rayDirection)
+{
+  vec3  invDir = 1.0 / rayDirection;
+  vec3  tbot   = invDir * (minimum - rayOrigin);
+  vec3  ttop   = invDir * (maximum - rayOrigin);
+  vec3  tmin   = min(ttop, tbot);
+  vec3  tmax   = max(ttop, tbot);
+  float t0     = max(tmin.x, max(tmin.y, tmin.z));
+  float t1     = min(tmax.x, min(tmax.y, tmax.z));
+  return t1 > max(t0, 0.0) ? t0 : -1.0;
+}
+
+void main()
+{
+  // Sphere data
+  vec4 sphere = allSpheres[gl_PrimitiveID];
+  float tHit    = -1;
+  int   hitKind = gl_PrimitiveID % 2 == 0 ? KIND_SPHERE : KIND_CUBE;
+  if(hitKind == KIND_SPHERE)
+  {
+    // Sphere intersection
+    tHit = hitSphere(sphere, gl_WorldRayOriginEXT, gl_WorldRayDirectionEXT);
+  }
+  else
+  {
+    // AABB intersection
+    vec3 aabbMin = sphere.xyz - vec3(sphere.w);
+    vec3 aabbMax = sphere.xyz + vec3(sphere.w);
+    tHit         = hitAABB(aabbMin, aabbMax, gl_WorldRayOriginEXT, gl_WorldRayDirectionEXT);
+  }
+
+  // Report hit point
+  if(tHit > 0)
+    reportIntersectionEXT(tHit, hitKind);
+}
