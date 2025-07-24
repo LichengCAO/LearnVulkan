@@ -136,8 +136,8 @@ void GraphicsPipeline::_InitCreateInfos()
 void GraphicsPipeline::_DoCommon(
 	VkCommandBuffer cmd,
 	const VkExtent2D& imageSize,
-	const std::vector<const DescriptorSet*>& pSets,
-	const std::vector<std::pair<VkShaderStageFlagBits, const void*>> pushConstants)
+	const std::vector<VkDescriptorSet>& pSets,
+	const std::vector<std::pair<VkShaderStageFlagBits, const void*>>& pushConstants)
 {
 	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
 
@@ -156,12 +156,7 @@ void GraphicsPipeline::_DoCommon(
 
 	if (pSets.size() > 0)
 	{
-		std::vector<VkDescriptorSet> descriptorSets;
-		for (int i = 0; i < pSets.size(); ++i)
-		{
-			descriptorSets.push_back(pSets[i]->vkDescriptorSet);
-		}
-		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipelineLayout, 0, static_cast<uint32_t>(descriptorSets.size()), descriptorSets.data(), 0, nullptr);
+		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipelineLayout, 0, static_cast<uint32_t>(pSets.size()), pSets.data(), 0, nullptr);
 	}
 
 	for (const auto& _pushConst : pushConstants)
@@ -328,61 +323,61 @@ void GraphicsPipeline::Uninit()
 	m_pRenderPass = nullptr;
 }
 
-void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput_Vertex& input)
+void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput_DrawIndexed& input)
 {
 	// TODO: check m_subpass should match number of vkCmdNextSubpass calls after vkCmdBeginRenderPass
+	_DoCommon(commandBuffer, input.imageSize, input.vkDescriptorSets, input.pushConstants);
 
-	_DoCommon(commandBuffer, input.imageSize, input.pDescriptorSets, input.pushConstants);
+	CHECK_TRUE(input.vertexBuffers.size() > 0, "Index draw must have vertex buffers."); // I'm not sure about it, check specification someday
+	CHECK_TRUE(input.indexBuffer != VK_NULL_HANDLE, "Index buffer must be assigned here.");
 
-	if (input.pVertexInputs.size() > 0)
+	if (input.optVertexBufferOffsets.has_value())
 	{
-		std::vector<VkBuffer> vertBuffers;
-		std::vector<VkDeviceSize> offsets;
-		for (int i = 0; i < input.pVertexInputs.size(); ++i)
-		{
-			vertBuffers.push_back(input.pVertexInputs[i]->pBuffer->vkBuffer);
-			offsets.push_back(input.pVertexInputs[i]->offset);
-		}
-		vkCmdBindVertexBuffers(commandBuffer, 0, static_cast<uint32_t>(vertBuffers.size()), vertBuffers.data(), offsets.data());
-		if (input.pVertexIndexInput != nullptr)
-		{
-			VkIndexType indexType = input.pVertexIndexInput->indexType;
-			vkCmdBindIndexBuffer(commandBuffer, input.pVertexIndexInput->pBuffer->vkBuffer, 0, indexType);
-			uint32_t bufferSize = static_cast<uint32_t>(input.pVertexIndexInput->pBuffer->GetBufferInformation().size);
-			uint32_t stride = 0;
-			switch (indexType)
-			{
-			case VK_INDEX_TYPE_UINT32:
-				stride = sizeof(uint32_t);
-				break;
-			case VK_INDEX_TYPE_UINT16:
-				stride = sizeof(uint16_t);
-				break;
-			}
-			CHECK_TRUE(stride != 0, "Size of index is unset!");
-			uint32_t indexCount = bufferSize / stride;
-			vkCmdDrawIndexed(commandBuffer, indexCount, 1, 0, 0, 0);
-		}
-		else
-		{
-			CHECK_TRUE(vertBuffers.size() > 0, "No vertex input!");
-			uint32_t bufferSize = static_cast<uint32_t>(input.pVertexInputs[0]->pBuffer->GetBufferInformation().size);
-			uint32_t stride = static_cast<uint32_t>(input.pVertexInputs[0]->pVertexInputLayout->stride);
-			uint32_t vertCount = bufferSize / stride;
-			vkCmdDraw(commandBuffer, vertCount, 1, 0, 0);
-		}
+		vkCmdBindVertexBuffers(
+			commandBuffer,
+			0,
+			static_cast<uint32_t>(input.vertexBuffers.size()),
+			input.vertexBuffers.data(),
+			input.optVertexBufferOffsets.value().data());
 	}
+	else
+	{
+		vkCmdBindVertexBuffers(commandBuffer, 0, static_cast<uint32_t>(input.vertexBuffers.size()), input.vertexBuffers.data(), nullptr);
+	}
+
+	if (input.optIndexBufferOffset.has_value())
+	{
+		vkCmdBindIndexBuffer(commandBuffer, input.indexBuffer, input.optIndexBufferOffset.value(), input.vkIndexType);
+	}
+	else
+	{
+		vkCmdBindIndexBuffer(commandBuffer, input.indexBuffer, 0, input.vkIndexType);
+	}
+
+	vkCmdDrawIndexed(commandBuffer, input.indexCount, 1, 0, 0, 0);
 }
 
 void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput_Mesh& input)
 {
-	_DoCommon(commandBuffer, input.imageSize, input.pDescriptorSets, input.pushConstants);
+	_DoCommon(commandBuffer, input.imageSize, input.vkDescriptorSets, input.pushConstants);
+	
 	vkCmdDrawMeshTasksEXT(commandBuffer, input.groupCountX, input.groupCountY, input.groupCountZ);
 }
 
 void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput_Draw& input)
 {
-	_DoCommon(commandBuffer, input.imageSize, input.pDescriptorSets, input.pushConstants);
+	_DoCommon(commandBuffer, input.imageSize, input.vkDescriptorSets, input.pushConstants);
+
+	if (input.vertexBuffers.size() > 0)
+	{
+		vkCmdBindVertexBuffers(
+			commandBuffer,
+			0,
+			static_cast<uint32_t>(input.vertexBuffers.size()),
+			input.vertexBuffers.data(),
+			(input.optVertexBufferOffsets.has_value() ? input.optVertexBufferOffsets.value().data() : nullptr)
+		);
+	}
 	vkCmdDraw(commandBuffer, input.vertexCount, 1, 0, 0);
 }
 
@@ -445,12 +440,15 @@ void ComputePipeline::Uninit()
 void ComputePipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput& input)
 {
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, vkPipeline);
-	std::vector<VkDescriptorSet> descriptorSets;
-	for (int i = 0; i < input.pDescriptorSets.size(); ++i)
-	{
-		descriptorSets.push_back(input.pDescriptorSets[i]->vkDescriptorSet);
-	}
-	vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_COMPUTE, vkPipelineLayout, 0, static_cast<uint32_t>(descriptorSets.size()), descriptorSets.data(), 0, nullptr);
+	vkCmdBindDescriptorSets(
+		commandBuffer,
+		VK_PIPELINE_BIND_POINT_COMPUTE,
+		vkPipelineLayout,
+		0,
+		static_cast<uint32_t>(input.vkDescriptorSets.size()),
+		input.vkDescriptorSets.data(),
+		0,
+		nullptr);
 
 	for (const auto& _pushConst : input.pushConstants)
 	{
@@ -634,17 +632,20 @@ void RayTracingPipeline::Uninit()
 
 void RayTracingPipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput& input)
 {
-	const auto& pSets = input.pDescriptorSets;
+	const auto& pSets = input.vkDescriptorSets;
 	vkCmdBindPipeline(commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, vkPipeline);
 
 	if (pSets.size() > 0)
 	{
-		std::vector<VkDescriptorSet> descriptorSets;
-		for (int i = 0; i < pSets.size(); ++i)
-		{
-			descriptorSets.push_back(pSets[i]->vkDescriptorSet);
-		}
-		vkCmdBindDescriptorSets(commandBuffer, VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR, vkPipelineLayout, 0, static_cast<uint32_t>(descriptorSets.size()), descriptorSets.data(), 0, nullptr);
+		vkCmdBindDescriptorSets(
+			commandBuffer,
+			VK_PIPELINE_BIND_POINT_RAY_TRACING_KHR,
+			vkPipelineLayout,
+			0,
+			static_cast<uint32_t>(pSets.size()),
+			pSets.data(),
+			0,
+			nullptr);
 	}
 
 	for (const auto& _pushConst : input.pushConstants)

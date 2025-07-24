@@ -584,7 +584,7 @@ void RayTracingApp::_DrawFrame()
 		input.groupCountX = m_models[0].mesh.verts.size();
 		input.groupCountY = 1;
 		input.groupCountZ = 1;
-		input.pDescriptorSets = { m_compDSets[m_currentFrame].get() };
+		input.vkDescriptorSets = { m_compDSets[m_currentFrame]->vkDescriptorSet };
 		input.pushConstants = { {VK_SHADER_STAGE_COMPUTE_BIT, &time} };
 		m_compPipeline.Do(cmd->vkCommandBuffer, input);
 
@@ -614,7 +614,7 @@ void RayTracingApp::_DrawFrame()
 	pipelineInput.uDepth = 1u;
 	pipelineInput.uWidth = device.GetSwapchainExtent().width;
 	pipelineInput.uHeight = device.GetSwapchainExtent().height;
-	pipelineInput.pDescriptorSets = { m_rtDSets[m_currentFrame].get() };
+	pipelineInput.vkDescriptorSets = { m_rtDSets[m_currentFrame]->vkDescriptorSet };
 	m_rtPipeline.Do(cmd->vkCommandBuffer, pipelineInput);
 
 	// transfer image to shader read only
@@ -1206,7 +1206,7 @@ void RayTracingThousandsApp::_DrawFrame()
 	pipelineInput.uDepth = 1u;
 	pipelineInput.uWidth = device.GetSwapchainExtent().width;
 	pipelineInput.uHeight = device.GetSwapchainExtent().height;
-	pipelineInput.pDescriptorSets = { m_rtDSets[m_currentFrame].get() };
+	pipelineInput.vkDescriptorSets = { m_rtDSets[m_currentFrame]->vkDescriptorSet };
 	m_rtPipeline.Do(cmd->vkCommandBuffer, pipelineInput);
 
 	// transfer image to shader read only
@@ -1830,7 +1830,7 @@ void RayTracingAABBsApp::_DrawFrame()
 	pipelineInput.uDepth = 1u;
 	pipelineInput.uWidth = device.GetSwapchainExtent().width;
 	pipelineInput.uHeight = device.GetSwapchainExtent().height;
-	pipelineInput.pDescriptorSets = { m_rtDSets[m_currentFrame].get() };
+	pipelineInput.vkDescriptorSets = { m_rtDSets[m_currentFrame]->vkDescriptorSet };
 	m_rtPipeline.Do(cmd->vkCommandBuffer, pipelineInput);
 
 	// transfer image to shader read only

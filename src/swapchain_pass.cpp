@@ -253,7 +253,7 @@ void SwapchainPass::Do(const std::vector<CommandSubmission::WaitInformation>& re
 
 	input.imageSize = device.GetSwapchainExtent();
 	input.vertexCount = 6;
-	input.pDescriptorSets = { m_DSets[m_uCurrentFrame].get() };
+	input.vkDescriptorSets = { m_DSets[m_uCurrentFrame]->vkDescriptorSet };
 	m_pipeline->Do(m_cmd->vkCommandBuffer, input);
 
 	m_cmd->EndRenderPass();

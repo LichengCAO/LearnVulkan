@@ -552,7 +552,7 @@ void MeshletApp::_DrawFrame()
 		meshInput.groupCountY = 1;
 		meshInput.groupCountZ = 1;
 		meshInput.imageSize = pDevice->GetSwapchainExtent();
-		meshInput.pDescriptorSets = { m_cameraDSets[m_currentFrame].get(), m_meshletDSets[i].get() };
+		meshInput.vkDescriptorSets = { m_cameraDSets[m_currentFrame]->vkDescriptorSet, m_meshletDSets[i]->vkDescriptorSet };
 		m_pipeline.Do(cmd->vkCommandBuffer, meshInput);
 	}
 	cmd->EndRenderPass();

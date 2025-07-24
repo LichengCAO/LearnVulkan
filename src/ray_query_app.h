@@ -23,15 +23,22 @@ private:
 	};
 	struct VBO
 	{
-		// no need to use alignas here, since we will use scalarEXT in shader, 
-		// but it won't work somehow, do not know the reason for it yet
-		alignas(16) glm::vec4 pos;
+		alignas(16) glm::vec4 position;
 		alignas(16) glm::vec4 normal;
+	};
+	struct ObjectUBO
+	{
+		glm::mat4 model;
 	};
 	struct CameraUBO
 	{
-		glm::mat4 inverseViewProj;
-		glm::vec4 eye;
+		glm::mat4 viewProj;
+	};
+	struct InstanceInformation
+	{
+		// Describes information of a model on device side
+		VkDeviceAddress vertexBuffer;
+		VkDeviceAddress indexBuffer;
 	};
 
 private:
@@ -46,8 +53,6 @@ private:
 	// Descriptor set count: MAX_FRAME_COUNT
 	DescriptorSetLayout m_rtDSetLayout;
 	std::vector<std::unique_ptr<DescriptorSet>> m_rtDSets;
-	DescriptorSetLayout m_compDSetLayout;
-	std::vector<std::unique_ptr<DescriptorSet>> m_compDSets;
 
 	// cameraUBO changes across frames, i create buffers for each frame
 	std::vector<std::unique_ptr<Buffer>> m_cameraBuffers;
@@ -55,19 +60,25 @@ private:
 	std::unique_ptr<Buffer> m_instanceBuffer;
 	std::vector<std::unique_ptr<Buffer>> m_vertexBuffers;
 	std::vector<std::unique_ptr<Buffer>> m_indexBuffers;
+	std::vector<std::unique_ptr<Buffer>> m_modelBuffers;
 
-	std::vector<RayTracingAccelerationStructure> m_rtAccelStruct;
+	RayTracingAccelerationStructure m_rtAccelStruct;
 
 	// Samplers
 	VkSampler m_vkSampler = VK_NULL_HANDLE;
 
 	// images
-	std::vector<std::unique_ptr<Image>> m_rtImages;
-	std::vector<std::unique_ptr<ImageView>> m_rtImageViews;
+	std::vector<std::unique_ptr<Image>> m_vecColorImage;
+	std::vector<std::unique_ptr<Image>> m_vecDepthImage;
+	std::vector<std::unique_ptr<ImageView>> m_vecColorImageView;
+	std::vector<std::unique_ptr<ImageView>> m_vecDepthImageView;
+
+	// Render pass and framebuffers
+	std::unique_ptr<RenderPass> m_uptrRenderPass;
+	std::vector<std::unique_ptr<Framebuffer>> m_vecFramebuffer;
 
 	//pipelines
-	RayTracingPipeline m_rtPipeline;
-	ComputePipeline m_compPipeline;
+	GraphicsPipeline m_graphicPipeline;
 
 	// command buffers
 	std::vector<std::unique_ptr<CommandSubmission>> m_commandSubmissions;
@@ -94,6 +105,12 @@ private:
 
 	void _InitImagesAndViews();
 	void _UninitImagesAndViews();
+
+	void _InitRenderPass();
+	void _UninitRenderPass();
+
+	void _InitFramebuffers();
+	void _UninitFramebuffers();
 
 	void _InitDescriptorSets();
 	void _UninitDescriptorSets();

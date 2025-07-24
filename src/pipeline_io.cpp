@@ -183,17 +183,23 @@ void DescriptorSetLayout::Uninit()
 	bindings.clear();
 }
 
+void VertexInputLayout::SetUpVertex(uint32_t _stride, VkVertexInputRate _inputRate)
+{
+	m_uStride = _stride;
+	m_InputRate = _inputRate;
+}
+
 uint32_t VertexInputLayout::AddLocation(VkFormat _format, uint32_t _offset)
 {
 	VkVertexInputAttributeDescription attr{};
-	uint32_t ret = static_cast<uint32_t>(m_locations.size());
+	uint32_t ret = static_cast<uint32_t>(m_Locations.size());
 
 	attr.binding = ~0; // unset
 	attr.format = _format;
 	attr.offset = _offset;
 	attr.location = ret;
 
-	m_locations.push_back(attr);
+	m_Locations.push_back(attr);
 
 	return ret;
 }
@@ -201,13 +207,13 @@ VkVertexInputBindingDescription VertexInputLayout::GetVertexInputBindingDescript
 {
 	VkVertexInputBindingDescription ret{};
 	ret.binding = _binding;
-	ret.stride = stride;
-	ret.inputRate = inputRate;
+	ret.stride = m_uStride;
+	ret.inputRate = m_InputRate;
 	return ret;
 }
 std::vector<VkVertexInputAttributeDescription> VertexInputLayout::GetVertexInputAttributeDescriptions(uint32_t _binding) const
 {
-	std::vector<VkVertexInputAttributeDescription> ret = m_locations;
+	std::vector<VkVertexInputAttributeDescription> ret = m_Locations;
 	for (int i = 0; i < ret.size(); ++i)
 	{
 		ret[i].binding = _binding;

@@ -1330,8 +1330,7 @@ void TransparentApp::_InitVertexInputs()
 		m_gbufferVertLayout.AddLocation(VK_FORMAT_R32G32B32_SFLOAT, offsetof(NormalVertex, position));
 		m_gbufferVertLayout.AddLocation(VK_FORMAT_R32G32B32_SFLOAT, offsetof(NormalVertex, normal));
 		m_gbufferVertLayout.AddLocation(VK_FORMAT_R32G32_SFLOAT, offsetof(NormalVertex, uv));
-		m_gbufferVertLayout.stride = sizeof(NormalVertex);
-		m_gbufferVertLayout.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		m_gbufferVertLayout.SetUpVertex(sizeof(NormalVertex));
 
 		// Load models
 		m_gbufferVertBuffers.reserve(m_models.size());
@@ -1383,8 +1382,7 @@ void TransparentApp::_InitVertexInputs()
 		m_transModelVertLayout.AddLocation(VK_FORMAT_R32G32B32_SFLOAT, offsetof(TransparentVertex, pos));
 		m_transModelVertLayout.AddLocation(VK_FORMAT_R32G32B32_SFLOAT, offsetof(TransparentVertex, normal));
 		m_transModelVertLayout.AddLocation(VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(TransparentVertex, color));
-		m_transModelVertLayout.stride = sizeof(TransparentVertex);
-		m_transModelVertLayout.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		m_transModelVertLayout.SetUpVertex(sizeof(TransparentVertex));
 
 		m_transModelVertBuffers.reserve(m_transModels.size());
 		m_transModelIndexBuffers.reserve(m_transModels.size());
@@ -1447,8 +1445,7 @@ void TransparentApp::_InitVertexInputs()
 
 		m_quadVertLayout.AddLocation(VK_FORMAT_R32G32_SFLOAT, offsetof(QuadVertex, pos));
 		m_quadVertLayout.AddLocation(VK_FORMAT_R32G32_SFLOAT, offsetof(QuadVertex, uv));
-		m_quadVertLayout.stride = sizeof(QuadVertex);
-		m_quadVertLayout.inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+		m_quadVertLayout.SetUpVertex(sizeof(QuadVertex));
 
 		localBufferInfo.size = sizeof(QuadVertex) * vertices.size();
 		localBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
@@ -1748,16 +1745,13 @@ void TransparentApp::_DrawFrame()
 	cmd.StartRenderPass(&m_gbufferRenderPass, &m_gbufferFramebuffers[m_currentFrame]);
 	for (int i = 0; i < m_gbufferVertBuffers.size(); ++i)
 	{
-		GraphicsPipeline::PipelineInput_Vertex input;
-		VertexIndexInput indexInput;
-		VertexInput vertInput;
-		indexInput.pBuffer = &m_gbufferIndexBuffers[i];
-		vertInput.pVertexInputLayout = &m_gbufferVertLayout;
-		vertInput.pBuffer = &m_gbufferVertBuffers[i];
-		input.pDescriptorSets = { &m_cameraDSets[m_currentFrame], &m_vecModelDSets[m_currentFrame][i] };
+		GraphicsPipeline::PipelineInput_DrawIndexed input;
+		input.vkDescriptorSets = { m_cameraDSets[m_currentFrame].vkDescriptorSet, m_vecModelDSets[m_currentFrame][i].vkDescriptorSet };
 		input.imageSize = MyDevice::GetInstance().GetSwapchainExtent();
-		input.pVertexIndexInput = &indexInput;
-		input.pVertexInputs = { &vertInput };
+		input.indexBuffer = m_gbufferIndexBuffers[i].vkBuffer;
+		input.vertexBuffers = { m_gbufferVertBuffers[i].vkBuffer };
+		input.vkIndexType = VK_INDEX_TYPE_UINT32;
+		input.indexCount = m_gbufferIndexBuffers[i].GetBufferInformation().size / sizeof(uint32_t);
 		
 		m_gbufferPipeline.Do(cmd.vkCommandBuffer, input); // the draw will be done unordered
 	}
@@ -1860,23 +1854,21 @@ void TransparentApp::_DrawFrame()
 	cmd.StartRenderPass(&m_distortRenderPass, &m_distortFramebuffers[m_currentFrame]);
 	for (int i = 0; i < m_transModelVertBuffers.size(); ++i)
 	{
-		GraphicsPipeline::PipelineInput_Vertex input;
-		VertexIndexInput indexInput;
-		VertexInput vertInput;
-		indexInput.pBuffer = &m_transModelIndexBuffers[i];
-		vertInput.pVertexInputLayout = &m_transModelVertLayout;
-		vertInput.pBuffer = &m_transModelVertBuffers[i];
-		input.pDescriptorSets =
-		{
-			&m_cameraDSets[m_currentFrame],
-			&m_vecTransModelDSets[m_currentFrame][i],
-			&m_distortDSets[m_currentFrame],
-			&m_gbufferDSets[m_currentFrame],
-			&m_vecMaterialDSets[m_currentFrame][i]
-		};
+		GraphicsPipeline::PipelineInput_DrawIndexed input;
+		
 		input.imageSize = MyDevice::GetInstance().GetSwapchainExtent();
-		input.pVertexIndexInput = &indexInput;
-		input.pVertexInputs = { &vertInput };
+		input.indexBuffer = m_transModelIndexBuffers[i].vkBuffer;
+		input.indexCount = m_transModelIndexBuffers[i].GetBufferInformation().size / sizeof(uint32_t);
+		input.vertexBuffers = { m_transModelVertBuffers[i].vkBuffer };
+		input.vkDescriptorSets =
+		{
+			m_cameraDSets[m_currentFrame].vkDescriptorSet,
+			m_vecTransModelDSets[m_currentFrame][i].vkDescriptorSet,
+			m_distortDSets[m_currentFrame].vkDescriptorSet,
+			m_gbufferDSets[m_currentFrame].vkDescriptorSet,
+			m_vecMaterialDSets[m_currentFrame][i].vkDescriptorSet
+		};
+		input.vkIndexType = VK_INDEX_TYPE_UINT32;
 
 		m_distortPipeline.Do(cmd.vkCommandBuffer, input); // the draw will be done unordered
 	}
@@ -1886,22 +1878,20 @@ void TransparentApp::_DrawFrame()
 	cmd.StartRenderPass(&m_oitRenderPass, &m_oitFramebuffers[m_currentFrame]);
 	for (int i = 0; i < m_transModelVertBuffers.size(); ++i)
 	{
-		GraphicsPipeline::PipelineInput_Vertex input;
-		VertexIndexInput indexInput;
-		VertexInput vertInput;
-		indexInput.pBuffer = &m_transModelIndexBuffers[i];
-		vertInput.pVertexInputLayout = &m_transModelVertLayout;
-		vertInput.pBuffer = &m_transModelVertBuffers[i];
-		input.pDescriptorSets = 
-		{ 
-			&m_cameraDSets[m_currentFrame],
-			&m_vecTransModelDSets[m_currentFrame][i],
-			&m_oitDSets[m_currentFrame], // we have synthcronization here, so i think it's ok
-			&m_gbufferDSets[m_currentFrame]
-		};
+		GraphicsPipeline::PipelineInput_DrawIndexed input;
+
 		input.imageSize = MyDevice::GetInstance().GetSwapchainExtent();
-		input.pVertexIndexInput = &indexInput;
-		input.pVertexInputs = { &vertInput };
+		input.indexBuffer = m_transModelIndexBuffers[i].vkBuffer;
+		input.indexCount = m_transModelIndexBuffers[i].GetBufferInformation().size / sizeof(uint32_t);
+		input.vertexBuffers = { m_transModelVertBuffers[i].vkBuffer };
+		input.vkDescriptorSets = 
+		{ 
+			m_cameraDSets[m_currentFrame].vkDescriptorSet,
+			m_vecTransModelDSets[m_currentFrame][i].vkDescriptorSet,
+			m_oitDSets[m_currentFrame].vkDescriptorSet, // we have synthcronization here, so i think it's ok
+			m_gbufferDSets[m_currentFrame].vkDescriptorSet
+		};
+		input.vkIndexType = VK_INDEX_TYPE_UINT32;
 
 		m_oitPipeline.Do(cmd.vkCommandBuffer, input); // the draw will be done unordered
 	}
@@ -1922,17 +1912,15 @@ void TransparentApp::_DrawFrame()
 	}
 	cmd.StartRenderPass(&m_lightRenderPass, &m_lightFramebuffers[m_currentFrame]);
 	{
-		GraphicsPipeline::PipelineInput_Vertex input{};
-		VertexIndexInput indexInput{};
-		VertexInput vertInput{};
-		indexInput.indexType = VK_INDEX_TYPE_UINT32;
-		indexInput.pBuffer = &m_quadIndexBuffer;
-		vertInput.pBuffer = &m_quadVertBuffer;
-		vertInput.pVertexInputLayout = &m_quadVertLayout;
+		GraphicsPipeline::PipelineInput_DrawIndexed input{};
+
 		input.imageSize = MyDevice::GetInstance().GetSwapchainExtent();
-		input.pDescriptorSets = { &m_gbufferDSets[m_currentFrame] };
-		input.pVertexIndexInput = &indexInput;
-		input.pVertexInputs = { &vertInput };
+		input.indexBuffer = m_quadIndexBuffer.vkBuffer;
+		input.indexCount = m_quadIndexBuffer.GetBufferInformation().size / sizeof(uint32_t);
+		input.vertexBuffers = { m_quadVertBuffer.vkBuffer };
+		input.vkDescriptorSets = { m_gbufferDSets[m_currentFrame].vkDescriptorSet };
+		input.vkIndexType = VK_INDEX_TYPE_UINT32;
+
 		m_lightPipeline.Do(cmd.vkCommandBuffer, input);
 	}
 	cmd.EndRenderPass();
@@ -1978,7 +1966,7 @@ void TransparentApp::_DrawFrame()
 			inputX.groupCountX = (imageSize.width * imageSize.height + 255) / 256;
 			inputX.groupCountY = 1;
 			inputX.groupCountZ = 1;
-			inputX.pDescriptorSets = { &m_blurLayeredDSetsX[m_currentFrame][i - 1] };
+			inputX.vkDescriptorSets = { m_blurLayeredDSetsX[m_currentFrame][i - 1].vkDescriptorSet };
 			m_blurPipelineX.Do(cmd.vkCommandBuffer, inputX);
 
 			// transfer blurred tmp to SHDAER_READONLY, next layer to GENERAL
@@ -2006,7 +1994,7 @@ void TransparentApp::_DrawFrame()
 			inputY.groupCountX = (imageSize.width * imageSize.height + 255) / 256;
 			inputY.groupCountY = 1;
 			inputY.groupCountZ = 1;
-			inputY.pDescriptorSets = { &m_blurLayeredDSetsY[m_currentFrame][i - 1] };
+			inputY.vkDescriptorSets = { m_blurLayeredDSetsY[m_currentFrame][i - 1].vkDescriptorSet };
 			m_blurPipelineY.Do(cmd.vkCommandBuffer, inputY);
 
 			// transfer the final result to SHADER_READONLY
@@ -2083,7 +2071,7 @@ void TransparentApp::_DrawFrame()
 		pipelineInput.groupCountX = (extent2d.width * extent2d.height + 255)/ 256;
 		pipelineInput.groupCountY = 1;
 		pipelineInput.groupCountZ = 1;
-		pipelineInput.pDescriptorSets = { &m_oitDSets[m_currentFrame], &m_oitColorDSets[m_currentFrame] };
+		pipelineInput.vkDescriptorSets = { m_oitDSets[m_currentFrame].vkDescriptorSet, m_oitColorDSets[m_currentFrame].vkDescriptorSet };
 		m_oitSortPipeline.Do(cmd.vkCommandBuffer, pipelineInput);
 	}
 	
@@ -2215,16 +2203,14 @@ void TransparentApp::_DrawFrame()
 	// draw final result to the swapchain
 	cmd.StartRenderPass(&m_renderPass, &m_framebuffers[imageIndex.value()]);
 	{
-		GraphicsPipeline::PipelineInput_Vertex input;
-		VertexIndexInput indexInput;
-		VertexInput vertInput;
-		indexInput.pBuffer = &m_quadIndexBuffer;
-		vertInput.pVertexInputLayout = &m_quadVertLayout;
-		vertInput.pBuffer = &m_quadVertBuffer;
-		input.pDescriptorSets = { &m_blurOutputDSets[m_currentFrame], &m_transOutputDSets[m_currentFrame] };
+		GraphicsPipeline::PipelineInput_DrawIndexed input;
+
 		input.imageSize = MyDevice::GetInstance().GetSwapchainExtent();
-		input.pVertexIndexInput = &indexInput;
-		input.pVertexInputs = { &vertInput };
+		input.indexBuffer = m_quadIndexBuffer.vkBuffer;
+		input.indexCount = m_quadIndexBuffer.GetBufferInformation().size / sizeof(uint32_t);
+		input.vertexBuffers = { m_quadVertBuffer.vkBuffer };
+		input.vkDescriptorSets = { m_blurOutputDSets[m_currentFrame].vkDescriptorSet, m_transOutputDSets[m_currentFrame].vkDescriptorSet };
+		input.vkIndexType = VK_INDEX_TYPE_UINT32;
 
 		m_gPipeline.Do(cmd.vkCommandBuffer, input);
 	}

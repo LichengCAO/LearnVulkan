@@ -1,4 +1,7 @@
 #include "ray_query_app.h"
+#include "device.h"
+#include "shader.h"
+#include "swapchain_pass.h"
 
 #define MAX_FRAME_COUNT 3
 
@@ -11,6 +14,8 @@ void RayQueryApp::_Init()
 	_InitBuffers();
 	_InitAS();
 	_InitImagesAndViews();
+	_InitRenderPass();
+	_InitFramebuffers();
 	_InitSwapchainPass();
 	_InitDescriptorSets();
 	_InitPipelines();
@@ -23,6 +28,8 @@ void RayQueryApp::_Uninit()
 	_UninitPipelines();
 	_UninitDescriptorSets();
 	_UninitSwapchainPass();
+	_UninitFramebuffers();
+	_UninitRenderPass();
 	_UninitImagesAndViews();
 	_UninitAS();
 	_UninitBuffers();
@@ -34,20 +41,15 @@ void RayQueryApp::_Uninit()
 
 void RayQueryApp::_InitDescriptorSetLayouts()
 {
-	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_RAYGEN_BIT_KHR); // camera info
-	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_RAYGEN_BIT_KHR); // AS
-	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_RAYGEN_BIT_KHR); // image output
-	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR); // instance data
+	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT); // camera info
+	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, VK_SHADER_STAGE_FRAGMENT_BIT); // AS
+	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT); // instance data
+	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT); // object model matrix
 	m_rtDSetLayout.Init();
-
-	//m_compDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT); // time
-	m_compDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT); // vertex buffer
-	m_compDSetLayout.Init();
 }
 
 void RayQueryApp::_UninitDescriptorSetLayouts()
 {
-	m_compDSetLayout.Uninit();
 	m_rtDSetLayout.Uninit();
 }
 
@@ -64,8 +66,6 @@ void RayQueryApp::_UninitSampler()
 void RayQueryApp::_InitModels()
 {
 	std::vector<Mesh> outMeshes;
-	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/sphere/sphere.obj", outMeshes);
-	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/bunny/bunny.obj", outMeshes);
 	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/wahoo/wahoo.obj", outMeshes);
 	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/ChessBoard/ChessBoard.obj", outMeshes);
 
@@ -75,101 +75,109 @@ void RayQueryApp::_InitModels()
 		model.mesh = mesh;
 		m_models.push_back(model);
 	}
-	//m_models[0].transform.SetScale(0.5, 0.5, 0.5);
-	m_models[2].transform.SetScale(0.5, 0.5, 0.5);
-	//m_models[2].transform.SetScale(0.1, 0.1, 0.1);
+	
+	m_models[1].transform.SetScale(0.1, 0.1, 0.1);
 
-	m_models[0 + 1].transform.SetPosition(0, 0, 0);
-	m_models[1 + 1].transform.SetPosition(6, 0, 1);
-	m_models[2 + 1].transform.SetPosition(0, 0, -2);
+	m_models[0].transform.SetPosition(6, 0, 1);
+	m_models[1].transform.SetPosition(0, 0, -2);
 
-	m_models[0 + 1].transform.SetRotation(90, 0, 180);
-	m_models[1 + 1].transform.SetRotation(90, 0, 180);
-	m_models[2 + 1].transform.SetRotation(0, 0, 90);
+	m_models[0].transform.SetRotation(90, 0, 180);
+	m_models[1].transform.SetRotation(0, 0, 90);
 }
 
 void RayQueryApp::_InitBuffers()
 {
-	// vertex, index buffers
+	// vertex, index, model buffers
 	{
 		Buffer::Information vertBufferInfo{};
+		Buffer::Information indexBufferInfo{};
+		Buffer::Information modelBufferInfo{};
 
 		vertBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		vertBufferInfo.usage =
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT
+			| VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
 			| VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
 			| VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR
 			| VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
+		indexBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		indexBufferInfo.usage = 
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT
+			| VK_BUFFER_USAGE_INDEX_BUFFER_BIT
+			| VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
+			| VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR
+			| VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
+
+		modelBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		modelBufferInfo.usage =
+			VK_BUFFER_USAGE_TRANSFER_DST_BIT
+			| VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+
 		for (auto const& model : m_models)
 		{
-			std::vector<std::unique_ptr<Buffer>> vecVertexBuffers{};
-			std::vector<std::unique_ptr<Buffer>> vecIndexBuffers{};
+			std::unique_ptr<Buffer> uptrVertexBuffer = std::make_unique<Buffer>();
+			std::unique_ptr<Buffer> uptrIndexBuffer = std::make_unique<Buffer>();
+			std::unique_ptr<Buffer> uptrModelBuffer = std::make_unique<Buffer>();
+			std::vector<VBO> vertData{};
 
-			vecVertexBuffers.reserve(MAX_FRAME_COUNT);
-			vecIndexBuffers.reserve(MAX_FRAME_COUNT);
-			for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+			vertData.reserve(model.mesh.verts.size());
+			for (auto const& vert : model.mesh.verts)
 			{
-				std::unique_ptr<Buffer> uptrVertexBuffer = std::make_unique<Buffer>();
-				std::unique_ptr<Buffer> uptrIndexBuffer = std::make_unique<Buffer>();
-				std::vector<VBO> vertData{};
-
-				vertData.reserve(model.mesh.verts.size());
-				for (auto const& vert : model.mesh.verts)
-				{
-					VBO curData{};
-					curData.pos = glm::vec4(vert.position, 1.0f);
-					CHECK_TRUE(vert.normal.has_value(), "We need a normal here!");
-					curData.normal = glm::vec4(vert.normal.value(), 0.0f);
-					vertData.push_back(curData);
-				}
-
-				vertBufferInfo.size = vertData.size() * sizeof(VBO);
-				uptrVertexBuffer->Init(vertBufferInfo);
-
-				vertBufferInfo.size = model.mesh.indices.size() * sizeof(uint32_t);
-				uptrIndexBuffer->Init(vertBufferInfo);
-
-				uptrVertexBuffer->CopyFromHost(vertData.data());
-				uptrIndexBuffer->CopyFromHost(model.mesh.indices.data());
-
-				vecVertexBuffers.push_back(std::move(uptrVertexBuffer));
-				vecIndexBuffers.push_back(std::move(uptrIndexBuffer));
+				VBO curData{};
+				curData.position = glm::vec4(vert.position, 1.0f);
+				CHECK_TRUE(vert.normal.has_value(), "We need a normal here!");
+				curData.normal = glm::vec4(vert.normal.value(), 0.0f);
+				vertData.push_back(curData);
 			}
 
-			m_vertexBuffers.push_back(std::move(vecVertexBuffers));
-			m_indexBuffers.push_back(std::move(vecIndexBuffers));
+			vertBufferInfo.size = vertData.size() * sizeof(VBO);
+			uptrVertexBuffer->Init(vertBufferInfo);
+
+			indexBufferInfo.size = model.mesh.indices.size() * sizeof(uint32_t);
+			uptrIndexBuffer->Init(indexBufferInfo);
+
+			modelBufferInfo.size = sizeof(glm::mat4);
+			uptrModelBuffer->Init(modelBufferInfo);
+
+			uptrVertexBuffer->CopyFromHost(vertData.data());
+			uptrIndexBuffer->CopyFromHost(model.mesh.indices.data());
+			{
+				auto transMat = model.transform.GetModelMatrix();
+				uptrModelBuffer->CopyFromHost(&transMat);
+			}
+
+			m_vertexBuffers.push_back(std::move(uptrVertexBuffer));
+			m_indexBuffers.push_back(std::move(uptrIndexBuffer));
+			m_modelBuffers.push_back(std::move(uptrModelBuffer));
 		}
 	}
 
 	// Instance buffer
 	{
-		for (int j = 0; j < MAX_FRAME_COUNT; ++j)
+		int n = m_models.size();
+		Buffer::Information instBufferInfo{};
+		std::vector<InstanceInformation> instInfos{};
+		std::unique_ptr<Buffer> uptrInstanceBuffer = std::make_unique<Buffer>();
+
+		instInfos.reserve(n);
+		for (int i = 0; i < n; ++i)
 		{
-			int n = m_models.size();
-			Buffer::Information instBufferInfo{};
-			std::vector<InstanceInformation> instInfos{};
-			std::unique_ptr<Buffer> uptrInstanceBuffer = std::make_unique<Buffer>();
+			InstanceInformation instInfo{};
 
-			instInfos.reserve(n);
-			for (int i = 0; i < n; ++i)
-			{
-				InstanceInformation instInfo{};
+			instInfo.vertexBuffer = m_vertexBuffers[i]->GetDeviceAddress();
+			instInfo.indexBuffer = m_indexBuffers[i]->GetDeviceAddress();
 
-				instInfo.vertexBuffer = m_vertexBuffers[i][j]->GetDeviceAddress();
-				instInfo.indexBuffer = m_indexBuffers[i][j]->GetDeviceAddress();
-
-				instInfos.push_back(instInfo);
-			}
-
-			instBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-			instBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-			instBufferInfo.size = instInfos.size() * sizeof(InstanceInformation);
-			uptrInstanceBuffer->Init(instBufferInfo);
-			uptrInstanceBuffer->CopyFromHost(instInfos.data());
-
-			m_instanceBuffer.push_back(std::move(uptrInstanceBuffer));
+			instInfos.push_back(instInfo);
 		}
+
+		instBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		instBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
+		instBufferInfo.size = instInfos.size() * sizeof(InstanceInformation);
+		uptrInstanceBuffer->Init(instBufferInfo);
+		uptrInstanceBuffer->CopyFromHost(instInfos.data());
+
+		m_instanceBuffer = std::move(uptrInstanceBuffer);
 	}
 
 	// Camera buffer
@@ -187,7 +195,6 @@ void RayQueryApp::_InitBuffers()
 			uptrCamera->Init(cameraBufferInfo);
 
 			// the buffer is update every frame, so I don't write to it here
-
 			m_cameraBuffers.push_back(std::move(uptrCamera));
 		}
 	}
@@ -195,136 +202,199 @@ void RayQueryApp::_InitBuffers()
 
 void RayQueryApp::_UninitBuffers()
 {
-	for (auto& vertexBuffers : m_vertexBuffers)
-	{
-		for (auto& uptrBuffer : vertexBuffers)
-		{
-			uptrBuffer->Uninit();
-		}
-		vertexBuffers.clear();
-	}
-	m_vertexBuffers.clear();
-
-	for (auto& indexBuffers : m_indexBuffers)
-	{
-		for (auto& uptrBuffer : indexBuffers)
-		{
-			uptrBuffer->Uninit();
-		}
-		indexBuffers.clear();
-	}
-	m_indexBuffers.clear();
-
-	for (auto& uptrBuffer : m_instanceBuffer)
-	{
-		uptrBuffer->Uninit();
-	}
-	m_instanceBuffer.clear();
-
 	for (auto& uptrBuffer : m_cameraBuffers)
 	{
 		uptrBuffer->Uninit();
 	}
 	m_cameraBuffers.clear();
+
+	m_instanceBuffer->Uninit();
+	m_instanceBuffer.reset();
+
+	for (auto& uptrBuffer : m_modelBuffers)
+	{
+		uptrBuffer->Uninit();
+	}
+	m_modelBuffers.clear();
+
+	for (auto& uptrBuffer : m_indexBuffers)
+	{
+		uptrBuffer->Uninit();
+	}
+	m_indexBuffers.clear();
+
+	for (auto& uptrBuffer : m_vertexBuffers)
+	{
+		uptrBuffer->Uninit();
+	}
+	m_vertexBuffers.clear();
 }
 
 void RayQueryApp::_InitAS()
 {
-	m_rtAccelStruct.reserve(MAX_FRAME_COUNT);
-	for (int j = 0; j < MAX_FRAME_COUNT; ++j)
+	std::vector<RayTracingAccelerationStructure::InstanceData> instDatas;
+	RayTracingAccelerationStructure AS{};
+
+	instDatas.reserve(m_models.size());
+	for (int i = 0; i < m_models.size(); ++i)
 	{
-		std::vector<RayTracingAccelerationStructure::InstanceData> instDatas;
-		RayTracingAccelerationStructure AS{};
+		RayTracingAccelerationStructure::TriangleData trigData{};
+		RayTracingAccelerationStructure::InstanceData instData{};
+		auto const& model = m_models[i];
+		auto const& uptrIndexBuffer = m_indexBuffers[i];
+		auto const& uptrVertexBuffer = m_vertexBuffers[i];
 
-		instDatas.reserve(m_models.size());
-		for (int i = 0; i < m_models.size(); ++i)
-		{
-			RayTracingAccelerationStructure::TriangleData trigData{};
-			RayTracingAccelerationStructure::InstanceData instData{};
-			auto const& model = m_models[i];
-			auto const& uptrIndexBuffer = m_indexBuffers[i];
-			auto const& uptrVertexBuffer = m_vertexBuffers[i];
+		trigData.uIndexCount = static_cast<uint32_t>(model.mesh.indices.size());
+		trigData.vkIndexType = VK_INDEX_TYPE_UINT32;
+		trigData.vkDeviceAddressIndex = uptrIndexBuffer->GetDeviceAddress();
 
-			trigData.uIndexCount = static_cast<uint32_t>(model.mesh.indices.size());
-			trigData.vkIndexType = VK_INDEX_TYPE_UINT32;
-			trigData.vkDeviceAddressIndex = uptrIndexBuffer[j]->GetDeviceAddress();
+		trigData.uVertexCount = static_cast<uint32_t>(model.mesh.verts.size());
+		trigData.uVertexStride = sizeof(VBO);
+		trigData.vkDeviceAddressVertex = uptrVertexBuffer->GetDeviceAddress();
 
-			trigData.uVertexCount = static_cast<uint32_t>(model.mesh.verts.size());
-			trigData.uVertexStride = sizeof(VBO);
-			trigData.vkDeviceAddressVertex = uptrVertexBuffer[j]->GetDeviceAddress();
+		instData.uBLASIndex = AS.AddBLAS({ trigData });
+		instData.transformMatrix = model.transform.GetModelMatrix();
 
-			instData.uBLASIndex = AS.AddBLAS({ trigData });
-			instData.transformMatrix = model.transform.GetModelMatrix();
-			if (i == 0)
-			{
-				m_BLASInputs = { trigData };
-			}
-
-			instDatas.push_back(instData);
-		}
-
-		AS.SetUpTLAS(instDatas);
-		AS.Init();
-		m_rtAccelStruct.push_back(std::move(AS));
-		m_TLASInputs = instDatas;
+		instDatas.push_back(instData);
 	}
+
+	AS.SetUpTLAS(instDatas);
+	AS.Init();
+	m_rtAccelStruct = std::move(AS);
 }
 
 void RayQueryApp::_UninitAS()
 {
-	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
-	{
-		m_rtAccelStruct[i].Uninit();
-	}
-	m_rtAccelStruct.clear();
+	m_rtAccelStruct.Uninit();
 }
 
 void RayQueryApp::_InitImagesAndViews()
 {
-	m_rtImages.clear();
-	m_rtImages.reserve(MAX_FRAME_COUNT);
+	m_vecColorImage.clear();
+	m_vecColorImage.reserve(MAX_FRAME_COUNT);
 	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 	{
-		std::unique_ptr<Image> rtImage = std::make_unique<Image>();
-		std::unique_ptr<ImageView> rtView{};
-		Image::Information imgInfo{};
+		std::unique_ptr<Image> uptrColorImage = std::make_unique<Image>();
+		std::unique_ptr<Image> uptrDepthImage = std::make_unique<Image>();
+		std::unique_ptr<ImageView> uptrColorView{};
+		std::unique_ptr<ImageView> uptrDepthView{};
+		Image::Information colorImageInfo{};
+		Image::Information depthImageInfo{};
 
-		imgInfo.arrayLayers = 1u;
-		imgInfo.depth = 1u;
-		imgInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-		imgInfo.imageType = VK_IMAGE_TYPE_2D;
-		imgInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		imgInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		imgInfo.mipLevels = 1u;
-		imgInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-		imgInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
-		imgInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-		imgInfo.width = MyDevice::GetInstance().GetSwapchainExtent().width;
-		imgInfo.height = MyDevice::GetInstance().GetSwapchainExtent().height;
+		colorImageInfo.arrayLayers = 1u;
+		colorImageInfo.depth = 1u;
+		colorImageInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+		colorImageInfo.imageType = VK_IMAGE_TYPE_2D;
+		colorImageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		colorImageInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		colorImageInfo.mipLevels = 1u;
+		colorImageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		colorImageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		colorImageInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
+		colorImageInfo.width = MyDevice::GetInstance().GetSwapchainExtent().width;
+		colorImageInfo.height = MyDevice::GetInstance().GetSwapchainExtent().height;
 
-		rtImage->SetImageInformation(imgInfo);
-		rtImage->Init();
-		rtView = std::make_unique<ImageView>(rtImage->NewImageView());
-		rtView->Init();
+		depthImageInfo.arrayLayers = 1u;
+		depthImageInfo.depth = 1u;
+		depthImageInfo.format = MyDevice::GetInstance().GetDepthFormat();
+		depthImageInfo.imageType = VK_IMAGE_TYPE_2D;
+		depthImageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+		depthImageInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		depthImageInfo.mipLevels = 1u;
+		depthImageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		depthImageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		depthImageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
+		depthImageInfo.width = MyDevice::GetInstance().GetSwapchainExtent().width;
+		depthImageInfo.height = MyDevice::GetInstance().GetSwapchainExtent().height;
 
-		m_rtImageViews.push_back(std::move(rtView));
-		m_rtImages.push_back(std::move(rtImage));
+		uptrColorImage->SetImageInformation(colorImageInfo);
+		uptrColorImage->Init();
+		uptrColorView = std::make_unique<ImageView>(uptrColorImage->NewImageView());
+		uptrColorView->Init();
+
+		uptrDepthImage->SetImageInformation(depthImageInfo);
+		uptrDepthImage->Init();
+		uptrDepthView = std::make_unique<ImageView>(uptrDepthImage->NewImageView());
+		uptrDepthView->Init();
+
+		m_vecColorImageView.push_back(std::move(uptrColorView));
+		m_vecColorImage.push_back(std::move(uptrColorImage));
+		m_vecDepthImageView.push_back(std::move(uptrDepthView));
+		m_vecDepthImage.push_back(std::move(uptrDepthImage));
 	}
 }
 
 void RayQueryApp::_UninitImagesAndViews()
 {
-	for (auto& imgView : m_rtImageViews)
+	for (auto& uptrView : m_vecDepthImageView)
+	{
+		uptrView->Uninit();
+	}
+	m_vecDepthImageView.clear();
+
+	for (auto& uptrImage : m_vecDepthImage)
+	{
+		uptrImage->Uninit();
+	}
+	m_vecDepthImage.clear();
+
+	for (auto& imgView : m_vecColorImageView)
 	{
 		imgView->Uninit();
 	}
-	m_rtImageViews.clear();
+	m_vecColorImageView.clear();
 
-	for (auto& img : m_rtImages)
+	for (auto& img : m_vecColorImage)
 	{
 		img->Uninit();
 	}
-	m_rtImages.clear();
+	m_vecColorImage.clear();
+}
+
+void RayQueryApp::_InitRenderPass()
+{
+	RenderPass::Subpass subpass{};
+
+	m_uptrRenderPass = std::make_unique<RenderPass>();
+
+	m_uptrRenderPass->AddAttachment(RenderPass::AttachmentPreset::SWAPCHAIN);
+	m_uptrRenderPass->AddAttachment(RenderPass::AttachmentPreset::DEPTH);
+
+	subpass.AddColorAttachment(0);
+	subpass.SetDepthStencilAttachment(1);
+
+	m_uptrRenderPass->AddSubpass(subpass);
+
+	m_uptrRenderPass->Init();
+}
+
+void RayQueryApp::_UninitRenderPass()
+{
+	m_uptrRenderPass->Uninit();
+	m_uptrRenderPass.reset();
+}
+
+void RayQueryApp::_InitFramebuffers()
+{
+	for (size_t i = 0; i < MAX_FRAME_COUNT; ++i)
+	{
+		std::unique_ptr<Framebuffer> uptrFramebuffer;
+		std::vector<const ImageView*> vecRenderView = {
+			m_vecColorImageView[i].get(),
+			m_vecDepthImageView[i].get(),
+		};
+		uptrFramebuffer = std::make_unique<Framebuffer>(m_uptrRenderPass->NewFramebuffer(vecRenderView));
+		m_vecFramebuffer.push_back(std::move(uptrFramebuffer));
+	}
+}
+
+void RayQueryApp::_UninitFramebuffers()
+{
+	for (auto& uptrBuffer : m_vecFramebuffer)
+	{
+		uptrBuffer->Uninit();
+	}
+	m_vecFramebuffer.clear();
 }
 
 void RayQueryApp::_InitDescriptorSets()
@@ -335,42 +405,22 @@ void RayQueryApp::_InitDescriptorSets()
 		VkDescriptorImageInfo imageInfo{};
 
 		imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-		imageInfo.imageView = m_rtImageViews[i]->vkImageView;
+		imageInfo.imageView = m_vecColorImageView[i]->vkImageView;
 		imageInfo.sampler = m_vkSampler;
 
 		uptrDSet->Init();
 		uptrDSet->StartUpdate();
 		uptrDSet->UpdateBinding(0, m_cameraBuffers[i].get());
-		uptrDSet->UpdateBinding(1, { m_rtAccelStruct[i].vkAccelerationStructure });
-		uptrDSet->UpdateBinding(2, imageInfo);
-		uptrDSet->UpdateBinding(3, m_instanceBuffer[i].get());
+		uptrDSet->UpdateBinding(1, { m_rtAccelStruct.vkAccelerationStructure });
+		uptrDSet->UpdateBinding(2, m_instanceBuffer.get());
 		uptrDSet->FinishUpdate();
 
 		m_rtDSets.push_back(std::move(uptrDSet));
-	}
-
-	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
-	{
-		std::unique_ptr<DescriptorSet> uptrDSet = std::make_unique<DescriptorSet>(m_compDSetLayout.NewDescriptorSet());
-
-		uptrDSet->Init();
-		uptrDSet->StartUpdate();
-		//uptrDSet->UpdateBinding(0, m_cameraBuffers[i].get());
-		uptrDSet->UpdateBinding(0, m_vertexBuffers[0][i].get()); // sphere
-		uptrDSet->FinishUpdate();
-
-		m_compDSets.push_back(std::move(uptrDSet));
 	}
 }
 
 void RayQueryApp::_UninitDescriptorSets()
 {
-	for (auto& uptrDSet : m_compDSets)
-	{
-		uptrDSet.reset();
-	}
-	m_compDSets.clear();
-
 	for (auto& uptrDSet : m_rtDSets)
 	{
 		uptrDSet.reset();
@@ -380,65 +430,37 @@ void RayQueryApp::_UninitDescriptorSets()
 
 void RayQueryApp::_InitPipelines()
 {
-	SimpleShader rgen{};
-	SimpleShader rchit{};
-	SimpleShader rchit2{};
-	SimpleShader rmiss{};
-	SimpleShader rmiss2{};
-	SimpleShader anim{};
-	uint32_t rgenId = 0u;
-	uint32_t rchitId = 0u;
-	uint32_t rchit2Id = 0u;
-	uint32_t rmissId = 0u;
-	uint32_t rmiss2Id = 0u;
+	SimpleShader vertShader{};
+	SimpleShader fragShader{};
+	VertexInputLayout vertInputLayout{};
 
-	rgen.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/rt.rgen.spv");
-	rchit.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/rt_shadow.rchit.spv");
-	rchit2.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/rt_simple.rchit.spv");
-	rmiss.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/rt.rmiss.spv");
-	rmiss2.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/rt_shadow.rmiss.spv");
-	anim.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/rt_anim.comp.spv");
+	vertShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/rq.vert.spv");
+	fragShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/rq.frag.spv");
 
-	rgen.Init();
-	rchit.Init();
-	rchit2.Init();
-	rmiss.Init();
-	rmiss2.Init();
-	anim.Init();
+	vertShader.Init();
+	fragShader.Init();
 
-	m_rtPipeline.AddDescriptorSetLayout(m_rtDSetLayout.vkDescriptorSetLayout);
-	rgenId = m_rtPipeline.AddShader(rgen.GetShaderStageInfo());
-	rchitId = m_rtPipeline.AddShader(rchit.GetShaderStageInfo());
-	rmissId = m_rtPipeline.AddShader(rmiss.GetShaderStageInfo());
-	rmiss2Id = m_rtPipeline.AddShader(rmiss2.GetShaderStageInfo());
-	rchit2Id = m_rtPipeline.AddShader(rchit2.GetShaderStageInfo());
+	vertInputLayout.AddLocation(VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(VBO, position));
+	vertInputLayout.AddLocation(VK_FORMAT_R32G32B32A32_SFLOAT, offsetof(VBO, normal));
+	vertInputLayout.SetUpVertex(sizeof(VBO));
 
-	m_compPipeline.AddDescriptorSetLayout(&m_compDSetLayout);
-	m_compPipeline.AddShader(anim.GetShaderStageInfo());
-	m_compPipeline.AddPushConstant(VK_SHADER_STAGE_COMPUTE_BIT, sizeof(float));
+	m_graphicPipeline.AddDescriptorSetLayout(m_rtDSetLayout.vkDescriptorSetLayout);
+	m_graphicPipeline.AddVertexInputLayout(&vertInputLayout);
 
-	m_rtPipeline.SetRayGenerationShaderRecord(rgenId);
-	m_rtPipeline.AddTriangleHitShaderRecord(rchitId);
-	m_rtPipeline.AddTriangleHitShaderRecord(rchit2Id);
-	m_rtPipeline.AddMissShaderRecord(rmissId);
-	m_rtPipeline.AddMissShaderRecord(rmiss2Id);
-	m_rtPipeline.SetMaxRecursion(2u);
+	m_graphicPipeline.AddShader(vertShader.GetShaderStageInfo());
+	m_graphicPipeline.AddShader(fragShader.GetShaderStageInfo());
+	
+	m_graphicPipeline.BindToSubpass(m_uptrRenderPass.get(), 0);
 
-	m_rtPipeline.Init();
-	m_compPipeline.Init();
+	m_graphicPipeline.Init();
 
-	rgen.Uninit();
-	rchit.Uninit();
-	rchit2.Uninit();
-	rmiss.Uninit();
-	rmiss2.Uninit();
-	anim.Uninit();
+	fragShader.Uninit();
+	vertShader.Uninit();
 }
 
 void RayQueryApp::_UninitPipelines()
 {
-	m_compPipeline.Uninit();
-	m_rtPipeline.Uninit();
+	m_graphicPipeline.Uninit();
 }
 
 void RayQueryApp::_InitSwapchainPass()
@@ -450,7 +472,7 @@ void RayQueryApp::_InitSwapchainPass()
 	{
 		VkDescriptorImageInfo imageInfo{};
 		imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		imageInfo.imageView = m_rtImageViews[i]->vkImageView;
+		imageInfo.imageView = m_vecColorImageView[i]->vkImageView;
 		imageInfo.sampler = m_vkSampler;
 		imageInfos.push_back(imageInfo);
 	}
@@ -526,14 +548,8 @@ void RayQueryApp::_UpdateUniformBuffer()
 		m_camera.MoveTo(mov);
 	}
 
-	//ubo.proj[1][1] *= -1;
-	//ubo.F = glm::vec4(glm::normalize(m_camera.ref - m_camera.eye), 1.0f);
-	//ubo.V = glm::vec4(m_camera.V, 1.0f);
-	//ubo.H = glm::vec4(m_camera.H, 1.0f);
-	ubo.inverseViewProj = glm::inverse(m_camera.GetViewProjectionMatrix());
-	ubo.eye = glm::vec4(m_camera.eye, 1.0f);
+	ubo.viewProj = m_camera.GetViewProjectionMatrix();
 	m_cameraBuffers[m_currentFrame]->CopyFromHost(&ubo);
-	m_models[1].transform.SetRotation(0, 0, lastTime * 10);
 }
 
 void RayQueryApp::_MainLoop()
@@ -555,7 +571,7 @@ void RayQueryApp::_DrawFrame()
 {
 	std::unique_ptr<CommandSubmission>& cmd = m_commandSubmissions[m_currentFrame];
 	auto& device = MyDevice::GetInstance();
-	RayTracingPipeline::PipelineInput pipelineInput{};
+	GraphicsPipeline::PipelineInput_DrawIndexed pipelineInput{};
 	CommandSubmission::WaitInformation scPassWait{};
 	ImageBarrierBuilder barrierBuilder{};
 	VkClearColorValue clearColor{};
@@ -569,38 +585,13 @@ void RayQueryApp::_DrawFrame()
 	_UpdateUniformBuffer();
 	cmd->StartCommands({});
 
-	for (int i = 0; i < m_TLASInputs.size(); ++i)
-	{
-		m_TLASInputs[i].transformMatrix = m_models[i].transform.GetModelMatrix();
-	}
-
-	// update vertex buffer with compute shader
-	{
-		ComputePipeline::PipelineInput input{};
-		VkMemoryBarrier barrier{ VK_STRUCTURE_TYPE_MEMORY_BARRIER };
-		float time = static_cast<float>(lastTime);
-		input.groupCountX = m_models[0].mesh.verts.size();
-		input.groupCountY = 1;
-		input.groupCountZ = 1;
-		input.pDescriptorSets = { m_compDSets[m_currentFrame].get() };
-		input.pushConstants = { {VK_SHADER_STAGE_COMPUTE_BIT, &time} };
-		m_compPipeline.Do(cmd->vkCommandBuffer, input);
-
-		barrier.srcAccessMask = VK_ACCESS_SHADER_WRITE_BIT;
-		barrier.dstAccessMask = VK_ACCESS_ACCELERATION_STRUCTURE_WRITE_BIT_KHR;
-
-		cmd->AddPipelineBarrier(VK_PIPELINE_STAGE_COMPUTE_SHADER_BIT, VK_PIPELINE_STAGE_ACCELERATION_STRUCTURE_BUILD_BIT_KHR, { barrier });
-	}
-
-	m_rtAccelStruct[m_currentFrame].UpdateBLAS(m_BLASInputs, 0, cmd.get());
-	m_rtAccelStruct[m_currentFrame].UpdateTLAS(m_TLASInputs, cmd.get());
 	RayTracingAccelerationStructure::RecordPipelineBarrier(cmd.get());
 
 	// transfer image to general and fill it with zero
 	{
-		m_rtImages[m_currentFrame]->ChangeLayoutAndFill(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, clearColor, cmd.get());
+		m_vecColorImage[m_currentFrame]->ChangeLayoutAndFill(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, clearColor, cmd.get());
 		auto barrier2 = barrierBuilder.NewBarrier(
-			m_rtImages[m_currentFrame]->vkImage,
+			m_vecColorImage[m_currentFrame]->vkImage,
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 			VK_IMAGE_LAYOUT_GENERAL,
 			VK_ACCESS_TRANSFER_WRITE_BIT,
@@ -609,16 +600,21 @@ void RayQueryApp::_DrawFrame()
 	}
 
 	// run ray tracing pipeline
-	pipelineInput.uDepth = 1u;
-	pipelineInput.uWidth = device.GetSwapchainExtent().width;
-	pipelineInput.uHeight = device.GetSwapchainExtent().height;
-	pipelineInput.pDescriptorSets = { m_rtDSets[m_currentFrame].get() };
-	m_rtPipeline.Do(cmd->vkCommandBuffer, pipelineInput);
+	pipelineInput.imageSize = MyDevice::GetInstance().GetSwapchainExtent();
+	for (size_t i = 0; i < m_models.size(); ++i)
+	{
+		pipelineInput.indexBuffer = m_indexBuffers[i]->vkBuffer;
+		pipelineInput.indexCount = m_indexBuffers[i]->GetBufferInformation().size / sizeof(uint32_t);
+		pipelineInput.vertexBuffers = { m_vertexBuffers[i]->vkBuffer };
+	}
+	pipelineInput.vkDescriptorSets = { m_rtDSets[m_currentFrame]->vkDescriptorSet };
+	pipelineInput.vkIndexType = VK_INDEX_TYPE_UINT32;
+	m_graphicPipeline.Do(cmd->vkCommandBuffer, pipelineInput);
 
 	// transfer image to shader read only
 	{
 		auto barrier = barrierBuilder.NewBarrier(
-			m_rtImages[m_currentFrame]->vkImage,
+			m_vecColorImage[m_currentFrame]->vkImage,
 			VK_IMAGE_LAYOUT_GENERAL,
 			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			VK_ACCESS_SHADER_WRITE_BIT,
@@ -639,8 +635,10 @@ void RayQueryApp::_ResizeWindow()
 	std::vector<VkDescriptorImageInfo> imageInfos;
 
 	_UninitDescriptorSets();
+	_UninitFramebuffers();
 	_UninitImagesAndViews();
 	_InitImagesAndViews();
+	_InitFramebuffers();
 	_InitDescriptorSets();
 
 	imageInfos.reserve(MAX_FRAME_COUNT);
@@ -648,7 +646,7 @@ void RayQueryApp::_ResizeWindow()
 	{
 		VkDescriptorImageInfo imageInfo{};
 		imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-		imageInfo.imageView = m_rtImageViews[i]->vkImageView;
+		imageInfo.imageView = m_vecColorImageView[i]->vkImageView;
 		imageInfo.sampler = m_vkSampler;
 		imageInfos.push_back(imageInfo);
 	}

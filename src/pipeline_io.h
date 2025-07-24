@@ -103,34 +103,32 @@ public:
 	void Uninit();
 };
 
-// Pipeline can have multiple VertexLayouts, 
-// when execute the pipeline we need to provide VertexInputs for each of the VertexLayout
+// Graphics pipeline can have multiple vertex bindings,
+// i.e. layout(binding = 0, location = 0); layout(binding = 1, location = 0)...
+// This class helps to describe vertex attribute layout that belongs to the same binding
+// in a graphics pipeline, I use this to create a graphics pipeline.
+// This class doesn't hold any Vulkan handle,
+// and can be destroyed after the construction of the graphics pipeline.
 class VertexInputLayout
 {
 private:
-	std::vector<VkVertexInputAttributeDescription> m_locations;
+	uint32_t          m_uStride	= 0;
+	VkVertexInputRate m_InputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+	std::vector<VkVertexInputAttributeDescription> m_Locations;
 
 public:
-	uint32_t stride = 0;
-	VkVertexInputRate inputRate = VK_VERTEX_INPUT_RATE_VERTEX;
+	// Set up per Vertex Description information
+	void SetUpVertex(uint32_t _stride, VkVertexInputRate _inputRate = VK_VERTEX_INPUT_RATE_VERTEX);
 
-public:
+	// Add location for this vertex binding, return the index of this location.
+	// Then you can use it in layout(binding = ..., location = <return>) in the shader
 	uint32_t AddLocation(VkFormat _format, uint32_t _offset);
-	VkVertexInputBindingDescription					GetVertexInputBindingDescription(uint32_t _binding = 0) const;
+
+	// Call after the SetUpVertex() and AddLocation() are called, used in graphics pipeline creation
+	VkVertexInputBindingDescription	GetVertexInputBindingDescription(uint32_t _binding = 0) const;
+
+	// Call after the SetUpVertex() and AddLocation() are called, used in graphics pipeline creation
 	std::vector<VkVertexInputAttributeDescription>	GetVertexInputAttributeDescriptions(uint32_t _binding = 0) const;
-};
-class VertexInput
-{
-public:
-	const VertexInputLayout* pVertexInputLayout = nullptr;
-	const Buffer* pBuffer = nullptr;
-	VkDeviceSize offset = 0;
-};
-class VertexIndexInput
-{
-public:
-	const Buffer* pBuffer = nullptr;
-	VkIndexType indexType = VK_INDEX_TYPE_UINT32;
 };
 
 // Render pass can be something like a blueprint of frame buffers

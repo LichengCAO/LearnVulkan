@@ -5,8 +5,6 @@ class Buffer;
 class DescriptorSetLayout;
 class DescriptorSet;
 class VertexInputLayout;
-class VertexIndexInput;
-class VertexInput;
 class RenderPass;
 class GraphicsPipeline;
 class ComputePipeline;
@@ -45,28 +43,36 @@ public:
 	struct PipelineInput_Draw
 	{
 		VkExtent2D imageSize{};
-		std::vector<const DescriptorSet*> pDescriptorSets;
+		std::vector<VkDescriptorSet> vkDescriptorSets;
 		std::vector<std::pair<VkShaderStageFlagBits, const void*>> pushConstants;
 
 		uint32_t vertexCount = 0u;
+
+		std::vector<VkBuffer>						vertexBuffers;			// can be empty
+		std::optional<std::vector<VkDeviceSize>>	optVertexBufferOffsets; // must have the same length as vertexBuffers
 	};
 
 	// For general graphics pipelines that use vertex buffers
-	struct PipelineInput_Vertex
+	struct PipelineInput_DrawIndexed
 	{
 		VkExtent2D imageSize{};
-		std::vector<const DescriptorSet*> pDescriptorSets;
+		std::vector<VkDescriptorSet> vkDescriptorSets;
 		std::vector<std::pair<VkShaderStageFlagBits, const void*>> pushConstants;
 
-		const VertexIndexInput* pVertexIndexInput = nullptr;
-		std::vector<const VertexInput*> pVertexInputs;
+		std::vector<VkBuffer>	vertexBuffers;								// not sure, but I think order matters
+		VkBuffer				indexBuffer = VK_NULL_HANDLE;
+		VkIndexType				vkIndexType = VK_INDEX_TYPE_UINT32;
+		uint32_t				indexCount = 0u;
+
+		std::optional<std::vector<VkDeviceSize>>	optVertexBufferOffsets; // must have the same length as vertexBuffers
+		std::optional<VkDeviceSize>					optIndexBufferOffset;
 	};
 
 	// For mesh shader pipelines
 	struct PipelineInput_Mesh
 	{
 		VkExtent2D imageSize{};
-		std::vector<const DescriptorSet*> pDescriptorSets;
+		std::vector<VkDescriptorSet> vkDescriptorSets;
 		std::vector<std::pair<VkShaderStageFlagBits, const void*>> pushConstants;
 
 		uint32_t groupCountX = 1;
@@ -100,8 +106,8 @@ private:
 	void _DoCommon(
 		VkCommandBuffer cmd,
 		const VkExtent2D& imageSize,
-		const std::vector<const DescriptorSet*>& pSets,
-		const std::vector<std::pair<VkShaderStageFlagBits, const void*>> pushConstants);
+		const std::vector<VkDescriptorSet>& pSets,
+		const std::vector<std::pair<VkShaderStageFlagBits, const void*>>& pushConstants);
 
 public:
 	GraphicsPipeline();
@@ -117,7 +123,7 @@ public:
 	void Init();
 	void Uninit();
 
-	void Do(VkCommandBuffer commandBuffer, const PipelineInput_Vertex& input);
+	void Do(VkCommandBuffer commandBuffer, const PipelineInput_DrawIndexed& input);
 	void Do(VkCommandBuffer commandBuffer, const PipelineInput_Mesh& input);
 	void Do(VkCommandBuffer commandBuffer, const PipelineInput_Draw& input);
 };
@@ -127,7 +133,7 @@ class ComputePipeline
 public:
 	struct PipelineInput
 	{
-		std::vector<const DescriptorSet*> pDescriptorSets;
+		std::vector<VkDescriptorSet> vkDescriptorSets;
 		std::vector<std::pair<VkShaderStageFlagBits, const void*>> pushConstants;
 
 		uint32_t groupCountX = 1;
@@ -196,7 +202,7 @@ private:
 public:
 	struct PipelineInput
 	{
-		std::vector<const DescriptorSet*> pDescriptorSets;
+		std::vector<VkDescriptorSet> vkDescriptorSets;
 		std::vector<std::pair<VkShaderStageFlagBits, const void*>> pushConstants;
 
 		// for simplicity, i bind SBT in RT pipeline
