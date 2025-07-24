@@ -95,7 +95,7 @@ public:
 	struct InstanceData
 	{
 		uint32_t	uBLASIndex;
-		uint32_t	uHitShaderGroupIndex;
+		uint32_t	uHitShaderGroupIndex; // index of the hit group in the used Shader Binding Table
 		glm::mat4   transformMatrix;
 		// i just use the index of input array for gl_InstanceCustomIndex;
 	};
@@ -160,6 +160,9 @@ public:
 	RayTracingAccelerationStructure();
 	RayTracingAccelerationStructure(RayTracingAccelerationStructure&& _other);
 	RayTracingAccelerationStructure(const RayTracingAccelerationStructure& _other) = delete;
+	RayTracingAccelerationStructure& operator=(const RayTracingAccelerationStructure& _other) = delete;
+	RayTracingAccelerationStructure& operator=(RayTracingAccelerationStructure&& _other) noexcept;
+	
 	~RayTracingAccelerationStructure();
 
 	// Add a BLAS to this acceleration structure, 

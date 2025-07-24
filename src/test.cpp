@@ -3,7 +3,7 @@
 #include "ray_tracing_app.h"
 int main() {
 	//RayTracingApp app;
-	RayTracingManyApp app;
+	RayTracingThousandsApp app;
 	//MeshletApp app;
 	app.Run(); // easier to debug this way
 	//try {

@@ -13,6 +13,7 @@ file(GLOB SHADER_SOURCES
     "shaders/*.rgen"
     "shaders/*.rmiss"
     "shaders/*.rchit"
+    "shaders/*.rint"
 )
 
 file(GLOB IMAGES

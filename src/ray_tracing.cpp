@@ -3,6 +3,7 @@
 #include "buffer.h"
 #include "commandbuffer.h"
 #include "utils.h"
+#include <chrono> // For timing
 
 void RayTracingAccelerationStructure::_InitScratchBuffer(
 	VkDeviceSize maxBudget,
@@ -74,6 +75,10 @@ void RayTracingAccelerationStructure::_InitScratchBuffer(
 
 void RayTracingAccelerationStructure::_BuildBLASs()
 {
+	std::chrono::steady_clock::time_point start{};
+	std::chrono::steady_clock::time_point end{};
+	std::chrono::microseconds duration{};
+
 	if (m_compactBLAS)
 	{
 		for (auto& _BLASInput : m_BLASInputs)
@@ -81,7 +86,17 @@ void RayTracingAccelerationStructure::_BuildBLASs()
 			_BLASInput.vkBuildFlags = _BLASInput.vkBuildFlags | VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR;
 		}
 	}
+
+	// Start measuring time
+	std::cout << "Start build BLASes..." << std::endl;
+	start = std::chrono::high_resolution_clock::now();
+
 	_BuildOrUpdateBLASes(m_BLASInputs, m_uptrBLASes, nullptr);
+
+	// Stop measuring time
+	end = std::chrono::high_resolution_clock::now();
+	duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+	std::cout << "Execution Time: " << duration.count() << " microseconds\n";
 }
 
 void RayTracingAccelerationStructure::_BuildOrUpdateBLASes(const std::vector<BLASInput>& _inputs, std::vector<std::unique_ptr<BLAS>>& _BLASes, CommandSubmission* _pCmd, VkDeviceSize maxBudget)
@@ -327,26 +342,14 @@ void RayTracingAccelerationStructure::_BuildOrUpdateBLASes(const std::vector<BLA
 
 void RayTracingAccelerationStructure::_BuildTLAS()
 {
-	CommandSubmission cmd{};
-	Buffer scratchBuffer{};
-	VkAccelerationStructureBuildGeometryInfoKHR buildGeomInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_GEOMETRY_INFO_KHR };
-	VkAccelerationStructureBuildSizesInfoKHR buildSizeInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_BUILD_SIZES_INFO_KHR };
-	uint32_t uMaxPrimitiveCount = 0u; // we only have one TLAS here, so I use a uint32_t instead of a vector
-	std::vector<VkDeviceAddress> slotAddresses; // size should be one
+	std::chrono::steady_clock::time_point start{};
+	std::chrono::steady_clock::time_point end{};
+	std::chrono::microseconds duration{};
+	CommandSubmission tmpCmd{};
 
-	buildGeomInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
-	buildGeomInfo.flags = m_TLASInput.vkBuildFlags;
-	buildGeomInfo.mode = VK_BUILD_ACCELERATION_STRUCTURE_MODE_BUILD_KHR;
-	buildGeomInfo.srcAccelerationStructure = VK_NULL_HANDLE;
-	buildGeomInfo.dstAccelerationStructure = VK_NULL_HANDLE;
-	buildGeomInfo.geometryCount = 1u;
-	buildGeomInfo.pGeometries = &m_TLASInput.vkASGeometry;
-
-	uMaxPrimitiveCount = m_TLASInput.vkASBuildRangeInfo.primitiveCount; 
-
-	vkGetAccelerationStructureBuildSizesKHR(MyDevice::GetInstance().vkDevice, VK_ACCELERATION_STRUCTURE_BUILD_TYPE_DEVICE_KHR, &buildGeomInfo, &uMaxPrimitiveCount, &buildSizeInfo);
-
-	_InitScratchBuffer(buildSizeInfo.buildScratchSize, { buildSizeInfo }, true, scratchBuffer, slotAddresses);
+	// Start measuring time
+	std::cout << "Start build TLAS..." << std::endl;
+	start = std::chrono::high_resolution_clock::now();
 
 	if (m_uptrTLAS.get() != nullptr)
 	{
@@ -354,21 +357,16 @@ void RayTracingAccelerationStructure::_BuildTLAS()
 		m_uptrTLAS.reset();
 	}
 	m_uptrTLAS = std::make_unique<TLAS>();
-	m_uptrTLAS->Init(buildSizeInfo.accelerationStructureSize);
-	vkAccelerationStructure = m_uptrTLAS->vkAccelerationStructure;
+	tmpCmd.Init();
+	tmpCmd.StartOneTimeCommands({});
+	_BuildOrUpdateTLAS(m_TLASInput, m_uptrTLAS.get(), &tmpCmd);
+	tmpCmd.SubmitCommands();
+	this->vkAccelerationStructure = m_uptrTLAS->vkAccelerationStructure;
 
-	buildGeomInfo.dstAccelerationStructure = vkAccelerationStructure;
-	buildGeomInfo.scratchData.deviceAddress = scratchBuffer.GetDeviceAddress();
-
-	cmd.Init();
-	cmd.StartOneTimeCommands({});
-	
-	cmd.BuildAccelerationStructures({ buildGeomInfo }, { &m_TLASInput.vkASBuildRangeInfo });
-	
-	cmd.SubmitCommands();
-	cmd.Uninit();
-
-	scratchBuffer.Uninit();
+	// Stop measuring time
+	end = std::chrono::high_resolution_clock::now();
+	duration = std::chrono::duration_cast<std::chrono::microseconds>(end - start);
+	std::cout << "Execution Time: " << duration.count() << " microseconds\n";
 
 	// From GPT:
 	// Instance buffer data - unlike triangle data - can be destroy after the AS is built. For triangle data, it depends on GPU vendor's implementations
@@ -552,12 +550,25 @@ RayTracingAccelerationStructure::RayTracingAccelerationStructure()
 RayTracingAccelerationStructure::RayTracingAccelerationStructure(RayTracingAccelerationStructure&& _other)
 {
 	this->m_BLASInputs = std::move(_other.m_BLASInputs);
+	this->m_compactBLAS = std::move(_other.m_compactBLAS);
 	this->m_TLASInput = std::move(_other.m_TLASInput);
 	this->m_uptrBLASes = std::move(_other.m_uptrBLASes);
 	this->m_uptrTLAS = std::move(_other.m_uptrTLAS);
 	this->vkAccelerationStructure = _other.vkAccelerationStructure;
 	_other.vkAccelerationStructure = VK_NULL_HANDLE;
 	_other.Uninit();
+}
+
+RayTracingAccelerationStructure& RayTracingAccelerationStructure::operator=(RayTracingAccelerationStructure&& _other) noexcept
+{
+	this->m_BLASInputs = std::move(_other.m_BLASInputs);
+	this->m_compactBLAS = std::move(_other.m_compactBLAS);
+	this->m_uptrBLASes = std::move(_other.m_uptrBLASes);
+	this->m_TLASInput = std::move(_other.m_TLASInput);
+	this->m_uptrTLAS = std::move(_other.m_uptrTLAS);
+	this->vkAccelerationStructure = _other.vkAccelerationStructure;
+	_other.vkAccelerationStructure = VK_NULL_HANDLE;
+	return *this;
 }
 
 RayTracingAccelerationStructure::~RayTracingAccelerationStructure()
@@ -583,6 +594,24 @@ uint32_t RayTracingAccelerationStructure::AddBLAS(const std::vector<TriangleData
     return uRet;
 }
 
+uint32_t RayTracingAccelerationStructure::AddBLAS(const std::vector<AABBData>& geomData, VkBuildAccelerationStructureFlagsKHR flags)
+{
+	uint32_t uRet = static_cast<uint32_t>(m_BLASInputs.size());
+	BLASInput blas{};
+
+	_FillBLASInput(geomData, blas);
+	blas.vkBuildFlags = flags;
+
+	if ((flags & VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR) != 0)
+	{
+		m_compactBLAS = true;
+	}
+
+	m_BLASInputs.push_back(blas);
+
+	return uRet;
+}
+
 void RayTracingAccelerationStructure::SetUpTLAS(const std::vector<InstanceData>& instData, VkBuildAccelerationStructureFlagsKHR flags)
 {	
 	_BuildBLASs();
@@ -594,20 +623,7 @@ void RayTracingAccelerationStructure::SetUpTLAS(const std::vector<InstanceData>&
 
 void RayTracingAccelerationStructure::Init()
 {
-	CommandSubmission tmpCmd{};
-	if (m_uptrTLAS.get() != nullptr)
-	{
-		m_uptrTLAS->Uninit();
-		m_uptrTLAS.reset();
-	}
-	m_uptrTLAS = std::make_unique<TLAS>();
-	tmpCmd.Init();
-	tmpCmd.StartOneTimeCommands({});
-	_BuildOrUpdateTLAS(m_TLASInput, m_uptrTLAS.get(), &tmpCmd);
-	tmpCmd.SubmitCommands();
-	this->vkAccelerationStructure = m_uptrTLAS->vkAccelerationStructure;
-	m_TLASInput.Reset();
-	//_BuildTLAS();
+	_BuildTLAS();
 }
 
 void RayTracingAccelerationStructure::UpdateBLAS(const std::vector<TriangleData>& _geomData, uint32_t _BLASIndex, CommandSubmission* _pCmd)

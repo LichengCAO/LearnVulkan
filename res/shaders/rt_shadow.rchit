@@ -28,7 +28,7 @@ layout(buffer_reference, scalar) buffer Indices {
 }; // Triangle indices
 
 hitAttributeEXT vec2 attribs; // Barycentric coordinates
-const vec3 posLight = vec3(2.0f, 1.0f, 5.0f); // Position of the light source
+const vec3 posLight = vec3(2.0f, 1.0f, 50.0f); // Position of the light source
 
 vec3 GetBarycentrics()
 {
@@ -55,7 +55,8 @@ vec3 GetRayHitPosition()
 
 void EmitShadowRay(in vec3 rayOrigin, in vec3 rayDirection)
 {
-    uint rayFlags = gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT | gl_RayFlagsCullBackFacingTrianglesEXT;
+    uint rayFlags = gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT | gl_RayFlagsSkipClosestHitShaderEXT;
+    // | gl_RayFlagsCullBackFacingTrianglesEXT;
     traceRayEXT(
         accelerationStructure,
         rayFlags,                   // Ray flags
@@ -92,8 +93,8 @@ void main()
     const vec3 nrmWorld = ObjectNormalToWorldNormal(nrmObject); // GetRayHitPosition() can also be used to get the world position, but is less precise
 
     vec3 wi = normalize(posLight - posWorld); // Vector from the hit position to the light source
-    payload.hitValue = vec3(clamp(dot(wi, nrmWorld), 0.0f, 1.0f)); // Convert to [0, 1] range for color output
+    payload.hitValue = vec3(clamp(dot(wi, nrmWorld), shadowValue, 1.0f)); // Convert to [0, 1] range for color output
     vec3 posShadowRay = posWorld + nrmWorld * 0.01f; // Offset the shadow ray origin slightly to avoid self-intersection
     EmitShadowRay(posShadowRay, wi);
-    if (bHitObject) payload.hitValue = vec3(0.0f, 0.0f, 0.0f); // If the shadow ray hit an object, set the hit value to black
+    if (bHitObject) payload.hitValue = vec3(shadowValue, shadowValue, shadowValue); // If the shadow ray hit an object, set the hit value to black
 }

@@ -5,10 +5,9 @@
 #extension GL_GOOGLE_include_directive : enable
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference2 : require
-#include "raycommon.glsl"
-#include "wavefront.glsl"
+#include "rt_common.glsl"
 
-layout(set = 1, binding = eImplicit, scalar) buffer allSpheres_
+layout(set = 0, binding = 4) buffer allSpheres_
 {
   vec4 allSpheres[];
 };
@@ -50,8 +49,8 @@ void main()
   // Sphere data
   vec4 sphere = allSpheres[gl_PrimitiveID];
   float tHit    = -1;
-  int   hitKind = gl_PrimitiveID % 2 == 0 ? KIND_SPHERE : KIND_CUBE;
-  if(hitKind == KIND_SPHERE)
+  int   hitKind = gl_PrimitiveID % 2;
+  if(hitKind == 0)
   {
     // Sphere intersection
     tHit = hitSphere(sphere, gl_WorldRayOriginEXT, gl_WorldRayDirectionEXT);

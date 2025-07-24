@@ -162,6 +162,7 @@ public:
 class RayTracingPipeline
 {
 private:
+	// https://www.willusher.io/graphics/2019/11/20/the-sbt-three-ways/
 	class ShaderBindingTable
 	{
 	private:
@@ -223,21 +224,20 @@ public:
 	uint32_t AddShader(const VkPipelineShaderStageCreateInfo& shaderInfo);
 	
 	void AddDescriptorSetLayout(VkDescriptorSetLayout vkDSetLayout);
+	
 	void AddPushConstant(VkShaderStageFlags _stages, uint32_t _size);
-
-	// https://www.willusher.io/graphics/2019/11/20/the-sbt-three-ways/
 	
 	// Set Ray Generation shader record in self shader binding table,
 	// return the index of this record in all ShaderRecords,
 	// i.e. index of element in pGroups of VkRayTracingPipelineCreateInfoKHR
 	uint32_t SetRayGenerationShaderRecord(uint32_t rayGen); 
 	
-	// Add Hit shader record in self shader binding table,
+	// Add Hit shader record in self shader binding table for triangle-based geometries,
 	// return the index of this record in all ShaderRecords,
 	// i.e. index of element in pGroups of VkRayTracingPipelineCreateInfoKHR
 	uint32_t AddTriangleHitShaderRecord(uint32_t closestHit, uint32_t anyHit = VK_SHADER_UNUSED_KHR);
 
-	// Add Hit shader record in self shader binding table,
+	// Add Hit shader record in self shader binding table for AABB geometries,
 	// return the index of this record in all ShaderRecords,
 	// i.e. index of element in pGroups of VkRayTracingPipelineCreateInfoKHR
 	uint32_t AddProceduralHitShaderRecord(uint32_t closestHit, uint32_t intersection, uint32_t anyHit = VK_SHADER_UNUSED_KHR);

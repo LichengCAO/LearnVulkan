@@ -17,3 +17,5 @@ struct Vertex
     vec4 position; // Position of the vertex in object space
     vec4 normal;   // Normal of the vertex in object space
 };
+
+const float shadowValue = 0.05f; // Default shadow value
