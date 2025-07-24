@@ -1,4 +1,4 @@
-#include "ray_tracing.h"
+#include "acceleration_structure.h"
 #include "device.h"
 #include "buffer.h"
 #include "commandbuffer.h"

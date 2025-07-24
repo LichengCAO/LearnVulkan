@@ -247,6 +247,11 @@ public:
 	// i.e. index of element in pGroups of VkRayTracingPipelineCreateInfoKHR
 	uint32_t AddMissShaderRecord(uint32_t miss);
 
+	// Add Callable shader record in self shader binding table,
+	// return the index of this record in all ShaderRecords,
+	// i.e. index of element in pGroups of VkRayTracingPipelineCreateInfoKHR
+	uint32_t AddCallableShaderRecord(uint32_t _callable);
+
 	void SetMaxRecursion(uint32_t maxRecur);
 
 	void Init();

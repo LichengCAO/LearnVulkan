@@ -199,6 +199,7 @@ void MyDevice::_SelectPhysicalDevice()
 	_AddBaseExtensionsAndFeatures(physicalDeviceSelector);
 	_AddMeshShaderExtensionsAndFeatures(physicalDeviceSelector);
 	_AddRayTracingExtensionsAndFeatures(physicalDeviceSelector);
+	_AddRayQueryExtensionsAndFeatures(physicalDeviceSelector);
 
 	// select device based on setting
 	{
@@ -461,6 +462,7 @@ void MyDevice::_AddRayTracingExtensionsAndFeatures(vkb::PhysicalDeviceSelector& 
 	vulkan12Featrues.runtimeDescriptorArray = VK_TRUE;
 	vulkan12Featrues.descriptorBindingVariableDescriptorCount = VK_TRUE;
 	vulkan12Featrues.hostQueryReset = VK_TRUE;
+
 	_selector.add_required_extensions(
 		{ 
 			VK_KHR_ACCELERATION_STRUCTURE_EXTENSION_NAME,
@@ -492,6 +494,16 @@ void MyDevice::_AddMeshShaderExtensionsAndFeatures(vkb::PhysicalDeviceSelector& 
 		});
 	_selector.add_required_extension_features(meshShaderFeatures);
 	_selector.add_required_extension_features(vulkan12Featrues);
+}
+
+void MyDevice::_AddRayQueryExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selector) const
+{
+	VkPhysicalDeviceRayQueryFeaturesKHR rayQueryFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_QUERY_FEATURES_KHR };
+
+	rayQueryFeatures.rayQuery = VK_TRUE;
+
+	_selector.add_required_extension(VK_KHR_RAY_QUERY_EXTENSION_NAME);
+	_selector.add_required_extension_features(rayQueryFeatures);
 }
 
 void MyDevice::_GetVkSwapchainImages(std::vector<VkImage>& _vkImages) const

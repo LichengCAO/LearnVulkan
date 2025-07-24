@@ -68,6 +68,7 @@ private:
 	void _AddBaseExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selector) const;
 	void _AddRayTracingExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selector) const;
 	void _AddMeshShaderExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selector) const;
+	void _AddRayQueryExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selector) const;
 
 	// get VkImages in current swapchain
 	void _GetVkSwapchainImages(std::vector<VkImage>& _vkImages) const;

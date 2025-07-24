@@ -561,6 +561,24 @@ uint32_t RayTracingPipeline::AddMissShaderRecord(uint32_t miss)
 	return uRet;
 }
 
+uint32_t RayTracingPipeline::AddCallableShaderRecord(uint32_t _callable)
+{
+	VkRayTracingShaderGroupCreateInfoKHR shaderRecord{ VK_STRUCTURE_TYPE_RAY_TRACING_SHADER_GROUP_CREATE_INFO_KHR };
+	uint32_t uRet = static_cast<uint32_t>(m_shaderRecords.size());
+
+	shaderRecord.pNext = nullptr;
+	shaderRecord.type = VK_RAY_TRACING_SHADER_GROUP_TYPE_GENERAL_KHR;
+	shaderRecord.generalShader = _callable;
+	shaderRecord.closestHitShader = VK_SHADER_UNUSED_KHR;
+	shaderRecord.anyHitShader = VK_SHADER_UNUSED_KHR;
+	shaderRecord.intersectionShader = VK_SHADER_UNUSED_KHR;
+	shaderRecord.pShaderGroupCaptureReplayHandle = nullptr;
+
+	m_shaderRecords.push_back(shaderRecord);
+	m_SBT.AddCallableRecord(uRet);
+	return uRet;
+}
+
 void RayTracingPipeline::SetMaxRecursion(uint32_t maxRecur)
 {
 	m_maxRayRecursionDepth = maxRecur;

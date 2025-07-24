@@ -14,8 +14,9 @@ class RayTracingAccelerationStructure final
 	// and we can use gl_PrimitiveID to get triangle hit of that model,
 	// but one BLAS holding multiple models is also allowed, 
 	// in that case, gl_PrimitiveID will be the offset plus the triangle ID in the hit model
-
-	// rules for update
+	// ===================
+	// UPDATE RULES£º
+	// ===================
 	// An update operation imposes certain constraints on the input, in exchange for considerably faster execution.When performing an update,
 	// the application is required to provide a full description of the acceleration structure, but is prohibited from changing anything other than instance definitions, transform matrices, 
 	// and vertex or AABB positions.All other aspects of the description must exactly match the one from the original build.
@@ -162,7 +163,6 @@ public:
 	RayTracingAccelerationStructure(const RayTracingAccelerationStructure& _other) = delete;
 	RayTracingAccelerationStructure& operator=(const RayTracingAccelerationStructure& _other) = delete;
 	RayTracingAccelerationStructure& operator=(RayTracingAccelerationStructure&& _other) noexcept;
-	
 	~RayTracingAccelerationStructure();
 
 	// Add a BLAS to this acceleration structure, 

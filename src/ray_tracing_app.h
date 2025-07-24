@@ -10,7 +10,7 @@
 #include "device.h"
 #include "transform.h"
 #include "utils.h"
-#include "ray_tracing.h"
+#include "acceleration_structure.h"
 
 class SwapchainPass;
 
