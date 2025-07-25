@@ -144,7 +144,8 @@ public:
 		GBUFFER_NORMAL,
 		GBUFFER_POSITION,
 		GBUFFER_ALBEDO,
-		GBUFFER_DEPTH 
+		GBUFFER_DEPTH,
+		COLOR_OUTPUT, //rgba32, shader read-only, clear on load
 	};
 	
 	struct Attachment

@@ -44,12 +44,15 @@ void RayQueryApp::_InitDescriptorSetLayouts()
 	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT); // camera info
 	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, VK_SHADER_STAGE_FRAGMENT_BIT); // AS
 	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT); // instance data
-	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT); // object model matrix
 	m_rtDSetLayout.Init();
+
+	m_modelDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT); // object model matrix
+	m_modelDSetLayout.Init();
 }
 
 void RayQueryApp::_UninitDescriptorSetLayouts()
 {
+	m_modelDSetLayout.Uninit();
 	m_rtDSetLayout.Uninit();
 }
 
@@ -137,14 +140,16 @@ void RayQueryApp::_InitBuffers()
 			indexBufferInfo.size = model.mesh.indices.size() * sizeof(uint32_t);
 			uptrIndexBuffer->Init(indexBufferInfo);
 
-			modelBufferInfo.size = sizeof(glm::mat4);
+			modelBufferInfo.size = sizeof(ObjectUBO);
 			uptrModelBuffer->Init(modelBufferInfo);
 
 			uptrVertexBuffer->CopyFromHost(vertData.data());
 			uptrIndexBuffer->CopyFromHost(model.mesh.indices.data());
 			{
-				auto transMat = model.transform.GetModelMatrix();
-				uptrModelBuffer->CopyFromHost(&transMat);
+				ObjectUBO ubo{};
+				ubo.model = model.transform.GetModelMatrix();
+				ubo.normalModel = model.transform.GetModelInverseTransposeMatrix();
+				uptrModelBuffer->CopyFromHost(&ubo);
 			}
 
 			m_vertexBuffers.push_back(std::move(uptrVertexBuffer));
@@ -270,8 +275,6 @@ void RayQueryApp::_UninitAS()
 
 void RayQueryApp::_InitImagesAndViews()
 {
-	m_vecColorImage.clear();
-	m_vecColorImage.reserve(MAX_FRAME_COUNT);
 	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 	{
 		std::unique_ptr<Image> uptrColorImage = std::make_unique<Image>();
@@ -314,7 +317,7 @@ void RayQueryApp::_InitImagesAndViews()
 
 		uptrDepthImage->SetImageInformation(depthImageInfo);
 		uptrDepthImage->Init();
-		uptrDepthView = std::make_unique<ImageView>(uptrDepthImage->NewImageView());
+		uptrDepthView = std::make_unique<ImageView>(uptrDepthImage->NewImageView(VK_IMAGE_ASPECT_DEPTH_BIT));
 		uptrDepthView->Init();
 
 		m_vecColorImageView.push_back(std::move(uptrColorView));
@@ -357,7 +360,7 @@ void RayQueryApp::_InitRenderPass()
 
 	m_uptrRenderPass = std::make_unique<RenderPass>();
 
-	m_uptrRenderPass->AddAttachment(RenderPass::AttachmentPreset::SWAPCHAIN);
+	m_uptrRenderPass->AddAttachment(RenderPass::AttachmentPreset::COLOR_OUTPUT);
 	m_uptrRenderPass->AddAttachment(RenderPass::AttachmentPreset::DEPTH);
 
 	subpass.AddColorAttachment(0);
@@ -384,6 +387,7 @@ void RayQueryApp::_InitFramebuffers()
 			m_vecDepthImageView[i].get(),
 		};
 		uptrFramebuffer = std::make_unique<Framebuffer>(m_uptrRenderPass->NewFramebuffer(vecRenderView));
+		uptrFramebuffer->Init();
 		m_vecFramebuffer.push_back(std::move(uptrFramebuffer));
 	}
 }
@@ -399,7 +403,7 @@ void RayQueryApp::_UninitFramebuffers()
 
 void RayQueryApp::_InitDescriptorSets()
 {
-	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
+	for (size_t i = 0; i < MAX_FRAME_COUNT; ++i)
 	{
 		std::unique_ptr<DescriptorSet> uptrDSet = std::make_unique<DescriptorSet>(m_rtDSetLayout.NewDescriptorSet());
 		VkDescriptorImageInfo imageInfo{};
@@ -417,10 +421,28 @@ void RayQueryApp::_InitDescriptorSets()
 
 		m_rtDSets.push_back(std::move(uptrDSet));
 	}
+
+	for (size_t i = 0; i < m_models.size(); ++i)
+	{
+		std::unique_ptr<DescriptorSet> uptrDSet = std::make_unique<DescriptorSet>(m_modelDSetLayout.NewDescriptorSet());
+
+		uptrDSet->Init();
+		uptrDSet->StartUpdate();
+		uptrDSet->UpdateBinding(0, m_modelBuffers[i].get());
+		uptrDSet->FinishUpdate();
+
+		m_modelDSets.push_back(std::move(uptrDSet));
+	}
 }
 
 void RayQueryApp::_UninitDescriptorSets()
 {
+	for (auto& uptrDSet : m_modelDSets)
+	{
+		uptrDSet.reset();
+	}
+	m_modelDSets.clear();
+
 	for (auto& uptrDSet : m_rtDSets)
 	{
 		uptrDSet.reset();
@@ -445,6 +467,7 @@ void RayQueryApp::_InitPipelines()
 	vertInputLayout.SetUpVertex(sizeof(VBO));
 
 	m_graphicPipeline.AddDescriptorSetLayout(m_rtDSetLayout.vkDescriptorSetLayout);
+	m_graphicPipeline.AddDescriptorSetLayout(m_modelDSetLayout.vkDescriptorSetLayout);
 	m_graphicPipeline.AddVertexInputLayout(&vertInputLayout);
 
 	m_graphicPipeline.AddShader(vertShader.GetShaderStageInfo());
@@ -584,44 +607,24 @@ void RayQueryApp::_DrawFrame()
 	cmd->WaitTillAvailable();
 	_UpdateUniformBuffer();
 	cmd->StartCommands({});
-
-	RayTracingAccelerationStructure::RecordPipelineBarrier(cmd.get());
-
-	// transfer image to general and fill it with zero
+	cmd->StartRenderPass(m_uptrRenderPass.get(), m_vecFramebuffer[m_currentFrame].get());
+	
 	{
-		m_vecColorImage[m_currentFrame]->ChangeLayoutAndFill(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, clearColor, cmd.get());
-		auto barrier2 = barrierBuilder.NewBarrier(
-			m_vecColorImage[m_currentFrame]->vkImage,
-			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
-			VK_IMAGE_LAYOUT_GENERAL,
-			VK_ACCESS_TRANSFER_WRITE_BIT,
-			VK_ACCESS_SHADER_WRITE_BIT);
-		cmd->AddPipelineBarrier(VK_PIPELINE_STAGE_TRANSFER_BIT, VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, { barrier2 });
+		GraphicsPipeline::PipelineInput_DrawIndexed input{};
+
+		input.imageSize = m_vecFramebuffer[m_currentFrame]->GetImageSize();
+		input.vkIndexType = VK_INDEX_TYPE_UINT32;
+		for (size_t i = 0; i < m_models.size(); ++i)
+		{
+			input.indexBuffer = m_indexBuffers[i]->vkBuffer;
+			input.indexCount = static_cast<uint32_t>(m_models[i].mesh.indices.size());
+			input.vertexBuffers = { m_vertexBuffers[i]->vkBuffer };
+			input.vkDescriptorSets = { m_rtDSets[m_currentFrame]->vkDescriptorSet, m_modelDSets[i]->vkDescriptorSet };
+			m_graphicPipeline.Do(cmd->vkCommandBuffer, input);
+		}
 	}
 
-	// run ray tracing pipeline
-	pipelineInput.imageSize = MyDevice::GetInstance().GetSwapchainExtent();
-	for (size_t i = 0; i < m_models.size(); ++i)
-	{
-		pipelineInput.indexBuffer = m_indexBuffers[i]->vkBuffer;
-		pipelineInput.indexCount = m_indexBuffers[i]->GetBufferInformation().size / sizeof(uint32_t);
-		pipelineInput.vertexBuffers = { m_vertexBuffers[i]->vkBuffer };
-	}
-	pipelineInput.vkDescriptorSets = { m_rtDSets[m_currentFrame]->vkDescriptorSet };
-	pipelineInput.vkIndexType = VK_INDEX_TYPE_UINT32;
-	m_graphicPipeline.Do(cmd->vkCommandBuffer, pipelineInput);
-
-	// transfer image to shader read only
-	{
-		auto barrier = barrierBuilder.NewBarrier(
-			m_vecColorImage[m_currentFrame]->vkImage,
-			VK_IMAGE_LAYOUT_GENERAL,
-			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
-			VK_ACCESS_SHADER_WRITE_BIT,
-			VK_ACCESS_SHADER_READ_BIT);
-		cmd->AddPipelineBarrier(VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, { barrier });
-	}
-
+	cmd->EndRenderPass();
 	scPassWait.waitSamaphore = cmd->SubmitCommands();
 	scPassWait.waitStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 	m_swapchainPass->Do({ scPassWait });

@@ -1676,7 +1676,6 @@ void TransparentApp::_UpdateUniformBuffer()
 	CameraUBO ubo{};
 	VkExtent2D swapchainExtent = MyDevice::GetInstance().GetSwapchainExtent();
 	ubo.proj = m_camera.GetProjectionMatrix();
-	ubo.proj[1][1] *= -1;
 	ubo.view = m_camera.GetViewMatrix();
 	ubo.eye = glm::vec4(m_camera.eye, 1.0f);
 	m_cameraBuffers[m_currentFrame].CopyFromHost(&ubo);

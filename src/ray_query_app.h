@@ -29,6 +29,7 @@ private:
 	struct ObjectUBO
 	{
 		glm::mat4 model;
+		glm::mat4 normalModel;
 	};
 	struct CameraUBO
 	{
@@ -53,6 +54,10 @@ private:
 	// Descriptor set count: MAX_FRAME_COUNT
 	DescriptorSetLayout m_rtDSetLayout;
 	std::vector<std::unique_ptr<DescriptorSet>> m_rtDSets;
+
+	// Descriptor set count: number of models
+	DescriptorSetLayout m_modelDSetLayout;
+	std::vector<std::unique_ptr<DescriptorSet>> m_modelDSets;
 
 	// cameraUBO changes across frames, i create buffers for each frame
 	std::vector<std::unique_ptr<Buffer>> m_cameraBuffers;

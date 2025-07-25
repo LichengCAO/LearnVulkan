@@ -1,9 +1,10 @@
 #include "meshlet_app.h"
 #include "transparent_app.h"
 #include "ray_tracing_app.h"
+#include "ray_query_app.h"
 int main() {
 	//RayTracingApp app;
-	RayTracingThousandsApp app;
+	RayQueryApp app;
 	//MeshletApp app;
 	app.Run(); // easier to debug this way
 	//try {

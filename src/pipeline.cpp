@@ -342,7 +342,8 @@ void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput_Dra
 	}
 	else
 	{
-		vkCmdBindVertexBuffers(commandBuffer, 0, static_cast<uint32_t>(input.vertexBuffers.size()), input.vertexBuffers.data(), nullptr);
+		std::vector<VkDeviceSize> vecDummyOffset(input.vertexBuffers.size(), 0);
+		vkCmdBindVertexBuffers(commandBuffer, 0, static_cast<uint32_t>(input.vertexBuffers.size()), input.vertexBuffers.data(), vecDummyOffset.data());
 	}
 
 	if (input.optIndexBufferOffset.has_value())
