@@ -16,6 +16,7 @@ set(EXT_LIBS
     meshoptimizer
     volk
     GPUOpen::VulkanMemoryAllocator
+    tinygltf
 )
 #add directories by their names on current computer
 add_subdirectory(GLFW)
@@ -25,6 +26,7 @@ add_subdirectory(vk-bootstrap)
 add_subdirectory(meshoptimizer)
 add_subdirectory(volk)
 add_subdirectory(vma)
+add_subdirectory(tinygltf)
 add_library(ExternalLibs INTERFACE)
 target_link_libraries(ExternalLibs INTERFACE ${EXT_LIBS})
 target_include_directories(ExternalLibs INTERFACE ${INCLUDE_DIRS}) 

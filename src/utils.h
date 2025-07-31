@@ -3,6 +3,7 @@
 #include "transform.h"
 #include <tiny_obj_loader.h>
 
+
 struct Mesh
 {
 	std::vector<Vertex> verts;
@@ -60,6 +61,18 @@ public:
 		std::vector<uint32_t>& outMeshletVertices,
 		std::vector<uint8_t>& outMeshletTriangles
 	);
+};
+
+struct GLTFScene
+{
+	std::vector<Mesh> meshes;
+	std::vector<glm::mat4> modelMatrices;
+};
+
+class SceneUtility
+{
+public:
+	static bool Load(const std::string& _glTFFile, GLTFScene& _outScene);
 };
 
 namespace CommonUtils
