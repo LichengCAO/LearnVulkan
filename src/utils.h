@@ -2,8 +2,8 @@
 #include "geometry.h"
 #include "transform.h"
 #include <tiny_obj_loader.h>
-
-
+#include <variant>
+#include "material.h"
 struct Mesh
 {
 	std::vector<Vertex> verts;
@@ -67,6 +67,7 @@ struct GLTFScene
 {
 	std::vector<Mesh> meshes;
 	std::vector<glm::mat4> modelMatrices;
+	std::vector<Material> materials;
 };
 
 class SceneUtility

@@ -1,6 +1,7 @@
 #include "utils.h"
 #include <meshoptimizer.h>
 #include <tiny_gltf.h>
+#include <numeric>
 #include "transform.h"
 
 bool MeshUtility::Load(const std::string& objFile, std::vector<Mesh>& outMesh)

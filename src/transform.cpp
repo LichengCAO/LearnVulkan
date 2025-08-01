@@ -38,6 +38,10 @@ void Transform::SetScale(const glm::vec3& i) {
 	m_needUpdate = true;
 }
 glm::mat4 Transform::GetModelMatrix()const {
+	if (!m_needUpdate)
+	{
+		return m_modelMat;
+	}
 	glm::mat4 ret;
 	glm::mat4 ret2;
 	_ComputeModelMatrix(ret, ret2);
@@ -53,6 +57,10 @@ glm::mat4 Transform::GetModelMatrix()
 	return m_modelMat;
 }
 glm::mat4 Transform::GetModelInverseTransposeMatrix()const {
+	if (!m_needUpdate)
+	{
+		return m_modelMatInvTr;
+	}
 	glm::mat4 ret;
 	glm::mat4 ret2;
 	_ComputeModelMatrix(ret, ret2);
