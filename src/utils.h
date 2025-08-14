@@ -3,7 +3,6 @@
 #include "transform.h"
 #include <tiny_obj_loader.h>
 #include <variant>
-#include "material.h"
 struct Mesh
 {
 	std::vector<Vertex> verts;
@@ -40,8 +39,8 @@ private:
 		const Mesh& inMesh,
 		const Meshlet& inMeshlet,
 		const std::vector<uint32_t>& inMeshletVertices,
-		const std::vector<uint8_t>& inMeshletTriangles
-	);
+		const std::vector<uint8_t>& inMeshletTriangles);
+
 public:
 	static bool Load(const std::string& objFile, std::vector<Mesh>& outMesh);
 	/*
@@ -52,28 +51,14 @@ public:
 		const Mesh& inMesh,
 		std::vector<Meshlet>& outMeshlets,
 		std::vector<uint32_t>& outMeshletVertices,
-		std::vector<uint8_t>& outMeshletTriangles
-	);
+		std::vector<uint8_t>& outMeshletTriangles);
+
 	static void BuildMeshlets(
 		const Mesh& inMesh,
 		std::vector<Meshlet>& outMeshlets,
 		std::vector<MeshletBounds>& outMeshletBounds,
 		std::vector<uint32_t>& outMeshletVertices,
-		std::vector<uint8_t>& outMeshletTriangles
-	);
-};
-
-struct GLTFScene
-{
-	std::vector<Mesh> meshes;
-	std::vector<glm::mat4> modelMatrices;
-	std::vector<Material> materials;
-};
-
-class SceneUtility
-{
-public:
-	static bool Load(const std::string& _glTFFile, GLTFScene& _outScene);
+		std::vector<uint8_t>& outMeshletTriangles);
 };
 
 namespace CommonUtils

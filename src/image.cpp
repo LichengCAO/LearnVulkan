@@ -3,9 +3,9 @@
 #include "buffer.h"
 #include "commandbuffer.h"
 #include "memory_allocator.h"
-#ifndef STB_IMAGE_IMPLEMENTATION
-#define STB_IMAGE_IMPLEMENTATION
-#endif
+//#ifndef STB_IMAGE_IMPLEMENTATION
+//#define STB_IMAGE_IMPLEMENTATION
+//#endif defined in tinyglTF
 #include "stb_image.h"
 
 Image::~Image()

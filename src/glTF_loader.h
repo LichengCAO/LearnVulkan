@@ -10,17 +10,18 @@ private:
 	struct Node : public ComponentManager
 	{
 		Node* pParent;
-		std::vector<Node*> children;
+		std::vector<Node*> pChildren;
 	};
 
 	struct Camera : public Component
 	{
 		COMPONENT_DECLARATION;
+		// TODO
 	};
 
 	struct Material
 	{
-
+		// TODO
 	};
 
 	struct Primitive
@@ -41,7 +42,6 @@ private:
 	struct Transform : public Component
 	{
 		COMPONENT_DECLARATION;
-	private:
 		struct SplitTransform
 		{
 			glm::vec3 translation;
@@ -49,16 +49,15 @@ private:
 			glm::vec3 scale;
 		};
 
-	private:
 		std::variant<glm::mat4, SplitTransform> m_transform;
 
-	public:
-		glm::mat4 GetModelMatrix();
+		glm::mat4 GetModelMatrix() const;
 	};
 
 	struct Animation : public Component
 	{
 		COMPONENT_DECLARATION;
+		// TODO
 	};
 
 	struct Scene
@@ -76,8 +75,15 @@ private:
 	template<class DataType>
 	static void _LoadAccessor(const tinygltf::Model& _root, const tinygltf::Accessor& _accessor, std::vector<DataType>& _outVec);
 
+	static void _LoadMesh(const tinygltf::Model& _root, const tinygltf::Mesh& _mesh, glTFContent::Mesh& _outMesh);
+
+	void _LoadNodes(const tinygltf::Model& _root);
+
+	void _LoadScene(const tinygltf::Model& _root);
+
 public:
 	void Load(const std::string& _glTFPath);
+
 };
 
 template<class DataType>
