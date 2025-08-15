@@ -1,6 +1,5 @@
 #pragma once
 #include "common.h"
-#include "spirv_reflect.h"
 class Binder
 {
 	void StartBind();
@@ -18,3 +17,19 @@ class Pass
 	void Run();
 };
 
+class SpirvReflector
+{
+private:
+
+
+public:
+	struct ReflectDescriptorSet
+	{
+		uint32_t uSetIndex = ~0;
+		std::vector<VkDescriptorSetLayoutBinding> bindings;
+	};
+
+public:
+	void ReflectSpirv(const std::string& _path);
+
+};
