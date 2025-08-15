@@ -191,8 +191,7 @@ void Image::CopyFromBuffer(const Buffer& stagingBuffer)
 		stagingBuffer.vkBuffer,
 		vkImage,
 		_GetImageLayout(),
-		{ region }
-	);
+		{ region });
 
 	cmdSubmit.SubmitCommands();
 }

@@ -41,6 +41,6 @@ add_executable(${CMAKE_PROJECT_NAME} ${SOURCES} ${HEADERS})
 
 add_subdirectory(external)
 add_subdirectory(res)
-
+set_target_properties(ExternalLibs PROPERTIES FOLDER "ThirdParty")
 target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC ExternalLibs)
 

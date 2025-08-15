@@ -22,3 +22,6 @@
 [submodule "external/tinygltf"]
 	path = external/tinygltf
 	url = https://github.com/syoyo/tinygltf.git
+[submodule "external/spirv_reflect"]
+	path = external/spirv_reflect
+	url = https://github.com/KhronosGroup/SPIRV-Reflect.git
