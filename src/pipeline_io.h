@@ -19,7 +19,18 @@ public:
 	~DescriptorSetLayout();
 
 public:
-	uint32_t AddBinding(uint32_t descriptorCount, VkDescriptorType descriptorType, VkShaderStageFlags stageFlags, const VkSampler* pImmutableSamplers = nullptr);
+	uint32_t AddBinding(
+		uint32_t descriptorCount, 
+		VkDescriptorType descriptorType,
+		VkShaderStageFlags stageFlags, 
+		const VkSampler* pImmutableSamplers = nullptr);
+
+	uint32_t AddBinding(
+		uint32_t binding, 
+		uint32_t descriptorCount, 
+		VkDescriptorType descriptorType, 
+		VkShaderStageFlags stageFlags, 
+		const VkSampler* pImmutableSamplers = nullptr);
 	
 	void Init();
 	

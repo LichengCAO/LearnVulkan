@@ -139,20 +139,37 @@ DescriptorSetLayout::~DescriptorSetLayout()
 	assert(vkDescriptorSetLayout == VK_NULL_HANDLE);
 }
 
-uint32_t DescriptorSetLayout::AddBinding(uint32_t descriptorCount, VkDescriptorType descriptorType, VkShaderStageFlags stageFlags, const VkSampler* pImmutableSamplers)
+uint32_t DescriptorSetLayout::AddBinding(
+	uint32_t descriptorCount, 
+	VkDescriptorType descriptorType, 
+	VkShaderStageFlags stageFlags, 
+	const VkSampler* pImmutableSamplers)
+{
+	uint32_t binding = static_cast<uint32_t>(bindings.size());
+
+	return AddBinding(binding, descriptorType, stageFlags, pImmutableSamplers);
+}
+
+uint32_t DescriptorSetLayout::AddBinding(
+	uint32_t binding, 
+	uint32_t descriptorCount, 
+	VkDescriptorType descriptorType, 
+	VkShaderStageFlags stageFlags, 
+	const VkSampler* pImmutableSamplers)
 {
 	VkDescriptorSetLayoutBinding layoutBinding{};
-	uint32_t binding = static_cast<uint32_t>(bindings.size());
 
 	layoutBinding.binding = binding;
 	layoutBinding.descriptorCount = descriptorCount;
 	layoutBinding.descriptorType = descriptorType;
 	layoutBinding.pImmutableSamplers = pImmutableSamplers;
 	layoutBinding.stageFlags = stageFlags;
-	
+
 	bindings.push_back(layoutBinding);
+
 	return binding;
 }
+
 void DescriptorSetLayout::Init()
 {
 	CHECK_TRUE(bindings.size() != 0, "No bindings set!");
