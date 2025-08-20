@@ -185,7 +185,7 @@ PersCamera::PersCamera(const PersCamera& c) :
 {}
 glm::mat4 PersCamera::GetProjectionMatrix()const {
     auto ret = glm::perspective(glm::radians(fovy), float(width) / float(height), near_clip, far_clip);
-	ret[1][1] *= -1;
+	//ret[1][1] *= -1;
 	return ret;
 }
 void PersCamera::RecomputeAttributes() {

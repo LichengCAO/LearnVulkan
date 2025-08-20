@@ -11,6 +11,7 @@
 #include <volk.h>
 #define GLM_FORCE_RADIANS
 #define GLM_FORCE_DEPTH_ZERO_TO_ONE
+
 #include <GLFW/glfw3.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/quaternion.hpp>
@@ -39,3 +40,5 @@ if(!(condition)){\
 failedMessage);\
 }\
 }while(0)
+
+#define COMPARE_BITS(a, bits) (((a) & (bits)) == (bits)) 

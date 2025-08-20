@@ -3,9 +3,10 @@
 #include "ray_tracing_app.h"
 #include "ray_query_app.h"
 int main() {
+	//RayQueryApp app;
 	//RayTracingApp app;
-	RayQueryApp app;
-	//MeshletApp app;
+	//RayTracingThousandsApp app;
+	MeshletApp app;
 	app.Run(); // easier to debug this way
 	//try {
 	//	app.Run();

@@ -1,3 +1,9 @@
+#set builld option for 3rd party
+set(TINYGLTF_BUILD_LOADER_EXAMPLE OFF)
+set(TINYGLTF_INSTALL OFF)
+set(SPIRV_REFLECT_STATIC_LIB ON)
+set(SPIRV_REFLECT_EXECUTABLE OFF)
+
 #find_package(Vulkan REQUIRED)
 set(GLM_INCLUDE_DIR "./glm")
 set(GLFW_INCLUDE_DIR "./glfw/include")
@@ -11,6 +17,7 @@ set(INCLUDE_DIRS
     ${TINY_OBJ_INCLUDE_DIR}
     ${SPIRV_REFLECT_INCLUDE_DIR}
 )
+
 set(EXT_LIBS
     glfw
     glm
@@ -20,10 +27,9 @@ set(EXT_LIBS
     volk
     VulkanMemoryAllocator
     tinygltf
-    spirv-reflect
-    spirv-reflect-pp
-    loader_example
+    spirv-reflect-static
 )
+
 #add directories by their names on current computer
 add_subdirectory(GLFW)
 add_subdirectory(glm)

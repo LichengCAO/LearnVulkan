@@ -85,8 +85,8 @@ void RayTracingApp::_InitModels()
 	m_models[1 + 1].transform.SetPosition(6, 0, 1);
 	m_models[2 + 1].transform.SetPosition(0, 0, -2);
 
-	m_models[0 + 1].transform.SetRotation(90, 0, 180);
-	m_models[1 + 1].transform.SetRotation(90, 0, 180);
+	m_models[0 + 1].transform.SetRotation(90, 0, 0);
+	m_models[1 + 1].transform.SetRotation(90, 0, 0);
 	m_models[2 + 1].transform.SetRotation(0, 0, 90);
 }
 
