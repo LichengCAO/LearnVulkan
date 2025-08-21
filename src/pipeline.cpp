@@ -401,8 +401,13 @@ void ComputePipeline::AddShader(const VkPipelineShaderStageCreateInfo& shaderInf
 
 void ComputePipeline::AddDescriptorSetLayout(const DescriptorSetLayout* pSetLayout)
 {
+	AddDescriptorSetLayout(pSetLayout->vkDescriptorSetLayout);
+}
+
+void ComputePipeline::AddDescriptorSetLayout(VkDescriptorSetLayout _vkLayout)
+{
 	assert(vkPipeline == VK_NULL_HANDLE);
-	m_descriptorSetLayouts.push_back(pSetLayout->vkDescriptorSetLayout);
+	m_descriptorSetLayouts.push_back(_vkLayout);
 }
 
 void ComputePipeline::Init()

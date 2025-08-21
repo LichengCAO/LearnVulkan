@@ -224,3 +224,16 @@ MeshletBounds MeshUtility::_ComputeMeshletBounds(
 	meshletBounds.coneCutoff = bounds.cone_cutoff;
 	return meshletBounds;
 }
+
+void CommonUtils::ReadFile(const std::string& _filePath, std::vector<uint8_t>& _output)
+{
+	std::ifstream file(_filePath, std::ios::ate | std::ios::binary);
+
+	CHECK_TRUE(file.is_open(), "Failed to open file!");
+
+	size_t fileSize = (size_t)file.tellg();
+	_output.resize(fileSize);
+	file.seekg(0);
+	file.read(reinterpret_cast<char*>(_output.data()), fileSize);
+	file.close();
+}

@@ -157,6 +157,7 @@ public:
 
 	void AddShader(const VkPipelineShaderStageCreateInfo& shaderInfo);
 	void AddDescriptorSetLayout(const DescriptorSetLayout* pSetLayout);
+	void AddDescriptorSetLayout(VkDescriptorSetLayout _vkLayout);
 	void AddPushConstant(VkShaderStageFlags _stages, uint32_t _size);
 
 	void Init();
