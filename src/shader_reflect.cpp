@@ -68,11 +68,11 @@ namespace
 	// reflect descriptor set layout based on shaders of a pipeline
 	// _shaderPaths: paths of all shader files of a pipeline,
 	// _mapSetBinding: output, maps descriptor name to {set, binding}
-	// _uptrDescriptorSetLayouts: output, stores layout in order, i.e. set0, set1, ...
+	// _descriptorSetData: output, stores layout information in order, i.e. set0, set1, ...
 	void _ReflectDescriptorSet(
 		const std::vector<std::string>& _shaderPaths,
 		std::unordered_map<std::string, std::pair<uint32_t, uint32_t>>& _mapSetBinding,
-		std::vector<std::unique_ptr<DescriptorSetLayout>>& _uptrDescriptorSetLayouts)
+		std::vector<std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding>>& _descriptorSetData)
 	{
 		std::unordered_map<uint32_t, DescriptorSetLayoutData> mapDescriptorSets;
 
@@ -193,10 +193,10 @@ namespace
 			if (setCount == 0) return;
 
 			// update _uptrDescriptorSetLayouts, _mapSetBinding
-			_uptrDescriptorSetLayouts.reserve(static_cast<size_t>(uMaxSet + 1));
+			_descriptorSetData.reserve(static_cast<size_t>(uMaxSet + 1));
 			for (uint32_t uSetId = 0u; uSetId <= uMaxSet; ++uSetId)
 			{
-				std::unique_ptr<DescriptorSetLayout> uptrDescriptorSetLayout = std::make_unique<DescriptorSetLayout>();
+				std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding> curSet{};
 
 				// fill descriptor setting in the layout and then initialize layout
 				if (mapDescriptorSets.find(uSetId) != mapDescriptorSets.end())
@@ -207,12 +207,37 @@ namespace
 						const auto& vkInfo = descriptorData.bindings[i];
 						const auto& strDescriptorName = descriptorData.names[i];
 
-						uptrDescriptorSetLayout->AddBinding(vkInfo.binding, vkInfo.descriptorCount, vkInfo.descriptorType, vkInfo.stageFlags, vkInfo.pImmutableSamplers);
+						curSet.insert({ vkInfo.binding, vkInfo });
 						_mapSetBinding[strDescriptorName] = { uSetId, vkInfo.binding };
 					}
-					uptrDescriptorSetLayout->Init();
 				}
-				_uptrDescriptorSetLayouts.push_back(std::move(uptrDescriptorSetLayout));
+
+				_descriptorSetData.push_back(std::move(curSet));
+			}
+		}
+
+		//print info for debug
+		{
+			static const std::string& strIndent = "\t";
+			for (const auto& mapPair : mapDescriptorSets)
+			{
+				uint32_t setId = mapPair.first;
+				const auto& setData = mapPair.second;
+				std::cout << "set: " << setId << std::endl;
+				for (size_t i = 0; i < setData.bindings.size(); ++i)
+				{
+					const auto& vkBinding = setData.bindings[i];
+					std::cout << strIndent << "binding name: " << setData.names[i] << std::endl;
+					std::cout << strIndent << "location: " << vkBinding.binding << std::endl;
+					std::cout << strIndent << "descriptor count: " << vkBinding.descriptorCount << std::endl;
+					std::cout << strIndent << "descriptor type: ";
+					_PrintDescriptorType(std::cout, vkBinding.descriptorType);
+					std::cout << std::endl;
+					std::cout << strIndent << "stage: ";
+					_PrintStage(std::cout, vkBinding.stageFlags);
+					std::cout << "\r\n\r\n";
+				}
+				std::cout << std::endl;
 			}
 		}
 	}
@@ -393,4 +418,21 @@ void ComputePipelineProgram::_ReflectPipeline()
 		uptrSimpleShader.reset();
 	}
 	uptrSimpleShaders.clear();
+}
+
+void ComputePipelineProgram::_InitDescriptorSets()
+{
+	for (uint32_t i = 0; i < m_uFrameInFlightCount; ++i)
+	{
+		for (size_t setId = 0; setId < m_vkDescriptorSetBindingInfo.size(); ++setId)
+		{
+			const auto& bindings = m_vkDescriptorSetBindingInfo[setId];
+			
+			for (const auto& binding : bindings)
+			{
+				uint32_t bindingId = binding.first;
+				const VkDescriptorSetLayoutBinding& vkBinding = binding.second;
+			}
+		}
+	}
 }
