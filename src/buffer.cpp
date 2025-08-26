@@ -2,6 +2,7 @@
 #include "device.h"
 #include "commandbuffer.h"
 #include "memory_allocator.h"
+#include "utils.h"
 
 //uint32_t Buffer::_FindMemoryTypeIndex(uint32_t typeBits, VkMemoryPropertyFlags properties) const
 //{
@@ -268,4 +269,70 @@ void BufferView::Uninit()
 		vkBufferView = VK_NULL_HANDLE;
 	}
 	pBuffer = nullptr;
+}
+
+void BufferBuilder::SetBufferUsage(VkBufferUsageFlags _flags)
+{
+	m_vkUsageSetting = _flags;
+}
+
+void BufferBuilder::SetBufferSharingMode(VkSharingMode _mode)
+{
+	m_vkSharingModeSetting = _mode;
+}
+
+void BufferBuilder::SetBufferMemoryProperty(VkMemoryPropertyFlags _property)
+{
+	m_vkMemoryPropertySetting = _property;
+}
+
+void BufferBuilder::SetBufferAlignment(VkDeviceSize _alignment)
+{
+	m_vkAlignmentSetting = _alignment;
+}
+
+void BufferBuilder::StartBuild()
+{
+	m_uBufferSize = 0u;
+	m_vecHostData.clear();
+}
+
+VkDeviceSize BufferBuilder::AppendToBuffer(const void* _pData, size_t _size, VkDeviceSize _alignment)
+{
+	VkDeviceSize currentOffset = CommonUtils::AlignUp(m_uBufferSize, _alignment);
+	HostData hostData{};
+	
+	m_uBufferSize += _size;
+	hostData.dataSize = _size;
+	hostData.offset = currentOffset;
+	hostData.pData = _pData;
+
+	m_vecHostData.push_back(hostData);
+
+	return currentOffset;
+}
+
+void BufferBuilder::FinishBuild(Buffer*& _initedBuffer)
+{
+	std::vector<uint8_t> dataToCopy(m_uBufferSize);
+	Buffer::Information bufferInfo{};
+
+	_initedBuffer = new Buffer();
+
+	for (const auto& _data : m_vecHostData)
+	{
+		memcpy(dataToCopy.data() + _data.offset, _data.pData, _data.dataSize);
+	}
+
+	bufferInfo.memoryProperty = m_vkMemoryPropertySetting;
+	if (m_vkAlignmentSetting != 0)
+	{
+		bufferInfo.optAlignment = m_vkAlignmentSetting;
+	}
+	bufferInfo.sharingMode = m_vkSharingModeSetting;
+	bufferInfo.size = m_uBufferSize;
+	bufferInfo.usage = m_vkUsageSetting;
+
+	_initedBuffer->Init(bufferInfo);
+	_initedBuffer->CopyFromHost(dataToCopy.data());
 }

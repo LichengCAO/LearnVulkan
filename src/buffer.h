@@ -96,6 +96,45 @@ public:
 	friend class Buffer;
 };
 
+class BufferBuilder
+{
+private:
+	struct HostData
+	{
+		VkDeviceSize offset = 0u;
+		const void* pData = nullptr;
+		size_t dataSize = 0u;
+	};
+
+private:
+	VkBufferUsageFlags		m_vkUsageSetting = 0;
+	VkSharingMode			m_vkSharingModeSetting = VK_SHARING_MODE_EXCLUSIVE;
+	VkMemoryPropertyFlags	m_vkMemoryPropertySetting = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	VkDeviceSize			m_vkAlignmentSetting = 0;
+
+	VkDeviceSize			m_uBufferSize = 0u;
+	std::vector<HostData>	m_vecHostData;
+
+public:
+	// optional
+	void SetBufferUsage(VkBufferUsageFlags _flags);
+
+	// optional
+	void SetBufferSharingMode(VkSharingMode _mode);
+
+	// optional
+	void SetBufferMemoryProperty(VkMemoryPropertyFlags _property);
+
+	// optional
+	void SetBufferAlignment(VkDeviceSize _alignment);
+
+	void StartBuild();
+
+	VkDeviceSize AppendToBuffer(const void* _pData, size_t _size, VkDeviceSize _alignment = 0);
+
+	void FinishBuild(Buffer*& _initedBuffer);
+};
+
 //Resource Type :
 //
 //Storage Texel Buffer : Operates on buffer resources; ideal for 1D data that can benefit from format interpretation(e.g., integer or floating - point conversion).
