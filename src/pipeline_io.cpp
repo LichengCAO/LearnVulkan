@@ -41,21 +41,27 @@ void DescriptorSet::UpdateBinding(uint32_t bindingId, const Buffer* pBuffer)
 	newUpdate.descriptorType = DescriptorType::BUFFER;
 	m_updates.push_back(newUpdate);
 }
-void DescriptorSet::UpdateBinding(uint32_t bindingId, const VkDescriptorImageInfo& dImageInfo)
+void DescriptorSet::UpdateBinding(uint32_t bindingId, const std::vector<VkDescriptorImageInfo>& dImageInfo)
 {
 	DescriptorSetUpdate newUpdate{};
 	newUpdate.binding = bindingId;
-	newUpdate.imageInfos = { dImageInfo };
+	newUpdate.imageInfos = dImageInfo;
 	newUpdate.descriptorType = DescriptorType::IMAGE;
 	m_updates.push_back(newUpdate);
 }
 void DescriptorSet::UpdateBinding(uint32_t bindingId, const BufferView* pBufferView)
 {
-	DescriptorSetUpdate newUpdate{};
 	VkBufferView bufferView{};
+	
 	bufferView = pBufferView->vkBufferView;
+	UpdateBinding(bindingId, { bufferView });
+}
+void DescriptorSet::UpdateBinding(uint32_t bindingId, const std::vector<VkBufferView>& bufferViews)
+{
+	DescriptorSetUpdate newUpdate{};
+	
 	newUpdate.binding = bindingId;
-	newUpdate.bufferViews = { bufferView };
+	newUpdate.bufferViews = bufferViews;
 	newUpdate.descriptorType = DescriptorType::TEXEL_BUFFER;
 	m_updates.push_back(newUpdate);
 }
@@ -189,6 +195,12 @@ DescriptorSet DescriptorSetLayout::NewDescriptorSet() const
 	DescriptorSet result{};
 	result.SetLayout(this);
 	return result;
+}
+DescriptorSet* DescriptorSetLayout::NewDescriptorSetPointer() const
+{
+	DescriptorSet* pDescriptor = new DescriptorSet();
+	pDescriptor->SetLayout(this);
+	return pDescriptor;
 }
 void DescriptorSetLayout::Uninit()
 {

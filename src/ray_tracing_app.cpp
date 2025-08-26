@@ -344,7 +344,7 @@ void RayTracingApp::_InitDescriptorSets()
 		uptrDSet->StartUpdate();
 		uptrDSet->UpdateBinding(0, m_cameraBuffers[i].get());
 		uptrDSet->UpdateBinding(1, { m_rtAccelStruct[i].vkAccelerationStructure });
-		uptrDSet->UpdateBinding(2, imageInfo);
+		uptrDSet->UpdateBinding(2, { imageInfo });
 		uptrDSet->UpdateBinding(3, m_instanceBuffer[i].get());
 		uptrDSet->FinishUpdate();
 
@@ -997,7 +997,7 @@ void RayTracingThousandsApp::_InitDescriptorSets()
 		uptrDSet->StartUpdate();
 		uptrDSet->UpdateBinding(0, m_cameraBuffers[i].get());
 		uptrDSet->UpdateBinding(1, { m_rtAccelStruct[i].vkAccelerationStructure });
-		uptrDSet->UpdateBinding(2, imageInfo);
+		uptrDSet->UpdateBinding(2, { imageInfo });
 		uptrDSet->UpdateBinding(3, m_instanceBuffer[i].get());
 		uptrDSet->FinishUpdate();
 
@@ -1614,7 +1614,7 @@ void RayTracingAABBsApp::_InitDescriptorSets()
 		uptrDSet->StartUpdate();
 		uptrDSet->UpdateBinding(0, m_cameraBuffers[i].get());
 		uptrDSet->UpdateBinding(1, { m_rtAccelStruct.vkAccelerationStructure });
-		uptrDSet->UpdateBinding(2, imageInfo);
+		uptrDSet->UpdateBinding(2, { imageInfo });
 		uptrDSet->UpdateBinding(3, m_instanceBuffer.get());
 		uptrDSet->UpdateBinding(4, m_spheresBuffer.get());
 		uptrDSet->FinishUpdate();

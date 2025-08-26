@@ -1005,8 +1005,8 @@ void TransparentApp::_InitDescriptorSets()
 			m_oitDSets[i].Init();
 			m_oitDSets[i].StartUpdate();
 			m_oitDSets[i].UpdateBinding(0, &m_oitSampleTexelBufferViews[i]);
-			m_oitDSets[i].UpdateBinding(1, sampleCountImageInfo);
-			m_oitDSets[i].UpdateBinding(2, inUseImageInfo);
+			m_oitDSets[i].UpdateBinding(1, { sampleCountImageInfo });
+			m_oitDSets[i].UpdateBinding(2, { inUseImageInfo });
 			m_oitDSets[i].UpdateBinding(3, &m_oitViewportBuffer);
 			m_oitDSets[i].FinishUpdate();
 		}
@@ -1023,7 +1023,7 @@ void TransparentApp::_InitDescriptorSets()
 			m_oitColorDSets[i].SetLayout(&m_oitColorDSetLayout);
 			m_oitColorDSets[i].Init();
 			m_oitColorDSets[i].StartUpdate();
-			m_oitColorDSets[i].UpdateBinding(0, outputImageInfo);
+			m_oitColorDSets[i].UpdateBinding(0, { outputImageInfo });
 			m_oitColorDSets[i].FinishUpdate();
 		}
 	}
@@ -1057,7 +1057,7 @@ void TransparentApp::_InitDescriptorSets()
 				m_vecModelDSets[i][j].Init();
 				m_vecModelDSets[i][j].StartUpdate();
 				m_vecModelDSets[i][j].UpdateBinding(0, &m_vecModelBuffers[i][j]);
-				m_vecModelDSets[i][j].UpdateBinding(1, m_modelTextures[j].GetVkDescriptorImageInfo());
+				m_vecModelDSets[i][j].UpdateBinding(1, { m_modelTextures[j].GetVkDescriptorImageInfo() });
 				m_vecModelDSets[i][j].FinishUpdate();
 			}
 		}
@@ -1148,10 +1148,10 @@ void TransparentApp::_InitDescriptorSets()
 			m_gbufferDSets.back().SetLayout(&m_gbufferDSetLayout);
 			m_gbufferDSets.back().Init();
 			m_gbufferDSets.back().StartUpdate();
-			m_gbufferDSets.back().UpdateBinding(0, imageInfo0);
-			m_gbufferDSets.back().UpdateBinding(1, imageInfo1);
-			m_gbufferDSets.back().UpdateBinding(2, imageInfo2);
-			m_gbufferDSets.back().UpdateBinding(3, imageInfo3);
+			m_gbufferDSets.back().UpdateBinding(0, { imageInfo0 });
+			m_gbufferDSets.back().UpdateBinding(1, { imageInfo1 });
+			m_gbufferDSets.back().UpdateBinding(2, { imageInfo2 });
+			m_gbufferDSets.back().UpdateBinding(3, { imageInfo3 });
 			m_gbufferDSets.back().FinishUpdate();
 		}
 	}
@@ -1175,8 +1175,8 @@ void TransparentApp::_InitDescriptorSets()
 			m_transOutputDSets[i].SetLayout(&m_transOutputDSetLayout);
 			m_transOutputDSets[i].Init();
 			m_transOutputDSets[i].StartUpdate();
-			m_transOutputDSets[i].UpdateBinding(0, oitOutputImageInfo);
-			m_transOutputDSets[i].UpdateBinding(1, distortOutputImageInfo);
+			m_transOutputDSets[i].UpdateBinding(0, { oitOutputImageInfo });
+			m_transOutputDSets[i].UpdateBinding(1, { distortOutputImageInfo });
 			m_transOutputDSets[i].FinishUpdate();
 		}
 	}
@@ -1220,8 +1220,8 @@ void TransparentApp::_InitDescriptorSets()
 				m_blurLayeredDSetsX[i][j].SetLayout(&m_blurDSetLayout);
 				m_blurLayeredDSetsX[i][j].Init();
 				m_blurLayeredDSetsX[i][j].StartUpdate();
-				m_blurLayeredDSetsX[i][j].UpdateBinding(0, blurInputImageInfoX);
-				m_blurLayeredDSetsX[i][j].UpdateBinding(1, blurOutputImageInfoX);
+				m_blurLayeredDSetsX[i][j].UpdateBinding(0, { blurInputImageInfoX });
+				m_blurLayeredDSetsX[i][j].UpdateBinding(1, { blurOutputImageInfoX });
 				m_blurLayeredDSetsX[i][j].UpdateBinding(2, &m_oitViewportBuffer);
 				m_blurLayeredDSetsX[i][j].UpdateBinding(3, &m_blurBuffers[i]);
 				m_blurLayeredDSetsX[i][j].UpdateBinding(4, kernelInfos);
@@ -1241,8 +1241,8 @@ void TransparentApp::_InitDescriptorSets()
 				m_blurLayeredDSetsY[i][j].SetLayout(&m_blurDSetLayout);
 				m_blurLayeredDSetsY[i][j].Init();
 				m_blurLayeredDSetsY[i][j].StartUpdate();
-				m_blurLayeredDSetsY[i][j].UpdateBinding(0, blurInputImageInfoY);
-				m_blurLayeredDSetsY[i][j].UpdateBinding(1, blurOutputImageInfoY);
+				m_blurLayeredDSetsY[i][j].UpdateBinding(0, { blurInputImageInfoY });
+				m_blurLayeredDSetsY[i][j].UpdateBinding(1, { blurOutputImageInfoY });
 				m_blurLayeredDSetsY[i][j].UpdateBinding(2, &m_oitViewportBuffer);
 				m_blurLayeredDSetsY[i][j].UpdateBinding(3, &m_blurBuffers[i]);
 				m_blurLayeredDSetsY[i][j].UpdateBinding(4, kernelInfos);
@@ -1265,7 +1265,7 @@ void TransparentApp::_InitDescriptorSets()
 			m_blurOutputDSets[i].SetLayout(&m_blurOutputDSetLayout);
 			m_blurOutputDSets[i].Init();
 			m_blurOutputDSets[i].StartUpdate();
-			m_blurOutputDSets[i].UpdateBinding(0, blurOutputImageInfo);
+			m_blurOutputDSets[i].UpdateBinding(0, { blurOutputImageInfo });
 			m_blurOutputDSets[i].FinishUpdate();
 		}
 	}

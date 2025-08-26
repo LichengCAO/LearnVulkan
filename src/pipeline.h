@@ -44,6 +44,7 @@ public:
 	{
 		VkExtent2D imageSize{};
 		std::vector<VkDescriptorSet> vkDescriptorSets;
+		std::vector<uint32_t> optDynamicOffsets;
 		std::vector<std::pair<VkShaderStageFlagBits, const void*>> pushConstants;
 
 		uint32_t vertexCount = 0u;
@@ -57,6 +58,7 @@ public:
 	{
 		VkExtent2D imageSize{};
 		std::vector<VkDescriptorSet> vkDescriptorSets;
+		std::vector<uint32_t> optDynamicOffsets;
 		std::vector<std::pair<VkShaderStageFlagBits, const void*>> pushConstants;
 
 		std::vector<VkBuffer>	vertexBuffers;								// not sure, but I think order matters
@@ -73,6 +75,7 @@ public:
 	{
 		VkExtent2D imageSize{};
 		std::vector<VkDescriptorSet> vkDescriptorSets;
+		std::vector<uint32_t> optDynamicOffsets;
 		std::vector<std::pair<VkShaderStageFlagBits, const void*>> pushConstants;
 
 		uint32_t groupCountX = 1;
@@ -104,10 +107,11 @@ public:
 private:
 	void _InitCreateInfos();
 	void _DoCommon(
-		VkCommandBuffer cmd,
-		const VkExtent2D& imageSize,
-		const std::vector<VkDescriptorSet>& pSets,
-		const std::vector<std::pair<VkShaderStageFlagBits, const void*>>& pushConstants);
+		VkCommandBuffer _cmd,
+		const VkExtent2D& _imageSize,
+		const std::vector<VkDescriptorSet>& _vkDescriptorSets,
+		const std::vector<uint32_t>& _dynamicOffsets,
+		const std::vector<std::pair<VkShaderStageFlagBits, const void*>>& _pushConstants);
 
 public:
 	GraphicsPipeline();
@@ -134,6 +138,7 @@ public:
 	struct PipelineInput
 	{
 		std::vector<VkDescriptorSet> vkDescriptorSets;
+		std::vector<uint32_t> optDynamicOffsets;
 		std::vector<std::pair<VkShaderStageFlagBits, const void*>> pushConstants;
 
 		uint32_t groupCountX = 1;
@@ -204,6 +209,7 @@ public:
 	struct PipelineInput
 	{
 		std::vector<VkDescriptorSet> vkDescriptorSets;
+		std::vector<uint32_t> optDynamicOffsets;
 		std::vector<std::pair<VkShaderStageFlagBits, const void*>> pushConstants;
 
 		// for simplicity, i bind SBT in RT pipeline

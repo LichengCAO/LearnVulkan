@@ -35,9 +35,11 @@ public:
 	void Init();
 	
 	DescriptorSet NewDescriptorSet() const;
+	DescriptorSet* NewDescriptorSetPointer() const;
 
 	void Uninit();
 };
+
 class DescriptorSet
 {
 private:
@@ -70,8 +72,9 @@ public:
 
 	void StartUpdate();
 	void UpdateBinding(uint32_t bindingId, const Buffer* pBuffer);
-	void UpdateBinding(uint32_t bindingId, const VkDescriptorImageInfo& dImageInfo);
+	void UpdateBinding(uint32_t bindingId, const std::vector<VkDescriptorImageInfo>& dImageInfo);
 	void UpdateBinding(uint32_t bindingId, const BufferView* bufferView);
+	void UpdateBinding(uint32_t bindingId, const std::vector<VkBufferView>& bufferViews);
 	void UpdateBinding(uint32_t bindingId, const std::vector<VkDescriptorBufferInfo>& bufferInfos);
 	void UpdateBinding(uint32_t bindingId, const std::vector<VkAccelerationStructureKHR>& _accelStructs);
 	void FinishUpdate();
@@ -211,6 +214,7 @@ public:
 	
 	void Uninit();
 };
+
 class Framebuffer
 {
 private:

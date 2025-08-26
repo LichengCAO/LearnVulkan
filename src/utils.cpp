@@ -3,6 +3,7 @@
 #include <tiny_gltf.h>
 #include <numeric>
 #include "transform.h"
+#include <fstream>
 
 bool MeshUtility::Load(const std::string& objFile, std::vector<Mesh>& outMesh)
 {

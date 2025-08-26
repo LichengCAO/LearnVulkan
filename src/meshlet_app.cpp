@@ -406,7 +406,6 @@ void MeshletApp::_InitPipelines()
 	SimpleShader taskShader{};
 	SimpleShader meshShader{};
 	SimpleShader fragShader{};
-	SpirvReflector reflector{};
 
 	m_pipeline.AddDescriptorSetLayout(m_cameraDSetLayout.vkDescriptorSetLayout);
 	m_pipeline.AddDescriptorSetLayout(m_meshletDSetLayout.vkDescriptorSetLayout);
@@ -418,8 +417,6 @@ void MeshletApp::_InitPipelines()
 	taskShader.Init();
 	meshShader.Init();
 	fragShader.Init();
-
-	reflector.ReflectPipeline({ "E:/GitStorage/LearnVulkan/bin/shaders/flat_task.task.spv", "E:/GitStorage/LearnVulkan/bin/shaders/flat_task.mesh.spv", "E:/GitStorage/LearnVulkan/bin/shaders/flat_task.frag.spv" });
 
 	m_pipeline.AddShader(taskShader.GetShaderStageInfo());
 	m_pipeline.AddShader(meshShader.GetShaderStageInfo());

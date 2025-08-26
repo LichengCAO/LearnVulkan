@@ -137,6 +137,7 @@ void GraphicsPipeline::_DoCommon(
 	VkCommandBuffer cmd,
 	const VkExtent2D& imageSize,
 	const std::vector<VkDescriptorSet>& pSets,
+	const std::vector<uint32_t>& _dynamicOffsets,
 	const std::vector<std::pair<VkShaderStageFlagBits, const void*>>& pushConstants)
 {
 	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
@@ -156,7 +157,15 @@ void GraphicsPipeline::_DoCommon(
 
 	if (pSets.size() > 0)
 	{
-		vkCmdBindDescriptorSets(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipelineLayout, 0, static_cast<uint32_t>(pSets.size()), pSets.data(), 0, nullptr);
+		vkCmdBindDescriptorSets(
+			cmd, 
+			VK_PIPELINE_BIND_POINT_GRAPHICS, 
+			vkPipelineLayout, 
+			0, 
+			static_cast<uint32_t>(pSets.size()), 
+			pSets.data(), 
+			static_cast<uint32_t>(_dynamicOffsets.size()), 
+			_dynamicOffsets.data());
 	}
 
 	for (const auto& _pushConst : pushConstants)
@@ -326,7 +335,7 @@ void GraphicsPipeline::Uninit()
 void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput_DrawIndexed& input)
 {
 	// TODO: check m_subpass should match number of vkCmdNextSubpass calls after vkCmdBeginRenderPass
-	_DoCommon(commandBuffer, input.imageSize, input.vkDescriptorSets, input.pushConstants);
+	_DoCommon(commandBuffer, input.imageSize, input.vkDescriptorSets, input.optDynamicOffsets, input.pushConstants);
 
 	CHECK_TRUE(input.vertexBuffers.size() > 0, "Index draw must have vertex buffers."); // I'm not sure about it, check specification someday
 	CHECK_TRUE(input.indexBuffer != VK_NULL_HANDLE, "Index buffer must be assigned here.");
@@ -360,14 +369,14 @@ void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput_Dra
 
 void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput_Mesh& input)
 {
-	_DoCommon(commandBuffer, input.imageSize, input.vkDescriptorSets, input.pushConstants);
+	_DoCommon(commandBuffer, input.imageSize, input.vkDescriptorSets, input.optDynamicOffsets, input.pushConstants);
 	
 	vkCmdDrawMeshTasksEXT(commandBuffer, input.groupCountX, input.groupCountY, input.groupCountZ);
 }
 
 void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput_Draw& input)
 {
-	_DoCommon(commandBuffer, input.imageSize, input.vkDescriptorSets, input.pushConstants);
+	_DoCommon(commandBuffer, input.imageSize, input.vkDescriptorSets, input.optDynamicOffsets, input.pushConstants);
 
 	if (input.vertexBuffers.size() > 0)
 	{
@@ -453,8 +462,8 @@ void ComputePipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput& inp
 		0,
 		static_cast<uint32_t>(input.vkDescriptorSets.size()),
 		input.vkDescriptorSets.data(),
-		0,
-		nullptr);
+		static_cast<uint32_t>(input.optDynamicOffsets.size()),
+		input.optDynamicOffsets.data());
 
 	for (const auto& _pushConst : input.pushConstants)
 	{
@@ -650,8 +659,8 @@ void RayTracingPipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput& 
 			0,
 			static_cast<uint32_t>(pSets.size()),
 			pSets.data(),
-			0,
-			nullptr);
+			static_cast<uint32_t>(input.optDynamicOffsets.size()),
+			input.optDynamicOffsets.data());
 	}
 
 	for (const auto& _pushConst : input.pushConstants)

@@ -59,7 +59,7 @@ void SwapchainPass::_InitDSets()
 
 		uptrDSet->Init();
 		uptrDSet->StartUpdate();
-		uptrDSet->UpdateBinding(0, m_textureInfos[i]);
+		uptrDSet->UpdateBinding(0, { m_textureInfos[i] });
 		uptrDSet->FinishUpdate();
 
 		m_DSets.push_back(std::move(uptrDSet));
