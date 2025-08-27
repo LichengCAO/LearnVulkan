@@ -118,7 +118,7 @@ public:
 };
 
 // Graphics pipeline can have multiple vertex bindings,
-// i.e. layout(binding = 0, location = 0); layout(binding = 1, location = 0)...
+// i.e. layout(binding = 0, location = 0); layout(binding = 1, location = 0)... ==> wrong, see: https://gist.github.com/SaschaWillems/428d15ed4b5d71ead462bc63adffa93a
 // This class helps to describe vertex attribute layout that belongs to the same binding
 // in a graphics pipeline, I use this to create a graphics pipeline.
 // This class doesn't hold any Vulkan handle,

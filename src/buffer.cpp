@@ -312,6 +312,21 @@ VkDeviceSize BufferBuilder::AppendToBuffer(const void* _pData, size_t _size, VkD
 	return currentOffset;
 }
 
+VkDeviceSize BufferBuilder::AppendToBuffer(const void* _pData, size_t _size)
+{
+	VkDeviceSize currentOffset = m_uBufferSize;
+	HostData hostData{};
+
+	m_uBufferSize += _size;
+	hostData.dataSize = _size;
+	hostData.offset = currentOffset;
+	hostData.pData = _pData;
+
+	m_vecHostData.push_back(hostData);
+
+	return currentOffset;
+}
+
 void BufferBuilder::FinishBuild(Buffer*& _initedBuffer)
 {
 	std::vector<uint8_t> dataToCopy(m_uBufferSize);

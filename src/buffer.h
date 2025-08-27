@@ -130,7 +130,9 @@ public:
 
 	void StartBuild();
 
-	VkDeviceSize AppendToBuffer(const void* _pData, size_t _size, VkDeviceSize _alignment = 0);
+	VkDeviceSize AppendToBuffer(const void* _pData, size_t _size, VkDeviceSize _alignment);
+
+	VkDeviceSize AppendToBuffer(const void* _pData, size_t _size);
 
 	void FinishBuild(Buffer*& _initedBuffer);
 };
