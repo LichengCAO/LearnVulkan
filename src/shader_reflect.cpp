@@ -17,11 +17,6 @@ namespace
 										os << #vkt2 << " ";\
 									}
 
-	struct DescriptorSetLayoutData {
-		std::vector<std::string> names;
-		std::vector<VkDescriptorSetLayoutBinding> bindings;
-	};
-
 	void _PrintStage(std::ostream& os, VkShaderStageFlags stages)
 	{
 		PRINT_STAGE(os, stages, VK_SHADER_STAGE_VERTEX_BIT);
@@ -104,184 +99,6 @@ namespace
 		PRINT_TYPE(os, _format, VK_FORMAT_R64G64B64A64_SINT);
 		PRINT_TYPE(os, _format, VK_FORMAT_R64G64B64A64_SFLOAT);
 	}
-
-	// reflect descriptor set layout based on shaders of a pipeline
-	// _shaderPaths: paths of all shader files of a pipeline,
-	// _mapSetBinding: output, maps descriptor name to {set, binding}
-	// _descriptorSetData: output, stores layout information in order, i.e. set0, set1, ...
-	void _ReflectDescriptorSet(
-		const std::vector<std::string>& _shaderPaths,
-		std::unordered_map<std::string, std::pair<uint32_t, uint32_t>>& _mapSetBinding,
-		std::vector<std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding>>& _descriptorSetData)
-	{
-		std::unordered_map<uint32_t, DescriptorSetLayoutData> mapDescriptorSets;
-
-		// fill mapDescriptorSets
-		for (auto& _shader : _shaderPaths)
-		{
-			SpvReflectShaderModule reflectModule{};
-			std::vector<uint8_t> spirvData;
-			auto eResult = SPV_REFLECT_RESULT_SUCCESS;
-			uint32_t uSetCount = 0u;
-			std::vector<SpvReflectDescriptorSet*> pSets;
-
-			CommonUtils::ReadFile(_shader, spirvData);
-
-			eResult = spvReflectCreateShaderModule(spirvData.size(), spirvData.data(), &reflectModule);
-			assert(eResult == SPV_REFLECT_RESULT_SUCCESS);
-
-			eResult = spvReflectEnumerateDescriptorSets(&reflectModule, &uSetCount, nullptr);
-			assert(eResult == SPV_REFLECT_RESULT_SUCCESS);
-
-			pSets.resize(uSetCount);
-			eResult = spvReflectEnumerateDescriptorSets(&reflectModule, &uSetCount, pSets.data());
-			assert(eResult == SPV_REFLECT_RESULT_SUCCESS);
-
-			// store descriptor set of this stage into map
-			for (auto _pSet : pSets)
-			{
-				const SpvReflectDescriptorSet& curSet = *_pSet;
-				std::vector<SpvReflectDescriptorBinding*> pBindings(_pSet->bindings, _pSet->bindings + static_cast<size_t>(_pSet->binding_count));
-				if (mapDescriptorSets.find(curSet.set) == mapDescriptorSets.end())
-				{
-					DescriptorSetLayoutData setData{};
-					for (auto pBinding : pBindings)
-					{
-						VkDescriptorSetLayoutBinding vkBinding{};
-						vkBinding.binding = pBinding->binding;
-						vkBinding.descriptorType = static_cast<VkDescriptorType>(pBinding->descriptor_type);
-						vkBinding.stageFlags |= static_cast<VkShaderStageFlagBits>(reflectModule.shader_stage);
-						vkBinding.descriptorCount = 1;
-						for (uint32_t uDim = 0u; uDim < pBinding->array.dims_count; ++uDim)
-						{
-							vkBinding.descriptorCount *= (pBinding->array.dims[uDim]);
-						}
-
-						setData.bindings.push_back(std::move(vkBinding));
-						setData.names.emplace_back(pBinding->name);
-					}
-
-					mapDescriptorSets.insert(std::make_pair(curSet.set, setData));
-				}
-				else
-				{
-					auto& setData = mapDescriptorSets[curSet.set];
-					for (auto pBinding : pBindings)
-					{
-						int index = -1;
-
-						// check if we already have such binding stored
-						for (int nBindingIndex = 0; nBindingIndex < setData.bindings.size(); ++nBindingIndex)
-						{
-							auto& vkBinding = setData.bindings[nBindingIndex];
-							if (vkBinding.binding == pBinding->binding)
-							{
-								index = nBindingIndex;
-								break;
-							}
-						}
-
-						if (index != -1)
-						{
-							// we update the existing binding
-							VkDescriptorSetLayoutBinding& vkBinding = setData.bindings[index];
-							uint32_t uDescriptorCount = 1;
-
-							for (uint32_t uDim = 0u; uDim < pBinding->array.dims_count; ++uDim)
-							{
-								uDescriptorCount *= (pBinding->array.dims[uDim]);
-							}
-							CHECK_TRUE(vkBinding.descriptorCount == uDescriptorCount, "The descriptor doesn't match!");
-							CHECK_TRUE(vkBinding.descriptorType == static_cast<VkDescriptorType>(pBinding->descriptor_type), "The descriptor doesn't match!");
-							vkBinding.stageFlags |= static_cast<VkShaderStageFlagBits>(reflectModule.shader_stage);
-						}
-						else
-						{
-							// we add a new binding
-							VkDescriptorSetLayoutBinding vkBinding{};
-
-							vkBinding.binding = pBinding->binding;
-							vkBinding.descriptorType = static_cast<VkDescriptorType>(pBinding->descriptor_type);
-							vkBinding.stageFlags |= static_cast<VkShaderStageFlagBits>(reflectModule.shader_stage);
-							vkBinding.descriptorCount = 1;
-							for (uint32_t uDim = 0u; uDim < pBinding->array.dims_count; ++uDim)
-							{
-								vkBinding.descriptorCount *= (pBinding->array.dims[uDim]);
-							}
-
-							setData.bindings.push_back(std::move(vkBinding));
-							setData.names.emplace_back(pBinding->name);
-						}
-					}
-				}
-			}
-
-			spvReflectDestroyShaderModule(&reflectModule);
-		}
-
-		// build descriptor set layout
-		{
-			// find out how many descriptor layouts do we have
-			uint32_t uMaxSet = 0u;
-			int setCount = 0;
-			for (const auto& _pair : mapDescriptorSets)
-			{
-				uint32_t uSetId = _pair.first;
-				uMaxSet = std::max(uMaxSet, uSetId);
-				++setCount;
-			}
-			if (setCount == 0) return;
-
-			// update _uptrDescriptorSetLayouts, _mapSetBinding
-			_descriptorSetData.reserve(static_cast<size_t>(uMaxSet + 1));
-			for (uint32_t uSetId = 0u; uSetId <= uMaxSet; ++uSetId)
-			{
-				std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding> curSet{};
-
-				// fill descriptor setting in the layout and then initialize layout
-				if (mapDescriptorSets.find(uSetId) != mapDescriptorSets.end())
-				{
-					const auto& descriptorData = mapDescriptorSets[uSetId];
-					for (size_t i = 0; i < descriptorData.bindings.size(); ++i)
-					{
-						const auto& vkInfo = descriptorData.bindings[i];
-						const auto& strDescriptorName = descriptorData.names[i];
-
-						curSet.insert({ vkInfo.binding, vkInfo });
-						_mapSetBinding[strDescriptorName] = { uSetId, vkInfo.binding };
-					}
-				}
-
-				_descriptorSetData.push_back(std::move(curSet));
-			}
-		}
-
-		//print info for debug
-		{
-			static const std::string& strIndent = "\t";
-			for (const auto& mapPair : mapDescriptorSets)
-			{
-				uint32_t setId = mapPair.first;
-				const auto& setData = mapPair.second;
-				std::cout << "set: " << setId << std::endl;
-				for (size_t i = 0; i < setData.bindings.size(); ++i)
-				{
-					const auto& vkBinding = setData.bindings[i];
-					std::cout << strIndent << "binding name: " << setData.names[i] << std::endl;
-					std::cout << strIndent << "location: " << vkBinding.binding << std::endl;
-					std::cout << strIndent << "descriptor count: " << vkBinding.descriptorCount << std::endl;
-					std::cout << strIndent << "descriptor type: ";
-					_PrintDescriptorType(std::cout, vkBinding.descriptorType);
-					std::cout << std::endl;
-					std::cout << strIndent << "stage: ";
-					_PrintStage(std::cout, vkBinding.stageFlags);
-					std::cout << "\r\n\r\n";
-				}
-				std::cout << std::endl;
-			}
-		}
-	}
-
 
 #undef PRINT_STAGE(os, stage, bit)
 #undef PRINT_TYPE(os, vkt, vkt2)
@@ -373,7 +190,13 @@ DescriptorSetManager::~DescriptorSetManager()
 
 void DescriptorSetManager::Init(const std::vector<std::string>& _pipelineShaders, uint32_t _uFrameInFlightCount)
 {
-	_ReflectDescriptorSet(_pipelineShaders, m_mapNameToSetBinding, m_vkDescriptorSetBindingInfo);
+	ShaderReflector reflector{};
+
+	reflector.Init(_pipelineShaders);
+	reflector.ReflectDescriptorSets(m_mapNameToSetBinding, m_vkDescriptorSetBindingInfo);
+	reflector.PrintReflectResult();
+	reflector.Uninit();
+
 	m_uFrameInFlightCount = _uFrameInFlightCount;
 	m_uCurrentFrame = 0u;
 	m_vecDescriptorSetIsBoundForFrame.resize(m_uFrameInFlightCount, false);
@@ -723,9 +546,14 @@ void ShaderReflector::Init(const std::vector<std::string>& _spirvFiles)
 
 void ShaderReflector::ReflectDescriptorSets(
 	std::unordered_map<std::string, std::pair<uint32_t, uint32_t>>& _mapSetBinding, 
-	std::vector<std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding>>& _descriptorSetData) const
+	std::vector<std::map<uint32_t, VkDescriptorSetLayoutBinding>>& _descriptorSetData) const
 {
-	std::unordered_map<uint32_t, DescriptorSetLayoutData> mapDescriptorSets;
+	struct DescriptorSetLayoutData {
+		std::vector<std::string> names;
+		std::vector<VkDescriptorSetLayoutBinding> bindings;
+	};
+
+	std::map<uint32_t, DescriptorSetLayoutData> mapDescriptorSets;
 
 	// fill mapDescriptorSets
 	for (auto& uptrReflectModule : m_vecReflectModule)
@@ -825,20 +653,22 @@ void ShaderReflector::ReflectDescriptorSets(
 	{
 		// find out how many descriptor layouts do we have
 		uint32_t uMaxSet = 0u;
-		int setCount = 0;
+		int setCount = 0; // check if no descriptors reflected 
+
 		for (const auto& _pair : mapDescriptorSets)
 		{
 			uint32_t uSetId = _pair.first;
 			uMaxSet = std::max(uMaxSet, uSetId);
 			++setCount;
 		}
+		
 		if (setCount == 0) return;
 
 		// update _uptrDescriptorSetLayouts, _mapSetBinding
 		_descriptorSetData.reserve(static_cast<size_t>(uMaxSet + 1));
 		for (uint32_t uSetId = 0u; uSetId <= uMaxSet; ++uSetId)
 		{
-			std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding> curSet{};
+			std::map<uint32_t, VkDescriptorSetLayoutBinding> curSet{};
 
 			// fill descriptor setting in the layout and then initialize layout
 			if (mapDescriptorSets.find(uSetId) != mapDescriptorSets.end())
@@ -862,7 +692,7 @@ void ShaderReflector::ReflectDescriptorSets(
 void ShaderReflector::ReflectInput(
 	VkShaderStageFlagBits _stage, 
 	std::unordered_map<std::string, uint32_t>& _mapLocation, 
-	std::unordered_map<uint32_t, VkFormat>& _mapFormat) const
+	std::map<uint32_t, VkFormat>& _mapFormat) const
 {
 	SpvReflectShaderModule* pReflectModule = _FindShaderModule(_stage);
 	auto eResult = SPV_REFLECT_RESULT_SUCCESS;
@@ -890,7 +720,7 @@ void ShaderReflector::ReflectInput(
 void ShaderReflector::ReflectOuput(
 	VkShaderStageFlagBits _stage, 
 	std::unordered_map<std::string, uint32_t>& _mapLocation, 
-	std::unordered_map<uint32_t, VkFormat>& _mapFormat) const
+	std::map<uint32_t, VkFormat>& _mapFormat) const
 {
 	SpvReflectShaderModule* pReflectModule = _FindShaderModule(_stage);
 	auto eResult = SPV_REFLECT_RESULT_SUCCESS;

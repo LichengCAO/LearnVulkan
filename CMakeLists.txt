@@ -39,6 +39,9 @@ source_group("Sources" FILES ${SOURCES})
 source_group("Headers" FILES ${HEADERS})
 add_executable(${CMAKE_PROJECT_NAME} ${SOURCES} ${HEADERS})
 
+# Set the startup project for Visual Studio
+set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${CMAKE_PROJECT_NAME})
+
 add_subdirectory(external)
 add_subdirectory(res)
 set_target_properties(ExternalLibs PROPERTIES FOLDER "ThirdParty")

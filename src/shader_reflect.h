@@ -2,6 +2,7 @@
 #include "common.h"
 #include <unordered_set>
 #include <spirv_reflect.h>
+#include <map>
 //class Binder
 //{
 //	void StartBind();
@@ -39,26 +40,26 @@ public:
 
 	// reflect descriptor sets of the pipeline,
 	// _mapSetBinding: output, map descriptor set name to {set, binding}, some descriptor sets may not have name
-	// _descriptorSetData: output, descriptor bindings of set0, set1, ..., the sets are presented by order
+	// _descriptorSetData: output, descriptor bindings of set0, set1, ..., the sets are presented by ascending order
 	void ReflectDescriptorSets(
 		std::unordered_map<std::string, std::pair<uint32_t, uint32_t>>& _mapSetBinding,
-		std::vector<std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding>>& _descriptorSetData) const;
+		std::vector<std::map<uint32_t, VkDescriptorSetLayoutBinding>>& _descriptorSetData) const;
 
 	// reflect input of the pipeline stage,
 	// _mapLocation: output, map input name to location
-	// _mapFormat: output, map location to VkFormat
+	// _mapFormat: output, map location to VkFormat, use map instead of unordered_map so that it can be accessed by ascending order
 	void ReflectInput(
 		VkShaderStageFlagBits _stage,
 		std::unordered_map<std::string, uint32_t>& _mapLocation,
-		std::unordered_map<uint32_t, VkFormat>& _mapFormat) const;
+		std::map<uint32_t, VkFormat>& _mapFormat) const;
 
 	// reflect output of the pipeline stage,
 	// _mapLocation: output, map output name to location
-	// _mapFormat: output, map location to VkFormat
+	// _mapFormat: output, map location to VkFormat, use map instead of unordered_map so that it can be accessed by ascending order
 	void ReflectOuput(
 		VkShaderStageFlagBits _stage, 
 		std::unordered_map<std::string, uint32_t>& _mapLocation,
-		std::unordered_map<uint32_t, VkFormat>& _mapFormat) const;
+		std::map<uint32_t, VkFormat>& _mapFormat) const;
 
 	// reflect push constant of the pipeline,
 	// _mapIndex: output, map output name to index in _pushConstInfo
@@ -93,8 +94,8 @@ private:
 
 private:
 	// get by reflection:
-	std::unordered_map<std::string, std::pair<uint32_t, uint32_t>>			m_mapNameToSetBinding;		// name in shader -> set, binding
-	std::vector<std::unordered_map<uint32_t, VkDescriptorSetLayoutBinding>> m_vkDescriptorSetBindingInfo; // m_vkDescriptorSetBindingInfo[set]
+	std::unordered_map<std::string, std::pair<uint32_t, uint32_t>>	m_mapNameToSetBinding;		// name in shader -> set, binding
+	std::vector<std::map<uint32_t, VkDescriptorSetLayoutBinding>>	m_vkDescriptorSetBindingInfo; // m_vkDescriptorSetBindingInfo[set]
 
 	// device objects:
 	std::vector<std::unique_ptr<DescriptorSetLayout>>				m_vecUptrDescriptorSetLayout;	// m_vecUptrDescriptorSetLayout[set]
