@@ -236,6 +236,15 @@ VkDeviceAddress Buffer::GetDeviceAddress() const
 	return vkDeviceAddr;
 }
 
+VkDescriptorBufferInfo Buffer::GetDescriptorInfo() const
+{
+	VkDescriptorBufferInfo info{};
+	info.buffer = vkBuffer;
+	info.offset = 0;
+	info.range = m_bufferInformation.size;
+	return info;
+}
+
 BufferView Buffer::NewBufferView(VkFormat _format)
 {
 	CHECK_TRUE((m_bufferInformation.usage & VK_BUFFER_USAGE_UNIFORM_TEXEL_BUFFER_BIT) || (m_bufferInformation.usage & VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT), "This buffer cannot have buffer views!");

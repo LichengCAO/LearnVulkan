@@ -373,7 +373,7 @@ void MeshletApp::_InitDescriptorSets()
 		cameraDSet->Init();
 		cameraDSet->StartUpdate();
 		cameraDSet->UpdateBinding(0, { cameraBufferInfo });
-		cameraDSet->UpdateBinding(1, pFrustumBuffer);
+		cameraDSet->UpdateBinding(1, { pFrustumBuffer->GetDescriptorInfo() });
 		cameraDSet->FinishUpdate();
 		m_cameraDSets.push_back(std::move(cameraDSet));
 	}
@@ -385,12 +385,12 @@ void MeshletApp::_InitDescriptorSets()
 		VkDescriptorBufferInfo bufferInfo{};
 		meshletDSet->Init();
 		meshletDSet->StartUpdate();
-		meshletDSet->UpdateBinding(0, m_meshletBuffers[i].get());
-		meshletDSet->UpdateBinding(1, m_meshletVertexBuffers[i].get());
-		meshletDSet->UpdateBinding(2, m_meshletTriangleBuffers[i].get());
-		meshletDSet->UpdateBinding(3, m_meshletVBOBuffers[i].get());
-		meshletDSet->UpdateBinding(4, m_meshUBOBuffers[i].get());
-		meshletDSet->UpdateBinding(5, m_meshletBoundsBuffers[i].get());
+		meshletDSet->UpdateBinding(0, { m_meshletBuffers[i]->GetDescriptorInfo() });
+		meshletDSet->UpdateBinding(1, { m_meshletVertexBuffers[i]->GetDescriptorInfo() });
+		meshletDSet->UpdateBinding(2, { m_meshletTriangleBuffers[i]->GetDescriptorInfo() });
+		meshletDSet->UpdateBinding(3, { m_meshletVBOBuffers[i]->GetDescriptorInfo() });
+		meshletDSet->UpdateBinding(4, { m_meshUBOBuffers[i]->GetDescriptorInfo() });
+		meshletDSet->UpdateBinding(5, { m_meshletBoundsBuffers[i]->GetDescriptorInfo() });
 		meshletDSet->FinishUpdate();
 		m_meshletDSets.push_back(std::move(meshletDSet));
 	}

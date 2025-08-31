@@ -85,7 +85,7 @@ public:
 	QueueFamilyIndices	queueFamilyIndices{};
 	VkSwapchainKHR		vkSwapchain = VK_NULL_HANDLE;
 	SamplerPool         samplerPool{};
-	DescriptorAllocator descriptorAllocator{};
+	DescriptorSetAllocator descriptorAllocator{};
 	std::unordered_map<uint32_t, VkCommandPool>		vkCommandPools;
 	std::unordered_map<VkImage, ImageLayout>        imageLayouts;
 	

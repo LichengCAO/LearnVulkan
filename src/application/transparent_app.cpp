@@ -1004,10 +1004,10 @@ void TransparentApp::_InitDescriptorSets()
 			m_oitDSets[i].SetLayout(&m_oitSampleDSetLayout);
 			m_oitDSets[i].Init();
 			m_oitDSets[i].StartUpdate();
-			m_oitDSets[i].UpdateBinding(0, &m_oitSampleTexelBufferViews[i]);
+			m_oitDSets[i].UpdateBinding(0, { m_oitSampleTexelBufferViews[i].vkBufferView });
 			m_oitDSets[i].UpdateBinding(1, { sampleCountImageInfo });
 			m_oitDSets[i].UpdateBinding(2, { inUseImageInfo });
-			m_oitDSets[i].UpdateBinding(3, &m_oitViewportBuffer);
+			m_oitDSets[i].UpdateBinding(3, { (&m_oitViewportBuffer)->GetDescriptorInfo() });
 			m_oitDSets[i].FinishUpdate();
 		}
 
@@ -1037,7 +1037,7 @@ void TransparentApp::_InitDescriptorSets()
 			m_distortDSets[i].SetLayout(&m_distortDSetLayout);
 			m_distortDSets[i].Init();
 			m_distortDSets[i].StartUpdate();
-			m_distortDSets[i].UpdateBinding(0, &m_distortBuffers[i]);
+			m_distortDSets[i].UpdateBinding(0, { (&m_distortBuffers[i])->GetDescriptorInfo() });
 			m_distortDSets[i].FinishUpdate();
 		}
 	}
@@ -1056,7 +1056,7 @@ void TransparentApp::_InitDescriptorSets()
 				m_vecModelDSets[i][j].SetLayout(&m_modelDSetLayout);
 				m_vecModelDSets[i][j].Init();
 				m_vecModelDSets[i][j].StartUpdate();
-				m_vecModelDSets[i][j].UpdateBinding(0, &m_vecModelBuffers[i][j]);
+				m_vecModelDSets[i][j].UpdateBinding(0, { m_vecModelBuffers[i][j].GetDescriptorInfo() });
 				m_vecModelDSets[i][j].UpdateBinding(1, { m_modelTextures[j].GetVkDescriptorImageInfo() });
 				m_vecModelDSets[i][j].FinishUpdate();
 			}
@@ -1074,7 +1074,7 @@ void TransparentApp::_InitDescriptorSets()
 				m_vecTransModelDSets[i][j].SetLayout(&m_modelDSetLayout);
 				m_vecTransModelDSets[i][j].Init();
 				m_vecTransModelDSets[i][j].StartUpdate();
-				m_vecTransModelDSets[i][j].UpdateBinding(0, &m_vecTransModelBuffers[i][j]);
+				m_vecTransModelDSets[i][j].UpdateBinding(0, { m_vecTransModelBuffers[i][j].GetDescriptorInfo() });
 				m_vecTransModelDSets[i][j].FinishUpdate();
 			}
 		}
@@ -1094,7 +1094,7 @@ void TransparentApp::_InitDescriptorSets()
 				m_vecMaterialDSets[i][j].SetLayout(&m_materialDSetLayout);
 				m_vecMaterialDSets[i][j].Init();
 				m_vecMaterialDSets[i][j].StartUpdate();
-				m_vecMaterialDSets[i][j].UpdateBinding(0, &m_vecMaterialBuffers[i][j]);
+				m_vecMaterialDSets[i][j].UpdateBinding(0, { m_vecMaterialBuffers[i][j].GetDescriptorInfo() });
 				m_vecMaterialDSets[i][j].FinishUpdate();
 			}
 		}
@@ -1109,7 +1109,7 @@ void TransparentApp::_InitDescriptorSets()
 			m_cameraDSets.back().SetLayout(&m_cameraDSetLayout);
 			m_cameraDSets.back().Init();
 			m_cameraDSets.back().StartUpdate();
-			m_cameraDSets.back().UpdateBinding(0, &m_cameraBuffers[i]);
+			m_cameraDSets.back().UpdateBinding(0, { m_cameraBuffers[i].GetDescriptorInfo() });
 			m_cameraDSets.back().FinishUpdate();
 		}
 	}
@@ -1222,8 +1222,8 @@ void TransparentApp::_InitDescriptorSets()
 				m_blurLayeredDSetsX[i][j].StartUpdate();
 				m_blurLayeredDSetsX[i][j].UpdateBinding(0, { blurInputImageInfoX });
 				m_blurLayeredDSetsX[i][j].UpdateBinding(1, { blurOutputImageInfoX });
-				m_blurLayeredDSetsX[i][j].UpdateBinding(2, &m_oitViewportBuffer);
-				m_blurLayeredDSetsX[i][j].UpdateBinding(3, &m_blurBuffers[i]);
+				m_blurLayeredDSetsX[i][j].UpdateBinding(2, { m_oitViewportBuffer.GetDescriptorInfo() });
+				m_blurLayeredDSetsX[i][j].UpdateBinding(3, { m_blurBuffers[i].GetDescriptorInfo() });
 				m_blurLayeredDSetsX[i][j].UpdateBinding(4, kernelInfos);
 				m_blurLayeredDSetsX[i][j].FinishUpdate();
 
@@ -1243,8 +1243,8 @@ void TransparentApp::_InitDescriptorSets()
 				m_blurLayeredDSetsY[i][j].StartUpdate();
 				m_blurLayeredDSetsY[i][j].UpdateBinding(0, { blurInputImageInfoY });
 				m_blurLayeredDSetsY[i][j].UpdateBinding(1, { blurOutputImageInfoY });
-				m_blurLayeredDSetsY[i][j].UpdateBinding(2, &m_oitViewportBuffer);
-				m_blurLayeredDSetsY[i][j].UpdateBinding(3, &m_blurBuffers[i]);
+				m_blurLayeredDSetsY[i][j].UpdateBinding(2, { m_oitViewportBuffer.GetDescriptorInfo() });
+				m_blurLayeredDSetsY[i][j].UpdateBinding(3, { m_blurBuffers[i].GetDescriptorInfo() });
 				m_blurLayeredDSetsY[i][j].UpdateBinding(4, kernelInfos);
 				m_blurLayeredDSetsY[i][j].FinishUpdate();
 			}

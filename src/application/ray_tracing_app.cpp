@@ -342,10 +342,10 @@ void RayTracingApp::_InitDescriptorSets()
 
 		uptrDSet->Init();
 		uptrDSet->StartUpdate();
-		uptrDSet->UpdateBinding(0, m_cameraBuffers[i].get());
+		uptrDSet->UpdateBinding(0, { m_cameraBuffers[i]->GetDescriptorInfo() });
 		uptrDSet->UpdateBinding(1, { m_rtAccelStruct[i].vkAccelerationStructure });
 		uptrDSet->UpdateBinding(2, { imageInfo });
-		uptrDSet->UpdateBinding(3, m_instanceBuffer[i].get());
+		uptrDSet->UpdateBinding(3, { m_instanceBuffer[i]->GetDescriptorInfo() });
 		uptrDSet->FinishUpdate();
 
 		m_rtDSets.push_back(std::move(uptrDSet));
@@ -358,7 +358,7 @@ void RayTracingApp::_InitDescriptorSets()
 		uptrDSet->Init();
 		uptrDSet->StartUpdate();
 		//uptrDSet->UpdateBinding(0, m_cameraBuffers[i].get());
-		uptrDSet->UpdateBinding(0, m_vertexBuffers[0][i].get()); // sphere
+		uptrDSet->UpdateBinding(0, { m_vertexBuffers[0][i]->GetDescriptorInfo() }); // sphere
 		uptrDSet->FinishUpdate();
 
 		m_compDSets.push_back(std::move(uptrDSet));
@@ -995,10 +995,10 @@ void RayTracingThousandsApp::_InitDescriptorSets()
 
 		uptrDSet->Init();
 		uptrDSet->StartUpdate();
-		uptrDSet->UpdateBinding(0, m_cameraBuffers[i].get());
+		uptrDSet->UpdateBinding(0, { m_cameraBuffers[i]->GetDescriptorInfo() });
 		uptrDSet->UpdateBinding(1, { m_rtAccelStruct[i].vkAccelerationStructure });
 		uptrDSet->UpdateBinding(2, { imageInfo });
-		uptrDSet->UpdateBinding(3, m_instanceBuffer[i].get());
+		uptrDSet->UpdateBinding(3, { m_instanceBuffer[i]->GetDescriptorInfo() });
 		uptrDSet->FinishUpdate();
 
 		m_rtDSets.push_back(std::move(uptrDSet));
@@ -1612,11 +1612,11 @@ void RayTracingAABBsApp::_InitDescriptorSets()
 
 		uptrDSet->Init();
 		uptrDSet->StartUpdate();
-		uptrDSet->UpdateBinding(0, m_cameraBuffers[i].get());
+		uptrDSet->UpdateBinding(0, { m_cameraBuffers[i]->GetDescriptorInfo() });
 		uptrDSet->UpdateBinding(1, { m_rtAccelStruct.vkAccelerationStructure });
 		uptrDSet->UpdateBinding(2, { imageInfo });
-		uptrDSet->UpdateBinding(3, m_instanceBuffer.get());
-		uptrDSet->UpdateBinding(4, m_spheresBuffer.get());
+		uptrDSet->UpdateBinding(3, { m_instanceBuffer->GetDescriptorInfo() });
+		uptrDSet->UpdateBinding(4, { m_spheresBuffer->GetDescriptorInfo() });
 		uptrDSet->FinishUpdate();
 
 		m_rtDSets.push_back(std::move(uptrDSet));

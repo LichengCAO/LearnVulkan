@@ -414,9 +414,9 @@ void RayQueryApp::_InitDescriptorSets()
 
 		uptrDSet->Init();
 		uptrDSet->StartUpdate();
-		uptrDSet->UpdateBinding(0, m_cameraBuffers[i].get());
+		uptrDSet->UpdateBinding(0, { m_cameraBuffers[i]->GetDescriptorInfo() });
 		uptrDSet->UpdateBinding(1, { m_rtAccelStruct.vkAccelerationStructure });
-		uptrDSet->UpdateBinding(2, m_instanceBuffer.get());
+		uptrDSet->UpdateBinding(2, { m_instanceBuffer->GetDescriptorInfo() });
 		uptrDSet->FinishUpdate();
 
 		m_rtDSets.push_back(std::move(uptrDSet));
@@ -428,7 +428,7 @@ void RayQueryApp::_InitDescriptorSets()
 
 		uptrDSet->Init();
 		uptrDSet->StartUpdate();
-		uptrDSet->UpdateBinding(0, m_modelBuffers[i].get());
+		uptrDSet->UpdateBinding(0, { m_modelBuffers[i]->GetDescriptorInfo() });
 		uptrDSet->FinishUpdate();
 
 		m_modelDSets.push_back(std::move(uptrDSet));

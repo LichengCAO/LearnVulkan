@@ -27,17 +27,31 @@ configure_file (
     "${PROJECT_SOURCE_DIR}/src/config.h"
 )
 
-file(GLOB SOURCES
-     "src/*.cpp"
-)
-file(GLOB HEADERS
-    "src/*.h"
-    "src/*.hpp"
-)
+#ref: https://blog.csdn.net/vv1025/article/details/131117925
+macro(source_group_by_dir source_files)
+    if(MSVC)
+        set(sgbd_cur_dir ${CMAKE_CURRENT_SOURCE_DIR})
+        foreach(sgbd_file ${${source_files}})
+            string(REGEX REPLACE ${sgbd_cur_dir}/\(.*\) \\1 sgbd_fpath ${sgbd_file})
+            string(REGEX REPLACE "\(.*\)/.*" \\1 sgbd_group_name ${sgbd_fpath})
+            string(COMPARE EQUAL ${sgbd_fpath} ${sgbd_group_name} sgbd_nogroup)
+            string(REPLACE "/" "\\" sgbd_group_name ${sgbd_group_name})
+            if(sgbd_nogroup)
+                set(sgbd_group_name "\\")
+            endif(sgbd_nogroup)
+            source_group(${sgbd_group_name} FILES ${sgbd_file})
+        endforeach(sgbd_file)
+    endif(MSVC)
+endmacro(source_group_by_dir)
 
-source_group("Sources" FILES ${SOURCES})
-source_group("Headers" FILES ${HEADERS})
-add_executable(${CMAKE_PROJECT_NAME} ${SOURCES} ${HEADERS})
+file(GLOB_RECURSE SOURCES "src/*.cpp")
+file(GLOB_RECURSE HEADERS "src/*.h" "src/*.hpp")
+
+set(ALL_FILES ${HEADERS} ${SOURCES})
+
+source_group_by_dir(ALL_FILES)
+
+add_executable(${CMAKE_PROJECT_NAME} ${ALL_FILES})
 
 # Set the startup project for Visual Studio
 set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT ${CMAKE_PROJECT_NAME})
@@ -45,5 +59,23 @@ set_property(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR} PROPERTY VS_STARTUP_PROJECT $
 add_subdirectory(external)
 add_subdirectory(res)
 set_target_properties(ExternalLibs PROPERTIES FOLDER "ThirdParty")
+target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE "./src/")
 target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC ExternalLibs)
+
+macro(include_directories_by_dir source_files)
+    if(MSVC)
+        set(sgbd_cur_dir ${CMAKE_CURRENT_SOURCE_DIR})
+        foreach(sgbd_file ${${source_files}})
+            string(REGEX REPLACE ${sgbd_cur_dir}/\(.*\) \\1 sgbd_fpath ${sgbd_file})
+            string(REGEX REPLACE "\(.*\)/.*" \\1 sgbd_group_name ${sgbd_fpath})
+            string(COMPARE EQUAL ${sgbd_fpath} ${sgbd_group_name} sgbd_nogroup)
+            string(REPLACE "/" "\\" sgbd_group_name ${sgbd_group_name})
+            if(sgbd_nogroup)
+                set(sgbd_group_name "\\")
+            endif(sgbd_nogroup)
+            target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE ${sgbd_group_name})
+        endforeach(sgbd_file)
+    endif(MSVC)
+endmacro(include_directories_by_dir)
+include_directories_by_dir(ALL_FILES)
 

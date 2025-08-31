@@ -74,6 +74,8 @@ public:
 	
 	VkDeviceAddress GetDeviceAddress() const;
 
+	VkDescriptorBufferInfo GetDescriptorInfo() const;
+
 	BufferView NewBufferView(VkFormat _format);
 };
 
@@ -130,8 +132,10 @@ public:
 
 	void StartBuild();
 
+	// _pData must be valid till the end of build
 	VkDeviceSize AppendToBuffer(const void* _pData, size_t _size, VkDeviceSize _alignment);
 
+	// _pData must be valid till the end of build
 	VkDeviceSize AppendToBuffer(const void* _pData, size_t _size);
 
 	void FinishBuild(Buffer*& _initedBuffer);
