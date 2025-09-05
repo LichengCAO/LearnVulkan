@@ -740,15 +740,15 @@ void TransparentApp::_InitImagesAndViews()
 				gbufferViews.back().Init();
 			}
 		}
-		for (int i = 0; i < n; ++i)
-		{
-			m_gbufferAlbedoImages.push_back(Image{});
-			Image& gbufferImage = m_gbufferAlbedoImages.back();
-			gbufferImage.SetImageInformation(gbufferAlbedoImageInfo);
-			gbufferImage.Init();
-			m_gbufferAlbedoImageViews.push_back(gbufferImage.NewImageView(VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u));
-			m_gbufferAlbedoImageViews.back().Init();
-		}
+		//for (int i = 0; i < n; ++i)
+		//{
+		//	//m_gbufferAlbedoImages.push_back(Image{});
+		//	Image& gbufferImage = m_gbufferAlbedoImages[i];
+		//	//gbufferImage.SetImageInformation(gbufferAlbedoImageInfo);
+		//	//gbufferImage.Init();
+		//	m_gbufferAlbedoImageViews.push_back(gbufferImage.NewImageView(VK_IMAGE_ASPECT_COLOR_BIT, 0u, 1u));
+		//	m_gbufferAlbedoImageViews.back().Init();
+		//}
 		for (int i = 0; i < n; ++i)
 		{
 			m_gbufferReadAlbedoImageViews.push_back(m_gbufferAlbedoImages[i].NewImageView(VK_IMAGE_ASPECT_COLOR_BIT, 0u, m_mipLevel));
@@ -1676,6 +1676,7 @@ void TransparentApp::_UpdateUniformBuffer()
 	CameraUBO ubo{};
 	VkExtent2D swapchainExtent = MyDevice::GetInstance().GetSwapchainExtent();
 	ubo.proj = m_camera.GetProjectionMatrix();
+	ubo.proj[1][1] *= -1; //TODO: debug this
 	ubo.view = m_camera.GetViewMatrix();
 	ubo.eye = glm::vec4(m_camera.eye, 1.0f);
 	m_cameraBuffers[m_currentFrame].CopyFromHost(&ubo);

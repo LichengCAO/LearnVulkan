@@ -335,7 +335,7 @@ void DescriptorSetManager::_ProcessPlan()
 		else if (plan.accelStructBind.size() > 0 && (!curBindInfo.IsBindTo(plan.accelStructBind)))
 		{
 			pDescriptorSet->UpdateBinding(plan.location, plan.accelStructBind);
-			curBindInfo.varBinding = plan.accelStructBind[0];
+			//curBindInfo.varBinding = plan.accelStructBind[0];
 		}
 		else
 		{
@@ -625,10 +625,10 @@ bool DescriptorSetManager::DescriptorBindRecord::IsBound() const
 {
 	bool result = false;
 
-	if (!std::holds_alternative<std::monostate>(varBinding))
-	{
-		result = true;
-	}
+	//if (!std::holds_alternative<std::monostate>(varBinding))
+	//{
+	//	result = true;
+	//}
 
 	return result;
 }
@@ -674,11 +674,11 @@ bool DescriptorSetManager::DescriptorBindRecord::IsBindTo(const std::vector<VkAc
 {
 	bool result = false;
 
-	if (const auto pVar = std::get_if<VkAccelerationStructureKHR>(&varBinding))
-	{
-		VkAccelerationStructureKHR vkAccelStruct = *pVar;
-		result = (vkAccelStruct == _input[0]);
-	}
+	//if (const auto pVar = std::get_if<VkAccelerationStructureKHR>(&varBinding))
+	//{
+	//	VkAccelerationStructureKHR vkAccelStruct = *pVar;
+	//	result = (vkAccelStruct == _input[0]);
+	//}
 
 	return result;
 }

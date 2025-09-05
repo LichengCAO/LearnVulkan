@@ -16,7 +16,8 @@ public:
 private:
 	struct DescriptorBindRecord
 	{
-		std::variant<VkDescriptorImageInfo, VkBufferView, VkDescriptorBufferInfo, VkAccelerationStructureKHR> varBinding;
+		//std::variant<VkDescriptorImageInfo, VkBufferView, VkDescriptorBufferInfo, VkAccelerationStructureKHR> varBinding;
+		std::variant<VkDescriptorImageInfo, VkBufferView, VkDescriptorBufferInfo> varBinding;
 
 		// return true if the descriptor is bound with something
 		bool IsBound() const;

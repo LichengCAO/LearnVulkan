@@ -139,7 +139,7 @@ uint32_t DescriptorSetLayout::AddBinding(
 {
 	uint32_t binding = static_cast<uint32_t>(bindings.size());
 
-	return AddBinding(binding, descriptorType, stageFlags, pImmutableSamplers);
+	return AddBinding(binding, descriptorCount, descriptorType, stageFlags, pImmutableSamplers);
 }
 
 uint32_t DescriptorSetLayout::AddBinding(
