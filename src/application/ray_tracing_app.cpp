@@ -528,10 +528,6 @@ void RayTracingApp::_UpdateUniformBuffer()
 		m_camera.MoveTo(mov);
 	}
 
-	//ubo.proj[1][1] *= -1;
-	//ubo.F = glm::vec4(glm::normalize(m_camera.ref - m_camera.eye), 1.0f);
-	//ubo.V = glm::vec4(m_camera.V, 1.0f);
-	//ubo.H = glm::vec4(m_camera.H, 1.0f);
 	ubo.inverseViewProj = glm::inverse(m_camera.GetViewProjectionMatrix());
 	ubo.eye = glm::vec4(m_camera.eye, 1.0f);
 	m_cameraBuffers[m_currentFrame]->CopyFromHost(&ubo);

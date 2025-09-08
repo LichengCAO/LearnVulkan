@@ -147,9 +147,9 @@ void main()
 			uint uGlobalTriangleOffset = uTriangleOffset + uMeshletPrimitiveIndex * 3;
 			
 			gl_PrimitiveTriangleIndicesEXT[uMeshletPrimitiveIndex + uPrimitiveTriangleOffset] = uvec3(
-				meshletTriangles[uGlobalTriangleOffset + 2],
+				meshletTriangles[uGlobalTriangleOffset + 0],
 				meshletTriangles[uGlobalTriangleOffset + 1],
-				meshletTriangles[uGlobalTriangleOffset + 0]
+				meshletTriangles[uGlobalTriangleOffset + 2]
 			);
 		}
 

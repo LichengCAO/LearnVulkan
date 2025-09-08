@@ -84,9 +84,9 @@ void main()
 	{
 		uint offset = meshlet.triangleOffset + i * 3;
 		gl_PrimitiveTriangleIndicesEXT[i] = uvec3(
-			meshletTriangles[offset + 2],
+			meshletTriangles[offset + 0],
 			meshletTriangles[offset + 1],
-			meshletTriangles[offset + 0]
+			meshletTriangles[offset + 2]
 		);
 	}
 }

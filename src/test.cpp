@@ -7,8 +7,8 @@ int main() {
 	//RayQueryApp app;
 	//RayTracingApp app;
 	//RayTracingThousandsApp app;
-	//MeshletApp app;
-	TransparentApp app;
+	MeshletApp app;
+	//TransparentApp app;
 	app.Run(); // easier to debug this way
 	//try {
 	//	app.Run();

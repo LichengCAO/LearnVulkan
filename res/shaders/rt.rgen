@@ -18,7 +18,6 @@ void GetRayOriginAndDirection(out vec3 rayOrigin, out vec3 rayDirection)
 {
     const vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
     vec2 inUV = pixelCenter/vec2(gl_LaunchSizeEXT.xy);
-    inUV.y = 1.0 - inUV.y; // Flip Y coordinate for OpenGL
     vec4 clipSpacePos = vec4(inUV * 2.0 - 1.0, 0.0, 1.0);
     rayOrigin = cameraInfo.eye.xyz;
     vec4 refPos = cameraInfo.inverseViewProj * clipSpacePos;
