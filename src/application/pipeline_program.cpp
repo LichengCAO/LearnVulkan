@@ -1,6 +1,37 @@
 #include "pipeline_program.h"
 #include <algorithm>
 
+namespace
+{
+
+	bool operator==(const VkDescriptorImageInfo& lhs, const VkDescriptorImageInfo& rhs) { return lhs.imageView == rhs.imageView; };
+	bool operator==(const VkDescriptorBufferInfo& lhs, const VkDescriptorBufferInfo& rhs) { return lhs.buffer == rhs.buffer; };
+
+}
+
+#define DESCRIPTOR_VARIANT(_T)	private:\
+									std::optional<_T> m_opt##_T;\
+								public:\
+									void Bind##_T(const std::vector<_T>& _input){ m_opt##_T = _input[0]; isBound = true; };\
+									bool IsBindTo##_T(const std::vector<_T>& _input) const { return m_opt##_T.has_value() && m_opt##_T.value() == _input[0]; };
+
+static class DescriptorBindRecord
+{
+private:
+	bool isBound = false;
+	DESCRIPTOR_VARIANT(VkDescriptorImageInfo);
+	DESCRIPTOR_VARIANT(VkBufferView);
+	DESCRIPTOR_VARIANT(VkDescriptorBufferInfo);
+	DESCRIPTOR_VARIANT(VkAccelerationStructureKHR);
+
+public:
+	// return true if the descriptor is bound with something
+	bool IsBound() const { return isBound; };
+
+};
+
+#undef DESCRIPTOR_VARIANT
+
 bool DescriptorSetManager::_GetDescriptorLocation(const std::string& _name, uint32_t& _set, uint32_t& _binding) const
 {
 	const auto itr = m_mapNameToSetBinding.find(_name);
@@ -188,19 +219,19 @@ void DescriptorSetManager::_ProcessPlan()
 						{
 							if (plan.bufferBind.size() > 0)
 							{
-								isValid = record.IsBindTo(plan.bufferBind);
+								isValid = record.IsBindToVkDescriptorBufferInfo(plan.bufferBind);
 							}
 							else if (plan.imageBind.size() > 0)
 							{
-								isValid = record.IsBindTo(plan.imageBind);
+								isValid = record.IsBindToVkDescriptorImageInfo(plan.imageBind);
 							}
 							else if (plan.viewBind.size() > 0)
 							{
-								isValid = record.IsBindTo(plan.viewBind);
+								isValid = record.IsBindToVkBufferView(plan.viewBind);
 							}
 							else if (plan.accelStructBind.size() > 0)
 							{
-								isValid = record.IsBindTo(plan.accelStructBind);
+								isValid = record.IsBindToVkAccelerationStructureKHR(plan.accelStructBind);
 							}
 						}
 						if (!isValid) break;
@@ -262,19 +293,19 @@ void DescriptorSetManager::_ProcessPlan()
 						{
 							if (plan.bufferBind.size() > 0)
 							{
-								isValid = record.IsBindTo(plan.bufferBind);
+								isValid = record.IsBindToVkDescriptorBufferInfo(plan.bufferBind);
 							}
 							else if (plan.imageBind.size() > 0)
 							{
-								isValid = record.IsBindTo(plan.imageBind);
+								isValid = record.IsBindToVkDescriptorImageInfo(plan.imageBind);
 							}
 							else if (plan.viewBind.size() > 0)
 							{
-								isValid = record.IsBindTo(plan.viewBind);
+								isValid = record.IsBindToVkBufferView(plan.viewBind);
 							}
 							else if (plan.accelStructBind.size() > 0)
 							{
-								isValid = record.IsBindTo(plan.accelStructBind);
+								isValid = record.IsBindToVkAccelerationStructureKHR(plan.accelStructBind);
 							}
 						}
 						if (!isValid) break;
@@ -317,25 +348,25 @@ void DescriptorSetManager::_ProcessPlan()
 		auto pDescriptorSetData = pDescriptorSetDatas[plan.set];
 		auto pDescriptorSet = pDescriptorSetData->uptrDescriptorSet.get();
 		auto curBindInfo = pDescriptorSetData->bindInfo[plan.location];
-		if (plan.bufferBind.size() > 0 && (!curBindInfo.IsBindTo(plan.bufferBind)))
+		if (plan.bufferBind.size() > 0 && (!curBindInfo.IsBindToVkDescriptorBufferInfo(plan.bufferBind)))
 		{
 			pDescriptorSet->UpdateBinding(plan.location, plan.bufferBind);
-			curBindInfo.varBinding = plan.bufferBind[0];
+			curBindInfo.BindVkDescriptorBufferInfo(plan.bufferBind);
 		}
-		else if (plan.imageBind.size() > 0 && (!curBindInfo.IsBindTo(plan.imageBind)))
+		else if (plan.imageBind.size() > 0 && (!curBindInfo.IsBindToVkDescriptorImageInfo(plan.imageBind)))
 		{
 			pDescriptorSet->UpdateBinding(plan.location, plan.imageBind);
-			curBindInfo.varBinding = plan.imageBind[0];
+			curBindInfo.BindVkDescriptorImageInfo(plan.imageBind);
 		}
-		else if (plan.viewBind.size() > 0 && (!curBindInfo.IsBindTo(plan.viewBind)))
+		else if (plan.viewBind.size() > 0 && (!curBindInfo.IsBindToVkBufferView(plan.viewBind)))
 		{
 			pDescriptorSet->UpdateBinding(plan.location, plan.viewBind);
-			curBindInfo.varBinding = plan.viewBind[0];
+			curBindInfo.BindVkBufferView(plan.viewBind);
 		}
-		else if (plan.accelStructBind.size() > 0 && (!curBindInfo.IsBindTo(plan.accelStructBind)))
+		else if (plan.accelStructBind.size() > 0 && (!curBindInfo.IsBindToVkAccelerationStructureKHR(plan.accelStructBind)))
 		{
 			pDescriptorSet->UpdateBinding(plan.location, plan.accelStructBind);
-			//curBindInfo.varBinding = plan.accelStructBind[0];
+			curBindInfo.IsBindToVkAccelerationStructureKHR(plan.accelStructBind);
 		}
 		else
 		{
@@ -619,66 +650,4 @@ DescriptorSetManager::DescriptorSetData::~DescriptorSetData()
 		uptrDescriptorSet.reset();
 	}
 	bindInfo.clear();
-}
-
-bool DescriptorSetManager::DescriptorBindRecord::IsBound() const
-{
-	bool result = false;
-
-	//if (!std::holds_alternative<std::monostate>(varBinding))
-	//{
-	//	result = true;
-	//}
-
-	return result;
-}
-
-bool DescriptorSetManager::DescriptorBindRecord::IsBindTo(const std::vector<VkDescriptorImageInfo>& _input) const
-{
-	bool result = false;
-	
-	if (const auto pVar = std::get_if<VkDescriptorImageInfo>(&varBinding))
-	{
-		result = (pVar->imageView == _input[0].imageView);
-	}
-
-	return result;
-}
-
-bool DescriptorSetManager::DescriptorBindRecord::IsBindTo(const std::vector<VkBufferView>& _input) const
-{
-	bool result = false;
-
-	if (const auto pVar = std::get_if<VkBufferView>(&varBinding))
-	{
-		VkBufferView vkView = *pVar;
-		result = (vkView == _input[0]);
-	}
-
-	return result;
-}
-
-bool DescriptorSetManager::DescriptorBindRecord::IsBindTo(const std::vector<VkDescriptorBufferInfo>& _input) const
-{
-	bool result = false;
-
-	if (const auto pVar = std::get_if<VkDescriptorBufferInfo>(&varBinding))
-	{
-		result = (pVar->buffer == _input[0].buffer);
-	}
-
-	return result;
-}
-
-bool DescriptorSetManager::DescriptorBindRecord::IsBindTo(const std::vector<VkAccelerationStructureKHR>& _input) const
-{
-	bool result = false;
-
-	//if (const auto pVar = std::get_if<VkAccelerationStructureKHR>(&varBinding))
-	//{
-	//	VkAccelerationStructureKHR vkAccelStruct = *pVar;
-	//	result = (vkAccelStruct == _input[0]);
-	//}
-
-	return result;
 }

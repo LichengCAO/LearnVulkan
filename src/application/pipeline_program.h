@@ -3,6 +3,8 @@
 #include "pipeline_io.h"
 #include <variant>
 
+class DescriptorBindRecord;
+
 class DescriptorSetManager
 {
 public:
@@ -14,20 +16,6 @@ public:
 	};
 
 private:
-	struct DescriptorBindRecord
-	{
-		//std::variant<VkDescriptorImageInfo, VkBufferView, VkDescriptorBufferInfo, VkAccelerationStructureKHR> varBinding;
-		std::variant<VkDescriptorImageInfo, VkBufferView, VkDescriptorBufferInfo> varBinding;
-
-		// return true if the descriptor is bound with something
-		bool IsBound() const;
-		
-		// return true if the descriptor is bound with the input
-		bool IsBindTo(const std::vector<VkDescriptorImageInfo>& _input) const;
-		bool IsBindTo(const std::vector<VkBufferView>& _input) const;
-		bool IsBindTo(const std::vector<VkDescriptorBufferInfo>& _input) const;
-		bool IsBindTo(const std::vector<VkAccelerationStructureKHR>& _input) const;
-	};
 	struct DescriptorSetData
 	{
 		std::unique_ptr<DescriptorSet> uptrDescriptorSet;
