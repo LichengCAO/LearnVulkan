@@ -1,4 +1,6 @@
 #include "pipeline_program.h"
+#include "commandbuffer.h"
+#include "my_vulkan/shader.h"
 #include <algorithm>
 
 namespace
@@ -366,7 +368,7 @@ void DescriptorSetManager::_ProcessPlan()
 		else if (plan.accelStructBind.size() > 0 && (!curBindInfo.IsBindToVkAccelerationStructureKHR(plan.accelStructBind)))
 		{
 			pDescriptorSet->UpdateBinding(plan.location, plan.accelStructBind);
-			curBindInfo.IsBindToVkAccelerationStructureKHR(plan.accelStructBind);
+			curBindInfo.BindVkAccelerationStructureKHR(plan.accelStructBind);
 		}
 		else
 		{
@@ -590,13 +592,12 @@ void DescriptorSetManager::BindDescriptor(
 
 void DescriptorSetManager::EndBind()
 {
-	uint32_t uDescriptorSetCount = m_vkDescriptorSetBindingInfo.size();
-
 	if (m_vecUptrDescriptorSetLayout.size() == 0)
 	{
 		_InitDescriptorSetLayouts();
 	}
 
+	CHECK_TRUE(m_pCurrentDescriptorSets.size() == 0, "Descriptors already bound once!");
 	_ProcessPlan();
 }
 
@@ -650,4 +651,205 @@ DescriptorSetManager::DescriptorSetData::~DescriptorSetData()
 		uptrDescriptorSet.reset();
 	}
 	bindInfo.clear();
+}
+
+void GraphicsProgram::_InitPipeline()
+{
+	std::vector<SimpleShader> shaders;
+	ShaderReflector reflector{};
+
+	reflector.Init(m_vecShaderPath);
+	reflector.PrintReflectResult();
+	m_uptrPipeline = std::make_unique<GraphicsPipeline>();
+	shaders.reserve(m_vecShaderPath.size());
+	for (const auto& path : m_vecShaderPath)
+	{
+		SimpleShader shader{};
+		shader.SetSPVFile(path);
+		shader.Init();
+		m_uptrPipeline->AddShader(shader.GetShaderStageInfo());
+		shaders.push_back(std::move(shader));
+	}
+
+	// setup descriptor set layouts
+	{
+		std::vector<VkDescriptorSetLayout> vkLayouts{};
+		m_uptrDescriptorSetManager->GetDescriptorSetLayouts(vkLayouts);
+
+		for (const auto& layout : vkLayouts)
+		{
+			m_uptrPipeline->AddDescriptorSetLayout(layout);
+		}
+	}
+
+	// add push constants
+	{
+		std::unordered_map<std::string, uint32_t> mapIndex;
+		std::vector<std::pair<VkShaderStageFlags, uint32_t>> pushConstInfo;
+		reflector.ReflectPushConst(mapIndex, pushConstInfo);
+
+		for (const auto& info : pushConstInfo)
+		{
+			m_uptrPipeline->AddPushConstant(info.first, info.second);
+		}
+	}
+
+	switch (m_type)
+	{
+	case GraphicsProgram::PipelineType::DRAW:
+	{
+
+	}
+		break;
+	case GraphicsProgram::PipelineType::DRAW_INDEXED:
+	{
+
+	}
+		break;
+	case GraphicsProgram::PipelineType::MESH:
+	{
+
+	}
+		break;
+	default:
+		CHECK_TRUE(false, "Type uninitialized!");
+		break;
+	}
+
+	for (auto& shader : shaders)
+	{
+
+	}
+}
+
+void GraphicsProgram::_UninitPipeline()
+{
+	if (m_uptrPipeline)
+	{
+		m_uptrPipeline->Uninit();
+		m_uptrPipeline.reset();
+	}
+}
+
+void GraphicsProgram::Init(const std::vector<std::string>& _shaderPaths)
+{
+	m_vecShaderPath = _shaderPaths;
+	m_uptrDescriptorSetManager = std::make_unique<DescriptorSetManager>();
+	m_uptrDescriptorSetManager->Init(_shaderPaths);
+}
+
+void GraphicsProgram::NextFrame()
+{
+	if (m_uptrDescriptorSetManager)
+	{
+		m_uptrDescriptorSetManager->NextFrame();
+	}
+}
+
+DescriptorSetManager& GraphicsProgram::GetDescriptorSetManager()
+{
+	return *m_uptrDescriptorSetManager;
+}
+
+void GraphicsProgram::BindVertexBuffers(uint32_t _vertexCount, const std::vector<VkBuffer>& _vertexBuffers)
+{
+	m_type = PipelineType::DRAW;
+	m_pipelineVariant.vertexCount = _vertexCount;
+	m_vkBuffers = _vertexBuffers;
+}
+
+void GraphicsProgram::BindIndexedVertexBuffers(
+	uint32_t _indexCount, 
+	VkBuffer _indexBuffer, 
+	const std::vector<VkBuffer>& _vertexBuffers,
+	VkIndexType _indexType)
+{
+	m_type = PipelineType::DRAW_INDEXED;
+	m_pipelineVariant.indexCount = _indexCount;
+	m_vkBuffers.clear();
+	m_vkBuffers.push_back(_indexBuffer);
+	m_vkBuffers.insert(m_vkBuffers.end(), _vertexBuffers.begin(), _vertexBuffers.end());
+	m_vkIndexType = _indexType;
+}
+
+void GraphicsProgram::DispatchWorkGroup(uint32_t _groupCountX, uint32_t _groupCountY, uint32_t _groupCountZ)
+{
+	m_type = PipelineType::MESH;
+	m_pipelineVariant.workGroups[0] = _groupCountX;
+	m_pipelineVariant.workGroups[1] = _groupCountY;
+	m_pipelineVariant.workGroups[2] = _groupCountZ;
+}
+
+void GraphicsProgram::PushConstant(VkShaderStageFlagBits _stages, const void* _data)
+{
+	m_pushConstants.push_back({ _stages, _data });
+}
+
+void GraphicsProgram::Apply(CommandSubmission* _pCmd, const VkExtent2D& _imageSize)
+{
+	if (!m_uptrPipeline)
+	{
+		_InitPipeline();
+	}
+	switch (m_type)
+	{
+	case GraphicsProgram::PipelineType::DRAW:
+	{
+		GraphicsPipeline::PipelineInput_Draw input{};
+		input.imageSize = _imageSize;
+		m_uptrDescriptorSetManager->GetCurrentDescriptorSets(input.vkDescriptorSets, input.optDynamicOffsets);
+		input.pushConstants = m_pushConstants;
+		input.vertexCount = m_pipelineVariant.vertexCount;
+		input.vertexBuffers = m_vkBuffers;
+
+		m_uptrPipeline->Do(_pCmd->vkCommandBuffer, input);
+	}
+		break;
+	case GraphicsProgram::PipelineType::DRAW_INDEXED:
+	{
+		GraphicsPipeline::PipelineInput_DrawIndexed input{};
+		input.imageSize = _imageSize;
+		m_uptrDescriptorSetManager->GetCurrentDescriptorSets(input.vkDescriptorSets, input.optDynamicOffsets);
+		input.pushConstants = m_pushConstants;
+		input.vertexBuffers = std::vector<VkBuffer>(m_vkBuffers.begin() + 1, m_vkBuffers.end());
+		input.indexBuffer = m_vkBuffers[0];
+		input.vkIndexType = m_vkIndexType;
+		input.indexCount = m_pipelineVariant.indexCount;
+
+		m_uptrPipeline->Do(_pCmd->vkCommandBuffer, input);
+	}
+		break;
+	case GraphicsProgram::PipelineType::MESH:
+	{
+		GraphicsPipeline::PipelineInput_Mesh input{};
+		input.imageSize = _imageSize;
+		input.pushConstants = m_pushConstants;
+		m_uptrDescriptorSetManager->GetCurrentDescriptorSets(input.vkDescriptorSets, input.optDynamicOffsets);
+		input.groupCountX = m_pipelineVariant.workGroups[0];
+		input.groupCountY = m_pipelineVariant.workGroups[1];
+		input.groupCountZ = m_pipelineVariant.workGroups[2];
+		
+		m_uptrPipeline->Do(_pCmd->vkCommandBuffer, input);
+	}
+		break;
+	default:
+		CHECK_TRUE(false, "Not supported graphics pipeline type!");
+		break;
+	}
+}
+
+void GraphicsProgram::Uninit()
+{
+	_UninitPipeline();
+	if (m_uptrDescriptorSetManager)
+	{
+		m_uptrDescriptorSetManager->Uninit();
+		m_uptrDescriptorSetManager.reset();
+	}
+	m_vecShaderPath.clear();
+	m_type = PipelineType::UNDEFINED;
+	m_vkBuffers.clear();
+	m_vkIndexType = VK_INDEX_TYPE_UINT32;
+	m_pipelineVariant = PipelineVariant{};
+	m_pushConstants.clear();
 }

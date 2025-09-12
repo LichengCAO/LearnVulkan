@@ -1,7 +1,7 @@
 #pragma once
 #include "shader_reflect.h"
 #include "pipeline_io.h"
-#include <variant>
+#include "pipeline.h"
 
 class DescriptorBindRecord;
 
@@ -32,8 +32,6 @@ private:
 		std::vector<VkDescriptorBufferInfo>		bufferBind;
 		std::vector<VkAccelerationStructureKHR> accelStructBind;
 	};
-
-private:
 	struct DynamicOffsetRecord
 	{
 		uint32_t set = 0;
@@ -89,8 +87,8 @@ private:
 	void _PlanBinding(const BindPlan& _bindPlan);
 
 	// in this function, I create descriptor sets based on descriptor layouts and
-	// descriptor set allocate stratigies, which suggest us to cache or update descriptor sets
-	// when neccessary
+	// descriptor set allocate strategies, which suggest us to cache or update descriptor sets
+	// when necessary
 	void _ProcessPlan();
 
 public:
@@ -98,7 +96,7 @@ public:
 	
 	~DescriptorSetManager();
 
-	void Init(const std::vector<std::string>& _pipelineShaders, uint32_t _uFrameInFlightCount = 1);
+	void Init(const std::vector<std::string>& _pipelineShaders, uint32_t _uFrameInFlightCount = 3);
 
 	void NextFrame();
 
@@ -178,21 +176,39 @@ public:
 	void Uninit();
 };
 
-class PipelineProgram
+class CommandSubmission;
+
+class GraphicsProgram
 {
-public:
-
+private:
+	enum class PipelineType {
+		UNDEFINED,
+		DRAW,
+		DRAW_INDEXED,
+		MESH
+	};
+	
+	union PipelineVariant
+	{
+		uint32_t workGroups[3];
+		uint32_t indexCount;
+		uint32_t vertexCount;
+	};
 
 private:
-	bool m_bPipelineLayoutReady = false;
-	bool m_bPipelineReady = false;
-	std::unique_ptr<ShaderReflector> m_uptrReflector;
+	std::unique_ptr<DescriptorSetManager> m_uptrDescriptorSetManager;
+	std::unique_ptr<GraphicsPipeline> m_uptrPipeline;
+	std::vector<std::string> m_vecShaderPath;
+	
+	PipelineType m_type = PipelineType::UNDEFINED;
+
+	std::vector<VkBuffer> m_vkBuffers; // for draw-indexed, 0 is index buffer
+	VkIndexType		m_vkIndexType = VK_INDEX_TYPE_UINT32;
+	PipelineVariant m_pipelineVariant;
+
+	std::vector<std::pair<VkShaderStageFlagBits, const void*>> m_pushConstants;
 
 private:
-	void _InitDescriptorSetLayouts();
-
-	void _UninitDescriptorSetLayouts();
-
 	void _InitPipeline();
 
 	void _UninitPipeline();
@@ -200,7 +216,25 @@ private:
 public:
 	void Init(const std::vector<std::string>& _shaderPaths);
 
-	bool ApplySelf(CommandSubmission* _pCmd);
+	void NextFrame();
+
+	DescriptorSetManager& GetDescriptorSetManager();
+
+	void BindVertexBuffers(
+		uint32_t _vertexCount, 
+		const std::vector<VkBuffer>& _vertexBuffers);
+	
+	void BindIndexedVertexBuffers(
+		uint32_t _indexCount,
+		VkBuffer _indexBuffer,
+		const std::vector<VkBuffer>& _vertexBuffers,
+		VkIndexType _indexType = VK_INDEX_TYPE_UINT32);
+
+	void DispatchWorkGroup(uint32_t _groupCountX, uint32_t _groupCountY, uint32_t _groupCountZ);
+
+	void PushConstant(VkShaderStageFlagBits _stages, const void* _data);
+
+	void Apply(CommandSubmission* _pCmd, const VkExtent2D& _imageSize);
 
 	void Uninit();
 };
