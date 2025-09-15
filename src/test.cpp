@@ -9,7 +9,7 @@ int main() {
 	//RayTracingThousandsApp app;
 	MeshletApp app;
 	//TransparentApp app;
-	app.Run(); // easier to debug this way
+	//app.Run(); // easier to debug this way
 	//try {
 	//	app.Run();
 	//}
@@ -18,15 +18,15 @@ int main() {
 	//	return EXIT_FAILURE;
 	//}
 
-	//ShaderReflector reflector{};
+	ShaderReflector reflector{};
 
-	//reflector.Init({
-	//	"E:/GitStorage/LearnVulkan/bin/shaders/tri_mesh.vert.spv",
-	//	"E:/GitStorage/LearnVulkan/bin/shaders/trig.frag.spv",
-	//	"E:/GitStorage/LearnVulkan/bin/shaders/oit.frag.spv",
-	//	});
+	reflector.Init({
+		"E:/GitStorage/LearnVulkan/bin/shaders/room.vert.spv",
+		"E:/GitStorage/LearnVulkan/bin/shaders/room.frag.spv",
+		//"E:/GitStorage/LearnVulkan/bin/shaders/oit.frag.spv",
+		});
 
-	//reflector.PrintReflectResult();
+	reflector.PrintReflectResult();
 
 	system("pause");
 	return EXIT_SUCCESS;

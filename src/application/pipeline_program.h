@@ -2,9 +2,13 @@
 #include "shader_reflect.h"
 #include "pipeline_io.h"
 #include "pipeline.h"
+#include <functional>
 
 class DescriptorBindRecord;
+class GraphicsProgram;
+class CommandSubmission;
 
+// builds descriptor set layouts and descriptor sets
 class DescriptorSetManager
 {
 public:
@@ -170,13 +174,13 @@ public:
 
 	void GetCurrentDescriptorSets(std::vector<VkDescriptorSet>& _outDescriptorSets, std::vector<uint32_t>& _outDynamicOffsets);
 
-	// only be valid after the first call of EndBind();
+	// only be valid after the first call of EndBind(), the layout will be filled ordered
 	void GetDescriptorSetLayouts(std::vector<VkDescriptorSetLayout>& _outDescriptorSetLayouts);
 
 	void Uninit();
-};
 
-class CommandSubmission;
+	friend class GraphicsProgram;
+};
 
 class GraphicsProgram
 {
@@ -199,14 +203,23 @@ private:
 	std::unique_ptr<DescriptorSetManager> m_uptrDescriptorSetManager;
 	std::unique_ptr<GraphicsPipeline> m_uptrPipeline;
 	std::vector<std::string> m_vecShaderPath;
+	ShaderReflector	m_shaderReflector;
 	
 	PipelineType m_type = PipelineType::UNDEFINED;
 
-	std::vector<VkBuffer> m_vkBuffers; // for draw-indexed, 0 is index buffer
+	VkBuffer m_indexBuffer = VK_NULL_HANDLE;
+	std::vector<VkBuffer> m_vertexBuffers;
 	VkIndexType		m_vkIndexType = VK_INDEX_TYPE_UINT32;
 	PipelineVariant m_pipelineVariant;
 
 	std::vector<std::pair<VkShaderStageFlagBits, const void*>> m_pushConstants;
+	
+	// for vertex inputs
+	std::vector<std::function<void(GraphicsPipeline*)>> m_lateInitialization;
+	std::unordered_map<uint32_t, VkFormat>				m_mapVertexFormat;
+
+	// binded framebuffer
+	const Framebuffer* m_pFramebuffer = nullptr;
 
 private:
 	void _InitPipeline();
@@ -214,27 +227,44 @@ private:
 	void _UninitPipeline();
 
 public:
+	void SetUpRenderPass(const RenderPass* _pRenderPass, uint32_t _subpass);
+
 	void Init(const std::vector<std::string>& _shaderPaths);
 
 	void NextFrame();
 
 	DescriptorSetManager& GetDescriptorSetManager();
 
-	void BindVertexBuffers(
-		uint32_t _vertexCount, 
-		const std::vector<VkBuffer>& _vertexBuffers);
-	
-	void BindIndexedVertexBuffers(
-		uint32_t _indexCount,
-		VkBuffer _indexBuffer,
-		const std::vector<VkBuffer>& _vertexBuffers,
-		VkIndexType _indexType = VK_INDEX_TYPE_UINT32);
+	void BindVertexBuffer(
+		VkBuffer _vertexBuffer,
+		uint32_t _vertexStride,
+		const std::unordered_map<uint32_t, uint32_t>& _mapLocationOffset);
 
-	void DispatchWorkGroup(uint32_t _groupCountX, uint32_t _groupCountY, uint32_t _groupCountZ);
+	void BindIndexBuffer(
+		VkBuffer _indexBuffer,
+		VkIndexType _indexType = VK_INDEX_TYPE_UINT32);
 
 	void PushConstant(VkShaderStageFlagBits _stages, const void* _data);
 
-	void Apply(CommandSubmission* _pCmd, const VkExtent2D& _imageSize);
+	void BindFramebuffer(
+		CommandSubmission* _pCmd, 
+		const Framebuffer* _pFramebuffer);
+
+	void Draw(
+		CommandSubmission* _pCmd, 
+		uint32_t _vertexCount);
+
+	void DrawIndexed(
+		CommandSubmission* _pCmd,
+		uint32_t _indexCount);
+
+	void DispatchWorkGroup(
+		CommandSubmission* _pCmd,
+		uint32_t _groupCountX, 
+		uint32_t _groupCountY, 
+		uint32_t _groupCountZ);
+
+	void UnbindFramebuffer(CommandSubmission* _pCmd);
 
 	void Uninit();
 };

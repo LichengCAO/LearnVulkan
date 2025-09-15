@@ -19,7 +19,10 @@ public:
 
 	// Add location for this vertex binding, return the index of this location.
 	// Then you can use it in layout(binding = ..., location = <return>) in the shader
-	uint32_t AddLocation(VkFormat _format, uint32_t _offset);
+	// _format: input, format of the input
+	// _offset: input, offset of the data of VBO from host
+	// _location: input, should match layout(location = ...) in shader, if it's ~0, then it will be the count of locations set minus 1
+	uint32_t AddLocation(VkFormat _format, uint32_t _offset, uint32_t _location = ~0);
 
 	// Call after the SetUpVertex() and AddLocation() are called, used in graphics pipeline creation
 	VkVertexInputBindingDescription	GetVertexInputBindingDescription(uint32_t _binding = 0) const;

@@ -72,5 +72,4 @@ public:
 	// After the render result is rendered as VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL (based on PreSetPassThroughImages),
 	// this pass will get a swapchain image, render the result to it and then present the swapchain
 	void Do(const std::vector<CommandSubmission::WaitInformation>& renderFinish);
-
 };

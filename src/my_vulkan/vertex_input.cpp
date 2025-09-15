@@ -6,10 +6,10 @@ void VertexInputLayout::SetUpVertex(uint32_t _stride, VkVertexInputRate _inputRa
 	m_InputRate = _inputRate;
 }
 
-uint32_t VertexInputLayout::AddLocation(VkFormat _format, uint32_t _offset)
+uint32_t VertexInputLayout::AddLocation(VkFormat _format, uint32_t _offset, uint32_t _location)
 {
 	VkVertexInputAttributeDescription attr{};
-	uint32_t ret = static_cast<uint32_t>(m_Locations.size());
+	uint32_t ret = (_location == ~0) ? static_cast<uint32_t>(m_Locations.size()) : _location;
 
 	attr.binding = ~0; // unset
 	attr.format = _format;

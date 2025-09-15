@@ -81,8 +81,11 @@ public:
 	const std::vector<const ImageView*> attachedViews;
 
 private:
-	Framebuffer(const RenderPass* _pRenderPass, const std::vector<const ImageView*> _imageViews)
-		: pRenderPass(_pRenderPass), attachedViews(_imageViews) {};
+	Framebuffer(
+		const RenderPass* _pRenderPass,
+		const std::vector<const ImageView*> _imageViews)
+		: pRenderPass(_pRenderPass),  
+		attachedViews(_imageViews) {};
 
 public:
 	Framebuffer() {};

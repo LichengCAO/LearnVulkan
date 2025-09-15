@@ -119,6 +119,9 @@ public:
 
 	void AddShader(const VkPipelineShaderStageCreateInfo& shaderInfo);
 	void AddVertexInputLayout(const VertexInputLayout* pVertLayout);
+	void AddVertexInputLayout(
+		const VkVertexInputBindingDescription& _bindingDescription, 
+		const std::vector<VkVertexInputAttributeDescription>& _attributeDescriptions);
 	void AddDescriptorSetLayout(const DescriptorSetLayout* pSetLayout);
 	void AddDescriptorSetLayout(VkDescriptorSetLayout vkDSetLayout);
 	void BindToSubpass(const RenderPass* pRenderPass, uint32_t subpass);

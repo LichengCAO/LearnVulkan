@@ -203,6 +203,12 @@ void GraphicsPipeline::AddVertexInputLayout(const VertexInputLayout* pVertLayout
 	}
 }
 
+void GraphicsPipeline::AddVertexInputLayout(const VkVertexInputBindingDescription& _bindingDescription, const std::vector<VkVertexInputAttributeDescription>& _attributeDescriptions)
+{
+	m_vertBindingDescriptions.push_back(_bindingDescription);
+	m_vertAttributeDescriptions.insert(m_vertAttributeDescriptions.end(), _attributeDescriptions.begin(), _attributeDescriptions.end());
+}
+
 void GraphicsPipeline::AddDescriptorSetLayout(const DescriptorSetLayout* pSetLayout)
 {
 	assert(vkPipeline == VK_NULL_HANDLE);
