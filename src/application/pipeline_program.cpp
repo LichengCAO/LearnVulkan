@@ -348,26 +348,38 @@ void DescriptorSetManager::_ProcessPlan()
 	{
 		auto pDescriptorSetData = pDescriptorSetDatas[plan.set];
 		auto pDescriptorSet = pDescriptorSetData->uptrDescriptorSet.get();
-		auto curBindInfo = pDescriptorSetData->bindInfo[plan.location];
-		if (plan.bufferBind.size() > 0 && (!curBindInfo.IsBindToVkDescriptorBufferInfo(plan.bufferBind)))
+		auto& curBindInfo = pDescriptorSetData->bindInfo[plan.location];
+		if (plan.bufferBind.size() > 0)
 		{
-			pDescriptorSet->UpdateBinding(plan.location, plan.bufferBind);
-			curBindInfo.BindVkDescriptorBufferInfo(plan.bufferBind);
+			if (!curBindInfo.IsBindToVkDescriptorBufferInfo(plan.bufferBind))
+			{
+				pDescriptorSet->UpdateBinding(plan.location, plan.bufferBind);
+				curBindInfo.BindVkDescriptorBufferInfo(plan.bufferBind);
+			}
 		}
-		else if (plan.imageBind.size() > 0 && (!curBindInfo.IsBindToVkDescriptorImageInfo(plan.imageBind)))
+		else if (plan.imageBind.size() > 0)
 		{
-			pDescriptorSet->UpdateBinding(plan.location, plan.imageBind);
-			curBindInfo.BindVkDescriptorImageInfo(plan.imageBind);
+			if (!curBindInfo.IsBindToVkDescriptorImageInfo(plan.imageBind))
+			{
+				pDescriptorSet->UpdateBinding(plan.location, plan.imageBind);
+				curBindInfo.BindVkDescriptorImageInfo(plan.imageBind);
+			}
 		}
-		else if (plan.viewBind.size() > 0 && (!curBindInfo.IsBindToVkBufferView(plan.viewBind)))
+		else if (plan.viewBind.size() > 0)
 		{
-			pDescriptorSet->UpdateBinding(plan.location, plan.viewBind);
-			curBindInfo.BindVkBufferView(plan.viewBind);
+			if (!curBindInfo.IsBindToVkBufferView(plan.viewBind))
+			{
+				pDescriptorSet->UpdateBinding(plan.location, plan.viewBind);
+				curBindInfo.BindVkBufferView(plan.viewBind);
+			}
 		}
-		else if (plan.accelStructBind.size() > 0 && (!curBindInfo.IsBindToVkAccelerationStructureKHR(plan.accelStructBind)))
+		else if (plan.accelStructBind.size() > 0)
 		{
-			pDescriptorSet->UpdateBinding(plan.location, plan.accelStructBind);
-			curBindInfo.BindVkAccelerationStructureKHR(plan.accelStructBind);
+			if (!curBindInfo.IsBindToVkAccelerationStructureKHR(plan.accelStructBind))
+			{
+				pDescriptorSet->UpdateBinding(plan.location, plan.accelStructBind);
+				curBindInfo.BindVkAccelerationStructureKHR(plan.accelStructBind);
+			}
 		}
 		else
 		{
@@ -379,11 +391,11 @@ void DescriptorSetManager::_ProcessPlan()
 		pDescriptorSetData->uptrDescriptorSet->FinishUpdate();
 		m_pCurrentDescriptorSets.push_back(pDescriptorSetData->uptrDescriptorSet.get());
 	}
+	m_currentPlan.clear();
 }
 
 DescriptorSetManager::~DescriptorSetManager()
 {
-	Uninit();
 }
 
 void DescriptorSetManager::Init(const std::vector<std::string>& _pipelineShaders, uint32_t _uFrameInFlightCount)
@@ -392,7 +404,6 @@ void DescriptorSetManager::Init(const std::vector<std::string>& _pipelineShaders
 
 	reflector.Init(_pipelineShaders);
 	reflector.ReflectDescriptorSets(m_mapNameToSetBinding, m_vkDescriptorSetBindingInfo);
-	reflector.PrintReflectResult();
 	reflector.Uninit();
 
 	m_uFrameInFlightCount = _uFrameInFlightCount;
@@ -629,6 +640,42 @@ void DescriptorSetManager::GetDescriptorSetLayouts(std::vector<VkDescriptorSetLa
 
 void DescriptorSetManager::Uninit()
 {
+	size_t count = 0;
+	
+	std::cout << "1 descriptor set for all frames: " << m_uptrDescriptorSetSetting0.size() << std::endl;
+	
+	for (auto& i : m_uptrDescriptorSetSetting1)
+	{
+		for (auto& j : i)
+		{
+			count++;
+		}
+	}
+	std::cout << "1 descriptor set for each frame: " << count << std::endl;
+
+	count = 0;
+	for (auto& i : m_uptrDescriptorSetSetting2)
+	{
+		for (auto& j : i)
+		{
+			for (auto& k : j)
+			{
+				count++;
+			}
+		}
+	}
+	std::cout << "1 descriptor set for each bind each frame: " << count << std::endl;
+
+	count = 0;
+	for (auto& i : m_uptrDescriptorSetSetting3)
+	{
+		for (auto& j : i)
+		{
+			count++;
+		}
+	}
+	std::cout << "1 descriptor set for each bind for all frames: " << count << std::endl;
+
 	m_mapNameToSetBinding.clear();
 	m_vkDescriptorSetBindingInfo.clear();
 	m_uptrDescriptorSetSetting0.clear();
@@ -654,16 +701,15 @@ DescriptorSetManager::DescriptorSetData::~DescriptorSetData()
 
 void GraphicsProgram::_InitPipeline()
 {
-	std::vector<SimpleShader> shaders;
+	std::vector<std::unique_ptr<SimpleShader>> shaders;
 
 	m_uptrPipeline = std::make_unique<GraphicsPipeline>();
-	shaders.reserve(m_vecShaderPath.size());
 	for (const auto& path : m_vecShaderPath)
 	{
-		SimpleShader shader{};
-		shader.SetSPVFile(path);
-		shader.Init();
-		m_uptrPipeline->AddShader(shader.GetShaderStageInfo());
+		std::unique_ptr<SimpleShader> shader = std::make_unique<SimpleShader>();
+		shader->SetSPVFile(path);
+		shader->Init();
+		m_uptrPipeline->AddShader(shader->GetShaderStageInfo());
 		shaders.push_back(std::move(shader));
 	}
 
@@ -703,7 +749,7 @@ void GraphicsProgram::_InitPipeline()
 
 	for (auto& shader : shaders)
 	{
-		shader.Uninit();
+		shader->Uninit();
 	}
 	shaders.clear();
 }
@@ -905,4 +951,5 @@ void GraphicsProgram::Uninit()
 	m_pipelineVariant = PipelineVariant{};
 	m_pushConstants.clear();
 	m_shaderReflector.Uninit();
+	m_mapVertexFormat.clear();
 }

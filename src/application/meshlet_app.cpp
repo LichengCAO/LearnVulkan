@@ -9,7 +9,6 @@ void MeshletApp::_Init()
 	pDevice->Init();
 	
 	_InitRenderPass();
-	_InitDescriptorSetLayouts();
 
 	_InitModels();
 	_InitBuffers();
@@ -17,7 +16,6 @@ void MeshletApp::_Init()
 	_InitFramebuffers();
 	_InitSampler();
 
-	_InitDescriptorSets();
 	_InitPipelines();
 	
 	// init semaphores
@@ -49,14 +47,12 @@ void MeshletApp::_Uninit()
 	}
 	
 	_UninitPipelines();
-	_UninitDescriptorSets();
 
 	_UninitFramebuffers();
 	_UninitImagesAndViews();
 	_UninitBuffers();
 	_UninitSampler();
 
-	_UninitDescriptorSetLayouts();
 	_UninitRenderPass();
 
 	pDevice->Uninit();
@@ -81,28 +77,6 @@ void MeshletApp::_UninitRenderPass()
 	m_renderPass.Uninit();
 }
 
-void MeshletApp::_InitDescriptorSetLayouts()
-{
-	m_cameraDSetLayout = DescriptorSetLayout{};
-	m_cameraDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT);
-	m_cameraDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_TASK_BIT_EXT);
-	m_cameraDSetLayout.Init();
-
-	m_meshletDSetLayout = DescriptorSetLayout{};
-	m_meshletDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT); // meshlets
-	m_meshletDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT); // meshlet vertices
-	m_meshletDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT); // meshlet triangles
-	m_meshletDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_MESH_BIT_EXT); // VBOs
-	m_meshletDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_TASK_BIT_EXT | VK_SHADER_STAGE_MESH_BIT_EXT); // model UBO
-	m_meshletDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_TASK_BIT_EXT); // model bounding sbo
-	m_meshletDSetLayout.Init();
-}
-void MeshletApp::_UninitDescriptorSetLayouts()
-{
-	m_meshletDSetLayout.Uninit();
-	m_cameraDSetLayout.Uninit();
-}
-
 void MeshletApp::_InitSampler()
 {
 	m_vkSampler = pDevice->samplerPool.GetSampler(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
@@ -116,6 +90,7 @@ void MeshletApp::_InitModels()
 {
 	std::vector<Mesh> meshs;
 	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/sphere/sphere.obj", meshs);
+	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/wahoo/wahoo.obj", meshs);
 	for (auto& mesh : meshs)
 	{
 		Model model{};
@@ -147,7 +122,6 @@ void MeshletApp::_InitBuffers()
 		m_frustumBuffers.push_back(std::move(frustumBuffer));
 	}
 
-	m_meshletDSets.reserve(n);
 	for (int i = 0; i < n; ++i)
 	{
 		Buffer::Information bufferInfo;
@@ -358,78 +332,18 @@ void MeshletApp::_UninitFramebuffers()
 	m_framebuffers.clear();
 }
 
-void MeshletApp::_InitDescriptorSets()
-{
-	// camera
-	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
-	{
-		std::unique_ptr<DescriptorSet> cameraDSet = std::make_unique<DescriptorSet>(m_cameraDSetLayout.NewDescriptorSet());
-		Buffer const* pCameraBuffer = m_cameraBuffers[i].get();
-		Buffer const* pFrustumBuffer = m_frustumBuffers[i].get();
-		VkDescriptorBufferInfo cameraBufferInfo{};
-		cameraBufferInfo.buffer = pCameraBuffer->vkBuffer;
-		cameraBufferInfo.offset = 0;
-		cameraBufferInfo.range = pCameraBuffer->GetBufferInformation().size;
-		cameraDSet->Init();
-		cameraDSet->StartUpdate();
-		cameraDSet->UpdateBinding(0, { cameraBufferInfo });
-		cameraDSet->UpdateBinding(1, { pFrustumBuffer->GetDescriptorInfo() });
-		cameraDSet->FinishUpdate();
-		m_cameraDSets.push_back(std::move(cameraDSet));
-	}
-
-	// meshlet
-	for (int i = 0; i < m_models.size(); ++i)
-	{
-		std::unique_ptr<DescriptorSet> meshletDSet = std::make_unique<DescriptorSet>(m_meshletDSetLayout.NewDescriptorSet());
-		VkDescriptorBufferInfo bufferInfo{};
-		meshletDSet->Init();
-		meshletDSet->StartUpdate();
-		meshletDSet->UpdateBinding(0, { m_meshletBuffers[i]->GetDescriptorInfo() });
-		meshletDSet->UpdateBinding(1, { m_meshletVertexBuffers[i]->GetDescriptorInfo() });
-		meshletDSet->UpdateBinding(2, { m_meshletTriangleBuffers[i]->GetDescriptorInfo() });
-		meshletDSet->UpdateBinding(3, { m_meshletVBOBuffers[i]->GetDescriptorInfo() });
-		meshletDSet->UpdateBinding(4, { m_meshUBOBuffers[i]->GetDescriptorInfo() });
-		meshletDSet->UpdateBinding(5, { m_meshletBoundsBuffers[i]->GetDescriptorInfo() });
-		meshletDSet->FinishUpdate();
-		m_meshletDSets.push_back(std::move(meshletDSet));
-	}
-}
-void MeshletApp::_UninitDescriptorSets()
-{
-	m_cameraDSets.clear();
-	m_meshletDSets.clear();
-}
-
 void MeshletApp::_InitPipelines()
 {
-	SimpleShader taskShader{};
-	SimpleShader meshShader{};
-	SimpleShader fragShader{};
-
-	m_pipeline.AddDescriptorSetLayout(m_cameraDSetLayout.vkDescriptorSetLayout);
-	m_pipeline.AddDescriptorSetLayout(m_meshletDSetLayout.vkDescriptorSetLayout);
-	m_pipeline.BindToSubpass(&m_renderPass, 0);
-
-	taskShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/flat_task.task.spv");
-	meshShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/flat_task.mesh.spv");
-	fragShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/flat_task.frag.spv");
-	taskShader.Init();
-	meshShader.Init();
-	fragShader.Init();
-
-	m_pipeline.AddShader(taskShader.GetShaderStageInfo());
-	m_pipeline.AddShader(meshShader.GetShaderStageInfo());
-	m_pipeline.AddShader(fragShader.GetShaderStageInfo());
-	m_pipeline.Init();
-
-	fragShader.Uninit();
-	meshShader.Uninit();
-	taskShader.Uninit();
+	m_program.SetUpRenderPass(&m_renderPass, 0);
+	m_program.Init({ 
+		"E:/GitStorage/LearnVulkan/bin/shaders/flat_task.task.spv",
+		"E:/GitStorage/LearnVulkan/bin/shaders/flat_task.mesh.spv",
+		"E:/GitStorage/LearnVulkan/bin/shaders/flat_task.frag.spv"
+		});
 }
 void MeshletApp::_UninitPipelines()
 {
-	m_pipeline.Uninit();
+	m_program.Uninit();
 }
 
 void MeshletApp::_MainLoop()
@@ -495,32 +409,6 @@ void MeshletApp::_UpdateUniformBuffer()
 	frustumUBO.nearFace = cameraFrustum.nearPlane;
 	m_frustumBuffers[m_currentFrame]->CopyFromHost(&frustumUBO);
 
-	//int culled = 0;
-	//for (int i = 0; i < m_tBound.size(); ++i)
-	//{
-	//	glm::vec4 b = m_tBound[i].boundSphere;
-	//	glm::vec4 bcenter = glm::vec4(glm::vec3(b), 1.0f);
-	//	float r = b.w;
-	//	if (
-	//		(glm::dot(bcenter, frustumUBO.leftFace)      < r)
-	//		&& (glm::dot(bcenter, frustumUBO.rightFace)  < r)
-	//		&& (glm::dot(bcenter, frustumUBO.topFace)    < r)
-	//		&& (glm::dot(bcenter, frustumUBO.bottomFace) < r)
-	//		&& (glm::dot(bcenter, frustumUBO.farFace)    < r)
-	//		&& (glm::dot(bcenter, frustumUBO.nearFace)   < r)
-	//		)
-	//	{
-	//		glm::vec4 v = cameraUBO.proj * cameraUBO.view * bcenter;
-	//		v /= v.w;
-	//		std::cout << v[0] << ", " << v[1] << ", " << v[2] << ", " << v[3] << std::endl;
-	//	}
-	//	else
-	//	{
-	//		culled++;
-	//	}
-	//}
-	//std::cout << "culled: " << culled << std::endl;
-
 }
 void MeshletApp::_DrawFrame()
 {
@@ -539,24 +427,60 @@ void MeshletApp::_DrawFrame()
 	waitInfo.waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	cmd->StartCommands({ waitInfo });
 
-	cmd->StartRenderPass(&m_renderPass, m_framebuffers[imageIndex.value()].get());
+	m_program.BindFramebuffer(cmd.get(), m_framebuffers[imageIndex.value()].get());
 	for (int i = 0; i < m_models.size(); ++i)
 	{
-		GraphicsPipeline::PipelineInput_Mesh meshInput{};
+		auto& manager = m_program.GetDescriptorSetManager();
 		const uint32_t meshletCountPerWorkgroup = 32;
+
+		manager.StartBind();
+		
+		manager.BindDescriptor(
+			0, 0, 
+			{ m_cameraBuffers[m_currentFrame]->GetDescriptorInfo() }, 
+			DescriptorSetManager::DESCRIPTOR_BIND_SETTING::CONSTANT_DESCRIPTOR_SET_PER_FRAME);
+		manager.BindDescriptor(
+			0, 1,
+			{ m_frustumBuffers[m_currentFrame]->GetDescriptorInfo() },
+			DescriptorSetManager::DESCRIPTOR_BIND_SETTING::CONSTANT_DESCRIPTOR_SET_PER_FRAME);
+		manager.BindDescriptor(
+			1, 0,
+			{ m_meshletBuffers[i]->GetDescriptorInfo() },
+			DescriptorSetManager::DESCRIPTOR_BIND_SETTING::DEDICATE_DESCRIPTOR_SET_ACROSS_FRAMES);
+		manager.BindDescriptor(
+			1, 1,
+			{ m_meshletVertexBuffers[i]->GetDescriptorInfo() },
+			DescriptorSetManager::DESCRIPTOR_BIND_SETTING::DEDICATE_DESCRIPTOR_SET_ACROSS_FRAMES);
+		manager.BindDescriptor(
+			1, 2,
+			{ m_meshletTriangleBuffers[i]->GetDescriptorInfo()},
+			DescriptorSetManager::DESCRIPTOR_BIND_SETTING::DEDICATE_DESCRIPTOR_SET_ACROSS_FRAMES);
+		manager.BindDescriptor(
+			1, 3,
+			{ m_meshletVBOBuffers[i]->GetDescriptorInfo() },
+			DescriptorSetManager::DESCRIPTOR_BIND_SETTING::DEDICATE_DESCRIPTOR_SET_ACROSS_FRAMES);
+		manager.BindDescriptor(
+			1, 4,
+			{ m_meshUBOBuffers[i]->GetDescriptorInfo() },
+			DescriptorSetManager::DESCRIPTOR_BIND_SETTING::DEDICATE_DESCRIPTOR_SET_ACROSS_FRAMES);
+		manager.BindDescriptor(
+			1, 5,
+			{ m_meshletBoundsBuffers[i]->GetDescriptorInfo() },
+			DescriptorSetManager::DESCRIPTOR_BIND_SETTING::DEDICATE_DESCRIPTOR_SET_ACROSS_FRAMES);
+
+		manager.EndBind();
+		m_program.DispatchWorkGroup(
+			cmd.get(),
+			(static_cast<uint32_t>(m_models[i].vecMeshlet.size()) + meshletCountPerWorkgroup - 1) / meshletCountPerWorkgroup,
+			1,
+			1);
 		// don't use task shader here
 		//meshInput.groupCountX = static_cast<uint32_t>(m_models[i].vecMeshlet.size()); // meshlet count
 		//meshInput.groupCountY = 1;
 		//meshInput.groupCountZ = 1;
-		// use task shader here
-		meshInput.groupCountX = (static_cast<uint32_t>(m_models[i].vecMeshlet.size()) + meshletCountPerWorkgroup - 1) / meshletCountPerWorkgroup; // task workgroup count
-		meshInput.groupCountY = 1;
-		meshInput.groupCountZ = 1;
-		meshInput.imageSize = pDevice->GetSwapchainExtent();
-		meshInput.vkDescriptorSets = { m_cameraDSets[m_currentFrame]->vkDescriptorSet, m_meshletDSets[i]->vkDescriptorSet };
-		m_pipeline.Do(cmd->vkCommandBuffer, meshInput);
 	}
-	cmd->EndRenderPass();
+	m_program.UnbindFramebuffer(cmd.get());
+	m_program.NextFrame();
 
 	VkSemaphore renderpassFinish = cmd->SubmitCommands();
 	MyDevice::GetInstance().PresentSwapchainImage({ renderpassFinish }, imageIndex.value());
@@ -566,15 +490,11 @@ void MeshletApp::_DrawFrame()
 void MeshletApp::_ResizeWindow()
 {
 	vkDeviceWaitIdle(pDevice->vkDevice);
-	//_UninitDescriptorSets();
 	_UninitFramebuffers();
 	_UninitImagesAndViews();
-	//_UninitBuffers();
 	pDevice->RecreateSwapchain();
-	//_InitBuffers();
 	_InitImagesAndViews();
 	_InitFramebuffers();
-	//_InitDescriptorSets();
 }
 
 VkImageLayout MeshletApp::_GetImageLayout(ImageView* pImageView) const

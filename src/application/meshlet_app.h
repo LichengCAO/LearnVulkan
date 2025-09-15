@@ -10,6 +10,7 @@
 #include "device.h"
 #include "transform.h"
 #include "utils.h"
+#include "pipeline_program.h"
 
 class MeshletApp
 {
@@ -77,14 +78,10 @@ private:
 	std::vector<MeshletBoundsSBO> m_tBound;
 
 	// cameraUBO changes across frames, i create buffers for each frame
-	DescriptorSetLayout m_cameraDSetLayout;
-	std::vector<std::unique_ptr<DescriptorSet>> m_cameraDSets;
 	std::vector<std::unique_ptr<Buffer>>        m_cameraBuffers;
 	std::vector<std::unique_ptr<Buffer>>        m_frustumBuffers;
 
 	// following buffers can be used cross frames, so i just create one buffer for one mesh instead of multiple buffers for each frame
-	DescriptorSetLayout m_meshletDSetLayout;
-	std::vector<std::unique_ptr<DescriptorSet>> m_meshletDSets;
 	std::vector<std::unique_ptr<Buffer>> m_meshletBuffers;
 	std::vector<std::unique_ptr<Buffer>> m_meshletVertexBuffers;
 	std::vector<std::unique_ptr<Buffer>> m_meshletTriangleBuffers;
@@ -104,7 +101,7 @@ private:
 	std::vector<std::unique_ptr<Framebuffer>> m_framebuffers;
 
 	//pipelines
-	GraphicsPipeline m_pipeline;
+	GraphicsProgram m_program;
 
 	// semaphores
 	std::vector<VkSemaphore>  m_swapchainImageAvailabilities;
@@ -115,9 +112,6 @@ private:
 
 	void _InitRenderPass();
 	void _UninitRenderPass();
-
-	void _InitDescriptorSetLayouts();
-	void _UninitDescriptorSetLayouts();
 
 	void _InitSampler();
 	void _UninitSampler();
@@ -131,9 +125,6 @@ private:
 
 	void _InitFramebuffers();
 	void _UninitFramebuffers();
-
-	void _InitDescriptorSets();
-	void _UninitDescriptorSets();
 
 	void _InitPipelines();
 	void _UninitPipelines();

@@ -172,6 +172,7 @@ public:
 
 	void EndBind();
 
+	// only be valid after the first call of EndBind(), the layout will be filled ordered
 	void GetCurrentDescriptorSets(std::vector<VkDescriptorSet>& _outDescriptorSets, std::vector<uint32_t>& _outDynamicOffsets);
 
 	// only be valid after the first call of EndBind(), the layout will be filled ordered
