@@ -945,11 +945,124 @@ void GraphicsProgram::Uninit()
 		m_uptrDescriptorSetManager.reset();
 	}
 	m_vecShaderPath.clear();
-	m_type = PipelineType::UNDEFINED;
 	m_vertexBuffers.clear();
 	m_vkIndexType = VK_INDEX_TYPE_UINT32;
-	m_pipelineVariant = PipelineVariant{};
 	m_pushConstants.clear();
 	m_shaderReflector.Uninit();
 	m_mapVertexFormat.clear();
+}
+
+void ComputeProgram::_InitPipeline()
+{
+	std::vector<std::unique_ptr<SimpleShader>> shaders;
+
+	m_uptrPipeline = std::make_unique<ComputePipeline>();
+	for (const auto& path : m_vecShaderPath)
+	{
+		std::unique_ptr<SimpleShader> shader = std::make_unique<SimpleShader>();
+		shader->SetSPVFile(path);
+		shader->Init();
+		m_uptrPipeline->AddShader(shader->GetShaderStageInfo());
+		shaders.push_back(std::move(shader));
+	}
+
+	// setup descriptor set layouts
+	{
+		std::vector<VkDescriptorSetLayout> vkLayouts{};
+		m_uptrDescriptorSetManager->GetDescriptorSetLayouts(vkLayouts);
+
+		for (const auto& layout : vkLayouts)
+		{
+			m_uptrPipeline->AddDescriptorSetLayout(layout);
+		}
+	}
+
+	// add push constants
+	{
+		std::unordered_map<std::string, uint32_t> mapIndex;
+		std::vector<std::pair<VkShaderStageFlags, uint32_t>> pushConstInfo;
+		m_shaderReflector.ReflectPushConst(mapIndex, pushConstInfo);
+
+		for (const auto& info : pushConstInfo)
+		{
+			m_uptrPipeline->AddPushConstant(info.first, info.second);
+		}
+	}
+
+	m_uptrPipeline->Init();
+
+	for (auto& shader : shaders)
+	{
+		shader->Uninit();
+	}
+	shaders.clear();
+}
+
+void ComputeProgram::_UninitPipeline()
+{
+	if (m_uptrPipeline)
+	{
+		m_uptrPipeline->Uninit();
+		m_uptrPipeline.reset();
+	}
+}
+
+void ComputeProgram::Init(const std::vector<std::string>& _shaderPaths)
+{
+	auto pDescriptorSetManager = new DescriptorSetManager();
+
+	m_vecShaderPath = _shaderPaths;
+	m_uptrDescriptorSetManager.reset(pDescriptorSetManager);
+	m_uptrDescriptorSetManager->Init(_shaderPaths);
+	m_shaderReflector.Init(_shaderPaths);
+	m_shaderReflector.PrintReflectResult();
+}
+
+void ComputeProgram::NextFrame()
+{
+	if (m_uptrDescriptorSetManager)
+	{
+		m_uptrDescriptorSetManager->NextFrame();
+	}
+}
+
+DescriptorSetManager& ComputeProgram::GetDescriptorSetManager()
+{
+	return *m_uptrDescriptorSetManager;
+}
+
+void ComputeProgram::PushConstant(VkShaderStageFlagBits _stages, const void* _data)
+{
+	m_pushConstants.push_back({ _stages, _data });
+}
+
+void ComputeProgram::DispatchWorkGroup(CommandSubmission* _pCmd, uint32_t _groupCountX, uint32_t _groupCountY, uint32_t _groupCountZ)
+{
+	ComputePipeline::PipelineInput input{};
+	bool bPipelineInitlaized = (m_uptrPipeline.get() != nullptr);
+
+	if (!bPipelineInitlaized)
+	{
+		_InitPipeline();
+	}
+
+	input.groupCountX = _groupCountX;
+	input.groupCountY = _groupCountY;
+	input.groupCountZ = _groupCountZ;
+	input.pushConstants = m_pushConstants;
+	m_uptrDescriptorSetManager->GetCurrentDescriptorSets(input.vkDescriptorSets, input.optDynamicOffsets);
+
+	m_uptrPipeline->Do(_pCmd->vkCommandBuffer, input);
+}
+
+void ComputeProgram::Uninit()
+{
+	_UninitPipeline();
+	if (m_uptrDescriptorSetManager)
+	{
+		m_uptrDescriptorSetManager->Uninit();
+		m_uptrDescriptorSetManager.reset();
+	}
+	m_pushConstants.clear();
+	m_shaderReflector.Uninit();
 }

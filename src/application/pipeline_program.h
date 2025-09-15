@@ -6,6 +6,7 @@
 
 class DescriptorBindRecord;
 class GraphicsProgram;
+class ComputeProgram;
 class CommandSubmission;
 
 // builds descriptor set layouts and descriptor sets
@@ -181,37 +182,20 @@ public:
 	void Uninit();
 
 	friend class GraphicsProgram;
+	friend class ComputeProgram;
 };
 
 class GraphicsProgram
 {
 private:
-	enum class PipelineType {
-		UNDEFINED,
-		DRAW,
-		DRAW_INDEXED,
-		MESH
-	};
-	
-	union PipelineVariant
-	{
-		uint32_t workGroups[3];
-		uint32_t indexCount;
-		uint32_t vertexCount;
-	};
-
-private:
 	std::unique_ptr<DescriptorSetManager> m_uptrDescriptorSetManager;
 	std::unique_ptr<GraphicsPipeline> m_uptrPipeline;
 	std::vector<std::string> m_vecShaderPath;
 	ShaderReflector	m_shaderReflector;
-	
-	PipelineType m_type = PipelineType::UNDEFINED;
 
 	VkBuffer m_indexBuffer = VK_NULL_HANDLE;
 	std::vector<VkBuffer> m_vertexBuffers;
 	VkIndexType		m_vkIndexType = VK_INDEX_TYPE_UINT32;
-	PipelineVariant m_pipelineVariant;
 
 	std::vector<std::pair<VkShaderStageFlagBits, const void*>> m_pushConstants;
 	
@@ -266,6 +250,38 @@ public:
 		uint32_t _groupCountZ);
 
 	void UnbindFramebuffer(CommandSubmission* _pCmd);
+
+	void Uninit();
+};
+
+class ComputeProgram
+{
+private:
+	std::unique_ptr<DescriptorSetManager> m_uptrDescriptorSetManager;
+	std::unique_ptr<ComputePipeline> m_uptrPipeline;
+	std::vector<std::string> m_vecShaderPath;
+	ShaderReflector	m_shaderReflector;
+	std::vector<std::pair<VkShaderStageFlagBits, const void*>> m_pushConstants;
+
+private:
+	void _InitPipeline();
+
+	void _UninitPipeline();
+
+public:
+	void Init(const std::vector<std::string>& _shaderPaths);
+
+	void NextFrame();
+
+	DescriptorSetManager& GetDescriptorSetManager();
+
+	void PushConstant(VkShaderStageFlagBits _stages, const void* _data);
+
+	void DispatchWorkGroup(
+		CommandSubmission* _pCmd,
+		uint32_t _groupCountX,
+		uint32_t _groupCountY,
+		uint32_t _groupCountZ);
 
 	void Uninit();
 };
