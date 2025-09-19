@@ -38,6 +38,8 @@ public:
 	const Information& GetImageViewInformation() const;
 	VkImageSubresourceRange GetRange() const;
 
+	VkDescriptorImageInfo GetDescriptorInfo(VkSampler _sampler, VkImageLayout _layout) const;
+
 	friend class Image;
 };
 

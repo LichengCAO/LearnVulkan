@@ -397,6 +397,17 @@ VkImageSubresourceRange ImageView::GetRange() const
 	return subRange;
 }
 
+VkDescriptorImageInfo ImageView::GetDescriptorInfo(VkSampler _sampler, VkImageLayout _layout) const
+{
+	VkDescriptorImageInfo info{};
+
+	info.imageLayout = _layout;
+	info.imageView = vkImageView;
+	info.sampler = _sampler;
+
+	return info;
+}
+
 void Texture::SetFilePath(std::string path)
 {
 	m_filePath = path;
