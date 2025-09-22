@@ -7,6 +7,7 @@
 class DescriptorBindRecord;
 class GraphicsProgram;
 class ComputeProgram;
+class RayTracingProgram;
 class CommandSubmission;
 
 // builds descriptor set layouts and descriptor sets
@@ -183,6 +184,7 @@ public:
 
 	friend class GraphicsProgram;
 	friend class ComputeProgram;
+	friend class RayTracingProgram;
 };
 
 class GraphicsProgram
@@ -282,6 +284,44 @@ public:
 		uint32_t _groupCountX,
 		uint32_t _groupCountY,
 		uint32_t _groupCountZ);
+
+	void Uninit();
+};
+
+class RayTracingProgram
+{
+private:
+	ShaderReflector	m_shaderReflector;
+	std::unique_ptr<DescriptorSetManager> m_uptrDescriptorSetManager;
+	std::unique_ptr<RayTracingPipeline> m_uptrPipeline;
+	std::vector<std::string> m_vecShaderPath;
+	std::vector<std::pair<VkShaderStageFlagBits, const void*>> m_pushConstants;
+	std::unordered_map<std::string, uint32_t> m_mapShaderToIndex;
+	std::vector<std::function<void(RayTracingPipeline*)>> m_lateInitialization;
+
+private:
+	void _InitPipeline();
+	void _UninitPipeline();
+
+public:
+	void AddRayGenerationShader(const std::string& _path);
+	void AddTriangleHitShaders(const std::string& _closestHit, const std::optional<std::string>& _anyHit);
+	void AddProceduralHitShaders(const std::string& _closestHit, const std::string& _intersection, const std::optional<std::string>& _anyHit);
+	void AddMissShader(const std::string& _miss);
+	void SetMaxRecursion(uint32_t _maxRecur);
+
+	void Init();
+
+	void NextFrame();
+
+	DescriptorSetManager& GetDescriptorSetManager();
+
+	void PushConstant(VkShaderStageFlagBits _stages, const void* _data);
+
+	void TraceRay(
+		CommandSubmission* _pCmd, 
+		uint32_t _uWidth, 
+		uint32_t _uHeight);
 
 	void Uninit();
 };

@@ -876,7 +876,7 @@ void GraphicsProgram::Draw(
 	input.pushConstants = m_pushConstants;
 
 	m_uptrPipeline->Do(_pCmd->vkCommandBuffer, input);
-
+	m_pushConstants.clear();
 	m_vertexBuffers.clear();
 }
 
@@ -903,6 +903,7 @@ void GraphicsProgram::DrawIndexed(
 	m_uptrPipeline->Do(_pCmd->vkCommandBuffer, input);
 
 	m_vertexBuffers.clear();
+	m_pushConstants.clear();
 	m_indexBuffer = VK_NULL_HANDLE;
 }
 
@@ -926,7 +927,7 @@ void GraphicsProgram::DispatchWorkGroup(
 	input.imageSize = m_pFramebuffer->GetImageSize();
 	input.pushConstants = m_pushConstants;
 	m_uptrDescriptorSetManager->GetCurrentDescriptorSets(input.vkDescriptorSets, input.optDynamicOffsets);
-
+	m_pushConstants.clear();
 	m_uptrPipeline->Do(_pCmd->vkCommandBuffer, input);
 }
 
@@ -1052,6 +1053,8 @@ void ComputeProgram::DispatchWorkGroup(CommandSubmission* _pCmd, uint32_t _group
 	input.pushConstants = m_pushConstants;
 	m_uptrDescriptorSetManager->GetCurrentDescriptorSets(input.vkDescriptorSets, input.optDynamicOffsets);
 
+	m_pushConstants.clear();
+
 	m_uptrPipeline->Do(_pCmd->vkCommandBuffer, input);
 }
 
@@ -1065,4 +1068,245 @@ void ComputeProgram::Uninit()
 	}
 	m_pushConstants.clear();
 	m_shaderReflector.Uninit();
+}
+
+void RayTracingProgram::_InitPipeline()
+{
+	std::vector<std::unique_ptr<SimpleShader>> shaders;
+
+	m_uptrPipeline = std::make_unique<RayTracingPipeline>();
+	for (const auto& path : m_vecShaderPath)
+	{
+		std::unique_ptr<SimpleShader> shader = std::make_unique<SimpleShader>();
+		shader->SetSPVFile(path);
+		shader->Init();
+		m_uptrPipeline->AddShader(shader->GetShaderStageInfo());
+		shaders.push_back(std::move(shader));
+	}
+
+	// setup descriptor set layouts
+	{
+		std::vector<VkDescriptorSetLayout> vkLayouts{};
+		m_uptrDescriptorSetManager->GetDescriptorSetLayouts(vkLayouts);
+
+		for (const auto& layout : vkLayouts)
+		{
+			m_uptrPipeline->AddDescriptorSetLayout(layout);
+		}
+	}
+
+	// add push constants
+	{
+		std::unordered_map<std::string, uint32_t> mapIndex;
+		std::vector<std::pair<VkShaderStageFlags, uint32_t>> pushConstInfo;
+		m_shaderReflector.ReflectPushConst(mapIndex, pushConstInfo);
+
+		for (const auto& info : pushConstInfo)
+		{
+			m_uptrPipeline->AddPushConstant(info.first, info.second);
+		}
+	}
+
+	// build SBT
+	{
+		for (auto& func : m_lateInitialization)
+		{
+			func(m_uptrPipeline.get());
+		}
+		m_lateInitialization.clear();
+	}
+
+	m_uptrPipeline->Init();
+
+	for (auto& shader : shaders)
+	{
+		shader->Uninit();
+	}
+	shaders.clear();
+}
+
+void RayTracingProgram::_UninitPipeline()
+{
+	if (m_uptrPipeline)
+	{
+		m_uptrPipeline->Uninit();
+		m_uptrPipeline.reset();
+	}
+}
+
+void RayTracingProgram::AddRayGenerationShader(const std::string& _path)
+{
+	uint32_t index = 0u;
+	if (m_mapShaderToIndex.find(_path) == m_mapShaderToIndex.end())
+	{
+		m_mapShaderToIndex[_path] = m_vecShaderPath.size();
+		m_vecShaderPath.push_back(_path);
+	}
+
+	index = m_mapShaderToIndex[_path];
+
+	m_lateInitialization.push_back(
+		[index](RayTracingPipeline* _pipeline)
+		{
+			_pipeline->SetRayGenerationShaderRecord(index);
+		}
+	);
+}
+
+void RayTracingProgram::AddTriangleHitShaders(const std::string& _closestHit, const std::optional<std::string>& _anyHit)
+{
+	uint32_t closestHit = 0u;
+	uint32_t anyHit = VK_SHADER_UNUSED_KHR;
+
+	if (m_mapShaderToIndex.find(_closestHit) == m_mapShaderToIndex.end())
+	{
+		m_mapShaderToIndex[_closestHit] = m_vecShaderPath.size();
+		m_vecShaderPath.push_back(_closestHit);
+	}
+
+	closestHit = m_mapShaderToIndex[_closestHit];
+
+	if (_anyHit.has_value())
+	{
+		if (m_mapShaderToIndex.find(_anyHit.value()) == m_mapShaderToIndex.end())
+		{
+			m_mapShaderToIndex[_anyHit.value()] = m_vecShaderPath.size();
+			m_vecShaderPath.push_back(_anyHit.value());
+		}
+
+		anyHit = m_mapShaderToIndex[_anyHit.value()];
+	}
+
+	m_lateInitialization.push_back(
+		[closestHit, anyHit](RayTracingPipeline* _pipeline)
+		{
+			_pipeline->AddTriangleHitShaderRecord(closestHit, anyHit);
+		}
+	);
+}
+
+void RayTracingProgram::AddProceduralHitShaders(const std::string& _closestHit, const std::string& _intersection, const std::optional<std::string>& _anyHit)
+{
+	uint32_t closestHit = 0u;
+	uint32_t intersection = 0u;
+	uint32_t anyHit = VK_SHADER_UNUSED_KHR;
+
+	if (m_mapShaderToIndex.find(_closestHit) == m_mapShaderToIndex.end())
+	{
+		m_mapShaderToIndex[_closestHit] = m_vecShaderPath.size();
+		m_vecShaderPath.push_back(_closestHit);
+	}
+	closestHit = m_mapShaderToIndex[_closestHit];
+
+	if (m_mapShaderToIndex.find(_intersection) == m_mapShaderToIndex.end())
+	{
+		m_mapShaderToIndex[_intersection] = m_vecShaderPath.size();
+		m_vecShaderPath.push_back(_intersection);
+	}
+	intersection = m_mapShaderToIndex[_intersection];
+
+	if (_anyHit.has_value())
+	{
+		if (m_mapShaderToIndex.find(_anyHit.value()) == m_mapShaderToIndex.end())
+		{
+			m_mapShaderToIndex[_anyHit.value()] = m_vecShaderPath.size();
+			m_vecShaderPath.push_back(_anyHit.value());
+		}
+		anyHit = m_mapShaderToIndex[_anyHit.value()];
+	}
+
+	m_lateInitialization.push_back(
+		[closestHit, intersection, anyHit](RayTracingPipeline* _pipeline)
+		{
+			_pipeline->AddProceduralHitShaderRecord(closestHit, intersection, anyHit);
+		}
+	);
+}
+
+void RayTracingProgram::AddMissShader(const std::string& _miss)
+{
+	uint32_t miss = 0u;
+
+	if (m_mapShaderToIndex.find(_miss) == m_mapShaderToIndex.end())
+	{
+		m_mapShaderToIndex[_miss] = m_vecShaderPath.size();
+		m_vecShaderPath.push_back(_miss);
+	}
+	miss = m_mapShaderToIndex[_miss];
+
+	m_lateInitialization.push_back(
+		[miss](RayTracingPipeline* _pipeline)
+		{
+			_pipeline->AddMissShaderRecord(miss);
+		}
+	);
+}
+
+void RayTracingProgram::SetMaxRecursion(uint32_t _maxRecur)
+{
+	m_lateInitialization.push_back(
+		[_maxRecur](RayTracingPipeline* _pipeline)
+		{
+			_pipeline->SetMaxRecursion(_maxRecur);
+		}
+	);
+}
+
+void RayTracingProgram::Init()
+{
+	auto pDescriptorSetManager = new DescriptorSetManager();
+
+	m_uptrDescriptorSetManager.reset(pDescriptorSetManager);
+	m_uptrDescriptorSetManager->Init(m_vecShaderPath);
+	m_shaderReflector.Init(m_vecShaderPath);
+	m_shaderReflector.PrintReflectResult();
+}
+
+void RayTracingProgram::NextFrame()
+{
+	m_uptrDescriptorSetManager->NextFrame();
+}
+
+DescriptorSetManager& RayTracingProgram::GetDescriptorSetManager()
+{
+	*m_uptrDescriptorSetManager.get();
+}
+
+void RayTracingProgram::PushConstant(VkShaderStageFlagBits _stages, const void* _data)
+{
+	m_pushConstants.push_back({ _stages, _data });
+}
+
+void RayTracingProgram::TraceRay(CommandSubmission* _pCmd, uint32_t _uWidth, uint32_t _uHeight)
+{
+	RayTracingPipeline::PipelineInput input{};
+	if (m_uptrPipeline.get() == nullptr)
+	{
+		_InitPipeline();
+	}
+
+	input.uWidth = _uWidth;
+	input.uHeight = _uHeight;
+	input.uDepth = 1u;
+	input.pushConstants = m_pushConstants;
+	m_uptrDescriptorSetManager->GetCurrentDescriptorSets(input.vkDescriptorSets, input.optDynamicOffsets);
+
+	m_pushConstants.clear();
+
+	m_uptrPipeline->Do(_pCmd->vkCommandBuffer, input);
+}
+
+void RayTracingProgram::Uninit()
+{
+	_UninitPipeline();
+	if (m_uptrDescriptorSetManager)
+	{
+		m_uptrDescriptorSetManager->Uninit();
+		m_uptrDescriptorSetManager.reset();
+	}
+	m_pushConstants.clear();
+	m_shaderReflector.Uninit();
+	m_vecShaderPath.clear();
+	m_mapShaderToIndex.clear();
+	m_lateInitialization.clear();
 }
