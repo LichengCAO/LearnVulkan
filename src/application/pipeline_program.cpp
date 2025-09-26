@@ -1,6 +1,7 @@
 #include "pipeline_program.h"
 #include "commandbuffer.h"
 #include "my_vulkan/shader.h"
+#include "device.h"
 #include <algorithm>
 
 namespace
@@ -638,6 +639,18 @@ void DescriptorSetManager::GetDescriptorSetLayouts(std::vector<VkDescriptorSetLa
 	}
 }
 
+void DescriptorSetManager::ClearDescriptorSets()
+{
+	MyDevice::GetInstance().WaitIdle();
+	
+	m_uptrDescriptorSetSetting0.clear();
+	m_uptrDescriptorSetSetting1.clear();
+	m_uptrDescriptorSetSetting2.clear();
+	m_uptrDescriptorSetSetting3.clear();
+	m_vecDynamicOffset.clear();
+	m_pCurrentDescriptorSets.clear();
+}
+
 void DescriptorSetManager::Uninit()
 {
 	size_t count = 0;
@@ -1269,7 +1282,7 @@ void RayTracingProgram::NextFrame()
 
 DescriptorSetManager& RayTracingProgram::GetDescriptorSetManager()
 {
-	*m_uptrDescriptorSetManager.get();
+	return *m_uptrDescriptorSetManager.get();
 }
 
 void RayTracingProgram::PushConstant(VkShaderStageFlagBits _stages, const void* _data)

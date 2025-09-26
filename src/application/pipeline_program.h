@@ -180,6 +180,9 @@ public:
 	// only be valid after the first call of EndBind(), the layout will be filled ordered
 	void GetDescriptorSetLayouts(std::vector<VkDescriptorSetLayout>& _outDescriptorSetLayouts);
 
+	// clear all stored descriptor sets
+	void ClearDescriptorSets();
+
 	void Uninit();
 
 	friend class GraphicsProgram;

@@ -666,6 +666,11 @@ UserInput MyDevice::GetUserInput() const
 	return ret;
 }
 
+void MyDevice::WaitIdle() const
+{
+	vkDeviceWaitIdle(vkDevice);
+}
+
 MemoryAllocator* MyDevice::GetMemoryAllocator()
 {
 	return m_uptrMemoryAllocator.get();
