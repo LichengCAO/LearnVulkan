@@ -146,6 +146,8 @@ void glTFContent::_LoadScene(const tinygltf::Model& _root)
 			CHECK_TRUE(index < m_nodes.size(), "Do not have this node!");
 			uptrScene->pNodes.push_back(m_nodes[index].get());
 		}
+
+		m_scenes.push_back(std::move(uptrScene));
 	}
 }
 
@@ -158,6 +160,7 @@ void glTFContent::_LoadMesh(const tinygltf::Model& _root, const tinygltf::Mesh& 
 
 		for (const auto& curAttribute : curPrimitive.attributes)
 		{
+			
 			const auto& taccessor = _root.accessors[curAttribute.second];
 			if (curAttribute.first.compare("POSITION") == 0)
 			{
@@ -187,6 +190,59 @@ void glTFContent::_LoadMesh(const tinygltf::Model& _root, const tinygltf::Mesh& 
 	}
 }
 
+void glTFContent::_FetchStaticMeshes(
+	const glTFContent::Node* _pNode, 
+	const glm::mat4& _parentModelMatrix, 
+	std::vector<::StaticMesh>& _outStaticMeshes, 
+	std::vector<glm::mat4>& _outModelMatrices) const
+{
+	std::vector<const glTFContent::Mesh*> meshThisNodeHolds;
+	glm::mat4 selfModelMatrix = _parentModelMatrix;
+	const glTFContent::Transform* pSelfTransform = _pNode->GetComponent<glTFContent::Transform>();
+
+	// fill in self static meshes
+	if (pSelfTransform)
+	{
+		selfModelMatrix = _parentModelMatrix * pSelfTransform->GetModelMatrix();
+	}
+
+	_pNode->GetComponents<Mesh>(meshThisNodeHolds);
+	for (auto pMesh : meshThisNodeHolds)
+	{
+		for (auto& primitive : pMesh->primitives)
+		{
+			StaticMesh staticMesh{};
+			size_t vertexCount = primitive.positions.size();
+
+			staticMesh.indices = primitive.indices;
+			
+			for (size_t i = 0; i < vertexCount; ++i)
+			{
+				Vertex curVertex{};
+				curVertex.position = primitive.positions[i];
+				if (i < primitive.normals.size())
+				{
+					curVertex.normal = primitive.normals[i];
+				}
+				if (i < primitive.texcoords.size())
+				{
+					curVertex.uv = primitive.texcoords[i];
+				}
+				staticMesh.verts.push_back(curVertex);
+			}
+
+			_outStaticMeshes.push_back(staticMesh);
+			_outModelMatrices.push_back(selfModelMatrix);
+		}
+	}
+
+	// fill children static meshes
+	for (const auto pChild : _pNode->pChildren)
+	{
+		_FetchStaticMeshes(pChild, selfModelMatrix, _outStaticMeshes, _outModelMatrices);
+	}
+}
+
 void glTFContent::Load(const std::string& _glTFPath)
 {
 	tinygltf::Model root;
@@ -196,6 +252,18 @@ void glTFContent::Load(const std::string& _glTFPath)
 	_LoadNodes(root);
 
 	_LoadScene(root);
+}
+
+void glTFContent::GetSceneSimpleMeshes(std::vector<::StaticMesh>& _staticMeshes, std::vector<glm::mat4>& _modelMatrices)
+{
+	if (m_scenes.size() == 0) return;
+
+	glm::mat4 originModel = glm::mat4(1.0f);;
+
+	for (auto pNode : m_scenes[0]->pNodes)
+	{
+		_FetchStaticMeshes(pNode, originModel, _staticMeshes, _modelMatrices);
+	}
 }
 
 glm::mat4 glTFContent::Transform::GetModelMatrix() const

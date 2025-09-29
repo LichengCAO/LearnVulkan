@@ -65,7 +65,7 @@ void RayTracingApp::_UninitSampler()
 
 void RayTracingApp::_InitModels()
 {
-	std::vector<Mesh> outMeshes;
+	std::vector<StaticMesh> outMeshes;
 	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/sphere/sphere.obj", outMeshes);
 	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/bunny/bunny.obj", outMeshes);
 	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/wahoo/wahoo.obj", outMeshes);
@@ -724,7 +724,7 @@ void RayTracingThousandsApp::_UninitSampler()
 
 void RayTracingThousandsApp::_InitModels()
 {
-	std::vector<Mesh> outMeshes;
+	std::vector<StaticMesh> outMeshes;
 	std::random_device              rd;  // Will be used to obtain a seed for the random number engine
 	std::mt19937                    gen(rd());  // Standard mersenne_twister_engine seeded with rd()
 	std::normal_distribution<float> dis(1.0f, 1.0f);
@@ -1317,7 +1317,7 @@ void RayTracingAABBsApp::_UninitSampler()
 
 void RayTracingAABBsApp::_InitModels()
 {
-	std::vector<Mesh> outMeshes;
+	std::vector<StaticMesh> outMeshes;
 	Model modelChessBoard{};
 	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/ChessBoard/ChessBoard.obj", outMeshes);
 

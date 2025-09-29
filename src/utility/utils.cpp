@@ -6,7 +6,7 @@
 #include "transform.h"
 #include <fstream>
 
-bool MeshUtility::Load(const std::string& objFile, std::vector<Mesh>& outMesh)
+bool MeshUtility::Load(const std::string& objFile, std::vector<StaticMesh>& outMesh)
 {
 	bool bSuccess = false;
 	tinyobj::attrib_t attrib;
@@ -17,7 +17,7 @@ bool MeshUtility::Load(const std::string& objFile, std::vector<Mesh>& outMesh)
 	
 	for (const auto& shape : shapes)
 	{
-		Mesh mesh{};
+		StaticMesh mesh{};
 		std::unordered_map<Vertex, uint32_t> uniqueVertices{};
 
 		for (const auto& index : shape.mesh.indices)
@@ -56,12 +56,14 @@ bool MeshUtility::Load(const std::string& objFile, std::vector<Mesh>& outMesh)
 }
 
 void MeshUtility::BuildMeshlets(
-	const Mesh& inMesh,
+	StaticMesh& inMesh,
 	std::vector<Meshlet>& outMeshlets,
 	std::vector<uint32_t>& outMeshletVertices,
 	std::vector<uint8_t>& outMeshletTriangles
 )
-{
+{	
+	_OptimizeMesh(inMesh);
+
 	const std::vector<uint32_t>& indices = inMesh.indices;
 	const std::vector<Vertex>& vertices = inMesh.verts;
 	const float coneWeight = 0.0f;
@@ -70,7 +72,7 @@ void MeshUtility::BuildMeshlets(
 	std::vector<meshopt_Meshlet> meshoptMeshlets;
 	size_t maxMeshlets = meshopt_buildMeshletsBound(indices.size(), maxIndices, maxTriangles);
 	size_t meshletCount = 0;
-	
+
 	meshoptMeshlets.resize(maxMeshlets, meshopt_Meshlet{});
 	outMeshletVertices.resize(maxMeshlets * maxIndices, 0);
 	outMeshletTriangles.resize(maxMeshlets * maxTriangles * 3, 0);
@@ -114,13 +116,15 @@ void MeshUtility::BuildMeshlets(
 }
 
 void MeshUtility::BuildMeshlets(
-	const Mesh& inMesh,
+	StaticMesh& inMesh,
 	std::vector<Meshlet>& outMeshlets,
 	std::vector<MeshletBounds>& outMeshletBounds,
 	std::vector<uint32_t>& outMeshletVertices,
 	std::vector<uint8_t>& outMeshletTriangles
 )
 {
+	_OptimizeMesh(inMesh);
+
 	size_t offset = outMeshlets.size();
 	
 	BuildMeshlets(inMesh, outMeshlets, outMeshletVertices, outMeshletTriangles);
@@ -131,7 +135,7 @@ void MeshUtility::BuildMeshlets(
 	}
 }
 
-void MeshUtility::_OptimizeMesh(Mesh& mesh)
+void MeshUtility::_OptimizeMesh(StaticMesh& mesh)
 {
 	std::vector<uint32_t> remap(std::max(mesh.indices.size(), mesh.verts.size()));
 	std::vector<uint32_t> dstIndices(mesh.indices.size());
@@ -176,7 +180,7 @@ void MeshUtility::_OptimizeMesh(Mesh& mesh)
 	mesh.indices = std::move(dstIndices);
 }
 
-void MeshUtility::_OptimizeMeshToVertexCacheStage(Mesh& mesh)
+void MeshUtility::_OptimizeMeshToVertexCacheStage(StaticMesh& mesh)
 {
 	std::vector<uint32_t> remap(std::max(mesh.indices.size(), mesh.verts.size()));
 	std::vector<uint32_t> dstIndices(mesh.indices.size());
@@ -204,7 +208,7 @@ void MeshUtility::_OptimizeMeshToVertexCacheStage(Mesh& mesh)
 }
 
 MeshletBounds MeshUtility::_ComputeMeshletBounds(
-	const Mesh& inMesh, 
+	const StaticMesh& inMesh, 
 	const Meshlet& inMeshlet, 
 	const std::vector<uint32_t>& inMeshletVertices, 
 	const std::vector<uint8_t>& inMeshletTriangles)

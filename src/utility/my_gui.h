@@ -13,12 +13,13 @@ private:
 	void _StartNewFrame();
 
 public:
-	// set up render pass for initialization
+	// set up render pass for initialization, call this before Init()
+	// every other ui function call should be inside this render pass
 	inline void SetUpRenderPass(VkRenderPass _renderpass) { m_vkRenderPass = _renderpass; };
 	
 	void Init();
 
-	// start to draw a window, render pass should be started and framebuffers should be bound before it
+	// start to draw a window, render pass should be started and frame buffers should be bound before it
 	// _title: name of the window
 	// _pShowWindow: if it's not nullptr, the window can be hidden and *_pShowWindow will be set
 	// _width, _height: width and height of the window

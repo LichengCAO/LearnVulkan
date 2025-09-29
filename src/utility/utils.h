@@ -2,7 +2,7 @@
 #include "geometry.h"
 #include "transform.h"
 #include <variant>
-struct Mesh
+struct StaticMesh
 {
 	std::vector<Vertex> verts;
 	std::vector<uint32_t> indices;
@@ -32,28 +32,28 @@ struct MeshletBounds
 class MeshUtility
 {
 private:
-	static void _OptimizeMesh(Mesh& mesh);
-	static void _OptimizeMeshToVertexCacheStage(Mesh& mesh);
+	static void _OptimizeMesh(StaticMesh& mesh);
+	static void _OptimizeMeshToVertexCacheStage(StaticMesh& mesh);
 	static MeshletBounds _ComputeMeshletBounds(
-		const Mesh& inMesh,
+		const StaticMesh& inMesh,
 		const Meshlet& inMeshlet,
 		const std::vector<uint32_t>& inMeshletVertices,
 		const std::vector<uint8_t>& inMeshletTriangles);
 
 public:
-	static bool Load(const std::string& objFile, std::vector<Mesh>& outMesh);
+	static bool Load(const std::string& objFile, std::vector<StaticMesh>& outMesh);
 	/*
 	* outMeshletVertices remap the vertices of the whole mesh to multiple subsets of vertices letting mesh shader to process locally,
 	* outMeshletTriangles serves as something like indices buffers for these subsets of vertices.
 	*/
 	static void BuildMeshlets(
-		const Mesh& inMesh,
+		StaticMesh& inMesh,
 		std::vector<Meshlet>& outMeshlets,
 		std::vector<uint32_t>& outMeshletVertices,
 		std::vector<uint8_t>& outMeshletTriangles);
 
 	static void BuildMeshlets(
-		const Mesh& inMesh,
+		StaticMesh& inMesh,
 		std::vector<Meshlet>& outMeshlets,
 		std::vector<MeshletBounds>& outMeshletBounds,
 		std::vector<uint32_t>& outMeshletVertices,

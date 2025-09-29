@@ -19,7 +19,7 @@ class RayTracingApp
 private:
 	struct Model
 	{
-		Mesh mesh;
+		StaticMesh mesh;
 		Transform transform;
 	};
 	struct VBO
@@ -140,7 +140,7 @@ class RayTracingThousandsApp
 private:
 	struct Model
 	{
-		Mesh mesh;
+		StaticMesh mesh;
 		Transform transform;
 	};
 	struct VBO
@@ -253,7 +253,7 @@ class RayTracingAABBsApp
 private:
 	struct Model
 	{
-		Mesh mesh;
+		StaticMesh mesh;
 		Transform transform;
 	};
 	struct VBO

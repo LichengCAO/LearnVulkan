@@ -18,7 +18,7 @@ class RayQueryApp
 private:
 	struct Model
 	{
-		Mesh mesh;
+		StaticMesh mesh;
 		Transform transform;
 	};
 	struct VBO

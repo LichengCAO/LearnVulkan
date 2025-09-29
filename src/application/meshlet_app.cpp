@@ -2,6 +2,7 @@
 #include "shader.h"
 #include "shader_reflect.h"
 #include "imgui.h"
+#include "utility/glTF_loader.h"
 #define MAX_FRAME_COUNT 3
 
 void MeshletApp::_Init()
@@ -91,17 +92,33 @@ void MeshletApp::_UninitSampler()
 
 void MeshletApp::_InitModels()
 {
-	std::vector<Mesh> meshs;
-	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/sphere/sphere.obj", meshs);
-	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/wahoo/wahoo.obj", meshs);
-	for (auto& mesh : meshs)
+	std::vector<StaticMesh> meshs;
+	std::vector<glm::mat4> matrices;
+	//MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/sphere/sphere.obj", meshs);
+	
+	glTFContent gltfScene{};
+	gltfScene.Load("E:/GitStorage/LearnVulkan/res/models/cornell_box/scene.gltf");
+	gltfScene.GetSceneSimpleMeshes(meshs, matrices);
+	//MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/wahoo/wahoo.obj", meshs);
+	//matrices.push_back(glm::mat4(1.0));
+	for (size_t i = 0; i < meshs.size(); ++i)
 	{
 		Model model{};
-		model.transform.SetScale({ 0.5, 0.5, 0.5 });
-		model.mesh = mesh;
-		MeshUtility::BuildMeshlets(mesh, model.vecMeshlet, model.vecMeshletBounds, model.vecVertexRemap, model.vecTriangleIndex);
+		model.mesh = meshs[i];
+		model.modelMatrix = matrices[i];
+		MeshUtility::BuildMeshlets(model.mesh, model.vecMeshlet, model.vecMeshletBounds, model.vecVertexRemap, model.vecTriangleIndex);
 		m_models.push_back(model);
 	}
+
+
+//	for (auto& mesh : meshs)
+//	{
+//		Model model{};
+//		model.transform.SetScale({ 0.5, 0.5, 0.5 });
+//		model.mesh = mesh;
+//		MeshUtility::BuildMeshlets(mesh, model.vecMeshlet, model.vecMeshletBounds, model.vecVertexRemap, model.vecTriangleIndex);
+//		m_models.push_back(model);
+//	}
 }
 void MeshletApp::_InitBuffers()
 {
@@ -199,8 +216,11 @@ void MeshletApp::_InitBuffers()
 		{
 			ModelUBO ubo{};
 			ubo.meshletCount = static_cast<uint32_t>(curModel.vecMeshlet.size());
-			ubo.model = curModel.transform.GetModelMatrix();
-			ubo.inverseTranposeModel = curModel.transform.GetModelInverseTransposeMatrix();
+			//ubo.model = curModel.transform.GetModelMatrix();
+			//ubo.inverseTranposeModel = curModel.transform.GetModelInverseTransposeMatrix();
+			ubo.model = curModel.modelMatrix;
+			ubo.inverseTranposeModel = (glm::transpose(glm::inverse(ubo.model)));
+			ubo.inverseTranposeModel[3] = { 0, 0, 0, 1 };
 			ubo.maxScale = 1.0f;
 			{
 				float scale2 = 0.0f;

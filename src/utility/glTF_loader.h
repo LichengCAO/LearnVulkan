@@ -3,27 +3,14 @@
 #include "component.h"
 #include <variant>
 #include <tiny_gltf.h>
-
+#include "utils.h"
 class glTFContent
 {
 private:
-	struct Node : public ComponentManager
-	{
-		Node* pParent;
-		std::vector<Node*> pChildren;
-	};
-
-	struct Camera : public Component
-	{
-		COMPONENT_DECLARATION;
-		// TODO
-	};
-
 	struct Material
 	{
 		// TODO
 	};
-
 	struct Primitive
 	{
 		std::vector<glm::vec3> positions;
@@ -33,12 +20,17 @@ private:
 		std::optional<Material> optMaterial;
 	};
 
+	//node's components
+	struct Camera : public Component
+	{
+		COMPONENT_DECLARATION;
+		// TODO
+	};
 	struct Mesh : public Component
 	{
 		COMPONENT_DECLARATION;
 		std::vector<Primitive> primitives;
 	};
-
 	struct Transform : public Component
 	{
 		COMPONENT_DECLARATION;
@@ -53,11 +45,16 @@ private:
 
 		glm::mat4 GetModelMatrix() const;
 	};
-
 	struct Animation : public Component
 	{
 		COMPONENT_DECLARATION;
 		// TODO
+	};
+
+	struct Node : public ComponentManager
+	{
+		Node* pParent;
+		std::vector<Node*> pChildren;
 	};
 
 	struct Scene
@@ -81,9 +78,18 @@ private:
 
 	void _LoadScene(const tinygltf::Model& _root);
 
+	// recursively fetch primitives from this node and its child nodes that can build static meshes
+	// return the static meshes built by these primitives and their model matrices
+	void _FetchStaticMeshes(
+		const glTFContent::Node* _pNode,
+		const glm::mat4& _parentModelMatrix,
+		std::vector<::StaticMesh>& _outStaticMeshes,
+		std::vector<glm::mat4>& _outModelMatrices) const;
+
 public:
 	void Load(const std::string& _glTFPath);
 
+	void GetSceneSimpleMeshes(std::vector<::StaticMesh>& _staticMeshes, std::vector<glm::mat4>& _modelMatrices);
 };
 
 template<class DataType>
@@ -92,13 +98,12 @@ void glTFContent::_LoadAccessor(const tinygltf::Model& _root, const tinygltf::Ac
 	const auto& tbufferView = _root.bufferViews[_accessor.bufferView];
 	const auto& tbuffer = _root.buffers[tbufferView.buffer];
 	int byteStride = _accessor.ByteStride(tbufferView);
-	const uint8_t* pBufferDataSrc = &tbuffer.data.at(0) + tbufferView.byteOffset;
+	const uint8_t* pBufferDataSrc = &tbuffer.data.at(0) + tbufferView.byteOffset + _accessor.byteOffset;
 
 	CHECK_TRUE(byteStride > 0, "Stride of index buffer is zero!");
-	int n = tbufferView.byteLength / byteStride;
-	_outVec.resize(n);
+	_outVec.resize(_accessor.count);
 
-	for (int i = 0; i < n; ++i)
+	for (int i = 0; i < _accessor.count; ++i)
 	{
 		memcpy(&_outVec[i], pBufferDataSrc, sizeof(DataType));
 		pBufferDataSrc += byteStride;

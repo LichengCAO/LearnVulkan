@@ -18,8 +18,9 @@ class MeshletApp
 private:
 	struct Model
 	{
-		Mesh mesh;
+		StaticMesh mesh;
 		Transform transform;
+		glm::mat4 modelMatrix;
 		std::vector<Meshlet>       vecMeshlet;
 		std::vector<uint32_t>      vecVertexRemap;
 		std::vector<uint8_t>       vecTriangleIndex;
@@ -72,7 +73,7 @@ private:
 	double lastTime = 0.0;
 	float frameTime = 0.0f;
 	uint32_t m_currentFrame = 0;
-	PersCamera m_camera{ 400, 300, glm::vec3(2,2,2), glm::vec3(0,0,0), glm::vec3(0,0,1) };
+	PersCamera m_camera{ 400, 300, glm::vec3(0, 1, 2), glm::vec3(0,0,0), glm::vec3(0,1,0) };
 	MyDevice* pDevice = nullptr;
 
 	std::vector<Model> m_models;

@@ -1340,7 +1340,7 @@ void TransparentApp::_InitVertexInputs()
 			Buffer::Information localBufferInfo;
 			std::vector<NormalVertex> vertices;
 			std::vector<uint32_t> indices;
-			std::vector<Mesh> scene;
+			std::vector<StaticMesh> scene;
 
 			CHECK_TRUE(MeshUtility::Load(m_models[i].objFilePath, scene), "Failed to load .obj file!");
 			
@@ -1389,7 +1389,7 @@ void TransparentApp::_InitVertexInputs()
 		
 		for (auto& transModel : m_transModels)
 		{
-			std::vector<Mesh> scene;
+			std::vector<StaticMesh> scene;
 			std::vector<uint32_t> indices{};
 			std::vector<TransparentVertex> vertices{};
 			glm::vec4 color(uniformDist(rnd), uniformDist(rnd), uniformDist(rnd), uniformDist(rnd));

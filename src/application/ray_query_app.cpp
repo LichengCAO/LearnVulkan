@@ -68,7 +68,7 @@ void RayQueryApp::_UninitSampler()
 
 void RayQueryApp::_InitModels()
 {
-	std::vector<Mesh> outMeshes;
+	std::vector<StaticMesh> outMeshes;
 	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/wahoo/wahoo.obj", outMeshes);
 	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/ChessBoard/ChessBoard.obj", outMeshes);
 
