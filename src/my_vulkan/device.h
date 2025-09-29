@@ -105,6 +105,7 @@ public:
 	VkFormat GetDepthFormat() const;
 	VkFormat GetSwapchainFormat() const;
 	UserInput GetUserInput() const;
+	VkQueue GetQueue(uint32_t _familyIndex, uint32_t _queueIndex = 0) const;
 	void WaitIdle() const;
 
 	MemoryAllocator* GetMemoryAllocator();

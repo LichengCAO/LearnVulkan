@@ -11,6 +11,7 @@
 #include "transform.h"
 #include "utils.h"
 #include "pipeline_program.h"
+#include "my_gui.h"
 
 class MeshletApp
 {
@@ -106,6 +107,10 @@ private:
 	// semaphores
 	std::vector<VkSemaphore>  m_swapchainImageAvailabilities;
 	std::vector<std::unique_ptr<CommandSubmission>> m_commandSubmissions;
+
+	// user interface
+	MyGUI m_gui;
+
 private:
 	void _Init();
 	void _Uninit();

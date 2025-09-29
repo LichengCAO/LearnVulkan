@@ -1,7 +1,6 @@
 #pragma once
 #include "geometry.h"
 #include "transform.h"
-#include <tiny_obj_loader.h>
 #include <variant>
 struct Mesh
 {

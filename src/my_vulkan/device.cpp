@@ -666,6 +666,15 @@ UserInput MyDevice::GetUserInput() const
 	return ret;
 }
 
+VkQueue MyDevice::GetQueue(uint32_t _familyIndex, uint32_t _queueIndex) const
+{
+	VkQueue vkQueue = VK_NULL_HANDLE;
+
+	vkGetDeviceQueue(vkDevice, _familyIndex, _queueIndex, &vkQueue);
+
+	return vkQueue;
+}
+
 void MyDevice::WaitIdle() const
 {
 	vkDeviceWaitIdle(vkDevice);

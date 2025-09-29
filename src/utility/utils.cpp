@@ -1,5 +1,6 @@
 #include "utils.h"
 #include <meshoptimizer.h>
+#include <tiny_obj_loader.h>
 #include <tiny_gltf.h>
 #include <numeric>
 #include "transform.h"

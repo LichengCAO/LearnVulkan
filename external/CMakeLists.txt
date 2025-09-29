@@ -97,7 +97,11 @@ if(IMGUI_GLFW)
 endif()
 
 # Include directories for public usage
-target_include_directories(imgui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}")
+target_include_directories(imgui PUBLIC "${CMAKE_CURRENT_SOURCE_DIR}" "${IMGUI_INCLUDE_DIR}")
+
+#define volk for imgui
+target_compile_definitions(imgui PRIVATE IMGUI_IMPL_VULKAN_USE_VOLK)
+target_link_libraries(imgui PRIVATE volk)
 
 # Set C++ standard
 target_compile_features(imgui PUBLIC cxx_std_11)

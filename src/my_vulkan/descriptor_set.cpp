@@ -204,20 +204,21 @@ void DescriptorSetLayout::Uninit()
 VkDescriptorPool DescriptorSetAllocator::_CreatePool()
 {
 	VkDevice device = MyDevice::GetInstance().vkDevice;
-
 	std::vector<VkDescriptorPoolSize> sizes;
+	VkDescriptorPoolCreateInfo pool_info = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+	VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
+
 	sizes.reserve(m_poolSizes.sizes.size());
 	for (auto sz : m_poolSizes.sizes)
 	{
 		sizes.push_back({ sz.first, sz.second });
 	}
-	VkDescriptorPoolCreateInfo pool_info = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+	
 	pool_info.flags = 0;
 	pool_info.maxSets = 1000;
 	pool_info.poolSizeCount = static_cast<uint32_t>(sizes.size());
 	pool_info.pPoolSizes = sizes.data();
 
-	VkDescriptorPool descriptorPool;
 	vkCreateDescriptorPool(device, &pool_info, nullptr, &descriptorPool);
 
 	return descriptorPool;

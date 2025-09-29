@@ -57,7 +57,7 @@ void CommandSubmission::Init()
 		CHECK_TRUE(fallbackIndex.has_value(), "Queue family index is not set!");
 		m_optQueueFamilyIndex = fallbackIndex.value();
 	}
-	vkGetDeviceQueue(MyDevice::GetInstance().vkDevice, m_optQueueFamilyIndex.value(), 0, &m_vkQueue);
+	m_vkQueue = MyDevice::GetInstance().GetQueue(m_optQueueFamilyIndex.value(), 0);
 	VkCommandBufferAllocateInfo allocInfo{ VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO };
 	allocInfo.commandPool = MyDevice::GetInstance().vkCommandPools[m_optQueueFamilyIndex.value()];
 	allocInfo.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;

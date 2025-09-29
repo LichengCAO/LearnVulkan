@@ -1,6 +1,7 @@
 #include "meshlet_app.h"
 #include "shader.h"
 #include "shader_reflect.h"
+#include "imgui.h"
 #define MAX_FRAME_COUNT 3
 
 void MeshletApp::_Init()
@@ -34,6 +35,8 @@ void MeshletApp::_Init()
 		m_commandSubmissions.push_back(std::make_unique<CommandSubmission>());
 		m_commandSubmissions.back()->Init();
 	}
+	m_gui.SetUpRenderPass(m_renderPass.vkRenderPass);
+	m_gui.Init();
 }
 void MeshletApp::_Uninit()
 {
@@ -45,7 +48,7 @@ void MeshletApp::_Uninit()
 	{
 		vkDestroySemaphore(pDevice->vkDevice, semaphore, nullptr);
 	}
-	
+	m_gui.Uninit();
 	_UninitPipelines();
 
 	_UninitFramebuffers();
@@ -428,6 +431,7 @@ void MeshletApp::_DrawFrame()
 	cmd->StartCommands({ waitInfo });
 
 	m_program.BindFramebuffer(cmd.get(), m_framebuffers[imageIndex.value()].get());
+	
 	for (int i = 0; i < m_models.size(); ++i)
 	{
 		auto& manager = m_program.GetDescriptorSetManager();
@@ -479,7 +483,20 @@ void MeshletApp::_DrawFrame()
 		//meshInput.groupCountY = 1;
 		//meshInput.groupCountZ = 1;
 	}
+
+	//ImGui::ShowDemoWindow();
+	m_gui.StartWindow("My test");
+	bool clicked = true;
+	m_gui.Button("Click me", clicked);
+	if (clicked)
+	{
+		std::cout << "clicked" << std::endl;
+	}
+	m_gui.EndWindow();
+	m_gui.Apply(cmd->vkCommandBuffer);
+
 	m_program.UnbindFramebuffer(cmd.get());
+
 	m_program.NextFrame();
 
 	VkSemaphore renderpassFinish = cmd->SubmitCommands();
