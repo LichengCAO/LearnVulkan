@@ -121,6 +121,79 @@ MemoryAllocator* Image::_GetMemoryAllocator() const
 	return MyDevice::GetInstance().GetMemoryAllocator();
 }
 
+void Image::_NewImageView(
+	ImageView& _pOutputImageView, 
+	VkImageAspectFlags _aspect, 
+	uint32_t _baseMipLevel, 
+	uint32_t _levelCount, 
+	uint32_t _baseArrayLayer, 
+	uint32_t _layerCount) const
+{
+	ImageView::Information& viewInfo = _pOutputImageView.m_viewInformation;
+
+	CHECK_TRUE(vkImage != VK_NULL_HANDLE, "Image is not initialized!");
+
+	viewInfo.aspectMask = _aspect;
+	viewInfo.baseArrayLayer = _baseArrayLayer;
+	viewInfo.baseMipLevel = _baseMipLevel;
+	viewInfo.format = m_imageInformation.format;
+	viewInfo.layerCount = _layerCount;
+	viewInfo.levelCount = _levelCount;
+	viewInfo.vkImage = vkImage;
+
+	if (_levelCount == VK_REMAINING_MIP_LEVELS)
+	{
+		CHECK_TRUE(m_imageInformation.mipLevels > _baseMipLevel, "Wrong base mip level!");
+		viewInfo.levelCount = m_imageInformation.mipLevels - _baseMipLevel;
+	}
+	if (_layerCount == VK_REMAINING_ARRAY_LAYERS)
+	{
+		CHECK_TRUE(m_imageInformation.arrayLayers > _baseArrayLayer, "Wrong base array layer!");
+		viewInfo.layerCount = m_imageInformation.arrayLayers - _baseArrayLayer;
+	}
+	CHECK_TRUE((viewInfo.baseArrayLayer + viewInfo.layerCount) <= m_imageInformation.arrayLayers, "Image doesn't have these layers!");
+	CHECK_TRUE((viewInfo.baseMipLevel + viewInfo.levelCount) <= m_imageInformation.mipLevels, "Image doesn't have these mipmap levels!");
+
+	_pOutputImageView.pImage = this;
+
+	if (viewInfo.layerCount > 1)
+	{
+		switch (m_imageInformation.imageType)
+		{
+		case VK_IMAGE_TYPE_1D:
+			viewInfo.type = VK_IMAGE_VIEW_TYPE_1D_ARRAY;
+			break;
+		case VK_IMAGE_TYPE_2D:
+			viewInfo.type = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
+			break;
+		case VK_IMAGE_TYPE_3D:
+			CHECK_TRUE(false, "No 3D image array!");
+			break;
+		default:
+			CHECK_TRUE(false, "Unhandled image type!");
+			break;
+		}
+	}
+	else
+	{
+		switch (m_imageInformation.imageType)
+		{
+		case VK_IMAGE_TYPE_1D:
+			viewInfo.type = VK_IMAGE_VIEW_TYPE_1D;
+			break;
+		case VK_IMAGE_TYPE_2D:
+			viewInfo.type = VK_IMAGE_VIEW_TYPE_2D;
+			break;
+		case VK_IMAGE_TYPE_3D:
+			viewInfo.type = VK_IMAGE_VIEW_TYPE_3D;
+			break;
+		default:
+			CHECK_TRUE(false, "Unhandled image type!");
+			break;
+		}
+	}
+}
+
 void Image::TransitionLayout(VkImageLayout newLayout)
 {
 	VkImageLayout oldLayout = _GetImageLayout();
@@ -263,71 +336,23 @@ void Image::ChangeLayoutAndFill(VkImageLayout finalLayout, const VkClearColorVal
 ImageView Image::NewImageView(VkImageAspectFlags aspect, uint32_t baseMipLevel, uint32_t levelCount, uint32_t baseArrayLayer, uint32_t layerCount) const
 {
 	ImageView val{};
-	ImageView::Information& viewInfo = val.m_viewInformation;
-
-	CHECK_TRUE(vkImage != VK_NULL_HANDLE, "Image is not initialized!");
-
-	viewInfo.aspectMask = aspect;
-	viewInfo.baseArrayLayer = baseArrayLayer;
-	viewInfo.baseMipLevel = baseMipLevel;
-	viewInfo.format = m_imageInformation.format;
-	viewInfo.layerCount = layerCount;
-	viewInfo.levelCount = levelCount;
-	viewInfo.vkImage = vkImage;
-
-	if (levelCount == VK_REMAINING_MIP_LEVELS)
-	{
-		CHECK_TRUE(m_imageInformation.mipLevels > baseMipLevel, "Wrong base mip level!");
-		viewInfo.levelCount = m_imageInformation.mipLevels - baseMipLevel;
-	}
-	if (layerCount == VK_REMAINING_ARRAY_LAYERS)
-	{
-		CHECK_TRUE(m_imageInformation.arrayLayers > baseArrayLayer, "Wrong base array layer!");
-		viewInfo.layerCount = m_imageInformation.arrayLayers - baseArrayLayer;
-	}
-	CHECK_TRUE((viewInfo.baseArrayLayer + viewInfo.layerCount) <= m_imageInformation.arrayLayers, "Image doesn't have these layers!");
-	CHECK_TRUE((viewInfo.baseMipLevel   + viewInfo.levelCount) <= m_imageInformation.mipLevels, "Image doesn't have these mipmap levels!");
-
-	val.pImage = this;
-
-	if (viewInfo.layerCount > 1)
-	{
-		switch (m_imageInformation.imageType)
-		{
-		case VK_IMAGE_TYPE_1D:
-			viewInfo.type = VK_IMAGE_VIEW_TYPE_1D_ARRAY;
-			break;
-		case VK_IMAGE_TYPE_2D:
-			viewInfo.type = VK_IMAGE_VIEW_TYPE_2D_ARRAY;
-			break;
-		case VK_IMAGE_TYPE_3D:
-			CHECK_TRUE(false, "No 3D image array!");
-			break;
-		default:
-			CHECK_TRUE(false, "Unhandled image type!");
-			break;
-		}
-	}
-	else
-	{
-		switch (m_imageInformation.imageType)
-		{
-		case VK_IMAGE_TYPE_1D:
-			viewInfo.type = VK_IMAGE_VIEW_TYPE_1D;
-			break;
-		case VK_IMAGE_TYPE_2D:
-			viewInfo.type = VK_IMAGE_VIEW_TYPE_2D;
-			break;
-		case VK_IMAGE_TYPE_3D:
-			viewInfo.type = VK_IMAGE_VIEW_TYPE_3D;
-			break;
-		default:
-			CHECK_TRUE(false, "Unhandled image type!");
-			break;
-		}
-	}
+	
+	_NewImageView(val, aspect, baseMipLevel, levelCount, baseArrayLayer, layerCount);
 
 	return val;
+}
+
+void Image::NewImageView(
+	ImageView*& _pOutputImageView, 
+	VkImageAspectFlags _aspect, 
+	uint32_t _baseMipLevel, 
+	uint32_t _levelCount, 
+	uint32_t _baseArrayLayer, 
+	uint32_t _layerCount) const
+{
+	_pOutputImageView = new ImageView();
+
+	_NewImageView(*_pOutputImageView, _aspect, _baseMipLevel, _levelCount, _baseArrayLayer, _layerCount);
 }
 
 const Image::Information& Image::GetImageInformation() const

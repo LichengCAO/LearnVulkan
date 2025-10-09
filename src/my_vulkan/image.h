@@ -33,9 +33,11 @@ public:
 	~ImageView();
 	
 	void Init();
+
 	void Uninit();
 	
 	const Information& GetImageViewInformation() const;
+	
 	VkImageSubresourceRange GetRange() const;
 
 	VkDescriptorImageInfo GetDescriptorInfo(VkSampler _sampler, VkImageLayout _layout) const;
@@ -66,7 +68,13 @@ public:
 	void Reset(uint32_t layerCount, uint32_t levelCount, VkImageLayout layout);
 
 	VkImageLayout GetLayout(VkImageSubresourceRange range) const;
-	VkImageLayout GetLayout(uint32_t baseLayer, uint32_t layerCount, uint32_t baseLevel, uint32_t levelCount, VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT) const;
+	VkImageLayout GetLayout(
+		uint32_t baseLayer, 
+		uint32_t layerCount, 
+		uint32_t baseLevel, 
+		uint32_t levelCount, 
+		VkImageAspectFlags aspect = VK_IMAGE_ASPECT_COLOR_BIT) const;
+
 	void SetLayout(VkImageLayout layout, VkImageSubresourceRange range);
 	void SetLayout(VkImageLayout layout,
 		uint32_t baseLayer, uint32_t layerCount,
@@ -114,6 +122,14 @@ private:
 	
 	MemoryAllocator* _GetMemoryAllocator() const;
 
+	void _NewImageView(
+		ImageView& _pOutputImageView,
+		VkImageAspectFlags _aspect,
+		uint32_t _baseMipLevel,
+		uint32_t _levelCount,
+		uint32_t _baseArrayLayer,
+		uint32_t _layerCount) const;
+
 public:
 	~Image();
 
@@ -158,6 +174,16 @@ public:
 		uint32_t levelCount = VK_REMAINING_MIP_LEVELS,
 		uint32_t baseArrayLayer = 0,
 		uint32_t layerCount = VK_REMAINING_ARRAY_LAYERS) const;
+
+	// New an uninitialized image view pointer of this image.
+	// _pOutputImageView: return pointer, allocate memory inside, user needs to delete it
+	void NewImageView(
+		ImageView*& _pOutputImageView,
+		VkImageAspectFlags _aspect = VK_IMAGE_ASPECT_COLOR_BIT,
+		uint32_t _baseMipLevel = 0,
+		uint32_t _levelCount = VK_REMAINING_MIP_LEVELS,
+		uint32_t _baseArrayLayer = 0,
+		uint32_t _layerCount = VK_REMAINING_ARRAY_LAYERS) const;
 
 	const Information& GetImageInformation() const;
 

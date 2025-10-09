@@ -1,7 +1,6 @@
 #pragma once
 #include "common.h"
 
-
 class Sampler
 {
 private:
@@ -48,7 +47,6 @@ private:
 	VkSampler _GetSampler(const SamplerInfo _info);
 
 public:
-	
 	VkSampler GetSampler(const VkSamplerCreateInfo& _createInfo);
 	VkSampler GetSampler(
 		VkFilter filter,
@@ -58,7 +56,6 @@ public:
 		float maxLod = VK_LOD_CLAMP_NONE,
 		float mipLodBias = 0.0f,
 		bool anistrophyEnable = false,
-		float maxAnistrophy = 1.0f
-	);
+		float maxAnistrophy = 1.0f);
 	void ReturnSampler(VkSampler* _sampler);
 };

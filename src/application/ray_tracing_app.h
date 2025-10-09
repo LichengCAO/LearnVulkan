@@ -13,6 +13,7 @@
 #include "acceleration_structure.h"
 
 class SwapchainPass;
+class RayTracingProgram;
 
 class RayTracingApp
 {
@@ -370,5 +371,43 @@ public:
 	RayTracingAABBsApp();
 	~RayTracingAABBsApp();
 
+	void Run();
+};
+
+class RayTracingReflectApp
+{
+private:
+	std::unique_ptr<RayTracingProgram> m_uptrPipeline;
+	std::unique_ptr<SwapchainPass> m_uptrSwapchainPass;
+	std::unique_ptr<RayTracingAccelerationStructure> m_uptrAccelStruct;
+	std::vector<std::unique_ptr<Buffer>> m_uptrModelVertexBuffers;
+	std::vector<std::unique_ptr<Buffer>> m_uptrModelIndexBuffers;
+	std::vector<std::unique_ptr<Image>> m_uptrOutputImages;
+	std::vector<std::unique_ptr<ImageView>> m_uptrOutputViews;
+	std::vector<RayTracingAccelerationStructure::TriangleData> m_rayTracingGeometryData;
+	VkSampler m_vkSampler = VK_NULL_HANDLE;
+
+private:
+	void _InitAccelerationStructures();
+	void _UninitAccelerationStructures();
+
+	void _InitPipeline();
+	void _UninitPipeline();
+
+	void _CreateImagesAndViews();
+	void _DestroyImagesAndViews();
+
+	void _LoadModels();
+	void _CreateBuffersAndViews();
+	void _DestroyBuffersAndViews();
+
+	void _Init();
+	void _Uninit();
+
+	void _ResizeWindow();
+
+	void _MainLoop();
+
+public:
 	void Run();
 };

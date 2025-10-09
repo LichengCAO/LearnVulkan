@@ -188,7 +188,7 @@ public:
 		VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR 
 		| VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR);
 	
-	// Build AS after TLAS's setup
+	// Build AS after TLAS's setup, wait till done
 	void Init();
 
 	// Update BLAS in this acceleration structure, 
