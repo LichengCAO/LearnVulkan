@@ -372,6 +372,16 @@ bool MyDevice::NeedRecreateSwapchain() const
 	return m_needRecreate;
 }
 
+bool MyDevice::NeedCloseWindow() const
+{
+    return glfwWindowShouldClose(pWindow);
+}
+
+void MyDevice::StartFrame() const
+{
+	glfwPollEvents();
+}
+
 void MyDevice::_DestroySwapchain()
 {
 	for (auto& uptrImage : m_uptrSwapchainImages)
@@ -678,6 +688,11 @@ VkQueue MyDevice::GetQueue(uint32_t _familyIndex, uint32_t _queueIndex) const
 void MyDevice::WaitIdle() const
 {
 	vkDeviceWaitIdle(vkDevice);
+}
+
+double MyDevice::GetTime() const
+{
+    return glfwGetTime();
 }
 
 MemoryAllocator* MyDevice::GetMemoryAllocator()

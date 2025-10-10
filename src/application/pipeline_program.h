@@ -76,6 +76,7 @@ private:
 
 private:
 	DescriptorSetManager() {};
+	DescriptorSetManager(const DescriptorSetManager& _other) = delete;
 
 	// given descriptor name, get the set and binding of the descriptor
 	// return true if the output is valid, return false if we cannot map the name

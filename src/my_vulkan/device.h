@@ -100,6 +100,8 @@ public:
 	std::optional<uint32_t> AquireAvailableSwapchainImageIndex(VkSemaphore finishSignal);
 	void PresentSwapchainImage(const std::vector<VkSemaphore>& waitSemaphores, uint32_t imageIdx);
 	bool NeedRecreateSwapchain() const;
+	bool NeedCloseWindow() const;
+	void StartFrame() const;
 	VkExtent2D GetSwapchainExtent() const;
 	VkFormat FindSupportFormat(const std::vector<VkFormat>& candidates, VkImageTiling tilling, VkFormatFeatureFlags features) const;
 	VkFormat GetDepthFormat() const;
@@ -107,6 +109,8 @@ public:
 	UserInput GetUserInput() const;
 	VkQueue GetQueue(uint32_t _familyIndex, uint32_t _queueIndex = 0) const;
 	void WaitIdle() const;
+	// get time, in seconds
+	double GetTime() const;
 
 	MemoryAllocator* GetMemoryAllocator();
 

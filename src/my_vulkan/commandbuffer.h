@@ -61,7 +61,7 @@ public:
 	struct WaitInformation
 	{
 		VkSemaphore          waitSamaphore = VK_NULL_HANDLE;
-		VkPipelineStageFlags waitStage = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+		VkPipelineStageFlags waitStage = VkPipelineStageFlagBits::VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT; // stages that cannot start till the semaphore is signaled
 	};
 
 private:
