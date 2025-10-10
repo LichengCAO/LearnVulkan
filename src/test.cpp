@@ -3,7 +3,6 @@
 #include "ray_tracing_app.h"
 #include "ray_tracing_reflect_app.h"
 #include "ray_query_app.h"
-#include "shader_reflect.h"
 int main() {
 	//RayQueryApp app;
 	//RayTracingApp app;

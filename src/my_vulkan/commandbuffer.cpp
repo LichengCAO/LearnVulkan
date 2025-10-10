@@ -109,7 +109,7 @@ void CommandSubmission::StartCommands(const std::vector<WaitInformation>& _waitI
 	m_vkWaitStages.reserve(n);
 	for (const auto& waitInfo : _waitInfos)
 	{
-		m_vkWaitStages.push_back(waitInfo.waitStage);
+		m_vkWaitStages.push_back(waitInfo.waitPipelineStage);
 		m_vkWaitSemaphores.push_back(waitInfo.waitSamaphore);
 	}
 }
@@ -135,7 +135,7 @@ void CommandSubmission::StartOneTimeCommands(const std::vector<WaitInformation>&
 	m_vkWaitStages.reserve(_waitInfos.size());
 	for (const auto& waitInfo : _waitInfos)
 	{
-		m_vkWaitStages.push_back(waitInfo.waitStage);
+		m_vkWaitStages.push_back(waitInfo.waitPipelineStage);
 		m_vkWaitSemaphores.push_back(waitInfo.waitSamaphore);
 	}
 }

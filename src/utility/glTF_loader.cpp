@@ -5,12 +5,12 @@
 #define COMPONENT_IMPLEMENTATION
 #include "component.h"
 
-COMPONENT_DEFINITION(Component, glTFContent::Camera);
-COMPONENT_DEFINITION(Component, glTFContent::Mesh);
-COMPONENT_DEFINITION(Component, glTFContent::Transform);
-COMPONENT_DEFINITION(Component, glTFContent::Animation);
+COMPONENT_DEFINITION(Component, glTFLoader::Camera);
+COMPONENT_DEFINITION(Component, glTFLoader::Mesh);
+COMPONENT_DEFINITION(Component, glTFLoader::Transform);
+COMPONENT_DEFINITION(Component, glTFLoader::Animation);
 
-void glTFContent::_LoadFile(const std::string& _file, tinygltf::Model& _out)
+void glTFLoader::_LoadFile(const std::string& _file, tinygltf::Model& _out)
 {
 	tinygltf::TinyGLTF tloader;
 	std::string strErr;
@@ -34,7 +34,7 @@ void glTFContent::_LoadFile(const std::string& _file, tinygltf::Model& _out)
 	}
 }
 
-void glTFContent::_LoadNodes(const tinygltf::Model& _root)
+void glTFLoader::_LoadNodes(const tinygltf::Model& _root)
 {
 	m_nodes.reserve(_root.nodes.size());
 	for (size_t i = 0; i < _root.nodes.size(); ++i)
@@ -46,7 +46,7 @@ void glTFContent::_LoadNodes(const tinygltf::Model& _root)
 		{
 			if (curNode.matrix.size() == 16)
 			{
-				glTFContent::Transform transform{};
+				glTFLoader::Transform transform{};
 				size_t index = 0;
 				glm::mat4 modelMatrix{};
 
@@ -60,12 +60,12 @@ void glTFContent::_LoadNodes(const tinygltf::Model& _root)
 				}
 				transform.m_transform = modelMatrix;
 
-				uptrNode->AddComponent<glTFContent::Transform>(transform);
+				uptrNode->AddComponent<glTFLoader::Transform>(transform);
 			}
 			else if (curNode.translation.size() == 3 || curNode.scale.size() == 3 || curNode.rotation.size() == 4)
 			{
-				glTFContent::Transform transform{};
-				glTFContent::Transform::SplitTransform splitTransform{};
+				glTFLoader::Transform transform{};
+				glTFLoader::Transform::SplitTransform splitTransform{};
 				if (curNode.translation.size() == 3)
 				{
 					splitTransform.translation = glm::vec3(
@@ -98,19 +98,19 @@ void glTFContent::_LoadNodes(const tinygltf::Model& _root)
 				}
 				transform.m_transform = splitTransform;
 
-				uptrNode->AddComponent<glTFContent::Transform>(transform);
+				uptrNode->AddComponent<glTFLoader::Transform>(transform);
 			}
 		}
 
 		// load mesh
 		if (curNode.mesh != -1)
 		{
-			glTFContent::Mesh mesh{};
+			glTFLoader::Mesh mesh{};
 			const auto& curMesh = _root.meshes[curNode.mesh];
 
 			_LoadMesh(_root, curMesh, mesh);
 
-			uptrNode->AddComponent<glTFContent::Mesh>(mesh);
+			uptrNode->AddComponent<glTFLoader::Mesh>(mesh);
 		}
 
 		m_nodes.push_back(std::move(uptrNode));
@@ -132,12 +132,12 @@ void glTFContent::_LoadNodes(const tinygltf::Model& _root)
 	}
 }
 
-void glTFContent::_LoadScene(const tinygltf::Model& _root)
+void glTFLoader::_LoadScene(const tinygltf::Model& _root)
 {
 	for (size_t i = 0; i < _root.scenes.size(); ++i)
 	{
 		const auto& curScene = _root.scenes[i];
-		std::unique_ptr<glTFContent::Scene> uptrScene = std::make_unique<glTFContent::Scene>();
+		std::unique_ptr<glTFLoader::Scene> uptrScene = std::make_unique<glTFLoader::Scene>();
 
 		uptrScene->pNodes.reserve(curScene.nodes.size());
 		for (size_t j = 0; j < curScene.nodes.size(); ++j)
@@ -151,16 +151,15 @@ void glTFContent::_LoadScene(const tinygltf::Model& _root)
 	}
 }
 
-void glTFContent::_LoadMesh(const tinygltf::Model& _root, const tinygltf::Mesh& _mesh, glTFContent::Mesh& _outMesh)
+void glTFLoader::_LoadMesh(const tinygltf::Model& _root, const tinygltf::Mesh& _mesh, glTFLoader::Mesh& _outMesh)
 {
 	for (size_t i = 0; i < _mesh.primitives.size(); ++i)
 	{
-		glTFContent::Primitive primitive{};
+		glTFLoader::Primitive primitive{};
 		const auto& curPrimitive = _mesh.primitives[i];
 
 		for (const auto& curAttribute : curPrimitive.attributes)
 		{
-			
 			const auto& taccessor = _root.accessors[curAttribute.second];
 			if (curAttribute.first.compare("POSITION") == 0)
 			{
@@ -186,19 +185,33 @@ void glTFContent::_LoadMesh(const tinygltf::Model& _root, const tinygltf::Mesh& 
 			_LoadAccessor(_root, taccessor, primitive.indices);
 		}
 
+		if (curPrimitive.material > -1)
+		{
+			const auto& tmaterial = _root.materials[curPrimitive.material];
+			Material primitiveMaterial{};
+			
+			primitiveMaterial.color = glm::vec4(
+				tmaterial.pbrMetallicRoughness.baseColorFactor[0],
+				tmaterial.pbrMetallicRoughness.baseColorFactor[1],
+				tmaterial.pbrMetallicRoughness.baseColorFactor[2],
+				tmaterial.pbrMetallicRoughness.baseColorFactor[3]);
+
+			primitive.optMaterial = primitiveMaterial;
+		}
+
 		_outMesh.primitives.push_back(std::move(primitive));
 	}
 }
 
-void glTFContent::_FetchStaticMeshes(
-	const glTFContent::Node* _pNode, 
+void glTFLoader::_FetchStaticMeshes(
+	const glTFLoader::Node* _pNode, 
 	const glm::mat4& _parentModelMatrix, 
 	std::vector<::StaticMesh>& _outStaticMeshes, 
 	std::vector<glm::mat4>& _outModelMatrices) const
 {
-	std::vector<const glTFContent::Mesh*> meshThisNodeHolds;
+	std::vector<const glTFLoader::Mesh*> meshThisNodeHolds;
 	glm::mat4 selfModelMatrix = _parentModelMatrix;
-	const glTFContent::Transform* pSelfTransform = _pNode->GetComponent<glTFContent::Transform>();
+	const glTFLoader::Transform* pSelfTransform = _pNode->GetComponent<glTFLoader::Transform>();
 
 	// fill in self static meshes
 	if (pSelfTransform)
@@ -243,7 +256,73 @@ void glTFContent::_FetchStaticMeshes(
 	}
 }
 
-void glTFContent::Load(const std::string& _glTFPath)
+void glTFLoader::_FetchSceneData(const glTFLoader::Node* _pNode, const glm::mat4& _parentModelMatrix, SceneData& _outputSceneData) const
+{
+	std::vector<const glTFLoader::Mesh*> meshThisNodeHolds;
+	glm::mat4 selfModelMatrix = _parentModelMatrix;
+	const glTFLoader::Transform* pSelfTransform = _pNode->GetComponent<glTFLoader::Transform>();
+
+	// fill in self static meshes
+	if (pSelfTransform)
+	{
+		selfModelMatrix = _parentModelMatrix * pSelfTransform->GetModelMatrix();
+	}
+
+	_pNode->GetComponents<Mesh>(meshThisNodeHolds);
+	for (auto pMesh : meshThisNodeHolds)
+	{
+		for (auto& primitive : pMesh->primitives)
+		{
+			StaticMesh staticMesh{};
+			size_t vertexCount = primitive.positions.size();
+
+			staticMesh.indices = primitive.indices;
+
+			for (size_t i = 0; i < vertexCount; ++i)
+			{
+				Vertex curVertex{};
+				curVertex.position = primitive.positions[i];
+				if (i < primitive.normals.size())
+				{
+					curVertex.normal = primitive.normals[i];
+				}
+				if (i < primitive.texcoords.size())
+				{
+					curVertex.uv = primitive.texcoords[i];
+				}
+				staticMesh.verts.push_back(curVertex);
+			}
+
+			if (_outputSceneData.pStaticMeshes != nullptr)
+			{
+				_outputSceneData.pStaticMeshes->push_back(staticMesh);
+			}
+			if (_outputSceneData.pModelMatrices != nullptr)
+			{
+				_outputSceneData.pModelMatrices->push_back(selfModelMatrix);
+			}
+			if (_outputSceneData.pMeshColors != nullptr)
+			{
+				if (primitive.optMaterial.has_value())
+				{
+					_outputSceneData.pMeshColors->push_back(primitive.optMaterial.value().color);
+				}
+				else
+				{
+					_outputSceneData.pMeshColors->push_back(glm::vec4(1, 1, 1, 1));
+				}
+			}
+		}
+	}
+
+	// fill children static meshes
+	for (const auto pChild : _pNode->pChildren)
+	{
+		_FetchSceneData(pChild, selfModelMatrix, _outputSceneData);
+	}
+}
+
+void glTFLoader::Load(const std::string& _glTFPath)
 {
 	tinygltf::Model root;
 
@@ -254,11 +333,11 @@ void glTFContent::Load(const std::string& _glTFPath)
 	_LoadScene(root);
 }
 
-void glTFContent::GetSceneSimpleMeshes(std::vector<::StaticMesh>& _staticMeshes, std::vector<glm::mat4>& _modelMatrices)
+void glTFLoader::GetSceneSimpleMeshes(std::vector<::StaticMesh>& _staticMeshes, std::vector<glm::mat4>& _modelMatrices)
 {
 	if (m_scenes.size() == 0) return;
 
-	glm::mat4 originModel = glm::mat4(1.0f);;
+	glm::mat4 originModel = glm::mat4(1.0f);
 
 	for (auto pNode : m_scenes[0]->pNodes)
 	{
@@ -266,7 +345,19 @@ void glTFContent::GetSceneSimpleMeshes(std::vector<::StaticMesh>& _staticMeshes,
 	}
 }
 
-glm::mat4 glTFContent::Transform::GetModelMatrix() const
+void glTFLoader::GetSceneData(SceneData& _outputSceneData) const
+{
+	if (m_scenes.size() == 0) return;
+
+	glm::mat4 originModel = glm::mat4(1.0f);
+
+	for (auto pNode : m_scenes[0]->pNodes)
+	{
+		_FetchSceneData(pNode, originModel, _outputSceneData);
+	}
+}
+
+glm::mat4 glTFLoader::Transform::GetModelMatrix() const
 {
 	if (auto ptr = std::get_if<SplitTransform>(&m_transform))
 	{

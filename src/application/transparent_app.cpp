@@ -1737,7 +1737,7 @@ void TransparentApp::_DrawFrame()
 	_UpdateUniformBuffer();
 	CommandSubmission::WaitInformation waitInfo{};
 	waitInfo.waitSamaphore = m_swapchainImageAvailabilities[m_currentFrame];
-	waitInfo.waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	waitInfo.waitPipelineStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	cmd.StartCommands({ waitInfo });
 	
 	// draw opaque objects

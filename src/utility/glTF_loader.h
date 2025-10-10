@@ -4,11 +4,12 @@
 #include <variant>
 #include <tiny_gltf.h>
 #include "utils.h"
-class glTFContent
+class glTFLoader
 {
 private:
 	struct Material
 	{
+		glm::vec4 color;
 		// TODO
 	};
 	struct Primitive
@@ -62,6 +63,15 @@ private:
 		std::vector<Node*> pNodes;
 	};
 
+public:
+	// set up pointer to get the data from glTF scene
+	struct SceneData
+	{
+		std::vector<::StaticMesh>* pStaticMeshes = nullptr; // optional, get static mesh with glTF primitives
+		std::vector<glm::mat4>* pModelMatrices = nullptr;   // optional, get model matrices of glTF primitives
+		std::vector<glm::vec4>* pMeshColors = nullptr;		// optional, get mesh color of glTF primitives
+	};
+
 private:
 	std::vector<std::unique_ptr<Node>> m_nodes;
 	std::vector<std::unique_ptr<Scene>> m_scenes;
@@ -72,7 +82,7 @@ private:
 	template<class DataType>
 	static void _LoadAccessor(const tinygltf::Model& _root, const tinygltf::Accessor& _accessor, std::vector<DataType>& _outVec);
 
-	static void _LoadMesh(const tinygltf::Model& _root, const tinygltf::Mesh& _mesh, glTFContent::Mesh& _outMesh);
+	static void _LoadMesh(const tinygltf::Model& _root, const tinygltf::Mesh& _mesh, glTFLoader::Mesh& _outMesh);
 
 	void _LoadNodes(const tinygltf::Model& _root);
 
@@ -81,19 +91,27 @@ private:
 	// recursively fetch primitives from this node and its child nodes that can build static meshes
 	// return the static meshes built by these primitives and their model matrices
 	void _FetchStaticMeshes(
-		const glTFContent::Node* _pNode,
+		const glTFLoader::Node* _pNode,
 		const glm::mat4& _parentModelMatrix,
 		std::vector<::StaticMesh>& _outStaticMeshes,
 		std::vector<glm::mat4>& _outModelMatrices) const;
+
+	void _FetchSceneData(
+		const glTFLoader::Node* _pNode,
+		const glm::mat4& _parentModelMatrix,
+		SceneData& _outputSceneData) const;
 
 public:
 	void Load(const std::string& _glTFPath);
 
 	void GetSceneSimpleMeshes(std::vector<::StaticMesh>& _staticMeshes, std::vector<glm::mat4>& _modelMatrices);
+
+	// Get scene data from glTF scene, see glTFLoader::SceneData for detail
+	void GetSceneData(SceneData& _outputSceneData) const;
 };
 
 template<class DataType>
-void glTFContent::_LoadAccessor(const tinygltf::Model& _root, const tinygltf::Accessor& _accessor, std::vector<DataType>& _outVec)
+void glTFLoader::_LoadAccessor(const tinygltf::Model& _root, const tinygltf::Accessor& _accessor, std::vector<DataType>& _outVec)
 {
 	const auto& tbufferView = _root.bufferViews[_accessor.bufferView];
 	const auto& tbuffer = _root.buffers[tbufferView.buffer];

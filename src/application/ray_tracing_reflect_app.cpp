@@ -135,14 +135,19 @@ void RayTracingReflectApp::_DestroyImagesAndViews()
 
 void RayTracingReflectApp::_CreateBuffers()
 {
-	glTFContent gltfLoader{};
+	glTFLoader gltfLoader{};
+	glTFLoader::SceneData glTFData{};
 	std::vector<StaticMesh> meshes;
 	std::vector<glm::mat4> modelMatrices;
+	std::vector<glm::vec4> meshColors;
 	std::vector<AddressData> addrData;
 	Buffer::Information bufferInfo{};
 
+	glTFData.pMeshColors = &meshColors;
+	glTFData.pModelMatrices = &modelMatrices;
+	glTFData.pStaticMeshes = &meshes;
 	gltfLoader.Load("E:/GitStorage/LearnVulkan/res/models/cornell_box/scene.gltf");
-	gltfLoader.GetSceneSimpleMeshes(meshes, modelMatrices);
+	gltfLoader.GetSceneData(glTFData);
 
 	for (size_t i = 0; i < meshes.size(); ++i)
 	{

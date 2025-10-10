@@ -23,14 +23,21 @@ private:
 		uint64_t vertexAddress;
 		uint64_t indexAddress;
 	};
+	struct Material
+	{
+		glm::vec4 colorOrLight; // xyz: rgb, w: is_light
+	};
 
 	std::unique_ptr<RayTracingProgram> m_uptrPipeline;
 	std::unique_ptr<SwapchainPass> m_uptrSwapchainPass;
 	std::unique_ptr<RayTracingAccelerationStructure> m_uptrAccelStruct;
 	std::unique_ptr<Buffer> m_uptrAddressBuffer;
+	std::unique_ptr<Buffer> m_uptrMaterialBuffer;
+
 	std::vector<std::unique_ptr<Buffer>> m_uptrModelVertexBuffers;
 	std::vector<std::unique_ptr<Buffer>> m_uptrModelIndexBuffers;
 	std::vector<std::unique_ptr<Buffer>> m_uptrCameraBuffers;
+	
 	std::vector<std::unique_ptr<Image>> m_uptrOutputImages;
 	std::vector<std::unique_ptr<ImageView>> m_uptrOutputViews;
 	std::vector<std::unique_ptr<CommandSubmission>> m_uptrCommands;

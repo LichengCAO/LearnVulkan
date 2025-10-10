@@ -627,7 +627,7 @@ void RayTracingApp::_DrawFrame()
 	}
 
 	scPassWait.waitSamaphore = cmd->SubmitCommands();
-	scPassWait.waitStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	scPassWait.waitPipelineStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 	m_swapchainPass->Do({ scPassWait });
 
 	m_currentFrame = (m_currentFrame + 1) % MAX_FRAME_COUNT;
@@ -1219,7 +1219,7 @@ void RayTracingThousandsApp::_DrawFrame()
 	}
 
 	scPassWait.waitSamaphore = cmd->SubmitCommands();
-	scPassWait.waitStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	scPassWait.waitPipelineStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 	m_swapchainPass->Do({ scPassWait });
 
 	m_currentFrame = (m_currentFrame + 1) % MAX_FRAME_COUNT;
@@ -1843,7 +1843,7 @@ void RayTracingAABBsApp::_DrawFrame()
 	}
 
 	scPassWait.waitSamaphore = cmd->SubmitCommands();
-	scPassWait.waitStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	scPassWait.waitPipelineStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
 	m_swapchainPass->Do({ scPassWait });
 
 	m_currentFrame = (m_currentFrame + 1) % MAX_FRAME_COUNT;

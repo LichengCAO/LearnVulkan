@@ -96,7 +96,7 @@ void MeshletApp::_InitModels()
 	std::vector<glm::mat4> matrices;
 	//MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/sphere/sphere.obj", meshs);
 	
-	glTFContent gltfScene{};
+	glTFLoader gltfScene{};
 	gltfScene.Load("E:/GitStorage/LearnVulkan/res/models/cornell_box/scene.gltf");
 	gltfScene.GetSceneSimpleMeshes(meshs, matrices);
 	//MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/wahoo/wahoo.obj", meshs);
@@ -447,7 +447,7 @@ void MeshletApp::_DrawFrame()
 	_UpdateUniformBuffer();
 	CommandSubmission::WaitInformation waitInfo{};
 	waitInfo.waitSamaphore = m_swapchainImageAvailabilities[m_currentFrame];
-	waitInfo.waitStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
+	waitInfo.waitPipelineStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	cmd->StartCommands({ waitInfo });
 
 	m_program.BindFramebuffer(cmd.get(), m_framebuffers[imageIndex.value()].get());
