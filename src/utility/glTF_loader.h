@@ -9,6 +9,7 @@ class glTFLoader
 private:
 	struct Material
 	{
+		std::string name;
 		glm::vec4 color;
 		// TODO
 	};
@@ -70,6 +71,7 @@ public:
 		std::vector<::StaticMesh>* pStaticMeshes = nullptr; // optional, get static mesh with glTF primitives
 		std::vector<glm::mat4>* pModelMatrices = nullptr;   // optional, get model matrices of glTF primitives
 		std::vector<glm::vec4>* pMeshColors = nullptr;		// optional, get mesh color of glTF primitives
+		std::vector<std::string>* pMaterialNames = nullptr; // optional, get name of materials
 	};
 
 private:

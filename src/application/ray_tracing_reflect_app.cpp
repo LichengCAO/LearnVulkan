@@ -35,7 +35,7 @@ void RayTracingReflectApp::_InitAccelerationStructures()
 	{
 		RayTracingAccelerationStructure::InstanceData curInstData{};
 
-		curInstData.transformMatrix = glm::mat4(1.0f);
+		curInstData.transformMatrix = m_rayTracingGeometryTransform[i];
 		curInstData.uBLASIndex = m_uptrAccelStruct->AddBLAS({ m_rayTracingGeometryData[i] }); // single BLAS can hold multiple geometries, but here i bind single geometry with one BLAS
 
 		instData.push_back(curInstData);
@@ -59,11 +59,9 @@ void RayTracingReflectApp::_InitPipeline()
 
 	m_uptrPipeline = std::make_unique<RayTracingProgram>();
 	m_uptrPipeline->SetMaxRecursion(2);
-	m_uptrPipeline->AddMissShader("E:/GitStorage/LearnVulkan/bin/shaders/rt.rmiss.spv");
-	m_uptrPipeline->AddMissShader("E:/GitStorage/LearnVulkan/bin/shaders/rt_shadow.rmiss.spv");
-	m_uptrPipeline->AddRayGenerationShader("E:/GitStorage/LearnVulkan/bin/shaders/rt.rgen.spv");
-	m_uptrPipeline->AddTriangleHitShaders("E:/GitStorage/LearnVulkan/bin/shaders/rt_shadow.rchit.spv", {});
-	m_uptrPipeline->AddTriangleHitShaders("E:/GitStorage/LearnVulkan/bin/shaders/rt_simple.rchit.spv", {});
+	m_uptrPipeline->AddMissShader("E:/GitStorage/LearnVulkan/bin/shaders/rt_pbr.rmiss.spv");
+	m_uptrPipeline->AddRayGenerationShader("E:/GitStorage/LearnVulkan/bin/shaders/rt_pbr.rgen.spv");
+	m_uptrPipeline->AddTriangleHitShaders("E:/GitStorage/LearnVulkan/bin/shaders/rt_pbr.rchit.spv", {});
 	m_uptrPipeline->Init();
 
 	m_uptrSwapchainPass = std::make_unique<SwapchainPass>();
@@ -140,15 +138,17 @@ void RayTracingReflectApp::_CreateBuffers()
 	std::vector<StaticMesh> meshes;
 	std::vector<glm::mat4> modelMatrices;
 	std::vector<glm::vec4> meshColors;
+	std::vector<std::string> materialNames;
 	std::vector<AddressData> addrData;
-	Buffer::Information bufferInfo{};
-
+	
 	glTFData.pMeshColors = &meshColors;
 	glTFData.pModelMatrices = &modelMatrices;
 	glTFData.pStaticMeshes = &meshes;
+	glTFData.pMaterialNames = &materialNames;
 	gltfLoader.Load("E:/GitStorage/LearnVulkan/res/models/cornell_box/scene.gltf");
 	gltfLoader.GetSceneData(glTFData);
 
+	// mesh data
 	for (size_t i = 0; i < meshes.size(); ++i)
 	{
 		Buffer::Information bufferInfo{};
@@ -156,7 +156,7 @@ void RayTracingReflectApp::_CreateBuffers()
 		AddressData instanceAddressData{};
 		std::unique_ptr<Buffer> uptrVertexBuffer = std::make_unique<Buffer>();
 		std::unique_ptr<Buffer> uptrIndexBuffer = std::make_unique<Buffer>();
-		std::vector<glm::vec4> vertPositions;
+		std::vector<Vertex> vertPositions;
 
 		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -164,7 +164,7 @@ void RayTracingReflectApp::_CreateBuffers()
 			| VK_BUFFER_USAGE_TRANSFER_DST_BIT
 			| VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
 			| VK_BUFFER_USAGE_2_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
-		bufferInfo.size = meshes[i].verts.size() * sizeof(glm::vec4);
+		bufferInfo.size = meshes[i].verts.size() * sizeof(Vertex);
 		uptrVertexBuffer->Init(bufferInfo);
 
 		bufferInfo.size = meshes[i].indices.size() * sizeof(uint32_t);
@@ -172,7 +172,7 @@ void RayTracingReflectApp::_CreateBuffers()
 
 		for (size_t j = 0; j < meshes[i].verts.size(); ++j)
 		{
-			vertPositions.push_back(glm::vec4(meshes[i].verts[j].position, 1.0f));
+			vertPositions.push_back({ glm::vec4(meshes[i].verts[j].position, 1.0f) , glm::vec4(meshes[i].verts[j].normal.value(), 0.0f)});
 		}
 		uptrVertexBuffer->CopyFromHost(vertPositions.data());
 		uptrIndexBuffer->CopyFromHost(meshes[i].indices.data());
@@ -180,7 +180,7 @@ void RayTracingReflectApp::_CreateBuffers()
 		trigData.vkIndexType = VK_INDEX_TYPE_UINT32;
 		trigData.uIndexCount = static_cast<uint32_t>(meshes[i].indices.size());
 		trigData.uVertexCount = static_cast<uint32_t>(meshes[i].verts.size());
-		trigData.uVertexStride = static_cast<uint32_t>(sizeof(glm::vec4));
+		trigData.uVertexStride = static_cast<uint32_t>(sizeof(Vertex));
 		trigData.vkDeviceAddressIndex = uptrIndexBuffer->GetDeviceAddress();
 		trigData.vkDeviceAddressVertex = uptrVertexBuffer->GetDeviceAddress();
 		instanceAddressData.indexAddress = static_cast<uint64_t>(uptrIndexBuffer->GetDeviceAddress());
@@ -189,10 +189,12 @@ void RayTracingReflectApp::_CreateBuffers()
 		addrData.push_back(instanceAddressData);
 
 		m_rayTracingGeometryData.push_back(std::move(trigData));
+		m_rayTracingGeometryTransform.push_back(modelMatrices[i]);
 		m_uptrModelVertexBuffers.push_back(std::move(uptrVertexBuffer));
 		m_uptrModelIndexBuffers.push_back(std::move(uptrIndexBuffer));
 	}
 
+	// camera data
 	for (size_t i = 0; i < 3; ++i)
 	{
 		std::unique_ptr<Buffer> uptrBuffer = std::make_unique<Buffer>();
@@ -207,17 +209,59 @@ void RayTracingReflectApp::_CreateBuffers()
 		m_uptrCameraBuffers.push_back(std::move(uptrBuffer));
 	}
 
-	m_uptrAddressBuffer = std::make_unique<Buffer>();
-	bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-	bufferInfo.size = static_cast<uint32_t>(sizeof(AddressData) * addrData.size());
-	bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	// address data
+	{
+		Buffer::Information bufferInfo{};
+		m_uptrAddressBuffer = std::make_unique<Buffer>();
+		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		bufferInfo.size = static_cast<uint32_t>(sizeof(AddressData) * addrData.size());
+		bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
-	m_uptrAddressBuffer->Init(bufferInfo);
-	m_uptrAddressBuffer->CopyFromHost(addrData.data());
+		m_uptrAddressBuffer->Init(bufferInfo);
+		m_uptrAddressBuffer->CopyFromHost(addrData.data());
+	}
+
+	// material data
+	{
+		Buffer::Information bufferInfo{};
+		std::vector<Material> mtls;
+
+		CHECK_TRUE(materialNames.size() == meshColors.size(), "Number of material names doesn't match number of material colors!");
+		for (size_t i = 0; i < materialNames.size(); ++i)
+		{
+			Material curMtl{};
+
+			curMtl.colorOrLight = meshColors[i];
+			if (materialNames[i] == "light")
+			{
+				curMtl.colorOrLight.a = 1.0f;
+			}
+			else
+			{
+				curMtl.colorOrLight.a = 0.0f;
+			}
+			mtls.push_back(curMtl);
+		}
+
+		m_uptrMaterialBuffer = std::make_unique<Buffer>();
+		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		bufferInfo.size = static_cast<uint32_t>(sizeof(Material) * mtls.size());
+		bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
+		m_uptrMaterialBuffer->Init(bufferInfo);
+		m_uptrMaterialBuffer->CopyFromHost(mtls.data());
+	}
+	
 }
 
 void RayTracingReflectApp::_DestroyBuffers()
 {
+	if (m_uptrMaterialBuffer)
+	{
+		m_uptrMaterialBuffer->Uninit();
+		m_uptrMaterialBuffer.reset();
+	}
+
 	for (auto& uptrCameraBuffer : m_uptrCameraBuffers)
 	{
 		uptrCameraBuffer->Uninit();
@@ -353,6 +397,7 @@ void RayTracingReflectApp::_DrawFrame()
 		binder.BindDescriptor(0, 1, { m_uptrAccelStruct->vkAccelerationStructure }, DescriptorSetManager::DESCRIPTOR_BIND_SETTING::CONSTANT_DESCRIPTOR_SET_ACROSS_FRAMES);
 		binder.BindDescriptor(0, 2, { m_uptrOutputViews[m_currentFrame]->GetDescriptorInfo(m_vkSampler, VK_IMAGE_LAYOUT_GENERAL) }, DescriptorSetManager::DESCRIPTOR_BIND_SETTING::CONSTANT_DESCRIPTOR_SET_PER_FRAME);
 		binder.BindDescriptor(0, 3, { m_uptrAddressBuffer->GetDescriptorInfo() }, DescriptorSetManager::DESCRIPTOR_BIND_SETTING::CONSTANT_DESCRIPTOR_SET_ACROSS_FRAMES);
+		binder.BindDescriptor(1, 0, { m_uptrMaterialBuffer->GetDescriptorInfo() }, DescriptorSetManager::DESCRIPTOR_BIND_SETTING::CONSTANT_DESCRIPTOR_SET_ACROSS_FRAMES);
 		binder.EndBind();
 		binder.NextFrame();
 	}

@@ -1,0 +1,63 @@
+#version 460 core
+#extension GL_EXT_ray_tracing : require
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+
+#include "rt_pbr_common.glsl"
+
+layout(set = 0, binding = 0) uniform CameraInformation
+{
+    mat4 inverseViewProj;
+    vec4 eye;
+} cameraInfo;
+layout(set = 0, binding = 1) uniform accelerationStructureEXT accelerationStructure;
+layout(set = 0, binding = 2, rgba32f) uniform image2D imageOutput;
+layout(location = 0) rayPayloadEXT PBRPayload payload;
+
+void GetRayOriginAndDirection(out vec3 rayOrigin, out vec3 rayDirection)
+{
+    const vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
+    vec2 inUV = pixelCenter/vec2(gl_LaunchSizeEXT.xy);
+    vec4 clipSpacePos = vec4(inUV * 2.0 - 1.0, 0.0, 1.0);
+    rayOrigin = cameraInfo.eye.xyz;
+    vec4 refPos = cameraInfo.inverseViewProj * clipSpacePos;
+    refPos /= refPos.w; // Perspective divide
+    rayDirection = normalize(refPos.xyz - rayOrigin);
+}
+
+void EmitRay(in vec3 rayOrigin, in vec3 rayDirection)
+{
+    uint sbtOffset = 0;
+    //if (rayDirection.x > 0.0f) sbtOffset = 1; // Right
+    //uint rayFlags = gl_RayFlagsOpaqueEXT | gl_RayFlagsTerminateOnFirstHitEXT;
+    traceRayEXT(
+        accelerationStructure,
+        gl_RayFlagsOpaqueEXT,       // Ray flags
+        0xFF,                       // object mask
+        sbtOffset,                  // sbtRecordOffset
+        0,                          // sbtRecordStride
+        0,                          // missIndex
+        rayOrigin,                  // ray origin
+        0.001f,                     // ray min range
+        rayDirection,               // ray direction
+        10000.0f,                   // ray max range
+        0                           // payload (location = 0)
+    );   
+}
+
+void main()
+{
+    GetRayOriginAndDirection(payload.rayOrigin, payload.rayDirection);
+    payload.hitValue = vec3(0.0f);
+    payload.traceEnd = false;
+    
+    for (int i = 0; i < 2; ++i)
+    {
+        EmitRay(payload.rayOrigin, payload.rayDirection);
+        if (payload.traceEnd) // No hit
+        {
+            break;
+        }
+    }
+    imageStore(imageOutput, ivec2(gl_LaunchIDEXT.xy), vec4(payload.hitValue, 1.0));
+}

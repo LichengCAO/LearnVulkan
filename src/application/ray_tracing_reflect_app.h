@@ -27,6 +27,11 @@ private:
 	{
 		glm::vec4 colorOrLight; // xyz: rgb, w: is_light
 	};
+	struct Vertex
+	{
+		glm::vec4 position;
+		glm::vec4 normal;
+	};
 
 	std::unique_ptr<RayTracingProgram> m_uptrPipeline;
 	std::unique_ptr<SwapchainPass> m_uptrSwapchainPass;
@@ -42,6 +47,7 @@ private:
 	std::vector<std::unique_ptr<ImageView>> m_uptrOutputViews;
 	std::vector<std::unique_ptr<CommandSubmission>> m_uptrCommands;
 	std::vector<RayTracingAccelerationStructure::TriangleData> m_rayTracingGeometryData;
+	std::vector<glm::mat4> m_rayTracingGeometryTransform;
 	VkSampler m_vkSampler = VK_NULL_HANDLE;
 	uint32_t m_currentFrame = 0u;
 	PersCamera m_camera{ 400, 300, glm::vec3(2,2,2), glm::vec3(0,0,0), glm::vec3(0,1,0) };

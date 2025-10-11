@@ -15,6 +15,33 @@ struct Vertex
 	}
 };
 
+struct StaticMesh
+{
+	std::vector<Vertex> verts;
+	std::vector<uint32_t> indices;
+};
+
+struct Meshlet
+{
+	uint32_t vertexOffset;
+	uint32_t vertexCount;
+
+	uint32_t triangleOffset;
+	uint32_t triangleCount;
+};
+
+struct MeshletBounds
+{
+	// frustum culling
+	glm::vec3 center;
+	float radius;
+	// back-face culling
+	// e.g. if (dot(normalize(coneApex - cameraPosition), coneAxis) >= coneCutoff) reject(); code from zeux/meshoptimizer
+	glm::vec3 coneApex;
+	glm::vec3 coneAxis;
+	float coneCutoff;
+};
+
 namespace std
 {
 	template<> struct hash<Vertex>

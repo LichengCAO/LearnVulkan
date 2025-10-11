@@ -190,6 +190,7 @@ void glTFLoader::_LoadMesh(const tinygltf::Model& _root, const tinygltf::Mesh& _
 			const auto& tmaterial = _root.materials[curPrimitive.material];
 			Material primitiveMaterial{};
 			
+			primitiveMaterial.name = tmaterial.name;
 			primitiveMaterial.color = glm::vec4(
 				tmaterial.pbrMetallicRoughness.baseColorFactor[0],
 				tmaterial.pbrMetallicRoughness.baseColorFactor[1],
@@ -310,6 +311,17 @@ void glTFLoader::_FetchSceneData(const glTFLoader::Node* _pNode, const glm::mat4
 				else
 				{
 					_outputSceneData.pMeshColors->push_back(glm::vec4(1, 1, 1, 1));
+				}
+			}
+			if (_outputSceneData.pMaterialNames != nullptr)
+			{
+				if (primitive.optMaterial.has_value())
+				{
+					_outputSceneData.pMaterialNames->push_back(primitive.optMaterial.value().name);
+				}
+				else
+				{
+					_outputSceneData.pMaterialNames->push_back({});
 				}
 			}
 		}
