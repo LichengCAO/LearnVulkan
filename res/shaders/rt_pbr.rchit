@@ -47,6 +47,12 @@ vec3 ObjectNormalToWorldNormal(const vec3 normal)
 {
     return  normalize(vec3(normal * gl_WorldToObjectEXT));
 }
+
+vec3 Noise(uint n)
+{
+    return  random_pcg3d(gl_LaunchIDEXT.xy, n);
+}
+
 void main()
 {
 
@@ -68,6 +74,12 @@ void main()
     const vec3 nrmWorld = ObjectNormalToWorldNormal(nrmObject); // GetRayHitPosition() can also be used to get the world position, but is less precise
 
     payload.rayOrigin = posWorld + nrmWorld * 0.001f; // Offset a little to avoid self-intersection
+
+    vec3 random = Noise(0);
+    float phi = cos(random.x * 2 * PI);
+    //float theta = asin(random.y);  // i think it's right if we only need to consider theta, but we need to consider both phi and theta
+    float theta = asin(sqrt(random.x));
+
     payload.rayDirection = reflect(payload.rayDirection, nrmWorld);
     if (materials.color[gl_InstanceCustomIndexEXT].a > 0.5f)
     {

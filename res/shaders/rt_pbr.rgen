@@ -48,7 +48,7 @@ void EmitRay(in vec3 rayOrigin, in vec3 rayDirection)
 void main()
 {
     GetRayOriginAndDirection(payload.rayOrigin, payload.rayDirection);
-    payload.hitValue = vec3(0.0f);
+    payload.hitValue = vec3(1.0f);
     payload.traceEnd = false;
     
     for (int i = 0; i < 2; ++i)
