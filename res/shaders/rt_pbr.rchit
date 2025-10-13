@@ -6,8 +6,15 @@
 // https://stackoverflow.com/questions/60549218/what-use-has-the-layout-specifier-scalar-in-ext-scalar-block-layout
 #extension GL_EXT_scalar_block_layout : enable
 
-#include "rt_pbr_common.glsl"
+//#include "rt_pbr_common.glsl"
 #include "rt_common.glsl"
+#include "microfacet.glsl"
+
+struct Material
+{
+    vec4 color;
+    uvec4 type;
+};
 
 // Note that there is no requirement that the location of the callee's incoming payload match 
 // the payload argument the caller passed to traceRayEXT! 
@@ -20,8 +27,8 @@ layout(set = 0, binding = 3, scalar) buffer InstanceAddressData_ {
 } instanceAddressData;
 layout(set = 1, binding = 0) buffer Materials
 {
-    vec4 color[];
-} materials;
+    Material i[];
+} material;
 
 // https://stackoverflow.com/questions/70887022/resource-pointer-using-buffer-reference-doesnt-point-to-the-right-thing
 layout(buffer_reference, scalar) buffer Vertices {
@@ -75,19 +82,28 @@ void main()
 
     payload.rayOrigin = posWorld + nrmWorld * 0.001f; // Offset a little to avoid self-intersection
 
-    vec3 random = Noise(payload.randomSeed);
-    vec3 tangentSample = CosineWeightedSample(random.xy);
-    payload.rayDirection = TangentToWorld(nrmWorld, -payload.rayDirection, tangentSample);
-
-    if (materials.color[gl_InstanceCustomIndexEXT].a > 0.5f)
+    if (material.i[gl_InstanceCustomIndexEXT].type.x == 1)
     {
         payload.traceEnd = true;
     }
+    else if (material.i[gl_InstanceCustomIndexEXT].type.x == 2)
+    {
+        vec3 random = Noise(payload.randomSeed);
+        float pdf = 1.0f;
+        vec3 wi = vec3(0.0f);
+        float roughness = 0.2f;
+        SampleMicrofacetNormal(-payload.rayDirection, roughness, random.xy, wi, pdf);
+        payload.hitValue = payload.hitValue * MicrofacetBRDF(-payload.rayDirection, wi, vec3(1.0f), roughness) * abs(dot(wi, nrmWorld)) / pdf; // The 100 factor is to boost the brightness a bit
+        payload.rayDirection = wi;
+    }
     else
     {
+        vec3 random = Noise(payload.randomSeed);
+        vec3 tangentSample = CosineWeightedSample(random.xy);
+        payload.rayDirection = TangentToWorld(nrmWorld, -payload.rayDirection, tangentSample);
         // pdf = cos(theta) / pi
         // BRDF = baseColor / pi
         // lambert law = BRDF * cos(theta) / pdf = baseColor / pi * cos(theta) / (cos(theta) / pi) = baseColor
-        payload.hitValue = payload.hitValue * materials.color[gl_InstanceCustomIndexEXT].rgb; // Simple diffuse lighting
+        payload.hitValue = payload.hitValue * material.i[gl_InstanceCustomIndexEXT].color.rgb; // Simple diffuse lighting
     }
 }

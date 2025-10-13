@@ -26,6 +26,7 @@ private:
 	struct Material
 	{
 		glm::vec4 colorOrLight; // xyz: rgb, w: is_light
+		glm::uvec4 materialType;
 	};
 	struct Vertex
 	{

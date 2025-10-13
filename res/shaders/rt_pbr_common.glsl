@@ -67,3 +67,48 @@ vec3 TangentToWorld(const vec3 _normal, const vec3 _view, const vec3 _sample)
     vec3 bitangent = cross(_normal, tangent);
     return _sample.x * tangent + _sample.y * bitangent + _sample.z * _normal;
 }
+
+vec2 UniformDiskSample(const vec2 xi)
+{
+    float r = sqrt(xi.x);
+    float theta = 2.0f * PI * xi.y;
+    return vec2(r * cos(theta), r * sin(theta));
+}
+
+// pbr
+float Cos2Theta(in vec3 w)
+{
+    return w.z * w.z;
+}
+float CosTheta(in vec3 w)
+{
+    return w.z;
+}
+float Sin2Theta(in vec3 w)
+{
+    return max(0.0f, 1.0f - Cos2Theta(w));
+}
+float SinTheta(in vec3 w)
+{
+    return sqrt(Sin2Theta(w));
+}
+float Tan2Theta(in vec3 w)
+{
+    return Sin2Theta(w) / Cos2Theta(w);
+}
+float TanTheta(in vec3 w)
+{
+    return sqrt(Tan2Theta(w));
+}
+float CosPhi(in vec3 w)
+{
+    float sinTheta = SinTheta(w);
+    if (sinTheta == 0.0f) return 1.0f;
+    return clamp(w.x / sinTheta, -1.0f, 1.0f);
+}
+float SinPhi(in vec3 w)
+{
+    float sinTheta = SinTheta(w);
+    if (sinTheta == 0.0f) return 0.0f;
+    return clamp(w.y / sinTheta, -1.0f, 1.0f);
+}
