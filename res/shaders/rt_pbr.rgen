@@ -13,6 +13,10 @@ layout(set = 0, binding = 0) uniform CameraInformation
 layout(set = 0, binding = 1) uniform accelerationStructureEXT accelerationStructure;
 layout(set = 0, binding = 2, rgba32f) uniform image2D imageOutput;
 layout(location = 0) rayPayloadEXT PBRPayload payload;
+layout(push_constant) uniform shaderInformation
+{
+  uint uFrameIndex;
+} pushConstants;
 
 void GetRayOriginAndDirection(out vec3 rayOrigin, out vec3 rayDirection)
 {
@@ -51,13 +55,20 @@ void main()
     payload.hitValue = vec3(1.0f);
     payload.traceEnd = false;
     
-    for (int i = 0; i < 2; ++i)
+    for (int i = 0; i < 5; ++i)
     {
+        payload.randomSeed = pushConstants.uFrameIndex * 1973 + i * 9277 + uint(gl_LaunchIDEXT.x) * 26699 + uint(gl_LaunchIDEXT.y) * 8191;
         EmitRay(payload.rayOrigin, payload.rayDirection);
         if (payload.traceEnd) // No hit
         {
             break;
         }
     }
+    if (payload.traceEnd == false)
+    {
+        // If the ray hits something but the max depth is reached, we set the color to black
+        payload.hitValue = vec3(0.0f);
+    }
+    payload.hitValue = mix(imageLoad(imageOutput, ivec2(gl_LaunchIDEXT.xy)).xyz, payload.hitValue, 1.0f / float(pushConstants.uFrameIndex)); // Temporal AA
     imageStore(imageOutput, ivec2(gl_LaunchIDEXT.xy), vec4(payload.hitValue, 1.0));
 }

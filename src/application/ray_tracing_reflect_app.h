@@ -50,6 +50,7 @@ private:
 	std::vector<glm::mat4> m_rayTracingGeometryTransform;
 	VkSampler m_vkSampler = VK_NULL_HANDLE;
 	uint32_t m_currentFrame = 0u;
+	uint32_t m_rayTraceFrame = 0u; // 3x ray trace frame since we have 3 images in flight
 	PersCamera m_camera{ 400, 300, glm::vec3(2,2,2), glm::vec3(0,0,0), glm::vec3(0,1,0) };
 
 private:

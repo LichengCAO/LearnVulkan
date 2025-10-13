@@ -13,5 +13,6 @@ layout(location = 1) rayPayloadInEXT PBRPayload payload;
 
 void main()
 {
+    payload.hitValue = vec3(0.0f);
     payload.traceEnd = true;
 }

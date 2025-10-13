@@ -50,7 +50,7 @@ vec3 ObjectNormalToWorldNormal(const vec3 normal)
 
 vec3 Noise(uint n)
 {
-    return  random_pcg3d(gl_LaunchIDEXT.xy, n);
+    return  random_pcg3d(uvec3(gl_LaunchIDEXT.xy, n));
 }
 
 void main()
@@ -75,18 +75,19 @@ void main()
 
     payload.rayOrigin = posWorld + nrmWorld * 0.001f; // Offset a little to avoid self-intersection
 
-    vec3 random = Noise(0);
-    float phi = cos(random.x * 2 * PI);
-    //float theta = asin(random.y);  // i think it's right if we only need to consider theta, but we need to consider both phi and theta
-    float theta = asin(sqrt(random.x));
+    vec3 random = Noise(payload.randomSeed);
+    vec3 tangentSample = CosineWeightedSample(random.xy);
+    payload.rayDirection = TangentToWorld(nrmWorld, -payload.rayDirection, tangentSample);
 
-    payload.rayDirection = reflect(payload.rayDirection, nrmWorld);
     if (materials.color[gl_InstanceCustomIndexEXT].a > 0.5f)
     {
-        payload.hitValue = vec3(1.0f, 1.0f, 1.0f); // Add some ambient light
+        payload.traceEnd = true;
     }
     else
     {
-        payload.hitValue = (payload.hitValue * 0.5f + materials.color[gl_InstanceCustomIndexEXT].rgb * 0.5f); // Simple diffuse lighting
+        // pdf = cos(theta) / pi
+        // BRDF = baseColor / pi
+        // lambert law = BRDF * cos(theta) / pdf = baseColor / pi * cos(theta) / (cos(theta) / pi) = baseColor
+        payload.hitValue = payload.hitValue * materials.color[gl_InstanceCustomIndexEXT].rgb; // Simple diffuse lighting
     }
 }

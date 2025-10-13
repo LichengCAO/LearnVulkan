@@ -328,6 +328,14 @@ void RayTracingReflectApp::_UpdateUniformBuffer()
 		if (userInput.D) mov += (speed * m_camera.right);
 		m_camera.MoveTo(mov);
 	}
+	if (userInput.RMB)
+	{
+		m_rayTraceFrame = 0u;
+	}
+	else
+	{
+		m_rayTraceFrame++;
+	}
 
 	ubo.inverseViewProj = glm::inverse(m_camera.GetViewProjectionMatrix());
 	ubo.eye = glm::vec4(m_camera.eye, 1.0f);
@@ -400,6 +408,12 @@ void RayTracingReflectApp::_DrawFrame()
 		binder.BindDescriptor(1, 0, { m_uptrMaterialBuffer->GetDescriptorInfo() }, DescriptorSetManager::DESCRIPTOR_BIND_SETTING::CONSTANT_DESCRIPTOR_SET_ACROSS_FRAMES);
 		binder.EndBind();
 		binder.NextFrame();
+	}
+	
+	// update frame count in ray tracing
+	{
+		uint32_t frameCount = m_rayTraceFrame / 3 + 1;
+		m_uptrPipeline->PushConstant(VK_SHADER_STAGE_RAYGEN_BIT_KHR, &frameCount);
 	}
 
 	m_uptrPipeline->TraceRay(

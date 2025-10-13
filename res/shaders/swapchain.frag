@@ -7,5 +7,5 @@ layout(location = 0) out vec4 outColor;
 
 void main()
 {
-    outColor = vec4(texture(resultTexture, inTexCoord).rgb, 1.0f);
+    outColor = vec4(pow(texture(resultTexture, inTexCoord).rgb, vec3(1.0f/2.2f)), 1.0f);
 }

@@ -4,6 +4,7 @@ struct PBRPayload
     vec3 rayOrigin;
     vec3 rayDirection;
     bool traceEnd;
+    uint randomSeed;
 };
 
 struct PBRMaterial
@@ -38,10 +39,31 @@ vec2 Hammersley(uint a, uint N)
 // Hash Functions for GPU Rendering, Jarzynski et al.
 // http://www.jcgt.org/published/0009/03/02/
 // code from https://www.gsn-lib.org/apps/raytracing/index.php?name=example_pathtracing
-vec3 random_pcg3d(uvec3 v) {
+vec3 random_pcg3d(uvec3 v) 
+{
   v = v * 1664525u + 1013904223u;
   v.x += v.y*v.z; v.y += v.z*v.x; v.z += v.x*v.y;
   v ^= v >> 16u;
   v.x += v.y*v.z; v.y += v.z*v.x; v.z += v.x*v.y;
   return vec3(v) * (1.0/float(0xffffffffu));
+}
+
+vec3 CosineWeightedSample(const vec2 xi)
+{
+    // float phi = 2.0f * PI * xi.x;
+    ////float theta = asin(xi.y); // i think it's right if we only need to consider theta, but we need to consider both phi and theta
+    // float theta = asin(sqrt(xi.y));
+    // return vec3(cos(phi) * sin(theta), sin(phi) * sin(theta), cos(theta));
+
+    float phi = 2.0f * PI * xi.x;
+    float sinTheta = sqrt(xi.y);
+    return vec3(sinTheta * cos(phi), sinTheta * sin(phi), sqrt(1.0 - xi.y));
+}
+
+// https://blog.selfshadow.com/sandbox/ltc.html
+vec3 TangentToWorld(const vec3 _normal, const vec3 _view, const vec3 _sample)
+{
+    vec3 tangent = normalize(_view - _normal * dot(_view, _normal));
+    vec3 bitangent = cross(_normal, tangent);
+    return _sample.x * tangent + _sample.y * bitangent + _sample.z * _normal;
 }
