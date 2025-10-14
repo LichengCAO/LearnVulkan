@@ -1,3 +1,5 @@
+#ifndef RT_PBR_COMMON_GLSL
+#define RT_PBR_COMMON_GLSL
 struct PBRPayload
 {
     vec3 hitValue;
@@ -123,3 +125,4 @@ float SinPhi(in vec3 w)
     if (sinTheta == 0.0f) return 0.0f;
     return clamp(w.y / sinTheta, -1.0f, 1.0f);
 }
+#endif // RT_PBR_COMMON_GLSL

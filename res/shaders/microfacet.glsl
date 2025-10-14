@@ -1,3 +1,5 @@
+#ifndef MICROFACET_GLSL
+#define MICROFACET_GLSL
 #include "rt_pbr_common.glsl"
 
 // roughness to alpha
@@ -85,3 +87,4 @@ vec3 MicrofacetBRDF(in vec3 wo, in vec3 wi, in vec3 Fresnel, in float roughness)
     float alpha = _RoughnessToAlpha(roughness);
     return D(wm, alpha) * G(wi, wo, alpha) * Fresnel / (4.0f * abs(wo.z * wi.z));
 }
+#endif // MICROFACET_GLSL

@@ -287,6 +287,17 @@ Framebuffer RenderPass::NewFramebuffer(const std::vector<const ImageView*> _imag
 	return Framebuffer{ this ,_imageViews };
 }
 
+void RenderPass::NewFramebuffer(Framebuffer* _pFramebuffer, const std::vector<const ImageView*> _imageViews) const
+{
+	CHECK_TRUE(vkRenderPass != VK_NULL_HANDLE, "Render pass is not initialized!");
+	CHECK_TRUE(_imageViews.size() == attachments.size(), "Number of image views is not the same as number of attachments");
+	for (int i = 0; i < _imageViews.size(); ++i)
+	{
+		CHECK_TRUE(attachments[i].attachmentDescription.format == _imageViews[i]->pImage->GetImageInformation().format, "Format of the imageview is not the same as the format of attachment");
+	}
+	_pFramebuffer = new Framebuffer(this, _imageViews);
+}
+
 void RenderPass::Subpass::AddColorAttachment(uint32_t _binding)
 {
 	colorAttachments.push_back({ _binding, VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL });

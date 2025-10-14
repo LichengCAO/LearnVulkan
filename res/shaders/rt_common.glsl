@@ -1,3 +1,5 @@
+#ifndef RT_COMMON_GLSL
+#define RT_COMMON_GLSL
 struct HitPayload
 {
     vec3 hitValue;
@@ -19,3 +21,4 @@ struct Vertex
 };
 
 const float shadowValue = 0.05f; // Default shadow value
+#endif // RT_COMMON_GLSL

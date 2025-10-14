@@ -68,6 +68,8 @@ public:
 
 	Framebuffer NewFramebuffer(const std::vector<const ImageView*> _imageViews) const;
 
+	void NewFramebuffer(Framebuffer* _pFramebuffer, const std::vector<const ImageView*> _imageViews) const;
+
 	// record vkCmdBeginRenderPass command in command buffer, also bind callback for image layout management
 	void StartRenderPass(CommandSubmission* pCmd, const Framebuffer* pFramebuffer = nullptr) const;
 

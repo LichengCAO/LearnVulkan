@@ -448,19 +448,8 @@ void RayTracingApp::_UninitPipelines()
 void RayTracingApp::_InitSwapchainPass()
 {
 	_UninitSwapchainPass();
-	std::vector<VkDescriptorImageInfo> imageInfos;
-	imageInfos.reserve(MAX_FRAME_COUNT);
-	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
-	{
-		VkDescriptorImageInfo imageInfo{};
-		imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		imageInfo.imageView = m_rtImageViews[i]->vkImageView;
-		imageInfo.sampler = m_vkSampler;
-		imageInfos.push_back(imageInfo);
-	}
 	m_swapchainPass = std::make_unique<SwapchainPass>();
-	m_swapchainPass->PreSetPassThroughImages(imageInfos);
-	m_swapchainPass->Init();
+	m_swapchainPass->Init(MAX_FRAME_COUNT);
 }
 
 void RayTracingApp::_UninitSwapchainPass()
@@ -556,7 +545,6 @@ void RayTracingApp::_DrawFrame()
 	std::unique_ptr<CommandSubmission>& cmd = m_commandSubmissions[m_currentFrame];
 	auto& device = MyDevice::GetInstance();
 	RayTracingPipeline::PipelineInput pipelineInput{};
-	CommandSubmission::WaitInformation scPassWait{};
 	ImageBarrierBuilder barrierBuilder{};
 	VkClearColorValue clearColor{};
 	clearColor.uint32[3] = 1.0f;
@@ -626,9 +614,8 @@ void RayTracingApp::_DrawFrame()
 		cmd->AddPipelineBarrier(VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, { barrier });
 	}
 
-	scPassWait.waitSamaphore = cmd->SubmitCommands();
-	scPassWait.waitPipelineStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-	m_swapchainPass->Do({ scPassWait });
+	auto syncSignal = cmd->SubmitCommands();
+	m_swapchainPass->Execute({m_rtImageViews[m_currentFrame]->GetDescriptorInfo(m_vkSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL)}, { syncSignal });
 
 	m_currentFrame = (m_currentFrame + 1) % MAX_FRAME_COUNT;
 }
@@ -652,7 +639,7 @@ void RayTracingApp::_ResizeWindow()
 		imageInfo.sampler = m_vkSampler;
 		imageInfos.push_back(imageInfo);
 	}
-	m_swapchainPass->RecreateSwapchain(imageInfos);
+	m_swapchainPass->OnSwapchainRecreated();
 }
 
 RayTracingApp::RayTracingApp()
@@ -1068,19 +1055,8 @@ void RayTracingThousandsApp::_UninitPipelines()
 void RayTracingThousandsApp::_InitSwapchainPass()
 {
 	_UninitSwapchainPass();
-	std::vector<VkDescriptorImageInfo> imageInfos;
-	imageInfos.reserve(MAX_FRAME_COUNT);
-	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
-	{
-		VkDescriptorImageInfo imageInfo{};
-		imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		imageInfo.imageView = m_rtImageViews[i]->vkImageView;
-		imageInfo.sampler = m_vkSampler;
-		imageInfos.push_back(imageInfo);
-	}
 	m_swapchainPass = std::make_unique<SwapchainPass>();
-	m_swapchainPass->PreSetPassThroughImages(imageInfos);
-	m_swapchainPass->Init();
+	m_swapchainPass->Init(MAX_FRAME_COUNT);
 }
 
 void RayTracingThousandsApp::_UninitSwapchainPass()
@@ -1218,9 +1194,9 @@ void RayTracingThousandsApp::_DrawFrame()
 		cmd->AddPipelineBarrier(VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, { barrier });
 	}
 
-	scPassWait.waitSamaphore = cmd->SubmitCommands();
-	scPassWait.waitPipelineStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-	m_swapchainPass->Do({ scPassWait });
+	auto syncSignal = cmd->SubmitCommands();
+
+	m_swapchainPass->Execute(m_rtImageViews[m_currentFrame]->GetDescriptorInfo(m_vkSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL), { syncSignal });
 
 	m_currentFrame = (m_currentFrame + 1) % MAX_FRAME_COUNT;
 }
@@ -1228,23 +1204,12 @@ void RayTracingThousandsApp::_DrawFrame()
 void RayTracingThousandsApp::_ResizeWindow()
 {
 	MyDevice::GetInstance().RecreateSwapchain();
-	std::vector<VkDescriptorImageInfo> imageInfos;
 
 	_UninitDescriptorSets();
 	_UninitImagesAndViews();
 	_InitImagesAndViews();
 	_InitDescriptorSets();
-
-	imageInfos.reserve(MAX_FRAME_COUNT);
-	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
-	{
-		VkDescriptorImageInfo imageInfo{};
-		imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-		imageInfo.imageView = m_rtImageViews[i]->vkImageView;
-		imageInfo.sampler = m_vkSampler;
-		imageInfos.push_back(imageInfo);
-	}
-	m_swapchainPass->RecreateSwapchain(imageInfos);
+	m_swapchainPass->OnSwapchainRecreated();
 }
 
 RayTracingThousandsApp::RayTracingThousandsApp()
@@ -1692,19 +1657,8 @@ void RayTracingAABBsApp::_UninitPipelines()
 void RayTracingAABBsApp::_InitSwapchainPass()
 {
 	_UninitSwapchainPass();
-	std::vector<VkDescriptorImageInfo> imageInfos;
-	imageInfos.reserve(MAX_FRAME_COUNT);
-	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
-	{
-		VkDescriptorImageInfo imageInfo{};
-		imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		imageInfo.imageView = m_rtImageViews[i]->vkImageView;
-		imageInfo.sampler = m_vkSampler;
-		imageInfos.push_back(imageInfo);
-	}
 	m_swapchainPass = std::make_unique<SwapchainPass>();
-	m_swapchainPass->PreSetPassThroughImages(imageInfos);
-	m_swapchainPass->Init();
+	m_swapchainPass->Init(MAX_FRAME_COUNT);
 }
 
 void RayTracingAABBsApp::_UninitSwapchainPass()
@@ -1842,9 +1796,8 @@ void RayTracingAABBsApp::_DrawFrame()
 		cmd->AddPipelineBarrier(VK_PIPELINE_STAGE_RAY_TRACING_SHADER_BIT_KHR, VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT, { barrier });
 	}
 
-	scPassWait.waitSamaphore = cmd->SubmitCommands();
-	scPassWait.waitPipelineStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-	m_swapchainPass->Do({ scPassWait });
+	auto syncSignal = cmd->SubmitCommands();
+	m_swapchainPass->Execute(m_rtImageViews[m_currentFrame]->GetDescriptorInfo(m_vkSampler, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL), { syncSignal });
 
 	m_currentFrame = (m_currentFrame + 1) % MAX_FRAME_COUNT;
 }
@@ -1852,23 +1805,13 @@ void RayTracingAABBsApp::_DrawFrame()
 void RayTracingAABBsApp::_ResizeWindow()
 {
 	MyDevice::GetInstance().RecreateSwapchain();
-	std::vector<VkDescriptorImageInfo> imageInfos;
 
 	_UninitDescriptorSets();
 	_UninitImagesAndViews();
 	_InitImagesAndViews();
 	_InitDescriptorSets();
 
-	imageInfos.reserve(MAX_FRAME_COUNT);
-	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
-	{
-		VkDescriptorImageInfo imageInfo{};
-		imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-		imageInfo.imageView = m_rtImageViews[i]->vkImageView;
-		imageInfo.sampler = m_vkSampler;
-		imageInfos.push_back(imageInfo);
-	}
-	m_swapchainPass->RecreateSwapchain(imageInfos);
+	m_swapchainPass->OnSwapchainRecreated();
 }
 
 RayTracingAABBsApp::RayTracingAABBsApp()

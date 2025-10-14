@@ -62,15 +62,10 @@ void RayTracingReflectApp::_InitPipeline()
 	m_uptrPipeline->AddMissShader("E:/GitStorage/LearnVulkan/bin/shaders/rt_pbr.rmiss.spv");
 	m_uptrPipeline->AddRayGenerationShader("E:/GitStorage/LearnVulkan/bin/shaders/rt_pbr.rgen.spv");
 	m_uptrPipeline->AddTriangleHitShaders("E:/GitStorage/LearnVulkan/bin/shaders/rt_pbr.rchit.spv", {});
-	m_uptrPipeline->Init();
+	m_uptrPipeline->Init(3);
 
 	m_uptrSwapchainPass = std::make_unique<SwapchainPass>();
-	for (size_t i = 0; i < m_uptrOutputViews.size(); ++i)
-	{
-		passThroughImages.push_back(m_uptrOutputViews[i]->GetDescriptorInfo(m_vkSampler, VK_IMAGE_LAYOUT_GENERAL));
-	}
-	m_uptrSwapchainPass->PreSetPassThroughImages(passThroughImages);
-	m_uptrSwapchainPass->Init();
+	m_uptrSwapchainPass->Init(3);
 }
 
 void RayTracingReflectApp::_UninitPipeline()
@@ -384,17 +379,12 @@ void RayTracingReflectApp::_ResizeWindow()
 	_DestroyBuffers();
 	_CreateBuffers();
 	_CreateImagesAndViews();
-	for (size_t i = 0; i < m_uptrOutputViews.size(); ++i)
-	{
-		newViews.push_back(m_uptrOutputViews[i]->GetDescriptorInfo(m_vkSampler, VK_IMAGE_LAYOUT_GENERAL));
-	}
-	m_uptrSwapchainPass->RecreateSwapchain(newViews);
+	m_uptrSwapchainPass->OnSwapchainRecreated();
 }
 
 void RayTracingReflectApp::_DrawFrame()
 {
 	auto cmd = m_uptrCommands[m_currentFrame].get();
-	CommandSubmission::WaitInformation synSignal{};
 
 	if (MyDevice::GetInstance().NeedRecreateSwapchain())
 	{
@@ -414,7 +404,7 @@ void RayTracingReflectApp::_DrawFrame()
 		binder.BindDescriptor(0, 3, { m_uptrAddressBuffer->GetDescriptorInfo() }, DescriptorSetManager::DESCRIPTOR_BIND_SETTING::CONSTANT_DESCRIPTOR_SET_ACROSS_FRAMES);
 		binder.BindDescriptor(1, 0, { m_uptrMaterialBuffer->GetDescriptorInfo() }, DescriptorSetManager::DESCRIPTOR_BIND_SETTING::CONSTANT_DESCRIPTOR_SET_ACROSS_FRAMES);
 		binder.EndBind();
-		binder.NextFrame();
+		binder.EndFrame();
 	}
 	
 	// update frame count in ray tracing
@@ -427,12 +417,11 @@ void RayTracingReflectApp::_DrawFrame()
 		cmd,
 		MyDevice::GetInstance().GetSwapchainExtent().width,
 		MyDevice::GetInstance().GetSwapchainExtent().height);
-	synSignal.waitSamaphore = cmd->SubmitCommands();
-	synSignal.waitPipelineStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+	auto syncSignal = cmd->SubmitCommands();
 
-	m_uptrSwapchainPass->Do({ synSignal });
+	m_uptrSwapchainPass->Execute({ m_uptrOutputViews[m_currentFrame]->GetDescriptorInfo(m_vkSampler, VK_IMAGE_LAYOUT_GENERAL) }, { syncSignal });
 
-	m_uptrPipeline->NextFrame();
+	m_uptrPipeline->EndFrame();
 	m_currentFrame = (m_currentFrame + 1) % 3;
 }
 

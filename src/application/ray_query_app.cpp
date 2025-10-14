@@ -489,19 +489,8 @@ void RayQueryApp::_UninitPipelines()
 void RayQueryApp::_InitSwapchainPass()
 {
 	_UninitSwapchainPass();
-	std::vector<VkDescriptorImageInfo> imageInfos;
-	imageInfos.reserve(MAX_FRAME_COUNT);
-	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
-	{
-		VkDescriptorImageInfo imageInfo{};
-		imageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
-		imageInfo.imageView = m_vecColorImageView[i]->vkImageView;
-		imageInfo.sampler = m_vkSampler;
-		imageInfos.push_back(imageInfo);
-	}
 	m_swapchainPass = std::make_unique<SwapchainPass>();
-	m_swapchainPass->PreSetPassThroughImages(imageInfos);
-	m_swapchainPass->Init();
+	m_swapchainPass->Init(MAX_FRAME_COUNT);
 }
 
 void RayQueryApp::_UninitSwapchainPass()
@@ -595,7 +584,6 @@ void RayQueryApp::_DrawFrame()
 	std::unique_ptr<CommandSubmission>& cmd = m_commandSubmissions[m_currentFrame];
 	auto& device = MyDevice::GetInstance();
 	GraphicsPipeline::PipelineInput_DrawIndexed pipelineInput{};
-	CommandSubmission::WaitInformation scPassWait{};
 	ImageBarrierBuilder barrierBuilder{};
 	VkClearColorValue clearColor{};
 	clearColor.uint32[3] = 1.0f;
@@ -625,9 +613,7 @@ void RayQueryApp::_DrawFrame()
 	}
 
 	cmd->EndRenderPass();
-	scPassWait.waitSamaphore = cmd->SubmitCommands();
-	scPassWait.waitPipelineStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
-	m_swapchainPass->Do({ scPassWait });
+	m_swapchainPass->Execute(m_vecColorImageView[m_currentFrame]->GetDescriptorInfo(m_vkSampler, VK_IMAGE_LAYOUT_GENERAL), { cmd->SubmitCommands() });
 
 	m_currentFrame = (m_currentFrame + 1) % MAX_FRAME_COUNT;
 }
@@ -635,7 +621,6 @@ void RayQueryApp::_DrawFrame()
 void RayQueryApp::_ResizeWindow()
 {
 	MyDevice::GetInstance().RecreateSwapchain();
-	std::vector<VkDescriptorImageInfo> imageInfos;
 
 	_UninitDescriptorSets();
 	_UninitFramebuffers();
@@ -643,17 +628,7 @@ void RayQueryApp::_ResizeWindow()
 	_InitImagesAndViews();
 	_InitFramebuffers();
 	_InitDescriptorSets();
-
-	imageInfos.reserve(MAX_FRAME_COUNT);
-	for (int i = 0; i < MAX_FRAME_COUNT; ++i)
-	{
-		VkDescriptorImageInfo imageInfo{};
-		imageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
-		imageInfo.imageView = m_vecColorImageView[i]->vkImageView;
-		imageInfo.sampler = m_vkSampler;
-		imageInfos.push_back(imageInfo);
-	}
-	m_swapchainPass->RecreateSwapchain(imageInfos);
+	m_swapchainPass->OnSwapchainRecreated();
 }
 
 RayQueryApp::RayQueryApp()

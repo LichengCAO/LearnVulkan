@@ -103,9 +103,9 @@ public:
 	
 	~DescriptorSetManager();
 
-	void Init(const std::vector<std::string>& _pipelineShaders, uint32_t _uFrameInFlightCount = 3);
+	void Init(const std::vector<std::string>& _pipelineShaders, uint32_t _uFrameInFlightCount);
 
-	void NextFrame();
+	void EndFrame();
 
 	void StartBind();
 
@@ -220,9 +220,9 @@ private:
 public:
 	void SetUpRenderPass(const RenderPass* _pRenderPass, uint32_t _subpass);
 
-	void Init(const std::vector<std::string>& _shaderPaths);
+	void Init(const std::vector<std::string>& _shaderPaths, uint32_t _frameInFlight);
 
-	void NextFrame();
+	void EndFrame();
 
 	DescriptorSetManager& GetDescriptorSetManager();
 
@@ -255,6 +255,7 @@ public:
 		uint32_t _groupCountY, 
 		uint32_t _groupCountZ);
 
+	// always call it before command submission if you call BindFramebuffer upfront 
 	void UnbindFramebuffer(CommandSubmission* _pCmd);
 
 	void Uninit();
@@ -275,9 +276,9 @@ private:
 	void _UninitPipeline();
 
 public:
-	void Init(const std::vector<std::string>& _shaderPaths);
+	void Init(const std::vector<std::string>& _shaderPaths, uint32_t _frameInFlight);
 
-	void NextFrame();
+	void EndFrame();
 
 	DescriptorSetManager& GetDescriptorSetManager();
 
@@ -314,9 +315,9 @@ public:
 	void AddMissShader(const std::string& _miss);
 	void SetMaxRecursion(uint32_t _maxRecur);
 
-	void Init();
+	void Init(uint32_t _frameInFlight);
 
-	void NextFrame();
+	void EndFrame();
 
 	DescriptorSetManager& GetDescriptorSetManager();
 

@@ -2,13 +2,12 @@
 #include "device.h"
 #include "image.h"
 #include "pipeline_io.h"
-#include "pipeline.h"
+#include "pipeline_program.h"
 #include "shader.h"
 
 void SwapchainPass::_InitViews()
 {
 	std::vector<Image*> pSwapchainImages;
-	_UninitViews();
 	MyDevice::GetInstance().GetSwapchainImagePointers(pSwapchainImages);
 	m_swapchainViews.reserve(pSwapchainImages.size());
 	for (size_t i = 0; i < pSwapchainImages.size(); ++i)
@@ -27,52 +26,6 @@ void SwapchainPass::_UninitViews()
 		uptrView.reset();
 	}
 	m_swapchainViews.clear();
-}
-
-void SwapchainPass::_InitDSetLayout()
-{
-	m_DSetLayout = std::make_unique<DescriptorSetLayout>();
-
-	m_DSetLayout->AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
-
-	m_DSetLayout->Init();
-}
-
-void SwapchainPass::_UninitDSetLayout()
-{
-	if (m_DSetLayout.get() != nullptr)
-	{
-		m_DSetLayout->Uninit();
-	}
-	m_DSetLayout.reset();
-}
-
-void SwapchainPass::_InitDSets()
-{
-	int n = static_cast<int>(m_uMaxFrameCount);
-	_UninitDSets();
-	m_DSets.reserve(n);
-
-	for (int i = 0; i < n; ++i)
-	{
-		std::unique_ptr<DescriptorSet> uptrDSet = std::make_unique<DescriptorSet>(m_DSetLayout->NewDescriptorSet());
-
-		uptrDSet->Init();
-		uptrDSet->StartUpdate();
-		uptrDSet->UpdateBinding(0, { m_textureInfos[i] });
-		uptrDSet->FinishUpdate();
-
-		m_DSets.push_back(std::move(uptrDSet));
-	}
-}
-
-void SwapchainPass::_UninitDSets()
-{
-	for (auto& uptrDSet : m_DSets)
-	{
-		uptrDSet.reset();
-	}
-	m_DSets.clear();
 }
 
 void SwapchainPass::_InitRenderPass()
@@ -98,40 +51,23 @@ void SwapchainPass::_UninitRenderPass()
 
 void SwapchainPass::_InitPipeline()
 {
-	SimpleShader vertShader{};
-	SimpleShader fragShader{};
-
-	vertShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/swapchain.vert.spv");
-	fragShader.SetSPVFile("E:/GitStorage/LearnVulkan/bin/shaders/swapchain.frag.spv");
-
-	vertShader.Init();
-	fragShader.Init();
-
-	m_pipeline = std::make_unique<GraphicsPipeline>();
-
-	m_pipeline->AddDescriptorSetLayout(m_DSetLayout->vkDescriptorSetLayout);
-	m_pipeline->AddShader(vertShader.GetShaderStageInfo());
-	m_pipeline->AddShader(fragShader.GetShaderStageInfo());
-	m_pipeline->BindToSubpass(m_renderPass.get(), 0);
-
-	m_pipeline->Init();
-	fragShader.Uninit();
-	vertShader.Uninit();
+	m_program = std::make_unique<GraphicsProgram>();
+	m_program->SetUpRenderPass(m_renderPass.get(), 0);
+	m_program->Init({ "E:/GitStorage/LearnVulkan/bin/shaders/pass_through.vert.spv", "E:/GitStorage/LearnVulkan/bin/shaders/swapchain.frag.spv" }, m_uMaxFrameCount);
 }
 
 void SwapchainPass::_UninitPipeline()
 {
-	if (m_pipeline.get() != nullptr)
+	if (m_program)
 	{
-		m_pipeline->Uninit();
+		m_program->Uninit();
+		m_program.reset();
 	}
-	m_pipeline.reset();
 }
 
 void SwapchainPass::_InitFramebuffer()
 {
 	int n = m_swapchainViews.size();
-	_UninitFramebuffer();
 	m_framebuffers.reserve(n);
 
 	for (int i = 0; i < n; ++i)
@@ -159,13 +95,21 @@ void SwapchainPass::_UninitFramebuffer()
 
 void SwapchainPass::_InitCommandBuffer()
 {
-	m_cmd = std::make_unique<CommandSubmission>();
-	m_cmd->Init();
+	for (uint32_t i = 0; i < m_uMaxFrameCount; ++i)
+	{
+		std::unique_ptr<CommandSubmission> uptrCmd = std::make_unique<CommandSubmission>();
+		uptrCmd->Init();
+		m_cmds.push_back(std::move(uptrCmd));
+	}
 }
 
 void SwapchainPass::_UninitCommandBuffer()
 {
-	m_cmd->Uninit();
+	for (auto& uptr : m_cmds)
+	{
+		uptr->Uninit();
+	}
+	m_cmds.clear();
 }
 
 void SwapchainPass::_InitSemaphores()
@@ -191,18 +135,18 @@ void SwapchainPass::_UninitSemaphores()
 	m_aquireImages.clear();
 }
 
-void SwapchainPass::PreSetPassThroughImages(const std::vector<VkDescriptorImageInfo>& textureInfos)
+SwapchainPass::SwapchainPass()
 {
-	m_textureInfos = textureInfos;
-	m_uMaxFrameCount = static_cast<uint32_t>(textureInfos.size());
-	m_uCurrentFrame = 0u;
 }
 
-void SwapchainPass::Init()
+SwapchainPass::~SwapchainPass()
 {
+}
+
+void SwapchainPass::Init(uint32_t _frameInFlight)
+{
+	m_uMaxFrameCount = _frameInFlight;
 	_InitViews();
-	_InitDSetLayout();
-	_InitDSets();
 	_InitRenderPass();
 	_InitPipeline();
 	_InitFramebuffer();
@@ -217,49 +161,57 @@ void SwapchainPass::Uninit()
 	_UninitFramebuffer();
 	_UninitPipeline();
 	_UninitRenderPass();
-	_UninitDSets();
-	_UninitDSetLayout();
 	_UninitViews();
 }
 
-void SwapchainPass::RecreateSwapchain(const std::vector<VkDescriptorImageInfo>& textureInfos)
+void SwapchainPass::OnSwapchainRecreated()
 {
-	PreSetPassThroughImages(textureInfos);
 	_UninitSemaphores();
-	_UninitDSets();
 	_UninitFramebuffer();
 	_UninitViews();
 	_InitViews();
 	_InitFramebuffer();
-	_InitDSets();
 	_InitSemaphores();
+	m_program->GetDescriptorSetManager().ClearDescriptorSets();
 }
 
-void SwapchainPass::Do(const std::vector<CommandSubmission::WaitInformation>& renderFinish)
+void SwapchainPass::Execute(const VkDescriptorImageInfo& _originalImage, const std::vector<VkSemaphore>& _waitSignals)
 {
+	auto pCmd = m_cmds[m_uCurrentFrame].get();
 	auto& device = MyDevice::GetInstance();
-	auto index = device.AquireAvailableSwapchainImageIndex(m_aquireImages[m_uCurrentFrame]);
+	std::optional<uint32_t> index{}; 
 	VkSemaphore semaphoreRenderFinish = VK_NULL_HANDLE;
-	CommandSubmission::WaitInformation waitFor{ m_aquireImages[m_uCurrentFrame], VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
+	CommandSubmission::WaitInformation waitForSwapchain{ m_aquireImages[m_uCurrentFrame], VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 	GraphicsPipeline::PipelineInput_Draw input{};
 	std::vector<CommandSubmission::WaitInformation> waitInfos{};
-	
+
+	pCmd->WaitTillAvailable(); // make sure that m_aquireImages[m_uCurrentFrame] is signaled
+	index = device.AquireAvailableSwapchainImageIndex(m_aquireImages[m_uCurrentFrame]);
 	if (!index.has_value()) return;
 
-	waitInfos = renderFinish;
-	waitInfos.push_back(waitFor);
-	m_cmd->StartCommands(waitInfos);
-	m_cmd->StartRenderPass(m_renderPass.get(), m_framebuffers[m_uCurrentFrame].get());
+	for (const auto& semaphore : _waitSignals)
+	{
+		CommandSubmission::WaitInformation waitInfo{};
 
-	input.imageSize = device.GetSwapchainExtent();
-	input.vertexCount = 6;
-	input.vkDescriptorSets = { m_DSets[m_uCurrentFrame]->vkDescriptorSet };
-	m_pipeline->Do(m_cmd->vkCommandBuffer, input);
+		waitInfo.waitPipelineStage = VK_PIPELINE_STAGE_FRAGMENT_SHADER_BIT;
+		waitInfo.waitSamaphore = semaphore;
 
-	m_cmd->EndRenderPass();
-	semaphoreRenderFinish = m_cmd->SubmitCommands();
+		waitInfos.push_back(waitInfo);
+	}
+	waitInfos.push_back(waitForSwapchain);
+
+	pCmd->StartCommands(waitInfos);
+	m_program->BindFramebuffer(pCmd, m_framebuffers[index.value()].get());
+	auto& binder = m_program->GetDescriptorSetManager();
+	binder.StartBind();
+	binder.BindDescriptor(0, 0, { _originalImage }, DescriptorSetManager::DESCRIPTOR_BIND_SETTING::CONSTANT_DESCRIPTOR_SET_PER_FRAME);
+	binder.EndBind();
+	m_program->Draw(pCmd, 6);
+	m_program->UnbindFramebuffer(pCmd);
+	semaphoreRenderFinish = pCmd->SubmitCommands();
 
 	device.PresentSwapchainImage({ semaphoreRenderFinish }, index.value());
-
+	
+	m_program->EndFrame();
 	m_uCurrentFrame = (m_uCurrentFrame + 1) % m_uMaxFrameCount;
 }

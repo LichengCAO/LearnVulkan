@@ -362,7 +362,7 @@ void MeshletApp::_InitPipelines()
 		"E:/GitStorage/LearnVulkan/bin/shaders/flat_task.task.spv",
 		"E:/GitStorage/LearnVulkan/bin/shaders/flat_task.mesh.spv",
 		"E:/GitStorage/LearnVulkan/bin/shaders/flat_task.frag.spv"
-		});
+		}, MAX_FRAME_COUNT);
 }
 void MeshletApp::_UninitPipelines()
 {
@@ -517,7 +517,7 @@ void MeshletApp::_DrawFrame()
 
 	m_program.UnbindFramebuffer(cmd.get());
 
-	m_program.NextFrame();
+	m_program.EndFrame();
 
 	VkSemaphore renderpassFinish = cmd->SubmitCommands();
 	MyDevice::GetInstance().PresentSwapchainImage({ renderpassFinish }, imageIndex.value());

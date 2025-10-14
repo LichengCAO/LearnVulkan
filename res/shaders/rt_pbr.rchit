@@ -6,7 +6,7 @@
 // https://stackoverflow.com/questions/60549218/what-use-has-the-layout-specifier-scalar-in-ext-scalar-block-layout
 #extension GL_EXT_scalar_block_layout : enable
 
-//#include "rt_pbr_common.glsl"
+#include "rt_pbr_common.glsl"
 #include "rt_common.glsl"
 #include "microfacet.glsl"
 
