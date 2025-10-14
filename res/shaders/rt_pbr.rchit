@@ -92,18 +92,19 @@ void main()
         float pdf = 1.0f;
         vec3 wi = vec3(0.0f);
         float roughness = 0.2f;
-        SampleMicrofacetNormal(-payload.rayDirection, roughness, random.xy, wi, pdf);
-        payload.hitValue = payload.hitValue * MicrofacetBRDF(-payload.rayDirection, wi, vec3(1.0f), roughness) * abs(dot(wi, nrmWorld)) / pdf; // The 100 factor is to boost the brightness a bit
-        payload.rayDirection = wi;
+        vec3 tangentWo = WorldToTangent(nrmWorld, -payload.rayDirection);
+        SampleMicrofacetNormal(tangentWo, roughness, random.xy, wi, pdf);
+        payload.hitValue = payload.hitValue * MicrofacetBRDF(tangentWo, wi, vec3(1.0f), roughness) * abs(wi.z) / pdf;
+        payload.rayDirection = TangentToWorld(nrmWorld, wi);
     }
     else
     {
         vec3 random = Noise(payload.randomSeed);
         vec3 tangentSample = CosineWeightedSample(random.xy);
-        payload.rayDirection = TangentToWorld(nrmWorld, -payload.rayDirection, tangentSample);
+        payload.rayDirection = TangentToWorld(nrmWorld, tangentSample);
         // pdf = cos(theta) / pi
         // BRDF = baseColor / pi
-        // lambert law = BRDF * cos(theta) / pdf = baseColor / pi * cos(theta) / (cos(theta) / pi) = baseColor
+        // apply lambert law: BRDF * cos(theta) / pdf = baseColor / pi * cos(theta) / (cos(theta) / pi) = baseColor
         payload.hitValue = payload.hitValue * material.i[gl_InstanceCustomIndexEXT].color.rgb; // Simple diffuse lighting
     }
 }

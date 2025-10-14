@@ -59,7 +59,18 @@ vec3 CosineWeightedSample(const vec2 xi)
     float sinTheta = sqrt(xi.y);
     return vec3(sinTheta * cos(phi), sinTheta * sin(phi), sqrt(1.0 - xi.y));
 }
-
+vec3 WorldToTangent(const vec3 _normal, const vec3 _sample)
+{
+    vec3 tangent = abs(_normal.z) < 0.999f ? normalize(cross(vec3(0.0f, 0.0f, 1.0f), _normal)) : vec3(1.0f, 0.0f, 0.0f);
+    vec3 bitangent = cross(_normal, tangent);
+    return vec3(dot(_sample, tangent), dot(_sample, bitangent), dot(_sample, _normal));
+}
+vec3 TangentToWorld(const vec3 _normal, const vec3 _sample)
+{
+    vec3 tangent = abs(_normal.z) < 0.999f ? normalize(cross(vec3(0.0f, 0.0f, 1.0f), _normal)) : vec3(1.0f, 0.0f, 0.0f);
+    vec3 bitangent = cross(_normal, tangent);
+    return _sample.x * tangent + _sample.y * bitangent + _sample.z * _normal;
+}
 // https://blog.selfshadow.com/sandbox/ltc.html
 vec3 TangentToWorld(const vec3 _normal, const vec3 _view, const vec3 _sample)
 {

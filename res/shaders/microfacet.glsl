@@ -1,5 +1,11 @@
 #include "rt_pbr_common.glsl"
 
+// roughness to alpha
+float _RoughnessToAlpha(in float roughness)
+{
+    return roughness * roughness;
+}
+
 // lambda function
 float _Lambda(in vec3 wo, in float alpha)
 {
@@ -40,7 +46,7 @@ float Dw(in vec3 wo, in vec3 wm, in float alpha)
 
 vec3 SampleMicrofacetNormal(in vec3 wo, in float roughness, in vec2 xi, out vec3 wi, out float pdf)
 {
-    float alpha = roughness * roughness;
+    float alpha = _RoughnessToAlpha(roughness);
     // Sample wh
     vec3 wh = normalize(vec3(wo.x * alpha, wo.y * alpha, wo.z));
     vec3 T1 = wh.z < 0.999f ? normalize(cross(wh, vec3(0.0f, 0.0f, 1.0f))) : vec3(1.0f, 0.0f, 0.0f);
@@ -76,6 +82,6 @@ vec3 MicrofacetBRDF(in vec3 wo, in vec3 wi, in vec3 Fresnel, in float roughness)
     vec3 wm = (wo + wi);
     if (dot(wm, wm) < 0.0001f) return vec3(0.0f);
     wm = normalize(wm);
-    float alpha = roughness * roughness;
+    float alpha = _RoughnessToAlpha(roughness);
     return D(wm, alpha) * G(wi, wo, alpha) * Fresnel / (4.0f * abs(wo.z * wi.z));
 }

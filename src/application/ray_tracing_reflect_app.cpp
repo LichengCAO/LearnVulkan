@@ -237,7 +237,7 @@ void RayTracingReflectApp::_CreateBuffers()
 				curMtl.colorOrLight.a = 1.0f;
 				curMtl.materialType = glm::uvec4(1, 0, 0, 0);
 			}
-			else if (materialNames[i] == "backWall")
+			else if (materialNames[i] == "backWall" || materialNames[i] == "leftWall")
 			{
 				curMtl.colorOrLight.a = 0.0f;
 				curMtl.materialType = glm::uvec4(2, 0, 0, 0);
