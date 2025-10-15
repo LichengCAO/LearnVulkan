@@ -58,4 +58,5 @@ public:
 		bool anistrophyEnable = false,
 		float maxAnistrophy = 1.0f);
 	void ReturnSampler(VkSampler* _sampler);
+	void ReturnSampler(VkSampler& _sampler);
 };

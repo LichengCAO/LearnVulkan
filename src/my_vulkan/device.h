@@ -114,6 +114,15 @@ public:
 
 	MemoryAllocator* GetMemoryAllocator();
 
+	// Create a VkFence, _pCreateInfo is optional, if it's not nullptr, VkFence will be created based on it
+	VkFence CreateVkFence(const VkFenceCreateInfo* _pCreateInfo = nullptr);
+	// Destroy _fence on device, set it to VK_NULL_HANDLE
+	void DestroyVkFence(VkFence& _fence);
+	// Create a VkSemaphore, _pCreateInfo is optional, if it's not nullptr, VkSemaphore will be created based on it
+	VkSemaphore CreateVkSemaphore(const VkSemaphoreCreateInfo* _pCreateInfo = nullptr);
+	// Destroy _semaphore on device, set it to VK_NULL_HANDLE
+	void DestroyVkSemaphore(VkSemaphore& _semaphore);
+
 public:
 	static MyDevice& GetInstance();
 	static void OnFramebufferResized(GLFWwindow* _pWindow, int width, int height);

@@ -4,12 +4,10 @@
 #include "buffer.h"
 void CommandSubmission::_CreateSynchronizeObjects()
 {
-	VkSemaphoreCreateInfo semaphoreInfo{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-	VkFenceCreateInfo fenceInfo{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
-	fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+	auto& device = MyDevice::GetInstance();
 
-	VK_CHECK(vkCreateSemaphore(MyDevice::GetInstance().vkDevice, &semaphoreInfo, nullptr, &m_vkSemaphore), "Failed to create the signal semaphore!");
-	VK_CHECK(vkCreateFence(MyDevice::GetInstance().vkDevice, &fenceInfo, nullptr, &vkFence), "Failed to create the availability fence!");
+	m_vkSemaphore = device.CreateVkSemaphore();
+	vkFence = device.CreateVkFence();
 }
 
 void CommandSubmission::_UpdateImageLayout(VkImage vkImage, VkImageSubresourceRange range, VkImageLayout layout) const
@@ -67,22 +65,15 @@ void CommandSubmission::Init()
 
 void CommandSubmission::Uninit()
 {
+	auto& device = MyDevice::GetInstance();
 	WaitTillAvailable();
 	if (vkCommandBuffer != VK_NULL_HANDLE)
 	{
 		// vkFreeCommandBuffers(MyDevice::GetInstance().vkDevice, MyDevice::GetInstance().vkCommandPools[m_optQueueFamilyIndex.value()], 1, &vkCommandBuffer);
 		vkCommandBuffer = VK_NULL_HANDLE;
 	}
-	if (vkFence != VK_NULL_HANDLE)
-	{
-		vkDestroyFence(MyDevice::GetInstance().vkDevice, vkFence, nullptr);
-		vkFence = VK_NULL_HANDLE;
-	}
-	if (m_vkSemaphore != VK_NULL_HANDLE)
-	{
-		vkDestroySemaphore(MyDevice::GetInstance().vkDevice, m_vkSemaphore, nullptr);
-		m_vkSemaphore = VK_NULL_HANDLE;
-	}
+	device.DestroyVkFence(vkFence);
+	device.DestroyVkSemaphore(m_vkSemaphore);
 	m_vkWaitSemaphores.clear();
 	CHECK_TRUE(!m_isRecording, "Still recording commands!");
 }

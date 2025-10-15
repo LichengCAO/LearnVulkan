@@ -114,23 +114,23 @@ void SwapchainPass::_UninitCommandBuffer()
 
 void SwapchainPass::_InitSemaphores()
 {
-	VkSemaphoreCreateInfo semaphoreInfo{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
-
-	_UninitSemaphores();
+	auto& device = MyDevice::GetInstance();
 
 	m_aquireImages.resize(m_uMaxFrameCount);
 
 	for (int i = 0; i < m_uMaxFrameCount; ++i)
 	{
-		VK_CHECK(vkCreateSemaphore(MyDevice::GetInstance().vkDevice, &semaphoreInfo, nullptr, &m_aquireImages[i]), "Failed to create semaphore!");
+		m_aquireImages[i] = device.CreateVkSemaphore();
 	}
 }
 
 void SwapchainPass::_UninitSemaphores()
 {
+	auto& device = MyDevice::GetInstance();
+
 	for (auto& semaphore : m_aquireImages)
 	{
-		vkDestroySemaphore(MyDevice::GetInstance().vkDevice, semaphore, nullptr);
+		device.DestroyVkSemaphore(semaphore);
 	}
 	m_aquireImages.clear();
 }
@@ -179,7 +179,7 @@ void SwapchainPass::Execute(const VkDescriptorImageInfo& _originalImage, const s
 {
 	auto pCmd = m_cmds[m_uCurrentFrame].get();
 	auto& device = MyDevice::GetInstance();
-	std::optional<uint32_t> index{}; 
+	std::optional<uint32_t> index;
 	VkSemaphore semaphoreRenderFinish = VK_NULL_HANDLE;
 	CommandSubmission::WaitInformation waitForSwapchain{ m_aquireImages[m_uCurrentFrame], VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT };
 	GraphicsPipeline::PipelineInput_Draw input{};
@@ -187,7 +187,11 @@ void SwapchainPass::Execute(const VkDescriptorImageInfo& _originalImage, const s
 
 	pCmd->WaitTillAvailable(); // make sure that m_aquireImages[m_uCurrentFrame] is signaled
 	index = device.AquireAvailableSwapchainImageIndex(m_aquireImages[m_uCurrentFrame]);
-	if (!index.has_value()) return;
+	if (!index.has_value())
+	{
+		device.WaitIdle();  // make sure that m_aquireImages[m_uCurrentFrame] is signaled
+		return;
+	}
 
 	for (const auto& semaphore : _waitSignals)
 	{

@@ -29,12 +29,6 @@ private:
 	void _InitViews();
 	void _UninitViews();
 
-	void _InitDSetLayout();
-	void _UninitDSetLayout();
-
-	void _InitDSets();
-	void _UninitDSets();
-
 	void _InitRenderPass();
 	void _UninitRenderPass();
 

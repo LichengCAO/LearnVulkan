@@ -20,7 +20,8 @@ layout(push_constant) uniform shaderInformation
 
 void GetRayOriginAndDirection(out vec3 rayOrigin, out vec3 rayDirection)
 {
-    const vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy) + vec2(0.5);
+    const uint N = 1024u;
+    const vec2 pixelCenter = vec2(gl_LaunchIDEXT.xy) + Hammersley((pushConstants.uFrameIndex % N), N); // jitter
     vec2 inUV = pixelCenter/vec2(gl_LaunchSizeEXT.xy);
     vec4 clipSpacePos = vec4(inUV * 2.0 - 1.0, 0.0, 1.0);
     rayOrigin = cameraInfo.eye.xyz;

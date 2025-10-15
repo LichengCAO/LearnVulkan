@@ -2233,7 +2233,7 @@ void TransparentApp::_ResizeWindow()
 	_InitDescriptorSets();
 }
 
-VkImageLayout TransparentApp::_GetImageLayout(ImageView* pImageView) const
+VkImageLayout TransparentApp::_GetImageLayout(const ImageView* pImageView) const
 {
 	MyDevice& device = MyDevice::GetInstance();
 	auto info = pImageView->GetImageViewInformation();

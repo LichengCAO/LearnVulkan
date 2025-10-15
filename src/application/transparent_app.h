@@ -217,7 +217,7 @@ private:
 
 	void _ResizeWindow();
 
-	VkImageLayout _GetImageLayout(ImageView* pImageView) const;
+	VkImageLayout _GetImageLayout(const ImageView* pImageView) const;
 	VkImageLayout _GetImageLayout(VkImage vkImage, uint32_t baseArrayLayer, uint32_t layerCount, uint32_t baseMipLevel, uint32_t levelCount, VkImageAspectFlags aspect) const;
 public:
 	void Run();

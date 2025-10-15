@@ -21,8 +21,12 @@ private:
 	std::vector<std::unique_ptr<ImageView>> m_uptrViews;
 	std::vector<std::unique_ptr<CommandSubmission>> m_uptrCmds;
 	std::unique_ptr<MyGUI> m_uptrGUI;
+	VkSampler m_sampler = VK_NULL_HANDLE;
 
 private:
+	void _InitSampler();
+	void _UninitSampler();
+
 	void _InitImageAndViews();
 	void _UninitImageAndViews();
 
@@ -53,6 +57,6 @@ public:
 
 	MyGUI& StartPass(const VkDescriptorImageInfo& _originalImage, const std::vector<VkSemaphore>& _waitSignals);
 
-	// Execute the pass, signal _finishSignals when pass done
-	void EndPass(const std::vector<VkSemaphore>& _finishSignals);
+	// Execute the pass, signal _finishSignals when pass done, _outputImage is the result that can be used as texture in other pass
+	void EndPass(const std::vector<VkSemaphore>& _finishSignals, VkDescriptorImageInfo& _outputImage);
 };

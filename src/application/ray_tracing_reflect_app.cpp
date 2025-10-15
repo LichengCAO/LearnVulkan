@@ -3,6 +3,7 @@
 #include "my_vulkan/device.h"
 #include "pipeline_program.h"
 #include "swapchain_pass.h"
+#include "gui_pass.h"
 #include "utility/glTF_loader.h"
 
 void RayTracingReflectApp::_CreateCommandBuffers()
@@ -66,6 +67,9 @@ void RayTracingReflectApp::_InitPipeline()
 
 	m_uptrSwapchainPass = std::make_unique<SwapchainPass>();
 	m_uptrSwapchainPass->Init(3);
+
+	m_uptrGUIPass = std::make_unique<GUIPass>();
+	m_uptrGUIPass->Init(3);
 }
 
 void RayTracingReflectApp::_UninitPipeline()
@@ -73,10 +77,17 @@ void RayTracingReflectApp::_UninitPipeline()
 	if (m_uptrPipeline)
 	{
 		m_uptrPipeline->Uninit();
+		m_uptrPipeline.reset();
 	}
 	if (m_uptrSwapchainPass)
 	{
 		m_uptrSwapchainPass->Uninit();
+		m_uptrSwapchainPass.reset();
+	}
+	if (m_uptrGUIPass)
+	{
+		m_uptrGUIPass->Uninit();
+		m_uptrGUIPass.reset();
 	}
 }
 
@@ -124,6 +135,28 @@ void RayTracingReflectApp::_DestroyImagesAndViews()
 
 	m_uptrOutputViews.clear();
 	m_uptrOutputImages.clear();
+}
+
+void RayTracingReflectApp::_CreateSemaphores()
+{
+	auto& device = MyDevice::GetInstance();
+
+	for (int i = 0; i < 3; ++i)
+	{
+		m_semaphores.push_back(device.CreateVkSemaphore());
+	}
+}
+
+void RayTracingReflectApp::_DestroySemaphores()
+{
+	auto& device = MyDevice::GetInstance();
+
+	for (auto& semophore : m_semaphores)
+	{
+		device.DestroyVkSemaphore(semophore);
+	}
+
+	m_semaphores.clear();
 }
 
 void RayTracingReflectApp::_CreateBuffers()
@@ -350,6 +383,7 @@ void RayTracingReflectApp::_Init()
 {
 	MyDevice::GetInstance().Init();
 	m_vkSampler = MyDevice::GetInstance().samplerPool.GetSampler(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
+	_CreateSemaphores();
 	_CreateCommandBuffers();
 	_CreateImagesAndViews();
 	_CreateBuffers();
@@ -365,6 +399,7 @@ void RayTracingReflectApp::_Uninit()
 	_DestroyBuffers();
 	_DestroyImagesAndViews();
 	_DestroyCommandBuffers();
+	_DestroySemaphores();
 	MyDevice::GetInstance().samplerPool.ReturnSampler(&m_vkSampler);
 	MyDevice::GetInstance().Uninit();
 }
@@ -380,11 +415,13 @@ void RayTracingReflectApp::_ResizeWindow()
 	_CreateBuffers();
 	_CreateImagesAndViews();
 	m_uptrSwapchainPass->OnSwapchainRecreated();
+	m_uptrGUIPass->OnSwapchainRecreated();
 }
 
 void RayTracingReflectApp::_DrawFrame()
 {
 	auto cmd = m_uptrCommands[m_currentFrame].get();
+	VkDescriptorImageInfo guiOutput{};
 
 	if (MyDevice::GetInstance().NeedRecreateSwapchain())
 	{
@@ -417,9 +454,13 @@ void RayTracingReflectApp::_DrawFrame()
 		cmd,
 		MyDevice::GetInstance().GetSwapchainExtent().width,
 		MyDevice::GetInstance().GetSwapchainExtent().height);
-	auto syncSignal = cmd->SubmitCommands();
 
-	m_uptrSwapchainPass->Execute({ m_uptrOutputViews[m_currentFrame]->GetDescriptorInfo(m_vkSampler, VK_IMAGE_LAYOUT_GENERAL) }, { syncSignal });
+	auto& gui = m_uptrGUIPass->StartPass({ m_uptrOutputViews[m_currentFrame]->GetDescriptorInfo(m_vkSampler, VK_IMAGE_LAYOUT_GENERAL) }, { cmd->SubmitCommands() });
+	gui.StartWindow("this is ui");
+	gui.EndWindow();
+	m_uptrGUIPass->EndPass({ m_semaphores[m_currentFrame] }, guiOutput);
+
+	m_uptrSwapchainPass->Execute({ guiOutput }, { m_semaphores[m_currentFrame] });
 
 	m_uptrPipeline->EndFrame();
 	m_currentFrame = (m_currentFrame + 1) % 3;

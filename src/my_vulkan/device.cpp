@@ -700,6 +700,51 @@ MemoryAllocator* MyDevice::GetMemoryAllocator()
 	return m_uptrMemoryAllocator.get();
 }
 
+VkFence MyDevice::CreateVkFence(const VkFenceCreateInfo* _pCreateInfo)
+{
+	VkFence vkFence = VK_NULL_HANDLE;
+	
+	if (_pCreateInfo)
+	{
+		VK_CHECK(vkCreateFence(vkDevice, _pCreateInfo, nullptr, &vkFence), "Failed to create the availability fence!");
+	}
+	else
+	{
+		VkFenceCreateInfo fenceInfo{ VK_STRUCTURE_TYPE_FENCE_CREATE_INFO };
+		fenceInfo.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+		VK_CHECK(vkCreateFence(MyDevice::GetInstance().vkDevice, &fenceInfo, nullptr, &vkFence), "Failed to create the availability fence!");
+	}
+
+    return vkFence;
+}
+
+void MyDevice::DestroyVkFence(VkFence& _fence)
+{
+	vkDestroyFence(vkDevice, _fence, nullptr);
+	_fence = VK_NULL_HANDLE;
+}
+
+VkSemaphore MyDevice::CreateVkSemaphore(const VkSemaphoreCreateInfo* _pCreateInfo)
+{
+	VkSemaphore vkSemaphore = VK_NULL_HANDLE;
+	if (_pCreateInfo)
+	{
+		VK_CHECK(vkCreateSemaphore(vkDevice, _pCreateInfo, nullptr, &vkSemaphore), "Failed to create the signal semaphore!");
+	}
+	else
+	{
+		VkSemaphoreCreateInfo semaphoreInfo{ VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO };
+		VK_CHECK(vkCreateSemaphore(vkDevice, &semaphoreInfo, nullptr, &vkSemaphore), "Failed to create the signal semaphore!");
+	}
+	return vkSemaphore;
+}
+
+void MyDevice::DestroyVkSemaphore(VkSemaphore& _semaphore)
+{
+	vkDestroySemaphore(vkDevice, _semaphore, nullptr);
+	_semaphore = VK_NULL_HANDLE;
+}
+
 MyDevice& MyDevice::GetInstance()
 {
 	if (s_uptrInstance.get() == nullptr)

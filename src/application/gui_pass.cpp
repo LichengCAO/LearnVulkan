@@ -22,10 +22,12 @@ void GUIPass::Init(uint32_t _frameInFlight)
 	_InitPipeline();
 	_InitCommandBuffer();
 	_InitMyGUI();
+	_InitSampler();
 }
 
 void GUIPass::Uninit()
 {
+	_UninitSampler();
 	_UninitMyGUI();
 	_UninitCommandBuffer();
 	_UninitPipeline();
@@ -66,18 +68,32 @@ MyGUI& GUIPass::StartPass(const VkDescriptorImageInfo& _originalImage, const std
 	return *m_uptrGUI.get();
 }
 
-void GUIPass::EndPass(const std::vector<VkSemaphore>& _finishSignals)
+void GUIPass::EndPass(const std::vector<VkSemaphore>& _finishSignals, VkDescriptorImageInfo& _outputImage)
 {
 	CommandSubmission* cmd = m_uptrCmds[m_uCurrentFrame].get();
 
 	m_uptrGUI->Apply(m_uptrCmds[m_uCurrentFrame]->vkCommandBuffer);
 	
 	m_uptrProgram->UnbindFramebuffer(cmd);
-	m_uptrProgram->EndFrame();
 
 	cmd->SubmitCommands(_finishSignals);
 
+	_outputImage.imageView = m_uptrViews[m_uCurrentFrame]->vkImageView;
+	_outputImage.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
+	_outputImage.sampler = m_sampler;
+
+	m_uptrProgram->EndFrame();
 	m_uCurrentFrame = (m_uCurrentFrame + 1) % m_uMaxFrameCount;
+}
+
+void GUIPass::_InitSampler()
+{
+	m_sampler = MyDevice::GetInstance().samplerPool.GetSampler(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_EDGE);
+}
+
+void GUIPass::_UninitSampler()
+{
+	MyDevice::GetInstance().samplerPool.ReturnSampler(m_sampler);
 }
 
 void GUIPass::_InitImageAndViews()
@@ -153,7 +169,7 @@ void GUIPass::_InitFramebuffers()
 		std::unique_ptr<Framebuffer> uptrFramebuffer;
 		Framebuffer* pFramebuffer = nullptr;
 
-		m_uptrRenderPass->NewFramebuffer(pFramebuffer, { m_uptrViews[i].get() });
+		m_uptrRenderPass->NewFramebuffer({ m_uptrViews[i].get() }, pFramebuffer);
 
 		uptrFramebuffer.reset(pFramebuffer);
 		uptrFramebuffer->Init();

@@ -91,3 +91,8 @@ void SamplerPool::ReturnSampler(VkSampler* _sampler)
 	}
 	*_sampler = VK_NULL_HANDLE;
 }
+
+void SamplerPool::ReturnSampler(VkSampler& _sampler)
+{
+	ReturnSampler(&_sampler);
+}

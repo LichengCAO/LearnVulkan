@@ -5,6 +5,7 @@
 
 class RayTracingProgram;
 class SwapchainPass;
+class GUIPass;
 class Buffer;
 class Image;
 class ImageView;
@@ -36,6 +37,7 @@ private:
 
 	std::unique_ptr<RayTracingProgram> m_uptrPipeline;
 	std::unique_ptr<SwapchainPass> m_uptrSwapchainPass;
+	std::unique_ptr<GUIPass> m_uptrGUIPass;
 	std::unique_ptr<RayTracingAccelerationStructure> m_uptrAccelStruct;
 	std::unique_ptr<Buffer> m_uptrAddressBuffer;
 	std::unique_ptr<Buffer> m_uptrMaterialBuffer;
@@ -49,12 +51,16 @@ private:
 	std::vector<std::unique_ptr<CommandSubmission>> m_uptrCommands;
 	std::vector<RayTracingAccelerationStructure::TriangleData> m_rayTracingGeometryData;
 	std::vector<glm::mat4> m_rayTracingGeometryTransform;
+	std::vector<VkSemaphore> m_semaphores;
 	VkSampler m_vkSampler = VK_NULL_HANDLE;
 	uint32_t m_currentFrame = 0u;
 	uint32_t m_rayTraceFrame = 0u; // 3x ray trace frame since we have 3 images in flight
 	PersCamera m_camera{ 400, 300, glm::vec3(2,2,2), glm::vec3(0,0,0), glm::vec3(0,1,0) };
 
 private:
+	void _CreateSemaphores();
+	void _DestroySemaphores();
+
 	void _CreateCommandBuffers();
 	void _DestroyCommandBuffers();
 
