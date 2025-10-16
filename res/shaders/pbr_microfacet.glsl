@@ -1,6 +1,8 @@
 #ifndef MICROFACET_GLSL
 #define MICROFACET_GLSL
-#include "rt_pbr_common.glsl"
+#include "pbr_common.glsl"
+
+// https://balyberdin.com/tools/ior-list/#metal-material-ior
 
 // roughness to alpha
 float _RoughnessToAlpha(in float roughness)

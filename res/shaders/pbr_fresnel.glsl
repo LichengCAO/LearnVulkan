@@ -1,6 +1,6 @@
 #ifndef FRESNEL_GLSL
 #define FRESNEL_GLSL
-#include "rt_pbr_common.glsl"
+#include "pbr_common.glsl"
 
 struct Complex
 {
@@ -39,13 +39,13 @@ Complex _sub(in Complex a, in Complex b)
 Complex _sqrt(in Complex a)
 {
     float magnitude = sqrt(sqrt(a.r * a.r + a.i * a.i));
-    float angle = atan(a.i, a.r) / 2.0f;
+    float angle = atan(a.i/ a.r) / 2.0f;
     return Complex(magnitude * cos(angle), magnitude * sin(angle));
 }
 
 float _norm(in Complex a)
 {
-    return sqrt(a.r * a.r + a.i * a.i);
+    return (a.r * a.r + a.i * a.i);
 }
 
 float _GetEta(in float IORi, in float IORt)

@@ -4,7 +4,7 @@
 #extension GL_GOOGLE_include_directive : enable
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 
-#include "rt_pbr_common.glsl"
+#include "pbr_common.glsl"
 
 // Note that there is no requirement that the location of the callee's incoming payload match 
 // the payload argument the caller passed to traceRayEXT! 

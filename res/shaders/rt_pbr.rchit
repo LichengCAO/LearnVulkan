@@ -6,10 +6,10 @@
 // https://stackoverflow.com/questions/60549218/what-use-has-the-layout-specifier-scalar-in-ext-scalar-block-layout
 #extension GL_EXT_scalar_block_layout : enable
 
-#include "rt_pbr_common.glsl"
+#include "pbr_common.glsl"
 #include "rt_common.glsl"
-#include "microfacet.glsl"
-#include "fresnel.glsl"
+#include "pbr_microfacet.glsl"
+#include "pbr_fresnel.glsl"
 
 struct Material
 {
@@ -89,41 +89,52 @@ void main()
     {
         payload.traceEnd = true;
     }
-    // else if (material.i[gl_InstanceCustomIndexEXT].type.x == 2)
-    // {
-    //     vec3 random = Noise(payload.randomSeed);
-    //     float pdf = 1.0f;
-    //     vec3 wm = vec3(0.0f);
-    //     float roughness = 0.2f;
-    //     vec3 tangentWo = WorldToTangent(nrmWorld, -payload.rayDirection);
-    //     SampleMicrofacetNormal(tangentWo, roughness, random.xy, wm, pdf);
-    //     payload.hitValue = payload.hitValue * MicrofacetBRDF(tangentWo, wm, roughness) * abs(wm.z) / pdf * material.i[gl_InstanceCustomIndexEXT].color.rgb;
-    //     vec3 wi = reflect(-tangentWo, wm);
-    //     payload.rayDirection = TangentToWorld(nrmWorld, wi);
-    // }
+    else if (material.i[gl_InstanceCustomIndexEXT].type.x == 2)
+    {
+        vec3 random = Noise(payload.randomSeed);
+        float pdf = 1.0f;
+        vec3 wm = vec3(0.0f);
+        float roughness = 0.2f;
+        vec3 tangentWo = WorldToTangent(nrmWorld, -payload.rayDirection);
+        SampleMicrofacetNormal(tangentWo, roughness, random.xy, wm, pdf);
+        payload.hitValue = payload.hitValue * MicrofacetBRDF(tangentWo, wm, roughness) * abs(wm.z) / pdf * material.i[gl_InstanceCustomIndexEXT].color.rgb;
+        vec3 wi = Reflect(tangentWo, wm);
+        payload.rayDirection = TangentToWorld(nrmWorld, wi);
+    }
     else if (material.i[gl_InstanceCustomIndexEXT].type.x == 8)
     {
         uint channel = pushConstants.uFrameIndex % 3;
         vec3 random = Noise(payload.randomSeed);
         float IORt = 1.514f;
-        // if (channel == 0)
-        //     IORt = 1.514f;
-        // else if (channel == 1)
-        //     IORt = 1.519f;
-        // else
-        //     IORt = 1.530f;
 
         float fresnel = Fresnel(dot(-payload.rayDirection, nrmWorld), 1.0f, IORt);
         if (random.r < fresnel) // Reflect
         {
             payload.rayDirection = Reflect(-payload.rayDirection, nrmWorld);
-            payload.hitValue = payload.hitValue * material.i[gl_InstanceCustomIndexEXT].color.rgb; // Simple specular lighting
+            payload.hitValue = payload.hitValue * material.i[gl_InstanceCustomIndexEXT].color.rgb;
         }
         else // Refract
         {
             payload.rayDirection = Refract(-payload.rayDirection, nrmWorld, 1.0f, IORt);
-            payload.hitValue = payload.hitValue * material.i[gl_InstanceCustomIndexEXT].color.rgb; // Simple specular lighting
+            payload.hitValue = payload.hitValue * material.i[gl_InstanceCustomIndexEXT].color.rgb;
         }
+    }
+    else if (material.i[gl_InstanceCustomIndexEXT].type.x == 7)
+    {
+        vec3 random = Noise(payload.randomSeed);
+        float pdf = 1.0f;
+        vec3 wm = vec3(0.0f);
+        float roughness = 0.1f;
+        vec3 tangentWo = WorldToTangent(nrmWorld, -payload.rayDirection);
+        SampleMicrofacetNormal(tangentWo, roughness, random.xy, wm, pdf);
+        float cosTheta = clamp(dot(tangentWo, wm), 0.0f, 1.0f);
+        vec3 fresnel = vec3(1.0f);
+        fresnel.r = Fresnel(cosTheta, Complex(1, 0), Complex(0.18f, 3.42f));
+        fresnel.g = Fresnel(cosTheta, Complex(1, 0), Complex(0.42f, 2.35f));
+        fresnel.b = Fresnel(cosTheta, Complex(1, 0), Complex(1.37f, 1.77f));
+        payload.hitValue = payload.hitValue * MicrofacetBRDF(tangentWo, wm, roughness) * abs(wm.z) / pdf * fresnel;
+        vec3 wi = Reflect(tangentWo, wm);
+        payload.rayDirection = TangentToWorld(nrmWorld, wi);
     }
     else
     {
