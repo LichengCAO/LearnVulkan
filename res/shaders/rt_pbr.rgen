@@ -55,8 +55,21 @@ void main()
     GetRayOriginAndDirection(payload.rayOrigin, payload.rayDirection);
     payload.hitValue = vec3(1.0f);
     payload.traceEnd = false;
-    
-    for (int i = 0; i < 5; ++i)
+    // uint channel = pushConstants.uFrameIndex % 3;
+    // if (channel == 0)
+    // {
+    //     payload.hitValue = vec3(1.0f, 0, 0);
+    // }
+    // else if (channel == 1)
+    // {
+    //     payload.hitValue = vec3(0, 1.0f, 0);
+    // }
+    // else
+    // {
+    //     payload.hitValue = vec3(0, 0, 1.0f);
+    // }
+
+    for (int i = 0; i < 8; ++i)
     {
         payload.randomSeed = pushConstants.uFrameIndex * 1973 + i * 9277 + uint(gl_LaunchIDEXT.x) * 26699 + uint(gl_LaunchIDEXT.y) * 8191;
         EmitRay(payload.rayOrigin, payload.rayDirection);

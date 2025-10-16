@@ -62,7 +62,6 @@ void main()
     Vertex v1 = vertices.v[indices.i[indexOffset + 1]];
     Vertex v2 = vertices.v[indices.i[indexOffset + 2]];
 
-    
     const vec3 posObject = v0.position.xyz * barycentrics.x + v1.position.xyz * barycentrics.y + v2.position.xyz * barycentrics.z;
     const vec3 posWorld = ObjectToWorld(posObject);
     

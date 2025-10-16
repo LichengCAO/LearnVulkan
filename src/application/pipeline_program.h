@@ -203,7 +203,7 @@ private:
 	std::vector<VkBuffer> m_vertexBuffers;
 	VkIndexType		m_vkIndexType = VK_INDEX_TYPE_UINT32;
 
-	std::vector<std::pair<VkShaderStageFlagBits, const void*>> m_pushConstants;
+	std::vector<std::pair<VkShaderStageFlags, const void*>> m_pushConstants;
 	
 	// for vertex inputs
 	std::vector<std::function<void(GraphicsPipeline*)>> m_lateInitialization;
@@ -235,7 +235,7 @@ public:
 		VkBuffer _indexBuffer,
 		VkIndexType _indexType = VK_INDEX_TYPE_UINT32);
 
-	void PushConstant(VkShaderStageFlagBits _stages, const void* _data);
+	void PushConstant(VkShaderStageFlags _stages, const void* _data);
 
 	void BindFramebuffer(
 		CommandSubmission* _pCmd, 
@@ -268,7 +268,7 @@ private:
 	std::unique_ptr<ComputePipeline> m_uptrPipeline;
 	std::vector<std::string> m_vecShaderPath;
 	ShaderReflector	m_shaderReflector;
-	std::vector<std::pair<VkShaderStageFlagBits, const void*>> m_pushConstants;
+	std::vector<std::pair<VkShaderStageFlags, const void*>> m_pushConstants;
 
 private:
 	void _InitPipeline();
@@ -282,7 +282,7 @@ public:
 
 	DescriptorSetManager& GetDescriptorSetManager();
 
-	void PushConstant(VkShaderStageFlagBits _stages, const void* _data);
+	void PushConstant(VkShaderStageFlags _stages, const void* _data);
 
 	void DispatchWorkGroup(
 		CommandSubmission* _pCmd,
@@ -300,7 +300,7 @@ private:
 	std::unique_ptr<DescriptorSetManager> m_uptrDescriptorSetManager;
 	std::unique_ptr<RayTracingPipeline> m_uptrPipeline;
 	std::vector<std::string> m_vecShaderPath;
-	std::vector<std::pair<VkShaderStageFlagBits, const void*>> m_pushConstants;
+	std::vector<std::pair<VkShaderStageFlags, const void*>> m_pushConstants;
 	std::unordered_map<std::string, uint32_t> m_mapShaderToIndex;
 	std::vector<std::function<void(RayTracingPipeline*)>> m_lateInitialization;
 
@@ -321,7 +321,7 @@ public:
 
 	DescriptorSetManager& GetDescriptorSetManager();
 
-	void PushConstant(VkShaderStageFlagBits _stages, const void* _data);
+	void PushConstant(VkShaderStageFlags _stages, const void* _data);
 
 	void TraceRay(
 		CommandSubmission* _pCmd, 

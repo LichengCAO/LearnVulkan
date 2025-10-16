@@ -9,6 +9,7 @@
 #include "rt_pbr_common.glsl"
 #include "rt_common.glsl"
 #include "microfacet.glsl"
+#include "fresnel.glsl"
 
 struct Material
 {
@@ -29,6 +30,10 @@ layout(set = 1, binding = 0) buffer Materials
 {
     Material i[];
 } material;
+layout(push_constant) uniform shaderInformation
+{
+  uint uFrameIndex;
+} pushConstants;
 
 // https://stackoverflow.com/questions/70887022/resource-pointer-using-buffer-reference-doesnt-point-to-the-right-thing
 layout(buffer_reference, scalar) buffer Vertices {
@@ -80,22 +85,45 @@ void main()
     const vec3 nrmObject = v0.normal.xyz * barycentrics.x + v1.normal.xyz * barycentrics.y + v2.normal.xyz * barycentrics.z;
     const vec3 nrmWorld = ObjectNormalToWorldNormal(nrmObject); // GetRayHitPosition() can also be used to get the world position, but is less precise
 
-    payload.rayOrigin = posWorld + nrmWorld * 0.001f; // Offset a little to avoid self-intersection
-
     if (material.i[gl_InstanceCustomIndexEXT].type.x == 1)
     {
         payload.traceEnd = true;
     }
-    else if (material.i[gl_InstanceCustomIndexEXT].type.x == 2)
+    // else if (material.i[gl_InstanceCustomIndexEXT].type.x == 2)
+    // {
+    //     vec3 random = Noise(payload.randomSeed);
+    //     float pdf = 1.0f;
+    //     vec3 wm = vec3(0.0f);
+    //     float roughness = 0.2f;
+    //     vec3 tangentWo = WorldToTangent(nrmWorld, -payload.rayDirection);
+    //     SampleMicrofacetNormal(tangentWo, roughness, random.xy, wm, pdf);
+    //     payload.hitValue = payload.hitValue * MicrofacetBRDF(tangentWo, wm, roughness) * abs(wm.z) / pdf * material.i[gl_InstanceCustomIndexEXT].color.rgb;
+    //     vec3 wi = reflect(-tangentWo, wm);
+    //     payload.rayDirection = TangentToWorld(nrmWorld, wi);
+    // }
+    else if (material.i[gl_InstanceCustomIndexEXT].type.x == 8)
     {
+        uint channel = pushConstants.uFrameIndex % 3;
         vec3 random = Noise(payload.randomSeed);
-        float pdf = 1.0f;
-        vec3 wi = vec3(0.0f);
-        float roughness = 0.2f;
-        vec3 tangentWo = WorldToTangent(nrmWorld, -payload.rayDirection);
-        SampleMicrofacetNormal(tangentWo, roughness, random.xy, wi, pdf);
-        payload.hitValue = payload.hitValue * MicrofacetBRDF(tangentWo, wi, vec3(1.0f), roughness) * abs(wi.z) / pdf;
-        payload.rayDirection = TangentToWorld(nrmWorld, wi);
+        float IORt = 1.514f;
+        // if (channel == 0)
+        //     IORt = 1.514f;
+        // else if (channel == 1)
+        //     IORt = 1.519f;
+        // else
+        //     IORt = 1.530f;
+
+        float fresnel = Fresnel(dot(-payload.rayDirection, nrmWorld), 1.0f, IORt);
+        if (random.r < fresnel) // Reflect
+        {
+            payload.rayDirection = Reflect(-payload.rayDirection, nrmWorld);
+            payload.hitValue = payload.hitValue * material.i[gl_InstanceCustomIndexEXT].color.rgb; // Simple specular lighting
+        }
+        else // Refract
+        {
+            payload.rayDirection = Refract(-payload.rayDirection, nrmWorld, 1.0f, IORt);
+            payload.hitValue = payload.hitValue * material.i[gl_InstanceCustomIndexEXT].color.rgb; // Simple specular lighting
+        }
     }
     else
     {
@@ -107,4 +135,6 @@ void main()
         // apply lambert law: BRDF * cos(theta) / pdf = baseColor / pi * cos(theta) / (cos(theta) / pi) = baseColor
         payload.hitValue = payload.hitValue * material.i[gl_InstanceCustomIndexEXT].color.rgb; // Simple diffuse lighting
     }
+
+    payload.rayOrigin = posWorld + sign(dot(nrmWorld, payload.rayDirection)) * 0.001f * nrmWorld; // Offset a little to avoid self-intersection
 }

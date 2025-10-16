@@ -860,7 +860,7 @@ void GraphicsProgram::BindIndexBuffer(VkBuffer _indexBuffer, VkIndexType _indexT
 	m_vkIndexType = _indexType;
 }
 
-void GraphicsProgram::PushConstant(VkShaderStageFlagBits _stages, const void* _data)
+void GraphicsProgram::PushConstant(VkShaderStageFlags _stages, const void* _data)
 {
 	m_pushConstants.push_back({ _stages, _data });
 }
@@ -1048,7 +1048,7 @@ DescriptorSetManager& ComputeProgram::GetDescriptorSetManager()
 	return *m_uptrDescriptorSetManager;
 }
 
-void ComputeProgram::PushConstant(VkShaderStageFlagBits _stages, const void* _data)
+void ComputeProgram::PushConstant(VkShaderStageFlags _stages, const void* _data)
 {
 	m_pushConstants.push_back({ _stages, _data });
 }
@@ -1288,7 +1288,7 @@ DescriptorSetManager& RayTracingProgram::GetDescriptorSetManager()
 	return *m_uptrDescriptorSetManager.get();
 }
 
-void RayTracingProgram::PushConstant(VkShaderStageFlagBits _stages, const void* _data)
+void RayTracingProgram::PushConstant(VkShaderStageFlags _stages, const void* _data)
 {
 	m_pushConstants.push_back({ _stages, _data });
 }

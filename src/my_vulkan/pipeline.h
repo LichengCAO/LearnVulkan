@@ -14,7 +14,8 @@ class PushConstantManager
 {
 private:
 	uint32_t m_currentSize = 0u;
-	std::unordered_map<VkShaderStageFlagBits, std::pair<uint32_t, uint32_t>> m_mapRange;
+	std::unordered_map<VkShaderStageFlags, std::pair<uint32_t, uint32_t>> m_mapRange;
+	VkShaderStageFlags m_usedStages = 0;
 
 private:
 	PushConstantManager();
@@ -26,7 +27,7 @@ public:
 	void AddConstantRange(VkShaderStageFlags _stages, uint32_t _size);
 
 	// Push constant to the input stage
-	void PushConstant(VkCommandBuffer _cmd, VkPipelineLayout _layout, VkShaderStageFlagBits _stage, const void* _data) const;
+	void PushConstant(VkCommandBuffer _cmd, VkPipelineLayout _layout, VkShaderStageFlags _stage, const void* _data) const;
 
 	// Get VkPushConstantRanges managed
 	void GetVkPushConstantRanges(std::vector<VkPushConstantRange>& _outRanges) const;
@@ -45,7 +46,7 @@ public:
 		VkExtent2D imageSize{};
 		std::vector<VkDescriptorSet> vkDescriptorSets;
 		std::vector<uint32_t> optDynamicOffsets;
-		std::vector<std::pair<VkShaderStageFlagBits, const void*>> pushConstants;
+		std::vector<std::pair<VkShaderStageFlags, const void*>> pushConstants;
 
 		uint32_t vertexCount = 0u;
 
@@ -59,7 +60,7 @@ public:
 		VkExtent2D imageSize{};
 		std::vector<VkDescriptorSet> vkDescriptorSets;
 		std::vector<uint32_t> optDynamicOffsets;
-		std::vector<std::pair<VkShaderStageFlagBits, const void*>> pushConstants;
+		std::vector<std::pair<VkShaderStageFlags, const void*>> pushConstants;
 
 		std::vector<VkBuffer>	vertexBuffers;								// not sure, but I think order matters
 		VkBuffer				indexBuffer = VK_NULL_HANDLE;
@@ -76,7 +77,7 @@ public:
 		VkExtent2D imageSize{};
 		std::vector<VkDescriptorSet> vkDescriptorSets;
 		std::vector<uint32_t> optDynamicOffsets;
-		std::vector<std::pair<VkShaderStageFlagBits, const void*>> pushConstants;
+		std::vector<std::pair<VkShaderStageFlags, const void*>> pushConstants;
 
 		uint32_t groupCountX = 1;
 		uint32_t groupCountY = 1;
@@ -111,7 +112,7 @@ private:
 		const VkExtent2D& _imageSize,
 		const std::vector<VkDescriptorSet>& _vkDescriptorSets,
 		const std::vector<uint32_t>& _dynamicOffsets,
-		const std::vector<std::pair<VkShaderStageFlagBits, const void*>>& _pushConstants);
+		const std::vector<std::pair<VkShaderStageFlags, const void*>>& _pushConstants);
 
 public:
 	GraphicsPipeline();
@@ -142,7 +143,7 @@ public:
 	{
 		std::vector<VkDescriptorSet> vkDescriptorSets;
 		std::vector<uint32_t> optDynamicOffsets;
-		std::vector<std::pair<VkShaderStageFlagBits, const void*>> pushConstants;
+		std::vector<std::pair<VkShaderStageFlags, const void*>> pushConstants;
 
 		uint32_t groupCountX = 1;
 		uint32_t groupCountY = 1;
@@ -213,7 +214,7 @@ public:
 	{
 		std::vector<VkDescriptorSet> vkDescriptorSets;
 		std::vector<uint32_t> optDynamicOffsets;
-		std::vector<std::pair<VkShaderStageFlagBits, const void*>> pushConstants;
+		std::vector<std::pair<VkShaderStageFlags, const void*>> pushConstants;
 
 		// for simplicity, i bind SBT in RT pipeline
 		uint32_t uWidth = 0u;

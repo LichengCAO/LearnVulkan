@@ -253,26 +253,29 @@ void RayTracingReflectApp::_CreateBuffers()
 	{
 		Buffer::Information bufferInfo{};
 		std::vector<Material> mtls;
-
+		static const std::vector<std::string> mtlNames = {
+			"unknown",     // 0
+			"light",       // 1
+			"backWall",    // 2
+			"ceiling",     // 3
+			"floor",       // 4
+			"leftWall",    // 5
+			"rightWall",   // 6
+			"shortBox",    // 7
+			"tallBox"      // 8
+		};
 		CHECK_TRUE(materialNames.size() == meshColors.size(), "Number of material names doesn't match number of material colors!");
 		for (size_t i = 0; i < materialNames.size(); ++i)
 		{
 			Material curMtl{};
 
 			curMtl.colorOrLight = meshColors[i];
-			if (materialNames[i] == "light")
+			for (uint32_t j = 0; j < mtlNames.size(); ++j)
 			{
-				curMtl.colorOrLight.a = 1.0f;
-				curMtl.materialType = glm::uvec4(1, 0, 0, 0);
-			}
-			else if (materialNames[i] == "backWall" || materialNames[i] == "leftWall")
-			{
-				curMtl.colorOrLight.a = 0.0f;
-				curMtl.materialType = glm::uvec4(2, 0, 0, 0);
-			}
-			else
-			{
-				curMtl.colorOrLight.a = 0.0f;
+				if (materialNames[i] == mtlNames[j])
+				{
+					curMtl.materialType = glm::uvec4(j, 0, 0, 0);
+				}
 			}
 
 			mtls.push_back(curMtl);
@@ -447,7 +450,7 @@ void RayTracingReflectApp::_DrawFrame()
 	// update frame count in ray tracing
 	{
 		uint32_t frameCount = m_rayTraceFrame / 3 + 1;
-		m_uptrPipeline->PushConstant(VK_SHADER_STAGE_RAYGEN_BIT_KHR, &frameCount);
+		m_uptrPipeline->PushConstant(VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, &frameCount);
 	}
 
 	m_uptrPipeline->TraceRay(

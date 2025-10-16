@@ -46,7 +46,8 @@ float Dw(in vec3 wo, in vec3 wm, in float alpha)
     return G1(wo, alpha) / CosTheta(wo) * abs(dot(wo, wm)) * D(wm, alpha);
 }
 
-vec3 SampleMicrofacetNormal(in vec3 wo, in float roughness, in vec2 xi, out vec3 wi, out float pdf)
+// Sample microfacet normal wm given wo
+void SampleMicrofacetNormal(in vec3 wo, in float roughness, in vec2 xi, out vec3 wm, out float pdf)
 {
     float alpha = _RoughnessToAlpha(roughness);
     // Sample wh
@@ -66,25 +67,28 @@ vec3 SampleMicrofacetNormal(in vec3 wo, in float roughness, in vec2 xi, out vec3
     // remap y from [-h, h] to [-cosTheta*h, h]
     sampleDisk.y = offset + sampleDisk.y * scale;
 
-    vec3 wm = sampleDisk.x * T1 + sampleDisk.y * T2 + sqrt(max(0.0f, 1.0f - sampleDisk.x * sampleDisk.x - sampleDisk.y * sampleDisk.y)) * wh;
+    wm = sampleDisk.x * T1 + sampleDisk.y * T2 + sqrt(max(0.0f, 1.0f - sampleDisk.x * sampleDisk.x - sampleDisk.y * sampleDisk.y)) * wh;
 
     // transform back
     wm = normalize(vec3(wm.x * alpha, wm.y * alpha, max(0.000001f, wm.z)));
 
     float pdf_wm = Dw(wo, wm, alpha);
     pdf = pdf_wm / (4.0f * abs(dot(wo, wm)));
-    wi = reflect(-wo, wm);
-    return wm;
 }
 
-vec3 MicrofacetBRDF(in vec3 wo, in vec3 wi, in vec3 Fresnel, in float roughness)
+vec3 MicrofacetBRDF(in vec3 wo, in vec3 wm, in float roughness)
 {
+    if (dot(wm, wm) < 0.0001f) return vec3(0.0f);
+    vec3 wi = reflect(-wo, wm);
     float denom = abs(4.0f * wo.z * wi.z);
     if (denom < 0.0001f) return vec3(0.0f);
-    vec3 wm = (wo + wi);
-    if (dot(wm, wm) < 0.0001f) return vec3(0.0f);
-    wm = normalize(wm);
     float alpha = _RoughnessToAlpha(roughness);
-    return D(wm, alpha) * G(wi, wo, alpha) * Fresnel / (4.0f * abs(wo.z * wi.z));
+    return D(wm, alpha) * G(wi, wo, alpha) * vec3(1.0f) / (4.0f * abs(wo.z * wi.z));
 }
+
+vec3 SpecularBRDF(in vec3 wi)
+{
+    return vec3(1.0f) / abs(wi.z);
+}
+
 #endif // MICROFACET_GLSL

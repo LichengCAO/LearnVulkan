@@ -56,18 +56,16 @@ std::vector<VkShaderStageFlagBits> PushConstantManager::_GetBitsFromStageFlags(V
 
 void PushConstantManager::AddConstantRange(VkShaderStageFlags _stages, uint32_t _size)
 {
-	auto stages = _GetBitsFromStageFlags(_stages);
 	uint32_t sizeAligned = CommonUtils::AlignUp(_size, 4); // Both offset and size are in units of bytes and must be a multiple of 4.
-	for (auto stage : stages)
-	{
-		CHECK_TRUE(m_mapRange.find(stage) == m_mapRange.end(), "Any two elements of pPushConstantRanges must not include the same stage in stageFlags!");
-		m_mapRange.insert({ stage, {m_currentSize, sizeAligned} });
-		m_currentSize += sizeAligned;
-	}
+	uint32_t currentOffset = m_currentSize;
+	CHECK_TRUE((m_usedStages & _stages) == 0, "Some stage already used!");
+	m_usedStages = m_usedStages | _stages;
+	m_currentSize += sizeAligned;
 	CHECK_TRUE(m_currentSize <= 128, "Push constant cannot be larger than 128 bytes!");
+	m_mapRange.insert({ _stages, { currentOffset, _size } });
 }
 
-void PushConstantManager::PushConstant(VkCommandBuffer _cmd, VkPipelineLayout _layout, VkShaderStageFlagBits _stage, const void* _data) const
+void PushConstantManager::PushConstant(VkCommandBuffer _cmd, VkPipelineLayout _layout, VkShaderStageFlags _stage, const void* _data) const
 {
 	const auto& storedData = m_mapRange.at(_stage);
 	uint32_t uSize = storedData.second;
@@ -138,7 +136,7 @@ void GraphicsPipeline::_DoCommon(
 	const VkExtent2D& imageSize,
 	const std::vector<VkDescriptorSet>& pSets,
 	const std::vector<uint32_t>& _dynamicOffsets,
-	const std::vector<std::pair<VkShaderStageFlagBits, const void*>>& pushConstants)
+	const std::vector<std::pair<VkShaderStageFlags, const void*>>& pushConstants)
 {
 	vkCmdBindPipeline(cmd, VK_PIPELINE_BIND_POINT_GRAPHICS, vkPipeline);
 
