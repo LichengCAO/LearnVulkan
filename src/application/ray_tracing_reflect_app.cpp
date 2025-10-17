@@ -175,6 +175,10 @@ void RayTracingReflectApp::_CreateBuffers()
 	glTFData.pMaterialNames = &materialNames;
 	gltfLoader.Load("E:/GitStorage/LearnVulkan/res/models/cornell_box/scene.gltf");
 	gltfLoader.GetSceneData(glTFData);
+	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/bunny/bunny.obj", meshes);
+	meshColors.push_back(glm::vec4(1.0f));
+	modelMatrices.push_back(glm::mat4(1.0));
+	materialNames.push_back("bunny");
 
 	// mesh data
 	for (size_t i = 0; i < meshes.size(); ++i)
@@ -185,6 +189,8 @@ void RayTracingReflectApp::_CreateBuffers()
 		std::unique_ptr<Buffer> uptrVertexBuffer = std::make_unique<Buffer>();
 		std::unique_ptr<Buffer> uptrIndexBuffer = std::make_unique<Buffer>();
 		std::vector<Vertex> vertPositions;
+
+		if (materialNames[i] == "shortBox" || materialNames[i] == "tallBox") continue;
 
 		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -222,6 +228,49 @@ void RayTracingReflectApp::_CreateBuffers()
 		m_uptrModelIndexBuffers.push_back(std::move(uptrIndexBuffer));
 	}
 
+	// material data
+	{
+		Buffer::Information bufferInfo{};
+		std::vector<Material> mtls;
+		static const std::vector<std::string> mtlNames = {
+			"unknown",     // 0
+			"light",       // 1
+			"backWall",    // 2
+			"ceiling",     // 3
+			"floor",       // 4
+			"leftWall",    // 5
+			"rightWall",   // 6
+			"shortBox",    // 7
+			"tallBox"      // 8
+		};
+		CHECK_TRUE(materialNames.size() == meshColors.size(), "Number of material names doesn't match number of material colors!");
+		for (size_t i = 0; i < materialNames.size(); ++i)
+		{
+			Material curMtl{};
+
+			if (materialNames[i] == "shortBox" || materialNames[i] == "tallBox") continue;
+
+			curMtl.colorOrLight = meshColors[i];
+			for (uint32_t j = 0; j < mtlNames.size(); ++j)
+			{
+				if (materialNames[i] == mtlNames[j])
+				{
+					curMtl.materialType = glm::uvec4(j, 0, 0, 0);
+				}
+			}
+
+			mtls.push_back(curMtl);
+		}
+
+		m_uptrMaterialBuffer = std::make_unique<Buffer>();
+		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		bufferInfo.size = static_cast<uint32_t>(sizeof(Material) * mtls.size());
+		bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+
+		m_uptrMaterialBuffer->Init(bufferInfo);
+		m_uptrMaterialBuffer->CopyFromHost(mtls.data());
+	}
+
 	// camera data
 	for (size_t i = 0; i < 3; ++i)
 	{
@@ -247,47 +296,6 @@ void RayTracingReflectApp::_CreateBuffers()
 
 		m_uptrAddressBuffer->Init(bufferInfo);
 		m_uptrAddressBuffer->CopyFromHost(addrData.data());
-	}
-
-	// material data
-	{
-		Buffer::Information bufferInfo{};
-		std::vector<Material> mtls;
-		static const std::vector<std::string> mtlNames = {
-			"unknown",     // 0
-			"light",       // 1
-			"backWall",    // 2
-			"ceiling",     // 3
-			"floor",       // 4
-			"leftWall",    // 5
-			"rightWall",   // 6
-			"shortBox",    // 7
-			"tallBox"      // 8
-		};
-		CHECK_TRUE(materialNames.size() == meshColors.size(), "Number of material names doesn't match number of material colors!");
-		for (size_t i = 0; i < materialNames.size(); ++i)
-		{
-			Material curMtl{};
-
-			curMtl.colorOrLight = meshColors[i];
-			for (uint32_t j = 0; j < mtlNames.size(); ++j)
-			{
-				if (materialNames[i] == mtlNames[j])
-				{
-					curMtl.materialType = glm::uvec4(j, 0, 0, 0);
-				}
-			}
-
-			mtls.push_back(curMtl);
-		}
-
-		m_uptrMaterialBuffer = std::make_unique<Buffer>();
-		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		bufferInfo.size = static_cast<uint32_t>(sizeof(Material) * mtls.size());
-		bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-
-		m_uptrMaterialBuffer->Init(bufferInfo);
-		m_uptrMaterialBuffer->CopyFromHost(mtls.data());
 	}
 	
 }
