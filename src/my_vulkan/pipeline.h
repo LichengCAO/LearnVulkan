@@ -24,7 +24,7 @@ private:
 
 public:
 	// Add a push constant in the input stage, the stage is not allowed to assigned twice
-	void AddConstantRange(VkShaderStageFlags _stages, uint32_t _size);
+	void AddConstantRange(VkShaderStageFlags _stages, uint32_t _offset, uint32_t _size);
 
 	// Push constant to the input stage
 	void PushConstant(VkCommandBuffer _cmd, VkPipelineLayout _layout, VkShaderStageFlags _stage, const void* _data) const;
@@ -127,7 +127,7 @@ public:
 	void AddDescriptorSetLayout(VkDescriptorSetLayout vkDSetLayout);
 	void BindToSubpass(const RenderPass* pRenderPass, uint32_t subpass);
 	void SetColorAttachmentAsAdd(int idx);
-	void AddPushConstant(VkShaderStageFlags _stages, uint32_t _size);
+	void AddPushConstant(VkShaderStageFlags _stages, uint32_t _offset, uint32_t _size);
 	void Init();
 	void Uninit();
 
@@ -167,7 +167,7 @@ public:
 	void AddShader(const VkPipelineShaderStageCreateInfo& shaderInfo);
 	void AddDescriptorSetLayout(const DescriptorSetLayout* pSetLayout);
 	void AddDescriptorSetLayout(VkDescriptorSetLayout _vkLayout);
-	void AddPushConstant(VkShaderStageFlags _stages, uint32_t _size);
+	void AddPushConstant(VkShaderStageFlags _stages, uint32_t _offset, uint32_t _size);
 
 	void Init();
 	void Uninit();
@@ -242,7 +242,7 @@ public:
 	
 	void AddDescriptorSetLayout(VkDescriptorSetLayout vkDSetLayout);
 	
-	void AddPushConstant(VkShaderStageFlags _stages, uint32_t _size);
+	void AddPushConstant(VkShaderStageFlags _stages, uint32_t _offset, uint32_t _size);
 	
 	// Set Ray Generation shader record in self shader binding table,
 	// return the index of this record in all ShaderRecords,

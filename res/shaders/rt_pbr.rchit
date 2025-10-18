@@ -10,6 +10,7 @@
 #include "rt_common.glsl"
 #include "pbr_microfacet.glsl"
 #include "pbr_fresnel.glsl"
+#include "pbr_volume_scattering.glsl"
 
 struct Material
 {
@@ -21,6 +22,7 @@ struct Material
 // the payload argument the caller passed to traceRayEXT! 
 // This is quite unlike the in/out variables used to connect vertex shaders and fragment shaders.
 layout(location = 1) rayPayloadInEXT PBRPayload payload;
+layout(location = 0) rayPayloadEXT float payloadT;
 
 layout(set = 0, binding = 1) uniform accelerationStructureEXT accelerationStructure;
 layout(set = 0, binding = 3, scalar) buffer InstanceAddressData_ {
@@ -32,8 +34,10 @@ layout(set = 1, binding = 0) buffer Materials
 } material;
 layout(push_constant) uniform shaderInformation
 {
-  uint uFrameIndex;
-} pushConstants;
+    layout(offset = 4)float a;
+    float s;
+    float g;
+} sigma;
 
 // https://stackoverflow.com/questions/70887022/resource-pointer-using-buffer-reference-doesnt-point-to-the-right-thing
 layout(buffer_reference, scalar) buffer Vertices {
@@ -63,6 +67,26 @@ vec3 ObjectNormalToWorldNormal(const vec3 normal)
 vec3 Noise(uint n)
 {
     return  random_pcg3d(uvec3(gl_LaunchIDEXT.xy, n));
+}
+
+uint ApplyVolumeScattering(uint seed, inout vec3 rayOrigin, inout vec3 rayDirection, inout vec3 throughput)
+{
+    uint state = 0;
+
+    SampleVolume(
+        random_pcg3d(uvec3(gl_LaunchIDEXT.xy, seed)),
+        random_pcg3d(uvec3(seed, gl_LaunchIDEXT.xy)),
+        gl_HitTEXT,         // distance from ray origin to surface hit
+        sigma.g,            // HenyeyGreenstein
+        sigma.a,            //in float sigma_a,
+        sigma.s,            //in float sigma_s,
+        0,
+        throughput, // total light
+        rayOrigin,
+        rayDirection,
+        state);
+
+    return state;
 }
 
 void main()
@@ -100,10 +124,10 @@ void main()
         payload.hitValue = payload.hitValue * MicrofacetBRDF(tangentWo, wm, roughness) * abs(wm.z) / pdf * material.i[gl_InstanceCustomIndexEXT].color.rgb;
         vec3 wi = Reflect(tangentWo, wm);
         payload.rayDirection = TangentToWorld(nrmWorld, wi);
+        payload.rayOrigin = posWorld + sign(dot(nrmWorld, payload.rayDirection)) * 0.001f * nrmWorld; // Offset a little to avoid self-intersection
     }
     else if (material.i[gl_InstanceCustomIndexEXT].type.x == 8)
     {
-        uint channel = pushConstants.uFrameIndex % 3;
         vec3 random = Noise(payload.randomSeed);
         float IORt = 1.514f;
 
@@ -118,6 +142,7 @@ void main()
             payload.rayDirection = Refract(-payload.rayDirection, nrmWorld, 1.0f, IORt);
             payload.hitValue = payload.hitValue * material.i[gl_InstanceCustomIndexEXT].color.rgb;
         }
+        payload.rayOrigin = posWorld + sign(dot(nrmWorld, payload.rayDirection)) * 0.001f * nrmWorld; // Offset a little to avoid self-intersection
     }
     else if (material.i[gl_InstanceCustomIndexEXT].type.x == 7)
     {
@@ -135,6 +160,59 @@ void main()
         payload.hitValue = payload.hitValue * MicrofacetBRDF(tangentWo, wm, roughness) * abs(wm.z) / pdf * fresnel;
         vec3 wi = Reflect(tangentWo, wm);
         payload.rayDirection = TangentToWorld(nrmWorld, wi);
+        payload.rayOrigin = posWorld + sign(dot(nrmWorld, payload.rayDirection)) * 0.001f * nrmWorld; // Offset a little to avoid self-intersection
+    }
+    else if (material.i[gl_InstanceCustomIndexEXT].type.x == 9)
+    {
+        vec3 random = Noise(payload.randomSeed);
+        float IORt = 1.514f;
+        float fresnel = Fresnel(dot(-payload.rayDirection, nrmWorld), 1.0f, IORt);
+
+        if (!payload.volumeScatter)
+        {
+            bool inside = dot(nrmWorld, payload.rayDirection) > 0.0f;
+            if (random.r < fresnel) // Reflect
+            {
+                payload.rayDirection = Reflect(-payload.rayDirection, nrmWorld);
+                payload.hitValue = payload.hitValue * material.i[gl_InstanceCustomIndexEXT].color.rgb;
+                payload.volumeScatter = inside;
+            }
+            else // Refract
+            {
+                payload.rayDirection = Refract(-payload.rayDirection, nrmWorld, 1.0f, IORt);
+                payload.hitValue = payload.hitValue * material.i[gl_InstanceCustomIndexEXT].color.rgb;
+                payload.volumeScatter = !inside;
+            }
+            payload.rayOrigin = posWorld + sign(dot(nrmWorld, payload.rayDirection)) * 0.001f * nrmWorld; // Offset a little to avoid self-intersection
+        }
+        else
+        {
+            uint state = ApplyVolumeScattering(payload.randomSeed, payload.rayOrigin, payload.rayDirection, payload.hitValue);
+            if (state == 0)
+            {
+                if (random.r < fresnel) // Reflect
+                {
+                    payload.rayDirection = Reflect(-payload.rayDirection, nrmWorld);
+                    payload.hitValue = payload.hitValue * material.i[gl_InstanceCustomIndexEXT].color.rgb;
+                    payload.volumeScatter = true;
+                }
+                else // Refract
+                {
+                    payload.rayDirection = Refract(-payload.rayDirection, nrmWorld, 1.0f, IORt);
+                    payload.hitValue = payload.hitValue * material.i[gl_InstanceCustomIndexEXT].color.rgb;
+                    payload.volumeScatter = false;
+                }
+                payload.rayOrigin = posWorld + sign(dot(nrmWorld, payload.rayDirection)) * 0.001f * nrmWorld; // Offset a little to avoid self-intersection
+            }
+            else if (state == 1)
+            {
+                payload.traceEnd = true;
+            }
+            else
+            {
+                payload.volumeScatter = true;
+            }
+        }
     }
     else
     {
@@ -145,7 +223,6 @@ void main()
         // BRDF = baseColor / pi
         // apply lambert law: BRDF * cos(theta) / pdf = baseColor / pi * cos(theta) / (cos(theta) / pi) = baseColor
         payload.hitValue = payload.hitValue * material.i[gl_InstanceCustomIndexEXT].color.rgb; // Simple diffuse lighting
+        payload.rayOrigin = posWorld + sign(dot(nrmWorld, payload.rayDirection)) * 0.001f * nrmWorld; // Offset a little to avoid self-intersection
     }
-
-    payload.rayOrigin = posWorld + sign(dot(nrmWorld, payload.rayDirection)) * 0.001f * nrmWorld; // Offset a little to avoid self-intersection
 }

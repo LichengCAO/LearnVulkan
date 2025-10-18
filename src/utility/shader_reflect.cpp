@@ -346,7 +346,7 @@ void ShaderReflector::ReflectOuput(
 
 void ShaderReflector::ReflectPushConst(
 	std::unordered_map<std::string, uint32_t>& _mapIndex, 
-	std::vector<std::pair<VkShaderStageFlags, uint32_t>>& _pushConstInfo) const
+	std::vector<std::pair<VkShaderStageFlags, std::pair<uint32_t, uint32_t>>>& _pushConstInfo) const
 {
 	for (auto& uptrShaderModule : m_vecReflectModule)
 	{
@@ -366,18 +366,20 @@ void ShaderReflector::ReflectPushConst(
 			auto itr = _mapIndex.find(pReflectBlock->name);
 			if (pReflectBlock->name[0] == '\0')
 			{
-				std::pair<VkShaderStageFlags, uint32_t> pushConstInfo = { static_cast<VkShaderStageFlagBits>(uptrShaderModule->shader_stage), pReflectBlock->size };
+				std::pair<uint32_t, uint32_t> val = { pReflectBlock->offset, pReflectBlock->size };
+				std::pair<VkShaderStageFlags, std::pair<uint32_t, uint32_t>> pushConstInfo = { static_cast<VkShaderStageFlagBits>(uptrShaderModule->shader_stage), val };
 				_pushConstInfo.push_back(pushConstInfo);
 			}
 			else if (itr != _mapIndex.end())
 			{
 				auto& pushConstInfo = _pushConstInfo[(*itr).second];
 				pushConstInfo.first |= static_cast<VkShaderStageFlagBits>(uptrShaderModule->shader_stage);
-				CHECK_TRUE(pushConstInfo.second == pReflectBlock->size, "Size of push constant in 2 stages should be same.");
+				CHECK_TRUE(pushConstInfo.second.second == pReflectBlock->size, "Size of push constant in 2 stages should be same.");
 			}
 			else
 			{
-				std::pair<VkShaderStageFlags, uint32_t> pushConstInfo = { static_cast<VkShaderStageFlagBits>(uptrShaderModule->shader_stage), pReflectBlock->size };
+				std::pair<uint32_t, uint32_t> val = { pReflectBlock->offset, pReflectBlock->size };
+				std::pair<VkShaderStageFlags, std::pair<uint32_t, uint32_t>> pushConstInfo = { static_cast<VkShaderStageFlagBits>(uptrShaderModule->shader_stage), val };
 				uint32_t uIndex = _pushConstInfo.size();
 				_mapIndex[pReflectBlock->name] = uIndex;
 				_pushConstInfo.push_back(pushConstInfo);
@@ -471,6 +473,7 @@ void ShaderReflector::PrintReflectResult() const
 			for (const auto pReflectBlock : pPushConstInfo)
 			{
 				std::cout << "\tname: " << pReflectBlock->name << std::endl;
+				std::cout << "\toffset: " << pReflectBlock->offset << std::endl;
 				std::cout << "\tsize: " << pReflectBlock->size << std::endl;
 				std::cout << "\n\n";
 			}

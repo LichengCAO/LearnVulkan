@@ -33,7 +33,9 @@ public:
 		float _posY = -1);
 
 	// add text to a window
-	void Text(const std::string& _text, ...);
+	void Text(const std::string& _text);
+
+	void FrameRateText();
 
 	// add check box to a window
 	void CheckBox(const std::string& _title, bool& _bChecked);

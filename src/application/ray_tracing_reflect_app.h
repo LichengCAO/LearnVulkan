@@ -34,6 +34,20 @@ private:
 		glm::vec4 position;
 		glm::vec4 normal;
 	};
+	struct Coefficient
+	{
+		float sigma_a;
+		float sigma_s;
+		float g;
+		bool operator==(const Coefficient& _other)
+		{
+			return _other.g == g && _other.sigma_a == sigma_a && _other.sigma_s == sigma_s;
+		}
+		bool operator!=(const Coefficient& _other)
+		{
+			return !(*this == _other);
+		}
+	};
 
 	std::unique_ptr<RayTracingProgram> m_uptrPipeline;
 	std::unique_ptr<SwapchainPass> m_uptrSwapchainPass;
@@ -54,7 +68,10 @@ private:
 	std::vector<VkSemaphore> m_semaphores;
 	VkSampler m_vkSampler = VK_NULL_HANDLE;
 	uint32_t m_currentFrame = 0u;
-	uint32_t m_rayTraceFrame = 0u; // 3x ray trace frame since we have 3 images in flight
+	uint32_t m_rayTraceFrame = 0u;
+	Coefficient m_coefficient{};
+	Coefficient m_coefficientLast{};
+	float m_fps = 0;
 	PersCamera m_camera{ 400, 300, glm::vec3(2,2,2), glm::vec3(0,0,0), glm::vec3(0,1,0) };
 
 private:

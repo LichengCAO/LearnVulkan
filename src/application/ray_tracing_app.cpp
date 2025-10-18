@@ -419,7 +419,7 @@ void RayTracingApp::_InitPipelines()
 
 	m_compPipeline.AddDescriptorSetLayout(&m_compDSetLayout);
 	m_compPipeline.AddShader(anim.GetShaderStageInfo());
-	m_compPipeline.AddPushConstant(VK_SHADER_STAGE_COMPUTE_BIT, sizeof(float));
+	m_compPipeline.AddPushConstant(VK_SHADER_STAGE_COMPUTE_BIT, 0, sizeof(float));
 
 	m_rtPipeline.SetRayGenerationShaderRecord(rgenId);
 	m_rtPipeline.AddTriangleHitShaderRecord(rchitId);

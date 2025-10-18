@@ -54,7 +54,7 @@ std::vector<VkShaderStageFlagBits> PushConstantManager::_GetBitsFromStageFlags(V
 	return result;
 }
 
-void PushConstantManager::AddConstantRange(VkShaderStageFlags _stages, uint32_t _size)
+void PushConstantManager::AddConstantRange(VkShaderStageFlags _stages, uint32_t _offset, uint32_t _size)
 {
 	uint32_t sizeAligned = CommonUtils::AlignUp(_size, 4); // Both offset and size are in units of bytes and must be a multiple of 4.
 	uint32_t currentOffset = m_currentSize;
@@ -395,9 +395,9 @@ void GraphicsPipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput_Dra
 	vkCmdDraw(commandBuffer, input.vertexCount, 1, 0, 0);
 }
 
-void GraphicsPipeline::AddPushConstant(VkShaderStageFlags _stages, uint32_t _size)
+void GraphicsPipeline::AddPushConstant(VkShaderStageFlags _stages, uint32_t _offset, uint32_t _size)
 {
-	m_pushConstant.AddConstantRange(_stages, _size);
+	m_pushConstant.AddConstantRange(_stages, _offset, _size);
 }
 
 ComputePipeline::~ComputePipeline()
@@ -477,9 +477,9 @@ void ComputePipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput& inp
 	vkCmdDispatch(commandBuffer, input.groupCountX, input.groupCountY, input.groupCountZ);
 }
 
-void ComputePipeline::AddPushConstant(VkShaderStageFlags _stages, uint32_t _size)
+void ComputePipeline::AddPushConstant(VkShaderStageFlags _stages, uint32_t _offset, uint32_t _size)
 {
-	m_pushConstant.AddConstantRange(_stages, _size);
+	m_pushConstant.AddConstantRange(_stages, _offset, _size);
 }
 
 RayTracingPipeline::RayTracingPipeline()
@@ -675,9 +675,9 @@ void RayTracingPipeline::Do(VkCommandBuffer commandBuffer, const PipelineInput& 
 	vkCmdTraceRaysKHR(commandBuffer, &m_SBT.vkRayGenRegion, &m_SBT.vkMissRegion, &m_SBT.vkHitRegion, &m_SBT.vkCallRegion, input.uWidth, input.uHeight, input.uDepth);
 }
 
-void RayTracingPipeline::AddPushConstant(VkShaderStageFlags _stages, uint32_t _size)
+void RayTracingPipeline::AddPushConstant(VkShaderStageFlags _stages, uint32_t _offset, uint32_t _size)
 {
-	m_pushConstant.AddConstantRange(_stages, _size);
+	m_pushConstant.AddConstantRange(_stages, _offset, _size);
 }
 
 RayTracingPipeline::ShaderBindingTable::ShaderBindingTable()

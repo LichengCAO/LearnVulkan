@@ -743,12 +743,12 @@ void GraphicsProgram::_InitPipeline()
 	// add push constants
 	{
 		std::unordered_map<std::string, uint32_t> mapIndex;
-		std::vector<std::pair<VkShaderStageFlags, uint32_t>> pushConstInfo;
+		std::vector<std::pair<VkShaderStageFlags, std::pair<uint32_t, uint32_t>>> pushConstInfo;
 		m_shaderReflector.ReflectPushConst(mapIndex, pushConstInfo);
 
 		for (const auto& info : pushConstInfo)
 		{
-			m_uptrPipeline->AddPushConstant(info.first, info.second);
+			m_uptrPipeline->AddPushConstant(info.first, info.second.first, info.second.second);
 		}
 	}
 
@@ -997,12 +997,12 @@ void ComputeProgram::_InitPipeline()
 	// add push constants
 	{
 		std::unordered_map<std::string, uint32_t> mapIndex;
-		std::vector<std::pair<VkShaderStageFlags, uint32_t>> pushConstInfo;
+		std::vector<std::pair<VkShaderStageFlags, std::pair<uint32_t, uint32_t>>> pushConstInfo;
 		m_shaderReflector.ReflectPushConst(mapIndex, pushConstInfo);
 
 		for (const auto& info : pushConstInfo)
 		{
-			m_uptrPipeline->AddPushConstant(info.first, info.second);
+			m_uptrPipeline->AddPushConstant(info.first, info.second.first, info.second.second);
 		}
 	}
 
@@ -1114,12 +1114,12 @@ void RayTracingProgram::_InitPipeline()
 	// add push constants
 	{
 		std::unordered_map<std::string, uint32_t> mapIndex;
-		std::vector<std::pair<VkShaderStageFlags, uint32_t>> pushConstInfo;
+		std::vector<std::pair<VkShaderStageFlags, std::pair<uint32_t, uint32_t>>> pushConstInfo;
 		m_shaderReflector.ReflectPushConst(mapIndex, pushConstInfo);
 
 		for (const auto& info : pushConstInfo)
 		{
-			m_uptrPipeline->AddPushConstant(info.first, info.second);
+			m_uptrPipeline->AddPushConstant(info.first, info.second.first, info.second.second);
 		}
 	}
 

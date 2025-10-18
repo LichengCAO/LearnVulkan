@@ -8,7 +8,7 @@
 
 void RayTracingReflectApp::_CreateCommandBuffers()
 {
-	for (int i = 0; i < 3; ++i)
+	for (int i = 0; i < 1; ++i)
 	{
 		std::unique_ptr<CommandSubmission> uptrCmd = std::make_unique<CommandSubmission>();
 		uptrCmd->Init();
@@ -63,13 +63,13 @@ void RayTracingReflectApp::_InitPipeline()
 	m_uptrPipeline->AddMissShader("E:/GitStorage/LearnVulkan/bin/shaders/rt_pbr.rmiss.spv");
 	m_uptrPipeline->AddRayGenerationShader("E:/GitStorage/LearnVulkan/bin/shaders/rt_pbr.rgen.spv");
 	m_uptrPipeline->AddTriangleHitShaders("E:/GitStorage/LearnVulkan/bin/shaders/rt_pbr.rchit.spv", {});
-	m_uptrPipeline->Init(3);
+	m_uptrPipeline->Init(1);
 
 	m_uptrSwapchainPass = std::make_unique<SwapchainPass>();
-	m_uptrSwapchainPass->Init(3);
+	m_uptrSwapchainPass->Init(1);
 
 	m_uptrGUIPass = std::make_unique<GUIPass>();
-	m_uptrGUIPass->Init(3);
+	m_uptrGUIPass->Init(1);
 }
 
 void RayTracingReflectApp::_UninitPipeline()
@@ -95,7 +95,7 @@ void RayTracingReflectApp::_CreateImagesAndViews()
 {
 	auto windowSize = MyDevice::GetInstance().GetSwapchainExtent();
 
-	for (int i = 0; i < 3; ++i)
+	for (int i = 0; i < 1; ++i)
 	{
 		std::unique_ptr<Image> uptrImage = std::make_unique<Image>();
 		std::unique_ptr<ImageView> uptrView;
@@ -141,7 +141,7 @@ void RayTracingReflectApp::_CreateSemaphores()
 {
 	auto& device = MyDevice::GetInstance();
 
-	for (int i = 0; i < 3; ++i)
+	for (int i = 0; i < 1; ++i)
 	{
 		m_semaphores.push_back(device.CreateVkSemaphore());
 	}
@@ -241,7 +241,8 @@ void RayTracingReflectApp::_CreateBuffers()
 			"leftWall",    // 5
 			"rightWall",   // 6
 			"shortBox",    // 7
-			"tallBox"      // 8
+			"tallBox",     // 8
+			"bunny"
 		};
 		CHECK_TRUE(materialNames.size() == meshColors.size(), "Number of material names doesn't match number of material colors!");
 		for (size_t i = 0; i < materialNames.size(); ++i)
@@ -272,7 +273,7 @@ void RayTracingReflectApp::_CreateBuffers()
 	}
 
 	// camera data
-	for (size_t i = 0; i < 3; ++i)
+	for (size_t i = 0; i < 1; ++i)
 	{
 		std::unique_ptr<Buffer> uptrBuffer = std::make_unique<Buffer>();
 		Buffer::Information bufferInfo{};
@@ -374,9 +375,10 @@ void RayTracingReflectApp::_UpdateUniformBuffer()
 		if (userInput.D) mov += (speed * m_camera.right);
 		m_camera.MoveTo(mov);
 	}
-	if (userInput.RMB)
+	if (userInput.RMB || (m_coefficient != m_coefficientLast))
 	{
 		m_rayTraceFrame = 0u;
+		m_coefficientLast = m_coefficient;
 	}
 	else
 	{
@@ -387,6 +389,7 @@ void RayTracingReflectApp::_UpdateUniformBuffer()
 	ubo.eye = glm::vec4(m_camera.eye, 1.0f);
 	m_uptrCameraBuffers[m_currentFrame]->CopyFromHost(&ubo);
 
+	m_fps = 1.0f / static_cast<float>(currentTime - lastTime);
 	lastTime = currentTime;
 }
 
@@ -422,8 +425,6 @@ void RayTracingReflectApp::_ResizeWindow()
 	MyDevice::GetInstance().WaitIdle();
 	MyDevice::GetInstance().RecreateSwapchain();
 	_DestroyImagesAndViews();
-	_DestroyBuffers();
-	_CreateBuffers();
 	_CreateImagesAndViews();
 	m_uptrSwapchainPass->OnSwapchainRecreated();
 	m_uptrGUIPass->OnSwapchainRecreated();
@@ -457,8 +458,9 @@ void RayTracingReflectApp::_DrawFrame()
 	
 	// update frame count in ray tracing
 	{
-		uint32_t frameCount = m_rayTraceFrame / 3 + 1;
-		m_uptrPipeline->PushConstant(VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, &frameCount);
+		uint32_t frameCount = m_rayTraceFrame + 1;
+		m_uptrPipeline->PushConstant(VK_SHADER_STAGE_RAYGEN_BIT_KHR, &frameCount);
+		m_uptrPipeline->PushConstant(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, &m_coefficient);
 	}
 
 	m_uptrPipeline->TraceRay(
@@ -468,13 +470,17 @@ void RayTracingReflectApp::_DrawFrame()
 
 	auto& gui = m_uptrGUIPass->StartPass({ m_uptrOutputViews[m_currentFrame]->GetDescriptorInfo(m_vkSampler, VK_IMAGE_LAYOUT_GENERAL) }, { cmd->SubmitCommands() });
 	gui.StartWindow("this is ui");
+	gui.SliderFloat("sigma_a", m_coefficient.sigma_a, 0, 10);
+	gui.SliderFloat("sigma_s", m_coefficient.sigma_s, 0, 10);
+	gui.SliderFloat("g", m_coefficient.g, -1.0f, 1.0f);
+	gui.FrameRateText();
 	gui.EndWindow();
 	m_uptrGUIPass->EndPass({ m_semaphores[m_currentFrame] }, guiOutput);
 
 	m_uptrSwapchainPass->Execute({ guiOutput }, { m_semaphores[m_currentFrame] });
 
 	m_uptrPipeline->EndFrame();
-	m_currentFrame = (m_currentFrame + 1) % 3;
+	m_currentFrame = (m_currentFrame + 1) % 1;
 }
 
 RayTracingReflectApp::RayTracingReflectApp()

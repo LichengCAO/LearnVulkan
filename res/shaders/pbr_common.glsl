@@ -6,6 +6,7 @@ struct PBRPayload
     vec3 rayOrigin;
     vec3 rayDirection;
     bool traceEnd;
+    bool volumeScatter;
     uint randomSeed;
 };
 
@@ -36,6 +37,11 @@ float _RadicalInverse(uint _n)
 vec2 Hammersley(uint a, uint N)
 {
     return vec2(float(a) / float(N), _RadicalInverse(a));
+}
+
+float Sqr(in float x)
+{
+    return x * x;
 }
 
 // Hash Functions for GPU Rendering, Jarzynski et al.

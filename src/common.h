@@ -24,6 +24,7 @@
 #include <set>
 #include <array>
 #include <functional>
+#include <format>
 
 #define VK_CHECK(vkcommand, failedMessage) \
 do{\

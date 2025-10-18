@@ -7,20 +7,6 @@
 // sigma_t = sigma_a + sigma_s: extinction coefficient
 // sigma_majorant = sigma_t for homogeneous medium
 
-struct Medium
-{
-    vec3 sigma_a; // absorption coefficient
-    vec3 sigma_s; // scattering coefficient
-    float g;      // anisotropy parameter for Henyey-Greenstein phase function
-}
-
-struct SegmentMajorant
-{
-    float tMin;
-    float tMax;
-    float majorant; // majorant extinction coefficient
-}
-
 // pdf: a * exp(-a * xi)
 float _SampleExponential(in float xi, in float a)
 {
@@ -33,17 +19,20 @@ float _SampleExponential(in float xi, in float a)
 float _HenyeyGreensteinPhaseFunction(in float cosTheta, in float g)
 {
     float g2 = g * g;
+
     return (1.0f - g2) / pow(1.0f + g2 - 2.0f * g * cosTheta, 1.5f) * INV_PI * 0.25f;
 }
 
 // for volume scattering
 // wo, wi poiting outwards, in world space
+// apply bxdf to throughput
 void _SampleHenyeyGreenstein(
     in vec3 wo, 
     in float g,
     in vec2 xi, 
-    out vec3 wi, 
-    out float pdf)
+    out vec3 wi,
+    out float pdf//pdf still don't know why adding this overall integration is over 1
+    )
 {
     float cosTheta = 0.0f;
     float phi = 2.0f * PI * xi.y;
@@ -51,46 +40,37 @@ void _SampleHenyeyGreenstein(
     {
         // isotropic
         cosTheta = 1.0f - 2.0f * xi.x;
-        pdf = _HenyeyGreensteinPhaseFunction(cosTheta, 0.0f);
+    }
+    else
+    {
+        cosTheta = -1.0 / (2 * g) * (1.0f + Sqr(g) - Sqr((1.0 - Sqr(g)) / (1.0f + g - 2 * g * xi.x)));
     }
     float sinTheta = sqrt(max(0.0f, 1.0f - cosTheta * cosTheta));
     vec3 wiTangent = vec3(sinTheta * cos(phi), sinTheta * sin(phi), cosTheta);
     wi = TangentToWorld(wo, wiTangent);
+    pdf = _HenyeyGreensteinPhaseFunction(cosTheta, g);
 }
 
-void _SamplePointInMedium(
-    in Medium medium,
-    in vec3 point,
-    out vec3 sigma_a,
-    out vec3 sigma_s,
-    out vec3 Le,
-    out float g)
-{
-    sigma_a = medium.sigma_a;
-    sigma_s = medium.sigma_s;
-    Le = vec3(0.0f);
-    g = medium.g;
-}
-
-void SampleHomogenousMedium(
-    in float xi,
-    in float t, // distance from ray origin to surface hit
-    in float g,
+void SampleVolume(
+    in vec3 rand,
+    in vec3 rand2,
+    in float t,             // distance from ray origin to surface hit
+    in float g,             // HenyeyGreenstein
     in float sigma_a,
     in float sigma_s,
     in float sigma_n,
     inout vec3 throughput, // total light
     inout vec3 rayOrigin,
     inout vec3 rayDirection,
-    out bool endMedium)
+    out uint state)        // 0: BXDF 1: trace ends 2: call sample volume again
 {
     float t1; // t'
-    float sigma_majorant = sigma_a + sigma_s + sigma_n;
-    float u = xi;
-    float u2 = xi;
-    float u3 = xi;
-    float u4 = xi;
-    float u5 = xi;
+    const float sigma_majorant = sigma_a + sigma_s + sigma_n;
+    const float u = rand.x;
+    const float u2 = rand.y;
+    const float u3 = rand.z;
+    const float u4 = rand2.x;
+    const float u5 = rand2.y;
 
     t1 = _SampleExponential(u, sigma_majorant); // t' 
     if (t1 > t)
@@ -98,8 +78,7 @@ void SampleHomogenousMedium(
         // evaluate first term of 14.3 in PBRTv4
         // evaluate with BXDF
         rayOrigin = rayOrigin + t * rayDirection;
-        endMedium = true; // do BXDF at surface
-        return;
+        state = 0;
     }
     else
     {
@@ -107,37 +86,39 @@ void SampleHomogenousMedium(
         if (t1 > t)
         {
             // no absorption or scattering before surface hit, ends here
-            endMedium = true;
             throughput = vec3(0.0f);
-            return;
+            state = 1;
         }
         // evaluate second term of 14.3 in PBRTv4
-        if (sigma_a / sigma_majorant < u3)
+        else if (sigma_a / sigma_majorant > u3)
         {
             // first term in 14.5, ends here
             // should apply Le(p')
             // since we have no emission in homogeneous medium, we ends like t1 > t
-            endMedium = true;
             throughput = vec3(0.0f); // if there is emission, we need to tell that do not proceed anymore
-            return;
+            state = 1;
         }
-        else if ((sigma_a + sigma_s) / sigma_majorant < u3)
+        else if ((sigma_a + sigma_s) / sigma_majorant > u3)
         {
             // second term in 14.5
             vec3 nextRayDirection;
+            float pdf = 1.0f;
             _SampleHenyeyGreenstein(-rayDirection, g, vec2(u4, u5), nextRayDirection, pdf);
             rayOrigin = rayOrigin + t1 * rayDirection;
+            throughput *= 0.5 * INV_PI * abs(dot(rayDirection, nextRayDirection));
             rayDirection = nextRayDirection;
-            throughput /= pdf; // TODO?: weighted by the ratio of the phase function and the probability of sampling the direction
+            
+            throughput /= pdf;
+            //throughput *= abs(nextRayDirection.z);
             // apply SampleHomogenousMedium again
-            endMedium = false;
+            state = 2;
         }
         else
         {
             // third term in 14.5
             rayOrigin = rayOrigin + t1 * rayDirection;
             // apply SampleHomogenousMedium again
-            endMedium = false;
+            state = 2;
         }
     }
 }

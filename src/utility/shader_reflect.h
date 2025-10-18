@@ -51,7 +51,7 @@ public:
 	// _pushConstInfo: output, store the stages and size of push constant
 	void ReflectPushConst(
 		std::unordered_map<std::string, uint32_t>& _mapIndex,
-		std::vector<std::pair<VkShaderStageFlags, uint32_t>>& _pushConstInfo) const;
+		std::vector<std::pair<VkShaderStageFlags, std::pair<uint32_t, uint32_t>>>& _pushConstInfo) const;
 
 	void PrintReflectResult() const;
 

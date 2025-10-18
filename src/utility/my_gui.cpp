@@ -68,14 +68,15 @@ void MyGUI::StartWindow(
 	ImGui::Begin(_title.c_str(), _pShowWindow);
 }
 
-void MyGUI::Text(const std::string& _text, ...)
+void MyGUI::Text(const std::string& _text)
 {
-	const char* pArgs = _text.c_str();
-	va_list args;
+	ImGui::Text(_text.c_str());
+}
 
-	va_start(args, pArgs);
-	ImGui::TextV(_text.c_str(), args);
-	va_end(args);
+void MyGUI::FrameRateText()
+{
+	ImGuiIO& io = ImGui::GetIO(); (void)io;
+	ImGui::Text("Application average %.3f ms/frame (%.1f FPS)", 1000.0f / io.Framerate, io.Framerate);
 }
 
 void MyGUI::CheckBox(const std::string& _title, bool& _bChecked)
