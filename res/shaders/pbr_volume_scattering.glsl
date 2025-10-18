@@ -105,7 +105,7 @@ void SampleVolume(
             float pdf = 1.0f;
             _SampleHenyeyGreenstein(-rayDirection, g, vec2(u4, u5), nextRayDirection, pdf);
             rayOrigin = rayOrigin + t1 * rayDirection;
-            throughput *= 0.5 * INV_PI * abs(dot(rayDirection, nextRayDirection));
+            throughput *= 0.25 * INV_PI;
             rayDirection = nextRayDirection;
             
             throughput /= pdf;

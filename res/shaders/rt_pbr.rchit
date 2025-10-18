@@ -157,9 +157,11 @@ void main()
         fresnel.r = Fresnel(cosTheta, Complex(1, 0), Complex(0.18f, 3.42f));
         fresnel.g = Fresnel(cosTheta, Complex(1, 0), Complex(0.42f, 2.35f));
         fresnel.b = Fresnel(cosTheta, Complex(1, 0), Complex(1.37f, 1.77f));
-        payload.hitValue = payload.hitValue * MicrofacetBRDF(tangentWo, wm, roughness) * abs(wm.z) / pdf * fresnel;
+        //payload.hitValue = payload.hitValue * MicrofacetBRDF(tangentWo, wm, roughness) * abs(wm.z) / pdf * fresnel;
+        payload.hitValue = payload.hitValue * fresnel;
         vec3 wi = Reflect(tangentWo, wm);
         payload.rayDirection = TangentToWorld(nrmWorld, wi);
+        //payload.rayDirection = Reflect(-payload.rayDirection, nrmWorld);
         payload.rayOrigin = posWorld + sign(dot(nrmWorld, payload.rayDirection)) * 0.001f * nrmWorld; // Offset a little to avoid self-intersection
     }
     else if (material.i[gl_InstanceCustomIndexEXT].type.x == 9)
@@ -193,13 +195,13 @@ void main()
                 if (random.r < fresnel) // Reflect
                 {
                     payload.rayDirection = Reflect(-payload.rayDirection, nrmWorld);
-                    payload.hitValue = payload.hitValue * material.i[gl_InstanceCustomIndexEXT].color.rgb;
+                    payload.hitValue = payload.hitValue;
                     payload.volumeScatter = true;
                 }
                 else // Refract
                 {
                     payload.rayDirection = Refract(-payload.rayDirection, nrmWorld, 1.0f, IORt);
-                    payload.hitValue = payload.hitValue * material.i[gl_InstanceCustomIndexEXT].color.rgb;
+                    payload.hitValue = payload.hitValue;
                     payload.volumeScatter = false;
                 }
                 payload.rayOrigin = posWorld + sign(dot(nrmWorld, payload.rayDirection)) * 0.001f * nrmWorld; // Offset a little to avoid self-intersection
