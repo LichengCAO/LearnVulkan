@@ -470,9 +470,9 @@ void RayTracingReflectApp::_DrawFrame()
 
 	auto& gui = m_uptrGUIPass->StartPass({ m_uptrOutputViews[m_currentFrame]->GetDescriptorInfo(m_vkSampler, VK_IMAGE_LAYOUT_GENERAL) }, { cmd->SubmitCommands() });
 	gui.StartWindow("this is ui");
-	gui.SliderFloat("sigma_a", m_coefficient.sigma_a, 0, 10);
-	gui.SliderFloat("sigma_s", m_coefficient.sigma_s, 0, 10);
-	gui.SliderFloat("g", m_coefficient.g, -1.0f, 1.0f);
+	gui.SliderFloat("sigma_a", m_coefficient.sigma_a, 0.001, 10);
+	gui.SliderFloat("sigma_s", m_coefficient.sigma_s, 0.001, 10);
+	gui.SliderFloat("g", m_coefficient.g, -0.999f, 0.999f);
 	gui.FrameRateText();
 	gui.EndWindow();
 	m_uptrGUIPass->EndPass({ m_semaphores[m_currentFrame] }, guiOutput);
@@ -480,7 +480,7 @@ void RayTracingReflectApp::_DrawFrame()
 	m_uptrSwapchainPass->Execute({ guiOutput }, { m_semaphores[m_currentFrame] });
 
 	m_uptrPipeline->EndFrame();
-	m_currentFrame = (m_currentFrame + 1) % 1;
+	m_currentFrame = 0;// (m_currentFrame + 1) % 1;
 }
 
 RayTracingReflectApp::RayTracingReflectApp()

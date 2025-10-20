@@ -13,7 +13,7 @@ float _SampleExponential(in float xi, in float a)
     return -log(1.0f - xi) / a;
 }
 
-// g: anisotropy parameter, -1 <= g <= 1
+// g: anisotropy parameter, -1 < g < 1
 // g = 0 isotropic
 // g's physical meaning: https://pbr-book.org/4ed/Volume_Scattering/Phase_Functions#eq:scattering-anisotropy
 float _HenyeyGreensteinPhaseFunction(in float cosTheta, in float g)
@@ -31,8 +31,8 @@ void _SampleHenyeyGreenstein(
     in float g,
     in vec2 xi, 
     out vec3 wi,
-    out float pdf//pdf still don't know why adding this overall integration is over 1
-    )
+    out float pdf,
+    inout vec3 throughput)
 {
     float cosTheta = 0.0f;
     float phi = 2.0f * PI * xi.y;
@@ -48,7 +48,9 @@ void _SampleHenyeyGreenstein(
     float sinTheta = sqrt(max(0.0f, 1.0f - cosTheta * cosTheta));
     vec3 wiTangent = vec3(sinTheta * cos(phi), sinTheta * sin(phi), cosTheta);
     wi = TangentToWorld(wo, wiTangent);
-    pdf = _HenyeyGreensteinPhaseFunction(cosTheta, g);
+    float p = _HenyeyGreensteinPhaseFunction(cosTheta, g);
+    pdf = p;
+    throughput *= p; // still don't know why is this
 }
 
 void SampleVolume(
@@ -90,7 +92,7 @@ void SampleVolume(
             state = 1;
         }
         // evaluate second term of 14.3 in PBRTv4
-        else if (sigma_a / sigma_majorant > u3)
+        if (sigma_a / sigma_majorant > u3)
         {
             // first term in 14.5, ends here
             // should apply Le(p')
@@ -103,13 +105,10 @@ void SampleVolume(
             // second term in 14.5
             vec3 nextRayDirection;
             float pdf = 1.0f;
-            _SampleHenyeyGreenstein(-rayDirection, g, vec2(u4, u5), nextRayDirection, pdf);
+            _SampleHenyeyGreenstein(-rayDirection, g, vec2(u4, u5), nextRayDirection, pdf, throughput);
             rayOrigin = rayOrigin + t1 * rayDirection;
-            throughput *= 0.25 * INV_PI;
             rayDirection = nextRayDirection;
-            
             throughput /= pdf;
-            //throughput *= abs(nextRayDirection.z);
             // apply SampleHomogenousMedium again
             state = 2;
         }

@@ -53,8 +53,9 @@ void EmitRay(in vec3 rayOrigin, in vec3 rayDirection)
 void main()
 {
     GetRayOriginAndDirection(payload.rayOrigin, payload.rayDirection);
-    payload.hitValue = vec3(5.0f);
+    payload.hitValue = vec3(1.0f);
     payload.traceEnd = false;
+    payload.volumeScatter = false;
 
     for (int i = 0; i < 8; ++i)
     {

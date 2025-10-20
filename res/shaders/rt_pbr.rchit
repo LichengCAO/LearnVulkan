@@ -66,7 +66,7 @@ vec3 ObjectNormalToWorldNormal(const vec3 normal)
 
 vec3 Noise(uint n)
 {
-    return  random_pcg3d(uvec3(gl_LaunchIDEXT.xy, n));
+    return  pcg3d(uvec3(gl_LaunchIDEXT.xy, n));
 }
 
 uint ApplyVolumeScattering(uint seed, inout vec3 rayOrigin, inout vec3 rayDirection, inout vec3 throughput)
@@ -74,13 +74,13 @@ uint ApplyVolumeScattering(uint seed, inout vec3 rayOrigin, inout vec3 rayDirect
     uint state = 0;
 
     SampleVolume(
-        random_pcg3d(uvec3(gl_LaunchIDEXT.xy, seed)),
-        random_pcg3d(uvec3(seed, gl_LaunchIDEXT.xy)),
+        pcg3d(uvec3(gl_LaunchIDEXT.xy, seed)),
+        pcg3d_2(uvec3(gl_LaunchIDEXT.xy, seed)),
         gl_HitTEXT,         // distance from ray origin to surface hit
         sigma.g,            // HenyeyGreenstein
         sigma.a,            //in float sigma_a,
         sigma.s,            //in float sigma_s,
-        0,
+        0.0f,
         throughput, // total light
         rayOrigin,
         rayDirection,
@@ -109,7 +109,7 @@ void main()
     const vec3 nrmObject = v0.normal.xyz * barycentrics.x + v1.normal.xyz * barycentrics.y + v2.normal.xyz * barycentrics.z;
     const vec3 nrmWorld = ObjectNormalToWorldNormal(nrmObject); // GetRayHitPosition() can also be used to get the world position, but is less precise
 
-    if (material.i[gl_InstanceCustomIndexEXT].type.x == 1)
+    if (material.i[gl_InstanceCustomIndexEXT].type.x == 2)
     {
         payload.traceEnd = true;
     }
@@ -157,11 +157,9 @@ void main()
         fresnel.r = Fresnel(cosTheta, Complex(1, 0), Complex(0.18f, 3.42f));
         fresnel.g = Fresnel(cosTheta, Complex(1, 0), Complex(0.42f, 2.35f));
         fresnel.b = Fresnel(cosTheta, Complex(1, 0), Complex(1.37f, 1.77f));
-        //payload.hitValue = payload.hitValue * MicrofacetBRDF(tangentWo, wm, roughness) * abs(wm.z) / pdf * fresnel;
-        payload.hitValue = payload.hitValue * fresnel;
+        payload.hitValue = payload.hitValue * MicrofacetBRDF(tangentWo, wm, roughness) * abs(wm.z) / pdf * fresnel;
         vec3 wi = Reflect(tangentWo, wm);
         payload.rayDirection = TangentToWorld(nrmWorld, wi);
-        //payload.rayDirection = Reflect(-payload.rayDirection, nrmWorld);
         payload.rayOrigin = posWorld + sign(dot(nrmWorld, payload.rayDirection)) * 0.001f * nrmWorld; // Offset a little to avoid self-intersection
     }
     else if (material.i[gl_InstanceCustomIndexEXT].type.x == 9)

@@ -36,8 +36,8 @@ private:
 	};
 	struct Coefficient
 	{
-		float sigma_a;
-		float sigma_s;
+		float sigma_a = 0.001;
+		float sigma_s = 0.001;
 		float g;
 		bool operator==(const Coefficient& _other)
 		{

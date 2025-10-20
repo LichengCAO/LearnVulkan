@@ -47,13 +47,23 @@ float Sqr(in float x)
 // Hash Functions for GPU Rendering, Jarzynski et al.
 // http://www.jcgt.org/published/0009/03/02/
 // code from https://www.gsn-lib.org/apps/raytracing/index.php?name=example_pathtracing
-vec3 random_pcg3d(uvec3 v) 
+vec3 pcg3d(uvec3 v) 
 {
-  v = v * 1664525u + 1013904223u;
-  v.x += v.y*v.z; v.y += v.z*v.x; v.z += v.x*v.y;
-  v ^= v >> 16u;
-  v.x += v.y*v.z; v.y += v.z*v.x; v.z += v.x*v.y;
-  return vec3(v) * (1.0/float(0xffffffffu));
+    v = v * 1664525u + 1013904223u;
+    v.x += v.y*v.z; v.y += v.z*v.x; v.z += v.x*v.y;
+    v ^= v >> 16u;
+    v.x += v.y*v.z; v.y += v.z*v.x; v.z += v.x*v.y;
+    return vec3(v) * (1.0/float(0xffffffffu));
+}
+
+//https://observablehq.com/@riccardoscalco/pcg-random-number-generators-in-glsl
+vec3 pcg3d_2(uvec3 v)
+{
+    v = v * uint(747796405) + uint(2891336453);
+    v.x += v.y*v.z; v.y += v.z*v.x; v.z += v.x*v.y;
+    v ^= v >> 16u;
+    v.x += v.y*v.z; v.y += v.z*v.x; v.z += v.x*v.y;
+    return vec3(v) * (1.0/float(0xffffffffu));
 }
 
 vec3 CosineWeightedSample(const vec2 xi)
@@ -63,6 +73,7 @@ vec3 CosineWeightedSample(const vec2 xi)
     // float theta = asin(sqrt(xi.y));
     // return vec3(cos(phi) * sin(theta), sin(phi) * sin(theta), cos(theta));
 
+    // see: https://pbr-book.org/3ed-2018/Monte_Carlo_Integration/2D_Sampling_with_Multidimensional_Transformations#CosineSampleHemisphere
     float phi = 2.0f * PI * xi.x;
     float sinTheta = sqrt(xi.y);
     return vec3(sinTheta * cos(phi), sinTheta * sin(phi), sqrt(1.0 - xi.y));
