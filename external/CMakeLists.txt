@@ -1,3 +1,5 @@
+add_library(ExternalLibs INTERFACE)
+
 #set builld option for 3rd party
 set(TINYGLTF_BUILD_LOADER_EXAMPLE OFF)
 set(TINYGLTF_INSTALL OFF)
@@ -105,9 +107,13 @@ target_link_libraries(imgui PRIVATE volk)
 
 # Set C++ standard
 target_compile_features(imgui PUBLIC cxx_std_11)
-#===================================
-#        initialize imgui
-#===================================
+#==================================
+#      initialize imgui END
+#==================================
+
+# Setup openvdb
+find_package(OpenVDB CONFIG REQUIRED)
+target_link_libraries(ExternalLibs INTERFACE OpenVDB::openvdb)
 
 #add directories by their names on current computer
 add_subdirectory(GLFW)
@@ -119,7 +125,6 @@ add_subdirectory(volk)
 add_subdirectory(vma)
 add_subdirectory(tinygltf)
 add_subdirectory(spirv_reflect)
-add_library(ExternalLibs INTERFACE)
 target_link_libraries(ExternalLibs INTERFACE ${EXT_LIBS})
 target_include_directories(ExternalLibs INTERFACE ${INCLUDE_DIRS}) 
 

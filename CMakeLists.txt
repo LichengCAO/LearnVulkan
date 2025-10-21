@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8.12)
+cmake_minimum_required(VERSION 3.10)
 set(CMAKE_MOUDULE_PATH ${CMAKE_MOUDULE_PATH} "${CMAKE_SOURCE_DIR}/cmake")
 
 project(learn_vulkan)
@@ -61,7 +61,6 @@ add_subdirectory(res)
 set_target_properties(ExternalLibs PROPERTIES FOLDER "ThirdParty")
 target_include_directories(${CMAKE_PROJECT_NAME} PRIVATE "./src/")
 target_link_libraries(${CMAKE_PROJECT_NAME} PUBLIC ExternalLibs)
-
 macro(include_directories_by_dir source_files)
     if(MSVC)
         set(sgbd_cur_dir ${CMAKE_CURRENT_SOURCE_DIR})

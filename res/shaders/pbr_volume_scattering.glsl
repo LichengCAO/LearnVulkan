@@ -32,7 +32,7 @@ void _SampleHenyeyGreenstein(
     in vec2 xi, 
     out vec3 wi,
     out float pdf,
-    inout vec3 throughput)
+    out float phase_function)
 {
     float cosTheta = 0.0f;
     float phi = 2.0f * PI * xi.y;
@@ -48,9 +48,8 @@ void _SampleHenyeyGreenstein(
     float sinTheta = sqrt(max(0.0f, 1.0f - cosTheta * cosTheta));
     vec3 wiTangent = vec3(sinTheta * cos(phi), sinTheta * sin(phi), cosTheta);
     wi = TangentToWorld(wo, wiTangent);
-    float p = _HenyeyGreensteinPhaseFunction(cosTheta, g);
-    pdf = p;
-    throughput *= p; // still don't know why is this
+    phase_function = _HenyeyGreensteinPhaseFunction(cosTheta, g);
+    pdf = phase_function; // true for henyey greenstein
 }
 
 void SampleVolume(
@@ -84,37 +83,38 @@ void SampleVolume(
     }
     else
     {
-        t1 = _SampleExponential(u2, sigma_majorant); // resample t' for next position in medium
-        if (t1 > t)
-        {
-            // no absorption or scattering before surface hit, ends here
-            throughput = vec3(0.0f);
-            state = 1;
-        }
+        // don't know how do we arrive 14.7's second formula in pbrtv4 here, why 1-q is eliminated?
+        // maybe because: 
+        // we have samples in 0-t instead of 0-inifinity 
+        // and with monte carlo integration our pdf becomes pdf_origin / (1 - q) 
+        // the result becomes integral from 0 to t instead of 0 to infinity
+
         // evaluate second term of 14.3 in PBRTv4
         if (sigma_a / sigma_majorant > u3)
         {
             // first term in 14.5, ends here
             // should apply Le(p')
             // since we have no emission in homogeneous medium, we ends like t1 > t
-            throughput = vec3(0.0f); // if there is emission, we need to tell that do not proceed anymore
+            vec3 Le = vec3(0.0f); // if there is emission, we need to tell that do not proceed anymore
+            throughput *= Le;
             state = 1;
         }
+        // second term in 14.5
         else if ((sigma_a + sigma_s) / sigma_majorant > u3)
         {
-            // second term in 14.5
             vec3 nextRayDirection;
+            float phase_function = 1.0f;
             float pdf = 1.0f;
-            _SampleHenyeyGreenstein(-rayDirection, g, vec2(u4, u5), nextRayDirection, pdf, throughput);
+            _SampleHenyeyGreenstein(-rayDirection, g, vec2(u4, u5), nextRayDirection, pdf, phase_function);
             rayOrigin = rayOrigin + t1 * rayDirection;
             rayDirection = nextRayDirection;
-            throughput /= pdf;
+            throughput *= (phase_function / pdf); // weighted by the ratio of the phase function and the probability of sampling the direction, don't know why
             // apply SampleHomogenousMedium again
             state = 2;
         }
+        // third term in 14.5
         else
         {
-            // third term in 14.5
             rayOrigin = rayOrigin + t1 * rayDirection;
             // apply SampleHomogenousMedium again
             state = 2;
