@@ -30,7 +30,8 @@ int main() {
 	std::cout << "Stratocumulus 1: " << std::endl;
 	loader.Load("E:/GitStorage/LearnVulkan/res/models/cloud/Stratocumulus 1.vdb");
 	std::cout << "Try to load compact data..." << std::endl;
-	loader.LoadToLevel1("E:/GitStorage/LearnVulkan/res/models/cloud/Stratocumulus 1.vdb", vdbData);
+	//loader.LoadToLevel1("E:/GitStorage/LearnVulkan/res/models/cloud/Stratocumulus 1.vdb", vdbData);
+	loader._CreateNanoVDBFromOpenVDB("E:/GitStorage/LearnVulkan/res/models/cloud/Cumulus Congestus.vdb");
 	system("pause");
 	return EXIT_SUCCESS;
 }

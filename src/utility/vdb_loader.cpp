@@ -2,6 +2,11 @@
 #include <openvdb/openvdb.h>
 #include <openvdb/tools/Dense.h>
 #include <openvdb/Metadata.h>
+#include <openvdb/tools/LevelSetSphere.h> // replace with your own dependencies for generating the OpenVDB grid
+#include <nanovdb/tools/CreateNanoGrid.h> // converter from OpenVDB to NanoVDB (includes NanoVDB.h and GridManager.h)
+#include <nanovdb/io/IO.h>
+
+#include <tbb/info.h>
 #include <filesystem>
 #include "common.h"
 namespace fs = std::filesystem;
@@ -34,6 +39,11 @@ namespace {
 		uint32_t vecIndex = bitPos / 8;
 		uint32_t bitMove = bitPos % 8;
 		_toUpdate[vecIndex] |= static_cast<uint8_t>(1 << bitMove);
+	}
+
+	bool _EndWith(const std::string& _path, const std::string& _suffix)
+	{
+		return _path.size() >= _suffix.size()  && _path.substr(_path.size() - 4) ==  _suffix;
 	}
 }
 
@@ -211,15 +221,15 @@ void MyVDBLoader::LoadToLevel1(const std::string& _path, Level1Data& _output)
 				pool0.level = iter1->LEVEL;
 				pool0.index = glm::vec3(bbox.min().x(), bbox.min().y(), bbox.min().z());
 				pool0.parentIndex = ~0;
-				pool0.childOffset = _output.level1Pool1.size();
-				pool0.activeChild.resize((1 << 12)/8, 0);
+				pool0.childOffset = _output.level0Pool0.size();
+				pool0.activeChild.resize((1 << 12) / 8, 0);
+
+				// skip level 0 nodes that doesn't have value
 				for (auto iter0 = iter1->cbeginChildOn(); iter0; ++iter0)
 				{
-					// skip level 0 nodes that doesn't have value
-					//if (!iter0.isValueOn()) continue;
 					Pool0Data leafPool0{};
-					Pool1Data pool1{};
 					std::array<float, 512> voxelData;
+
 					leafPool0.level = 0;
 					leafPool0.index = glm::vec3(iter0.getCoord().x(), iter0.getCoord().y(), iter0.getCoord().z());
 					leafPool0.parentIndex = _output.level1Pool0.size(); // parent index in level 1 pool0
@@ -239,10 +249,6 @@ void MyVDBLoader::LoadToLevel1(const std::string& _path, Level1Data& _output)
 					}
 					_output.voxelData.push_back(voxelData);
 
-					// store index to level 1 pool1
-					pool1.pool0Index = _output.level0Pool0.size();
-					_output.level1Pool1.push_back(pool1);
-
 					// store data to level 0 pool0 
 					_output.level0Pool0.push_back(leafPool0);
 
@@ -257,6 +263,43 @@ void MyVDBLoader::LoadToLevel1(const std::string& _path, Level1Data& _output)
 				_output.level1Pool0.push_back(pool0);
 			}
 		}
+	}
+
+	file.close();
+}
+
+void MyVDBLoader::_CreateNanoVDBFromOpenVDB(const std::string& _openVDB)
+{
+	CHECK_TRUE(_EndWith(_openVDB, ".vdb"), "This is not a openVDB file!");
+	std::string nanoVDB = _openVDB.substr(0, _openVDB.size() - 4) + ".nvdb";
+	openvdb::io::File file(_openVDB);
+	
+	file.open();
+
+	// we only process the first grid
+	auto nameIter = file.beginName();
+	CHECK_TRUE(nameIter != file.endName(), "No grid is stored in the VDB!");
+
+	// Ensure it's a known type (e.g., FloatGrid)
+	auto baseGrid = file.readGrid(nameIter.gridName());
+	baseGrid->pruneGrid();
+	CHECK_TRUE(baseGrid->isType<openvdb::FloatGrid>(), "Grid type is not supported!");
+
+	try
+	{
+		auto srcGrid = openvdb::gridPtrCast<openvdb::FloatGrid>(baseGrid);
+		auto handle = nanovdb::tools::createNanoGrid(*srcGrid); // Convert from OpenVDB to NanoVDB and return a shared pointer to a GridHandle.
+		auto* dstGrid = handle.grid<float>();										// Get a (raw) pointer to the NanoVDB grid form the GridManager.
+		
+		if (!dstGrid)
+		{
+			throw std::runtime_error("GridHandle does not contain a grid with value type float");
+		}
+
+		nanovdb::io::writeGrid(nanoVDB, handle); // Write the NanoVDB grid to file and throw if writing fails
+	}
+	catch (const std::exception& e) {
+		std::cerr << "An exception occurred: \"" << e.what() << "\"" << std::endl;
 	}
 
 	file.close();

@@ -7,7 +7,7 @@ set(SPIRV_REFLECT_STATIC_LIB ON)
 set(SPIRV_REFLECT_EXECUTABLE OFF)
 set(IMGUI_VULKAN ON)
 set(IMGUI_GLFW ON)
-
+set(ALLOW_DUPLICATE_CUSTOM_TARGETS TRUE)
 #find_package(Vulkan REQUIRED)
 set(GLM_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/glm")
 set(GLFW_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/glfw/include")
@@ -15,6 +15,7 @@ set(TINY_OBJ_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/tinyobj")
 set(VMA_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vma")
 set(SPIRV_REFLECT_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/spirv_reflect")
 set(IMGUI_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/imgui" "${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends")
+set(VDB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/openvdb/openvdb/openvdb" "${CMAKE_CURRENT_SOURCE_DIR}/openvdb/nanovdb/nanovdb")
 
 set(INCLUDE_DIRS 
     ${GLM_INCLUDE_DIR}
@@ -22,6 +23,7 @@ set(INCLUDE_DIRS
     ${TINY_OBJ_INCLUDE_DIR}
     ${SPIRV_REFLECT_INCLUDE_DIR}
     ${IMGUI_INCLUDE_DIR}
+    ${OPENVDB_INCLUDE_DIRS}
 )
 
 set(EXT_LIBS
@@ -35,6 +37,7 @@ set(EXT_LIBS
     tinygltf
     spirv-reflect-static
     imgui
+    nanovdb
 )
 
 #===================================
@@ -112,8 +115,7 @@ target_compile_features(imgui PUBLIC cxx_std_11)
 #==================================
 
 # Setup openvdb
-find_package(OpenVDB CONFIG REQUIRED)
-target_link_libraries(ExternalLibs INTERFACE OpenVDB::openvdb)
+#find_package(OpenVDB CONFIG REQUIRED)
 
 #add directories by their names on current computer
 add_subdirectory(GLFW)
@@ -125,6 +127,7 @@ add_subdirectory(volk)
 add_subdirectory(vma)
 add_subdirectory(tinygltf)
 add_subdirectory(spirv_reflect)
+add_subdirectory(openvdb)
 target_link_libraries(ExternalLibs INTERFACE ${EXT_LIBS})
 target_include_directories(ExternalLibs INTERFACE ${INCLUDE_DIRS}) 
 
