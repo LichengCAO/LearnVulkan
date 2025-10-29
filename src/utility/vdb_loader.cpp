@@ -5,6 +5,8 @@
 #include <openvdb/tools/LevelSetSphere.h> // replace with your own dependencies for generating the OpenVDB grid
 #include <nanovdb/tools/CreateNanoGrid.h> // converter from OpenVDB to NanoVDB (includes NanoVDB.h and GridManager.h)
 #include <nanovdb/io/IO.h>
+#include <nanovdb/util/NodeManager.h>
+#include <nanovdb/NanoVDB.h>
 
 #include <tbb/info.h>
 #include <filesystem>
@@ -45,6 +47,68 @@ namespace {
 	{
 		return _path.size() >= _suffix.size()  && _path.substr(_path.size() - 4) ==  _suffix;
 	}
+
+	void _PrintCompactData(const MyVDBLoader::CompactData& _data)
+	{
+		std::cout << "Compact data information: " << std::endl;
+		std::cout << "=====================" << std::endl;
+		std::cout << "data size: " << _data.data.size() << std::endl;
+		for (int i = 4; i >= 0; --i)
+		{
+			std::cout << "level " << i << ": " << std::endl;
+			std::cout << "    offset: " << _data.offsets[i] << std::endl;
+			std::cout << "    size: " << _data.dataSizes[i] << std::endl;
+		}
+	}
+}
+
+void MyVDBLoader::_ExportCompactDataFromGridHandle(const nanovdb::GridHandle<>& _handle, CompactData& _output)
+{
+	using GridT = nanovdb::NanoGrid<float>;
+	using TreeT = GridT::TreeType;
+	using RootT = TreeT::RootType;
+	using Node2T = RootT::ChildNodeType;
+	using Node1T = Node2T::ChildNodeType;
+	using Node0T = Node1T::ChildNodeType;
+
+	auto pFloatGrid = _handle.grid<float>();
+	auto managerHandle = nanovdb::createNodeManager(*pFloatGrid);
+	auto pManager = managerHandle.mgr<float>();
+
+	_output.data.resize(_handle.size());
+	memcpy(_output.data.data(), pFloatGrid, _handle.size());
+
+	_output.dataSizes =
+	{
+		uint32_t(pFloatGrid->tree().nodeCount<Node0T>() * pFloatGrid->tree().getFirstNode<0>()->memUsage()),
+		uint32_t(pFloatGrid->tree().nodeCount<Node1T>() * pFloatGrid->tree().getFirstNode<1>()->memUsage()),
+		uint32_t(pFloatGrid->tree().nodeCount<Node2T>() * pFloatGrid->tree().getFirstNode<2>()->memUsage()),
+		uint32_t(pFloatGrid->tree().root().memUsage()),
+		uint32_t(GridT::memUsage()) 
+	};
+
+	{
+		// auto* pLevel0 = &pManager->leaf(0);
+		// auto* explicitly tells the compiler to deduce the type as a pointer, 
+		// so ret will also have the type T*, it is identical to simply use auto:
+		auto pLevel0 = &pManager->leaf(0);
+		auto pLevel1 = &pManager->lower(0);
+		auto pLevel2 = &pManager->upper(0);
+		auto pRoot = &(pFloatGrid->tree().root());
+		auto pGrid = pFloatGrid;
+		uintptr_t baseAddr = uintptr_t(pGrid);
+
+		_output.offsets =
+		{
+			uint32_t(uintptr_t(pLevel0) - baseAddr),
+			uint32_t(uintptr_t(pLevel1) - baseAddr),
+			uint32_t(uintptr_t(pLevel2) - baseAddr),
+			uint32_t(uintptr_t(pRoot) - baseAddr),
+			uint32_t(uintptr_t(pGrid) - baseAddr),
+		};
+	}
+
+	_PrintCompactData(_output);
 }
 
 MyVDBLoader::MyVDBLoader()
@@ -90,68 +154,6 @@ void MyVDBLoader::Load(const std::string& _path)
 				std::cout << "Node Count at level " << level << " is " << nodeCount[level] << std::endl;
 				level++;
 			}
-			
-			//// Iterate over top level nodes
-			//for (auto iter = vdbTree.cbeginRootChildren(); iter; ++iter)
-			//{
-			//	const auto& bbox = iter->getNodeBoundingBox();
-			//	std::cout << iter->LEVEL << " Level Node: Bounding Box = " << iter->getNodeBoundingBox() << ", Active Child Count = " << iter->childCount() << std::endl;
-			//	std::cout << "bbox min: " << floatGrid->transform().indexToWorld(bbox.min()) << std::endl;
-			//	std::cout << "bbox max: " << floatGrid->transform().indexToWorld(bbox.max()) << std::endl;
-
-			//	int i = 0;
-			//	//for (auto iter2 = iter->cbeginChildAll(); iter2; ++iter2)
-			//	//{
-			//	//	//if (i > 10) break;
-			//	//	//std::cout << iter2->LEVEL << " Level Node: Bounding Box = " << iter2->getNodeBoundingBox() << ", Child Count = " << iter2->childCount() << std::endl;
-			//	//	//std::cout << "bbox min: " << floatGrid->transform().indexToWorld(bbox.min()) << std::endl;
-			//	//	//std::cout << "bbox max: " << floatGrid->transform().indexToWorld(bbox.max()) << std::endl;
-			//	//	int j = 0;
-			//	//	//for (auto iter3 = iter2->cbeginChildOn(); iter3; ++iter3)
-			//	//	//{
-			//	//	//	if (j > 10) break;
-			//	//	//	std::cout << iter3->LEVEL << " Level Node: Bounding Box = " << iter3->getNodeBoundingBox() << ", Child Count = " << iter3->childCount() << std::endl;
-			//	//	//	std::cout << "bbox min: " << floatGrid->transform().indexToWorld(bbox.min()) << std::endl;
-			//	//	//	std::cout << "bbox max: " << floatGrid->transform().indexToWorld(bbox.max()) << std::endl;
-			//	//	//	++j;
-			//	//	//}
-			//	//	++i;
-			//	//}
-			//	std::cout << "All child count: " << i << std::endl;
-			//}
-	
-			//// Iterate over leaf nodes
-			//int i = 0, j = 0;
-			//for (auto iter = floatGrid->tree().cbeginLeaf(); iter; ++iter) 
-			//{
-			//	
-			//	if (i < 12)
-			//	{
-			//		int x, y, z;
-			//		glm::vec4 test{};
-			//		const auto& bbox = iter->getNodeBoundingBox();
-
-			//		std::cout << "Leaf Node: Bounding box = " << iter->getNodeBoundingBox() 
-			//			<< ", Value Count = " << iter->numValues() << std::endl;
-			//		
-			//		std::cout << "bbox min: " << floatGrid->transform().indexToWorld(bbox.min()) << std::endl;
-			//		bbox.min().asXYZ(x, y, z);
-			//		test = (model * glm::vec4(x, y, z, 1.0f));
-			//		std::cout << "cal: " << test.r << ", " << test.g << ", " << test.b << std::endl;
-			//		std::cout << "bbox max: " << floatGrid->transform().indexToWorld(bbox.max()) << std::endl;
-
-			//		// Optionally, iterate over values in the leaf node
-			//		for (auto voxelIter = iter->cbeginValueOn(); voxelIter; ++voxelIter)
-			//		{
-			//			if (j < 12)
-			//			{
-			//				std::cout << "Voxel Value = " << *voxelIter << " at " << voxelIter.getCoord() << std::endl;
-			//			}
-			//			++j;
-			//		}
-			//	}
-			//	++i;
-			//}
 		}
 	}
 
@@ -295,6 +297,8 @@ void MyVDBLoader::_CreateNanoVDBFromOpenVDB(const std::string& _openVDB)
 		{
 			throw std::runtime_error("GridHandle does not contain a grid with value type float");
 		}
+		CompactData deviceData{};
+		_ExportCompactDataFromGridHandle(handle, deviceData);
 
 		nanovdb::io::writeGrid(nanoVDB, handle); // Write the NanoVDB grid to file and throw if writing fails
 	}

@@ -1,5 +1,6 @@
 #pragma once
 #include "common.h"
+#include <nanovdb/io/IO.h>
 class MyVDBLoader
 {
 public:
@@ -30,11 +31,15 @@ public:
 	struct CompactData
 	{
 		std::vector<uint8_t> data;
+		std::array<uint32_t, 5> offsets;			// level 0, 1, 2, 3, grid
+		std::array<uint32_t, 5> dataSizes;
 	};
+private:
+	void _ExportCompactDataFromGridHandle(const nanovdb::GridHandle<>& _handle, CompactData& _output);
 
 public:
 	MyVDBLoader();
 	void Load(const std::string& _path);
 	void LoadToLevel1(const std::string& _path, Level1Data& _output);
-	static void _CreateNanoVDBFromOpenVDB(const std::string& _openVDB) ;
+	void _CreateNanoVDBFromOpenVDB(const std::string& _openVDB);
 };
