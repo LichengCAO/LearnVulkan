@@ -39,11 +39,11 @@ public:
 		glm::vec3 maxBound;
 	};
 private:
-	void _ExportCompactDataFromGridHandle(const nanovdb::GridHandle<>& _handle, CompactData& _output);
+	std::string _CreateNanoVDBFromOpenVDB(const std::string& _openVDB) const;
+	void _ExportCompactDataFromGridHandle(const nanovdb::GridHandle<>& _handle, CompactData& _output) const;
+	void _ExportNanoVDB(const std::string& _nvdbFile, CompactData& _output) const;
 
 public:
 	MyVDBLoader();
-	void Load(const std::string& _path);
-	void LoadToLevel1(const std::string& _path, Level1Data& _output);
-	void _CreateNanoVDBFromOpenVDB(const std::string& _openVDB);
+	void Load(const std::string& _file, CompactData& _output) const;
 };

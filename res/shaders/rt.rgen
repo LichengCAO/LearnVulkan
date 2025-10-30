@@ -42,7 +42,7 @@ void EmitRay(in vec3 rayOrigin, in vec3 rayDirection)
         rayDirection,               // ray direction
         10000.0f,                   // ray max range
         0                           // payload (location = 0)
-    );   
+    );
 }
 
 void main()

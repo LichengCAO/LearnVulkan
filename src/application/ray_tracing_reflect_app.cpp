@@ -5,6 +5,7 @@
 #include "swapchain_pass.h"
 #include "gui_pass.h"
 #include "utility/glTF_loader.h"
+#include "utility/vdb_loader.h"
 
 void RayTracingReflectApp::_CreateCommandBuffers()
 {
@@ -41,6 +42,21 @@ void RayTracingReflectApp::_InitAccelerationStructures()
 
 		instData.push_back(curInstData);
 	}
+
+	// add cloud
+	{
+		RayTracingAccelerationStructure::InstanceData curInstData{};
+		RayTracingAccelerationStructure::AABBData aabbData{};
+
+		aabbData.uAABBCount = 1;
+		aabbData.uAABBStride = 24;
+		aabbData.vkDeviceAddressAABB = m_uptrAABBBuffer->GetDeviceAddress();
+
+		curInstData.uHitShaderGroupIndexOffset = 1;
+		curInstData.transformMatrix = glm::mat4(1.0f);
+		curInstData.uBLASIndex = m_uptrAccelStruct->AddBLAS({ aabbData });
+	}
+
 	m_uptrAccelStruct->SetUpTLAS(instData);
 	m_uptrAccelStruct->Init();
 }
@@ -63,6 +79,7 @@ void RayTracingReflectApp::_InitPipeline()
 	m_uptrPipeline->AddMissShader("E:/GitStorage/LearnVulkan/bin/shaders/rt_pbr.rmiss.spv");
 	m_uptrPipeline->AddRayGenerationShader("E:/GitStorage/LearnVulkan/bin/shaders/rt_pbr.rgen.spv");
 	m_uptrPipeline->AddTriangleHitShaders("E:/GitStorage/LearnVulkan/bin/shaders/rt_pbr.rchit.spv", {});
+	m_uptrPipeline->AddProceduralHitShaders("E:/GitStorage/LearnVulkan/bin/shaders/rt_vdb.rchit.spv", "E:/GitStorage/LearnVulkan/bin/shaders/rt_vdb.rint.spv", {});
 	m_uptrPipeline->Init(1);
 
 	m_uptrSwapchainPass = std::make_unique<SwapchainPass>();
@@ -163,6 +180,8 @@ void RayTracingReflectApp::_CreateBuffers()
 {
 	glTFLoader gltfLoader{};
 	glTFLoader::SceneData glTFData{};
+	MyVDBLoader vdbLoader{};
+	MyVDBLoader::CompactData vdbData{};
 	std::vector<StaticMesh> meshes;
 	std::vector<glm::mat4> modelMatrices;
 	std::vector<glm::vec4> meshColors;
@@ -179,6 +198,7 @@ void RayTracingReflectApp::_CreateBuffers()
 	meshColors.push_back(glm::vec4(1.0f));
 	modelMatrices.push_back(glm::mat4(1.0));
 	materialNames.push_back("bunny");
+	vdbLoader.Load("E:\\GitStorage\\LearnVulkan\\res\\models\\cloud\\Stratocumulus 1.nvdb", vdbData);
 
 	// mesh data
 	for (size_t i = 0; i < meshes.size(); ++i)
@@ -298,11 +318,46 @@ void RayTracingReflectApp::_CreateBuffers()
 		m_uptrAddressBuffer->Init(bufferInfo);
 		m_uptrAddressBuffer->CopyFromHost(addrData.data());
 	}
+
+	// cloud data
+	{
+		Buffer::Information bufferInfo{};
+		Buffer::Information aabbBufferInfo{};
+
+		m_uptrNanoVDBBuffer = std::make_unique<Buffer>();
+		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		bufferInfo.size = sizeof(uint32_t) + vdbData.data.size();
+		bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+		
+		m_uptrNanoVDBBuffer->Init(bufferInfo);
+		m_uptrNanoVDBBuffer->CopyFromHost(&vdbData.offsets[3], 0, sizeof(vdbData.offsets[3]));
+		m_uptrNanoVDBBuffer->CopyFromHost(vdbData.data.data(), sizeof(vdbData.offsets[3]), vdbData.data.size());
+
+		m_uptrAABBBuffer = std::make_unique<Buffer>();
+		aabbBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		aabbBufferInfo.size = 24;
+		aabbBufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT  | VK_BUFFER_USAGE_2_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
+
+		m_uptrAABBBuffer->Init(aabbBufferInfo);
+		m_uptrAABBBuffer->CopyFromHost(&vdbData.minBound, 0, 12);
+		m_uptrAABBBuffer->CopyFromHost(&vdbData.maxBound, 12, 12);
+	}
 	
 }
 
 void RayTracingReflectApp::_DestroyBuffers()
 {
+	if (m_uptrAABBBuffer)
+	{
+		m_uptrAABBBuffer->Uninit();
+		m_uptrAABBBuffer.reset();
+	}
+
+	if (m_uptrNanoVDBBuffer)
+	{
+		m_uptrNanoVDBBuffer->Uninit();
+		m_uptrNanoVDBBuffer.reset();
+	}
 	if (m_uptrMaterialBuffer)
 	{
 		m_uptrMaterialBuffer->Uninit();
@@ -452,6 +507,7 @@ void RayTracingReflectApp::_DrawFrame()
 		binder.BindDescriptor(0, 2, { m_uptrOutputViews[m_currentFrame]->GetDescriptorInfo(m_vkSampler, VK_IMAGE_LAYOUT_GENERAL) }, DescriptorSetManager::DESCRIPTOR_BIND_SETTING::CONSTANT_DESCRIPTOR_SET_PER_FRAME);
 		binder.BindDescriptor(0, 3, { m_uptrAddressBuffer->GetDescriptorInfo() }, DescriptorSetManager::DESCRIPTOR_BIND_SETTING::CONSTANT_DESCRIPTOR_SET_ACROSS_FRAMES);
 		binder.BindDescriptor(1, 0, { m_uptrMaterialBuffer->GetDescriptorInfo() }, DescriptorSetManager::DESCRIPTOR_BIND_SETTING::CONSTANT_DESCRIPTOR_SET_ACROSS_FRAMES);
+		binder.BindDescriptor(1, 1, { m_uptrNanoVDBBuffer->GetDescriptorInfo() }, DescriptorSetManager::DESCRIPTOR_BIND_SETTING::CONSTANT_DESCRIPTOR_SET_ACROSS_FRAMES);
 		binder.EndBind();
 		binder.EndFrame();
 	}

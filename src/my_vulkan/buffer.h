@@ -41,9 +41,9 @@ private:
 	void _UnmapHostMemory();
 
 	// Map the memory and copy, if this buffer is host coherent
-	void _CopyFromHostWithMappedMemory(const void* src, size_t size);
+	void _CopyFromHostWithMappedMemory(const void* src, size_t bufferOffset, size_t size);
 	// Create a staging buffer to copy from host and then copy from staging buffer
-	void _CopyFromHostWithStaggingBuffer(const void* src, size_t size);
+	void _CopyFromHostWithStaggingBuffer(const void* src, size_t bufferOffest, size_t size);
 
 public:
 	Buffer();
@@ -58,12 +58,16 @@ public:
 	// Copy from host, will use stagging buffer if necessary, use buffer's size as length
 	void CopyFromHost(const void* src);
 	// Copy from host, will use stagging buffer if necessary
-	void CopyFromHost(const void* src, size_t size);
+	void CopyFromHost(const void* src, size_t bufferOffset, size_t size);
 
 	// Copy from buffer, will wait until copy is done, use buffer's size as length
 	void CopyFromBuffer(const Buffer& otherBuffer);
 	// Copy from buffer, will wait until copy is done, use buffer's size as length
 	void CopyFromBuffer(const Buffer* pOtherBuffer);
+	// Copy from buffer,
+	// if pCmd is nullptr it will create a command buffer and wait this action to finish,
+	// if command buffer is provided, then when does this command finish depends on user
+	void CopyFromBuffer(const Buffer* pOtherBuffer, size_t srcOffset, size_t dstOffset, size_t size, CommandSubmission* pCmd = nullptr);
 
 	// Fill buffer with input data,
 	// if pCmd is nullptr it will create a command buffer and wait this action to finish,

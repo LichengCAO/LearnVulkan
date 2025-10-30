@@ -1715,7 +1715,7 @@ void TransparentApp::_UpdateUniformBuffer()
 	m_distortBuffers[m_currentFrame].CopyFromHost(&cameraViewInfo);
 
 	std::vector<float> kernels = Get1DGaussian(m_blurRadius);
-	m_kernelBuffers[m_currentFrame].CopyFromHost(kernels.data(), kernels.size() * sizeof(float));
+	m_kernelBuffers[m_currentFrame].CopyFromHost(kernels.data(), 0, kernels.size() * sizeof(float));
 
 	GaussianBlurInformation blurInfo{};
 	blurInfo.blurRad = m_blurRadius;

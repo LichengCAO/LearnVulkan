@@ -96,7 +96,11 @@ public:
 	struct InstanceData
 	{
 		uint32_t	uBLASIndex;
-		uint32_t	uHitShaderGroupIndex; // index of the hit group in the used Shader Binding Table
+		// offset apply to the shader hit group in shader,
+		// in case when AABB BLASes and Triangle BLASes are all in the scene, 
+		// and different shader group need to be used,
+		// but in rgen we can only set 1 shader hit group when traceRayEXT
+		uint32_t	uHitShaderGroupIndexOffset; 
 		glm::mat4   transformMatrix;
 		// i just use the index of input array for gl_InstanceCustomIndex;
 	};

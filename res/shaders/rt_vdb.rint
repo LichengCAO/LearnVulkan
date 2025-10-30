@@ -1,0 +1,28 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+
+layout(set = 1, binding = 1) buffer nanovdb_
+{
+  uint rootOffset;
+  uint pnanovdb_buf_data[];
+}
+
+#include "nanovdb_adaptor.glsl"
+
+void main()
+{
+  NanoVDB_InitAccessor(rootOffset);
+  vec3 indexPosition = NanoVDB_WorldToIndex(gl_WorldRayOriginEXT);
+  vec3 indexDirection = NanoVDB_WorldToIndexDirection(gl_WorldRayDirectionEXT);
+  float tHit = -1.0f;
+  float value = 0.0f;
+  if (NanoVDB_HDDAZeroCrossing(indexPosition, indexDirection, tHit, value))
+  {
+    reportIntersectionEXT(tHit, 0);
+  }
+}

@@ -406,7 +406,7 @@ void RayTracingAccelerationStructure::_FillTLASInput(const std::vector<InstanceD
 		vkASInst.mask = 0xFF;
 		vkASInst.instanceCustomIndex = gl_InstanceCustomIndex;
 		vkASInst.accelerationStructureReference = m_uptrBLASes[instInfo.uBLASIndex]->vkDeviceAddress;
-		vkASInst.instanceShaderBindingTableRecordOffset = instInfo.uHitShaderGroupIndex;
+		vkASInst.instanceShaderBindingTableRecordOffset = instInfo.uHitShaderGroupIndexOffset;
 		vkASInst.transform = CommonUtils::ToTransformMatrixKHR(instInfo.transformMatrix);
 
 		gl_InstanceCustomIndex++;

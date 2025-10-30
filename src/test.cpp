@@ -21,9 +21,6 @@ int main() {
 	//	std::cerr << e.what() << std::endl;
 	//	return EXIT_FAILURE;
 	//}
-	std::cout << "Try to load compact data..." << std::endl;
-	//loader.LoadToLevel1("E:/GitStorage/LearnVulkan/res/models/cloud/Stratocumulus 1.vdb", vdbData);
-	loader._CreateNanoVDBFromOpenVDB("E:/GitStorage/LearnVulkan/res/models/cloud/Cumulus Congestus.vdb");
 	system("pause");
 	return EXIT_SUCCESS;
 }

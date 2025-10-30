@@ -55,10 +55,12 @@ private:
 	std::unique_ptr<RayTracingAccelerationStructure> m_uptrAccelStruct;
 	std::unique_ptr<Buffer> m_uptrAddressBuffer;
 	std::unique_ptr<Buffer> m_uptrMaterialBuffer;
+	std::unique_ptr<Buffer> m_uptrNanoVDBBuffer;
 
 	std::vector<std::unique_ptr<Buffer>> m_uptrModelVertexBuffers;
 	std::vector<std::unique_ptr<Buffer>> m_uptrModelIndexBuffers;
 	std::vector<std::unique_ptr<Buffer>> m_uptrCameraBuffers;
+	std::unique_ptr<Buffer> m_uptrAABBBuffer;
 	
 	std::vector<std::unique_ptr<Image>> m_uptrOutputImages;
 	std::vector<std::unique_ptr<ImageView>> m_uptrOutputViews;

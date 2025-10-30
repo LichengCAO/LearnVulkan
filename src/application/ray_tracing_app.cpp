@@ -1499,7 +1499,7 @@ void RayTracingAABBsApp::_InitAS()
 
 		instData.transformMatrix = glm::identity<glm::mat4>();
 		instData.uBLASIndex = AS.AddBLAS({ aabbData });
-		instData.uHitShaderGroupIndex = 1;
+		instData.uHitShaderGroupIndexOffset = 1;
 
 		instDatas.push_back(std::move(instData));
 	}

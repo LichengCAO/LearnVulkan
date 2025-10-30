@@ -118,17 +118,19 @@ void Buffer::_UnmapHostMemory()
 	pAllocator->UnmapVkBuffer(vkBuffer);
 }
 
-void Buffer::_CopyFromHostWithMappedMemory(const void* src, size_t size)
+void Buffer::_CopyFromHostWithMappedMemory(const void* src, size_t bufferOffest, size_t size)
 {
 	if (m_mappedMemory == nullptr)
 	{
 		MemoryAllocator* pAllocator = _GetMemoryAllocator();
 		pAllocator->MapVkBufferToHost(vkBuffer, m_mappedMemory);
 	}
-	memcpy(m_mappedMemory, src, size);
+	uint8_t* pMapped = (uint8_t*)m_mappedMemory;
+	pMapped += bufferOffest;
+	memcpy((void*)pMapped, src, size);
 }
 
-void Buffer::_CopyFromHostWithStaggingBuffer(const void* src, size_t size)
+void Buffer::_CopyFromHostWithStaggingBuffer(const void* src, size_t bufferOffest, size_t size)
 {
 	Information stagBufInfo{};
 	Buffer stagBuf{};
@@ -138,9 +140,9 @@ void Buffer::_CopyFromHostWithStaggingBuffer(const void* src, size_t size)
 	stagBufInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
 
 	stagBuf.Init(stagBufInfo);
-	stagBuf.CopyFromHost(src, size);
+	stagBuf.CopyFromHost(src);
 
-	CopyFromBuffer(stagBuf);
+	CopyFromBuffer(&stagBuf, 0, bufferOffest, size);
 
 	stagBuf.Uninit();
 }
@@ -160,42 +162,56 @@ Buffer::Buffer(Buffer&& _toMove)
 
 void Buffer::CopyFromHost(const void* src)
 {
-	CopyFromHost(src, static_cast<size_t>(m_bufferInformation.size));
+	CopyFromHost(src, 0, static_cast<size_t>(m_bufferInformation.size));
 }
 
-void Buffer::CopyFromHost(const void* src, size_t size)
+void Buffer::CopyFromHost(const void* src, size_t bufferOffset, size_t size)
 {
 	CHECK_TRUE(size <= static_cast<size_t>(m_bufferInformation.size), "Try to copy too much data from host!");
 	if ((m_bufferInformation.memoryProperty & VK_MEMORY_PROPERTY_HOST_COHERENT_BIT) == VK_MEMORY_PROPERTY_HOST_COHERENT_BIT)
 	{
-		_CopyFromHostWithMappedMemory(src, size);
+		_CopyFromHostWithMappedMemory(src, bufferOffset, size);
 	}
 	else
 	{
-		_CopyFromHostWithStaggingBuffer(src, size);
+		_CopyFromHostWithStaggingBuffer(src, bufferOffset, size);
 	}
 }
 
 void Buffer::CopyFromBuffer(const Buffer& otherBuffer)
 {
-	CommandSubmission cmdSubmit{};
+	CopyFromBuffer(&otherBuffer, 0, 0, m_bufferInformation.size);
+}
+
+void Buffer::CopyFromBuffer(const Buffer* pOtherBuffer)
+{
+	CopyFromBuffer(pOtherBuffer, 0, 0, m_bufferInformation.size);
+}
+
+void Buffer::CopyFromBuffer(const Buffer* pOtherBuffer, size_t srcOffset, size_t dstOffset, size_t size, CommandSubmission* pCmd)
+{
 	VkBufferCopy copyInfo{};
 
 	CHECK_TRUE(vkBuffer != VK_NULL_HANDLE, "This buffer is not initialized!");
 	CHECK_TRUE(((m_bufferInformation.usage & VK_BUFFER_USAGE_TRANSFER_DST_BIT) != 0), "This buffer must have VK_BUFFER_USAGE_TRANSFER_DST_BIT to copy from other buffer!");
 
-	copyInfo.size = m_bufferInformation.size;
+	copyInfo.size = size;
+	copyInfo.dstOffset = dstOffset;
+	copyInfo.srcOffset = srcOffset;
 
-	cmdSubmit.Init();
-	cmdSubmit.StartOneTimeCommands({});
-	cmdSubmit.CopyBuffer(otherBuffer.vkBuffer, vkBuffer, { copyInfo });
-	cmdSubmit.SubmitCommands();
-	cmdSubmit.Uninit();
-}
-
-void Buffer::CopyFromBuffer(const Buffer* pOtherBuffer)
-{
-	CopyFromBuffer(*pOtherBuffer);
+	if (pCmd)
+	{
+		pCmd->CopyBuffer(pOtherBuffer->vkBuffer, vkBuffer, { copyInfo });
+	}
+	else
+	{
+		CommandSubmission cmdSubmit{};
+		cmdSubmit.Init();
+		cmdSubmit.StartOneTimeCommands({});
+		cmdSubmit.CopyBuffer(pOtherBuffer->vkBuffer, vkBuffer, { copyInfo });
+		cmdSubmit.SubmitCommands();
+		cmdSubmit.Uninit();
+	}
 }
 
 void Buffer::Fill(uint32_t _data, CommandSubmission* pCmd)

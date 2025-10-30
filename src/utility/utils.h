@@ -57,4 +57,6 @@ namespace CommonUtils
 	}
 
 	void ReadFile(const std::string& _filePath, std::vector<uint8_t>& _output);
+
+	std::string GetFileExtension(const std::string& _filePath);
 }

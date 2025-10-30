@@ -243,3 +243,16 @@ void CommonUtils::ReadFile(const std::string& _filePath, std::vector<uint8_t>& _
 	file.read(reinterpret_cast<char*>(_output.data()), fileSize);
 	file.close();
 }
+
+std::string CommonUtils::GetFileExtension(const std::string& _filePath)
+{
+	std::string ret;
+	size_t pos = _filePath.rfind('.'); // Find the last dot in the filename
+
+	if (pos != std::string::npos) 
+	{
+		ret = _filePath.substr(pos + 1); // Extract the extension
+	}
+
+	return ret;
+}

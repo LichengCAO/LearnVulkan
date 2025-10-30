@@ -19,7 +19,7 @@
 // platforms
 //#define PNANOVDB_C
 //#define PNANOVDB_HLSL
-//#define PNANOVDB_GLSL
+#define PNANOVDB_GLSL
 
 // addressing mode
 // PNANOVDB_ADDRESS_32
