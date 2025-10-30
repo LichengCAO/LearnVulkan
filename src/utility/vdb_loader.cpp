@@ -11,6 +11,7 @@
 #include <tbb/info.h>
 #include <filesystem>
 #include "common.h"
+#include "utils.h"
 namespace fs = std::filesystem;
 using GridType = openvdb::FloatGrid;
 using TreeType = GridType::TreeType;
@@ -48,6 +49,175 @@ namespace {
 		return _path.size() >= _suffix.size()  && _path.substr(_path.size() - 4) ==  _suffix;
 	}
 
+	void _PrintUint(const std::vector<uint8_t>& _data, size_t& _offset, std::ostream& os)
+	{
+		os << *(uint32_t*)(_data.data() + _offset);
+		_offset += 4;
+	}
+
+	void _PrintInt(const std::vector<uint8_t>& _data, size_t& _offset, std::ostream& os)
+	{
+		os << *(int32_t*)(_data.data() + _offset);
+		_offset += 4;
+	}
+
+	void _PrintUvec2(const std::vector<uint8_t>& _data, size_t& _offset, std::ostream& os)
+	{
+		os << "[";
+		_PrintUint(_data, _offset, os);
+		os << ", ";
+		_PrintUint(_data, _offset, os);
+		os << "]";
+	}
+
+	void _PrintIvec2(const std::vector<uint8_t>& _data, size_t& _offset, std::ostream& os)
+	{
+		os << "[";
+		_PrintInt(_data, _offset, os);
+		os << ", ";
+		_PrintInt(_data, _offset, os);
+		os << "]";
+	}
+
+	void _PrintFloat(const std::vector<uint8_t>& _data, size_t& _offset, std::ostream& os)
+	{
+		_offset = CommonUtils::AlignUp(_offset, 4);
+		os << *(float*)(_data.data() + _offset);
+		_offset += 4;
+	}
+
+	void _PrintDouble(const std::vector<uint8_t>& _data, size_t& _offset, std::ostream& os)
+	{
+		_offset = CommonUtils::AlignUp(_offset, 8);
+		os << *(double*)(_data.data() + _offset);
+		_offset += 8;
+	}
+
+	void _PrintVec3(const std::vector<uint8_t>& _data, size_t& _offset, std::ostream& os)
+	{
+		os << "[";
+		_PrintFloat(_data, _offset, os);
+		os << ", ";
+		_PrintFloat(_data, _offset, os);
+		os << ", ";
+		_PrintFloat(_data, _offset, os);
+		os << "]";
+	}
+
+	void _PrintDvec3(const std::vector<uint8_t>& _data, size_t& _offset, std::ostream& os)
+	{
+		os << "[";
+		_PrintDouble(_data, _offset, os);
+		os << ", ";
+		_PrintDouble(_data, _offset, os);
+		os << ", ";
+		_PrintDouble(_data, _offset, os);
+		os << "]";
+	}
+
+	void _PrintMat3(const std::vector<uint8_t>& _data, size_t& _offset, std::ostream& os, int _indent = 2)
+	{
+		for (int i = 0; i < 3; ++i)
+		{
+			for (int j = 0; j < _indent; ++j)
+			{
+				os << "  ";
+			}
+			_PrintVec3(_data, _offset, os);
+			os << std::endl;
+		}
+	}
+
+	void _PrintDmat3(const std::vector<uint8_t>& _data, size_t& _offset, std::ostream& os, int _indent = 2)
+	{
+		for (int i = 0; i < 3; ++i)
+		{
+			for (int j = 0; j < _indent; ++j)
+			{
+				os << "  ";
+			}
+			_PrintDvec3(_data, _offset, os);
+			os << std::endl;
+		}
+	}
+
+	void _PrintGridData(const std::vector<uint8_t>& _data)
+	{
+		size_t offset = 0;
+		std::cout << "Grid Data: \r\n";
+		std::cout << "======================== \r\n";
+		std::cout << "  magic: ";
+		_PrintUvec2(_data, offset, std::cout);
+		std::cout << std::endl;
+		std::cout << "  checksum: ";
+		_PrintUvec2(_data, offset, std::cout);
+		std::cout << std::endl;
+		std::cout << "  version: ";
+		_PrintUint(_data, offset, std::cout);
+		std::cout << std::endl;
+		std::cout << "  flags: ";
+		_PrintUint(_data, offset, std::cout);
+		std::cout << std::endl;
+		std::cout << "  grid index: ";
+		_PrintUint(_data, offset, std::cout);
+		std::cout << std::endl;
+		std::cout << "  grid count: ";
+		_PrintUint(_data, offset, std::cout);
+		std::cout << std::endl;
+		std::cout << "  grid size: ";
+		_PrintUvec2(_data, offset, std::cout);
+		std::cout << std::endl;
+		offset += 256;
+
+		std::cout << "  Map: \r\n";
+		std::cout << "    matf:\r\n";
+		_PrintMat3(_data, offset, std::cout);
+		std::cout << "    invmatf:\r\n";
+		_PrintMat3(_data, offset, std::cout);
+		std::cout << "    vecf: ";
+		_PrintVec3(_data, offset, std::cout);
+		std::cout << std::endl;
+		std::cout << "    typerf: ";
+		_PrintFloat(_data, offset, std::cout);
+		std::cout << std::endl;
+		std::cout << "    matd:\r\n";
+		_PrintDmat3(_data, offset, std::cout);
+		std::cout << "    invmatd:\r\n";
+		_PrintDmat3(_data, offset, std::cout);
+		std::cout << "    vecd: ";
+		_PrintDvec3(_data, offset, std::cout);
+		std::cout << std::endl;
+		std::cout << "    typerd: ";
+		_PrintDouble(_data, offset, std::cout);
+		std::cout << std::endl;
+
+		std::cout << "  world bbox: \r\n";
+		std::cout << "    ";
+		_PrintDvec3(_data, offset, std::cout);
+		std::cout << std::endl;
+		std::cout << "    ";
+		_PrintDvec3(_data, offset, std::cout);
+		std::cout << std::endl;
+		std::cout << "  voxel size: ";
+		_PrintDvec3(_data, offset, std::cout);
+		std::cout << std::endl;
+
+		std::cout << " grid class: ";
+		_PrintUint(_data, offset, std::cout);
+		std::cout << std::endl;
+
+		std::cout << " grid type: ";
+		_PrintUint(_data, offset, std::cout);
+		std::cout << std::endl;
+
+		std::cout << "  blind meta data offset: ";
+		_PrintIvec2(_data, offset, std::cout);
+		std::cout << std::endl;
+		std::cout << "  blind meta data count: ";
+		_PrintUint(_data, offset, std::cout);
+		std::cout << std::endl;
+	}
+
 	void _PrintCompactData(const MyVDBLoader::CompactData& _data)
 	{
 		std::cout << "Compact data information: " << std::endl;
@@ -59,6 +229,7 @@ namespace {
 			std::cout << "    offset: " << _data.offsets[i] << std::endl;
 			std::cout << "    size: " << _data.dataSizes[i] << std::endl;
 		}
+		_PrintGridData(_data.data);
 	}
 }
 
@@ -78,6 +249,7 @@ void MyVDBLoader::_ExportCompactDataFromGridHandle(const nanovdb::GridHandle<>& 
 	_output.data.resize(_handle.size());
 	memcpy(_output.data.data(), pFloatGrid, _handle.size());
 
+	// data size
 	_output.dataSizes =
 	{
 		uint32_t(pFloatGrid->tree().nodeCount<Node0T>() * pFloatGrid->tree().getFirstNode<0>()->memUsage()),
@@ -87,6 +259,7 @@ void MyVDBLoader::_ExportCompactDataFromGridHandle(const nanovdb::GridHandle<>& 
 		uint32_t(GridT::memUsage()) 
 	};
 
+	// data offset
 	{
 		// auto* pLevel0 = &pManager->leaf(0);
 		// auto* explicitly tells the compiler to deduce the type as a pointer, 
@@ -107,6 +280,10 @@ void MyVDBLoader::_ExportCompactDataFromGridHandle(const nanovdb::GridHandle<>& 
 			uint32_t(uintptr_t(pGrid) - baseAddr),
 		};
 	}
+
+	// bounding box
+	_output.minBound = glm::vec3(pFloatGrid->worldBBox().min()[0], pFloatGrid->worldBBox().min()[1], pFloatGrid->worldBBox().min()[2]);
+	_output.maxBound = glm::vec3(pFloatGrid->worldBBox().max()[0], pFloatGrid->worldBBox().max()[1], pFloatGrid->worldBBox().max()[2]);
 
 	_PrintCompactData(_output);
 }

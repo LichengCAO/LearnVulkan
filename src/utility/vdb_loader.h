@@ -30,9 +30,13 @@ public:
 	// GPU friendly data to update to GPU
 	struct CompactData
 	{
-		std::vector<uint8_t> data;
-		std::array<uint32_t, 5> offsets;			// level 0, 1, 2, 3, grid
+		std::vector<uint8_t> data;				    // data to push to the GPU
+
+		std::array<uint32_t, 5> offsets;			// leaf, lower, upper, root, grid
 		std::array<uint32_t, 5> dataSizes;
+
+		glm::vec3 minBound;
+		glm::vec3 maxBound;
 	};
 private:
 	void _ExportCompactDataFromGridHandle(const nanovdb::GridHandle<>& _handle, CompactData& _output);
