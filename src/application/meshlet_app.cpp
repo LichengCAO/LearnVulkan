@@ -95,7 +95,7 @@ void MeshletApp::_InitModels()
 	std::vector<StaticMesh> meshs;
 	std::vector<glm::mat4> matrices;
 	//MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/sphere/sphere.obj", meshs);
-	
+
 	glTFLoader gltfScene{};
 	gltfScene.Load("E:/GitStorage/LearnVulkan/res/models/cornell_box/scene.gltf");
 	gltfScene.GetSceneSimpleMeshes(meshs, matrices);

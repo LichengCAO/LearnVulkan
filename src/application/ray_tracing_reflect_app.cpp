@@ -198,7 +198,7 @@ void RayTracingReflectApp::_CreateBuffers()
 	//meshColors.push_back(glm::vec4(1.0f));
 	//modelMatrices.push_back(glm::mat4(1.0));
 	//materialNames.push_back("bunny");
-	vdbLoader.Load("E:\\GitStorage\\LearnVulkan\\res\\models\\cloud\\Stratocumulus 1.nvdb", vdbData);
+	vdbLoader.Load("E:\\GitStorage\\LearnVulkan\\res\\models\\cloud\\Stratocumulus 1.vdb", vdbData);
 
 	// mesh data
 	for (size_t i = 0; i < meshes.size(); ++i)
@@ -530,6 +530,9 @@ void RayTracingReflectApp::_DrawFrame()
 	gui.SliderFloat("sigma_s", m_coefficient.sigma_s, 0.001, 10);
 	gui.SliderFloat("g", m_coefficient.g, -0.999f, 0.999f);
 	gui.FrameRateText();
+	std::stringstream ss;
+	ss << "camera position: " << m_camera.eye.x << ", " << m_camera.eye.y << ", " << m_camera.eye.z;
+	gui.Text(ss.str());
 	gui.EndWindow();
 	m_uptrGUIPass->EndPass({ m_semaphores[m_currentFrame] }, guiOutput);
 
@@ -556,4 +559,106 @@ void RayTracingReflectApp::Run()
 		_DrawFrame();
 	}
 	_Uninit();
+}
+
+void RayTracingNanoVDBApp::_InitProgram()
+{
+	m_uptrProgram = std::make_unique<RayTracingProgram>();
+
+	m_uptrProgram->AddMissShader("E:/GitStorage/LearnVulkan/bin/shaders/rt_pbr.rmiss.spv");
+	m_uptrProgram->AddProceduralHitShaders("E:/GitStorage/LearnVulkan/bin/shaders/rt_vdb.rchit.spv", "E:/GitStorage/LearnVulkan/bin/shaders/rt_pbr.rint.spv", {});
+	m_uptrProgram->AddRayGenerationShader("E:/GitStorage/LearnVulkan/bin/shaders/rt_vdb.rgen.spv");
+	m_uptrProgram->SetMaxRecursion(2);
+	m_uptrProgram->Init(1);
+
+	m_uptrGUIPass = std::make_unique<GUIPass>();
+	m_uptrGUIPass->Init(1);
+
+	m_uptrSwapchainPass = std::make_unique<SwapchainPass>();
+	m_uptrSwapchainPass->Init(1);
+}
+
+void RayTracingNanoVDBApp::_UnintProgram()
+{
+	if (m_uptrSwapchainPass)
+	{
+		m_uptrSwapchainPass->Uninit();
+		m_uptrSwapchainPass.reset();
+	}
+
+	if (m_uptrGUIPass)
+	{
+		m_uptrGUIPass->Uninit();
+		m_uptrGUIPass.reset();
+	}
+
+	if (m_uptrProgram)
+	{
+		m_uptrProgram->Uninit();
+		m_uptrProgram.reset();
+	}
+}
+
+void RayTracingNanoVDBApp::_InitBuffers()
+{
+
+}
+
+void RayTracingNanoVDBApp::_UninitBuffers()
+{
+
+}
+
+void RayTracingNanoVDBApp::_UpdateUniformBuffer()
+{
+
+}
+
+void RayTracingNanoVDBApp::_CreateImageAndViews()
+{
+	Image::Information imageInfo{};
+	m_uptrOutputImage = std::make_unique<Image>();
+
+	imageInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
+	imageInfo.width = MyDevice::GetInstance().GetSwapchainExtent().width;
+	imageInfo.height = MyDevice::GetInstance().GetSwapchainExtent().height;
+	imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT
+		| VK_IMAGE_USAGE_TRANSFER_DST_BIT
+		| VK_IMAGE_USAGE_SAMPLED_BIT;
+	m_uptrOutputImage->SetImageInformation(imageInfo);
+}
+
+void RayTracingNanoVDBApp::_DestroyImageAndViews()
+{
+
+}
+
+void RayTracingNanoVDBApp::_InitAccelerationStructure()
+{
+
+}
+
+void RayTracingNanoVDBApp::_UninitAccelerationStructure()
+{
+
+}
+
+void RayTracingNanoVDBApp::_Init()
+{
+
+}
+
+void RayTracingNanoVDBApp::_Uninit()
+{
+
+}
+
+void RayTracingNanoVDBApp::_ResizeWindow()
+{
+
+}
+
+void RayTracingNanoVDBApp::_DrawFrame()
+{
+
 }

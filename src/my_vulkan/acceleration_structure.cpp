@@ -404,7 +404,7 @@ void RayTracingAccelerationStructure::_FillTLASInput(const std::vector<InstanceD
 		VkAccelerationStructureInstanceKHR vkASInst{};
 		vkASInst.flags = VK_GEOMETRY_INSTANCE_TRIANGLE_FACING_CULL_DISABLE_BIT_KHR;
 		vkASInst.mask = 0xFF;
-		vkASInst.instanceCustomIndex = gl_InstanceCustomIndex;
+		vkASInst.instanceCustomIndex = instInfo.optCustomIndex.has_value() ? instInfo.optCustomIndex.value() : gl_InstanceCustomIndex;
 		vkASInst.accelerationStructureReference = m_uptrBLASes[instInfo.uBLASIndex]->vkDeviceAddress;
 		vkASInst.instanceShaderBindingTableRecordOffset = instInfo.uHitShaderGroupIndexOffset;
 		vkASInst.transform = CommonUtils::ToTransformMatrixKHR(instInfo.transformMatrix);

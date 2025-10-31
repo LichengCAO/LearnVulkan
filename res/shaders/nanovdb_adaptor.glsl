@@ -17,6 +17,7 @@
 
 pnanovdb_buf_t          g_unusedBuffer;      // unused in glsl, ignore it
 pnanovdb_readaccessor_t g_accessor;          // need to be initialized in main
+pnanovdb_grid_handle_t  g_gridHandle;
 
 pnanovdb_address_t _CreateNanoVDBAddress(uint _offset)
 {
@@ -25,53 +26,41 @@ pnanovdb_address_t _CreateNanoVDBAddress(uint _offset)
     return offset;
 }
 
-void NanoVDB_InitAccessor(uint _rootOffset)
+void NanoVDB_Init(uint _rootOffset)
 {
     pnanovdb_root_handle_t rootHandle;
     rootHandle.address = _CreateNanoVDBAddress(_rootOffset);
+
     pnanovdb_readaccessor_init(g_accessor, rootHandle);
+
+    g_gridHandle.address = _CreateNanoVDBAddress(0); // grid is the first data in memory layout
 }
 
 vec3 NanoVDB_WorldToIndex(in vec3 _position)
-{
-    pnanovdb_grid_handle_t gridHandle;
-    gridHandle.address = _CreateNanoVDBAddress(0); // grid is the first data in memory layout
-    
-    return pnanovdb_grid_world_to_indexf(g_unusedBuffer, gridHandle, _position);
+{    
+    return pnanovdb_grid_world_to_indexf(g_unusedBuffer, g_gridHandle, _position);
 }
 
 vec3 NanoVDB_IndexToWorld(in vec3 _position)
 {
-    pnanovdb_grid_handle_t gridHandle;
-    gridHandle.address = _CreateNanoVDBAddress(0); // grid is the first data in memory layout
-
-    return pnanovdb_grid_index_to_worldf(g_unusedBuffer, gridHandle, _position);
+    return pnanovdb_grid_index_to_worldf(g_unusedBuffer, g_gridHandle, _position);
 }
 
 // result is not normalized
 vec3 NanoVDB_WorldToIndexDirection(in vec3 _direction)
 {
-    pnanovdb_grid_handle_t gridHandle;
-    gridHandle.address = _CreateNanoVDBAddress(0); // grid is the first data in memory layout
-
-    return pnanovdb_grid_world_to_index_dirf(g_unusedBuffer, gridHandle, _direction);
+    return pnanovdb_grid_world_to_index_dirf(g_unusedBuffer, g_gridHandle, _direction);
 }
 
 // result is not normalized
 vec3 NanoVDB_IndexToWorldDirection(in vec3 _direction)
 {
-    pnanovdb_grid_handle_t gridHandle;
-    gridHandle.address = _CreateNanoVDBAddress(0); // grid is the first data in memory layout
-
-    return pnanovdb_grid_index_to_world_dirf(g_unusedBuffer, gridHandle, _direction);
+    return pnanovdb_grid_index_to_world_dirf(g_unusedBuffer, g_gridHandle, _direction);
 }
 
 bool NanoVDB_IsActive(in ivec3 _ijk)
 {
-    pnanovdb_grid_handle_t gridHandle;
-    gridHandle.address = _CreateNanoVDBAddress(0); // grid is the first data in memory layout
-    
-    uint type = pnanovdb_grid_get_grid_type(g_unusedBuffer, gridHandle);
+    uint type = pnanovdb_grid_get_grid_type(g_unusedBuffer, g_gridHandle);
     return pnanovdb_readaccessor_is_active(type, g_unusedBuffer, g_accessor, _ijk);
 }
 
@@ -90,6 +79,18 @@ float NanoVDB_ReadFloat(in ivec3 _ijk)
 ivec3 NanoVDB_IndexToIJK(in vec3 _indexPosition)
 {
     return ivec3(_indexPosition);
+}
+
+void NanoVDB_GetGridWorldBoundingBox(out vec3 _min, out vec3 _max)
+{
+    _min = vec3(
+        pnanovdb_grid_get_world_bbox(g_unusedBuffer, g_gridHandle, 0),
+        pnanovdb_grid_get_world_bbox(g_unusedBuffer, g_gridHandle, 1),
+        pnanovdb_grid_get_world_bbox(g_unusedBuffer, g_gridHandle, 2));
+    _max = vec3(
+        pnanovdb_grid_get_world_bbox(g_unusedBuffer, g_gridHandle, 3),
+        pnanovdb_grid_get_world_bbox(g_unusedBuffer, g_gridHandle, 4),
+        pnanovdb_grid_get_world_bbox(g_unusedBuffer, g_gridHandle, 5));
 }
 
 // _origin: index space

@@ -437,6 +437,7 @@ void MyDevice::_AddBaseExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selec
 	requiredFeatures.sampleRateShading = VK_TRUE;
 	requiredFeatures.fragmentStoresAndAtomics = VK_TRUE;
 	requiredFeatures.shaderInt64 = VK_TRUE;
+	requiredFeatures.shaderFloat64 = VK_TRUE;
 	physicalDeviceDescriptorIndexingFeatures.shaderSampledImageArrayNonUniformIndexing = VK_TRUE;
 	physicalDeviceDescriptorIndexingFeatures.runtimeDescriptorArray = VK_TRUE;
 	physicalDeviceDescriptorIndexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;

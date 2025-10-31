@@ -102,15 +102,16 @@ public:
 		// but in rgen we can only set 1 shader hit group when traceRayEXT
 		uint32_t	uHitShaderGroupIndexOffset; 
 		glm::mat4   transformMatrix;
-		// i just use the index of input array for gl_InstanceCustomIndex;
+		// By default, I just use the index of input array for gl_InstanceCustomIndex;
+		std::optional<uint32_t> optCustomIndex;
 	};
 
 private:
-	std::vector<BLASInput>					m_BLASInputs; // hold info temporarily, will be invalid after Init
-	TLASInput								m_TLASInput; // hold info temporarily, will be invalid after Init
+	std::vector<BLASInput>								m_BLASInputs; // hold info temporarily, will be invalid after Init
+	TLASInput													m_TLASInput; // hold info temporarily, will be invalid after Init
 	std::vector<std::unique_ptr<BLAS>>		m_uptrBLASes;
-	std::unique_ptr<TLAS>					m_uptrTLAS;
-	bool									m_compactBLAS = false; // if one of BLASes allows compact, we build all BLASes compacted
+	std::unique_ptr<TLAS>								m_uptrTLAS;
+	bool																m_compactBLAS = false; // if one of BLASes allows compact, we build all BLASes compacted
 
 public:
 	VkAccelerationStructureKHR vkAccelerationStructure = VK_NULL_HANDLE;

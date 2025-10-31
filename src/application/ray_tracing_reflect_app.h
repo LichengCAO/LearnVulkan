@@ -74,7 +74,7 @@ private:
 	Coefficient m_coefficient{};
 	Coefficient m_coefficientLast{};
 	float m_fps = 0;
-	PersCamera m_camera{ 400, 300, glm::vec3(2,2,2), glm::vec3(0,0,0), glm::vec3(0,1,0) };
+	PersCamera m_camera{ 400, 300, glm::vec3(2, 2, 2), glm::vec3(0,0,0), glm::vec3(0,1,0) };
 
 private:
 	void _CreateSemaphores();
@@ -106,6 +106,48 @@ private:
 public:
 	RayTracingReflectApp();
 	~RayTracingReflectApp();
+
+	void Run();
+};
+
+class RayTracingNanoVDBApp
+{
+private:
+	std::unique_ptr<Buffer> m_uptrAABBBuffer;
+	std::unique_ptr<Buffer> m_uptrCameraBuffer;
+	std::unique_ptr<Buffer> m_uptrVDBBuffer;
+	std::unique_ptr<RayTracingProgram>							m_uptrProgram;
+	std::unique_ptr<RayTracingAccelerationStructure>	m_uptrAccelerationStructure;
+	std::unique_ptr<GUIPass>				m_uptrGUIPass;
+	std::unique_ptr<SwapchainPass>	m_uptrSwapchainPass;
+	std::unique_ptr<Image>						m_uptrOutputImage;
+	std::unique_ptr<ImageView>				m_uptrOutputView;
+	std::unique_ptr<CommandSubmission> m_uptrCmd;
+
+
+private:
+	void _InitProgram();
+	void _UnintProgram();
+
+	void _InitBuffers();
+	void _UninitBuffers();
+	void _UpdateUniformBuffer();
+
+	void _CreateImageAndViews();
+	void _DestroyImageAndViews();
+
+	void _InitAccelerationStructure();
+	void _UninitAccelerationStructure();
+
+	void _Init();
+	void _Uninit();
+
+	void _ResizeWindow();
+	void _DrawFrame();
+
+public:
+	RayTracingNanoVDBApp();
+	~RayTracingNanoVDBApp();
 
 	void Run();
 };

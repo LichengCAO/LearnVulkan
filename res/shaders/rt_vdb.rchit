@@ -20,7 +20,7 @@ layout(location = 1) rayPayloadInEXT PBRPayload payload;
 
 void main()
 {
-  NanoVDB_InitAccessor(rootOffset);
+  NanoVDB_Init(rootOffset);
   vec3 worldPos = gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT;
   ivec3 ijk = NanoVDB_IndexToIJK(NanoVDB_WorldToIndex(worldPos));
 
@@ -30,5 +30,6 @@ void main()
     payload.traceEnd = true;
     payload.hitValue = vec3(0, 0, value);
   }
-  
+  payload.traceEnd = true;
+  payload.hitValue = vec3(0, 0, 1);
 }
