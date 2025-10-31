@@ -10,7 +10,7 @@ layout(set = 1, binding = 1) buffer nanovdb_
 {
   uint rootOffset;
   uint pnanovdb_buf_data[];
-}
+};
 
 #include "nanovdb_adaptor.glsl"
 

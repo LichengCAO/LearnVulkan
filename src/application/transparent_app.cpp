@@ -1739,7 +1739,7 @@ void TransparentApp::_DrawFrame()
 	waitInfo.waitSamaphore = m_swapchainImageAvailabilities[m_currentFrame];
 	waitInfo.waitPipelineStage = VK_PIPELINE_STAGE_COLOR_ATTACHMENT_OUTPUT_BIT;
 	cmd.StartCommands({ waitInfo });
-	
+
 	// draw opaque objects
 	cmd.StartRenderPass(&m_gbufferRenderPass, &m_gbufferFramebuffers[m_currentFrame]);
 	for (int i = 0; i < m_gbufferVertBuffers.size(); ++i)
@@ -1751,7 +1751,7 @@ void TransparentApp::_DrawFrame()
 		input.vertexBuffers = { m_gbufferVertBuffers[i].vkBuffer };
 		input.vkIndexType = VK_INDEX_TYPE_UINT32;
 		input.indexCount = m_gbufferIndexBuffers[i].GetBufferInformation().size / sizeof(uint32_t);
-		
+
 		m_gbufferPipeline.Do(cmd.vkCommandBuffer, input); // the draw will be done unordered
 	}
 	cmd.EndRenderPass();
@@ -1782,7 +1782,7 @@ void TransparentApp::_DrawFrame()
 		);
 
 		// clean
-		VkClearColorValue clearColor32Ruint{ .uint32 = {0u} };
+		VkClearColorValue clearColor32Ruint = { 0u, 0u, 0u, 0u };
 		m_oitSampleCountImages[m_currentFrame].Fill(clearColor32Ruint, &cmd);
 		m_oitInUseImages[m_currentFrame].Fill(clearColor32Ruint, &cmd);
 		m_oitSampleTexelBuffers[m_currentFrame].Fill(0, &cmd);
@@ -1813,7 +1813,7 @@ void TransparentApp::_DrawFrame()
 	}
 
 	// wait for previous depth draw, gbuffer draw done
-	{	
+	{
 		ImageBarrierBuilder barrierBuilder{};
 		VkImageMemoryBarrier gbufferPosBarrier = barrierBuilder.NewBarrier(
 			m_gbufferPosImages[m_currentFrame].vkImage,
@@ -1854,7 +1854,7 @@ void TransparentApp::_DrawFrame()
 	for (int i = 0; i < m_transModelVertBuffers.size(); ++i)
 	{
 		GraphicsPipeline::PipelineInput_DrawIndexed input;
-		
+
 		input.imageSize = MyDevice::GetInstance().GetSwapchainExtent();
 		input.indexBuffer = m_transModelIndexBuffers[i].vkBuffer;
 		input.indexCount = m_transModelIndexBuffers[i].GetBufferInformation().size / sizeof(uint32_t);
@@ -1883,8 +1883,8 @@ void TransparentApp::_DrawFrame()
 		input.indexBuffer = m_transModelIndexBuffers[i].vkBuffer;
 		input.indexCount = m_transModelIndexBuffers[i].GetBufferInformation().size / sizeof(uint32_t);
 		input.vertexBuffers = { m_transModelVertBuffers[i].vkBuffer };
-		input.vkDescriptorSets = 
-		{ 
+		input.vkDescriptorSets =
+		{
 			m_cameraDSets[m_currentFrame].vkDescriptorSet,
 			m_vecTransModelDSets[m_currentFrame][i].vkDescriptorSet,
 			m_oitDSets[m_currentFrame].vkDescriptorSet, // we have synthcronization here, so i think it's ok
@@ -1932,7 +1932,7 @@ void TransparentApp::_DrawFrame()
 		barrierBuilder.SetArrayLayerRange(0, 1);
 		barrierBuilder.SetMipLevelRange(0, 1);
 		barrierBuilder.SetAspect(VK_IMAGE_ASPECT_COLOR_BIT);
-		VkImageMemoryBarrier imageBarrier = barrierBuilder.NewBarrier(m_lightImages[m_currentFrame].vkImage, 
+		VkImageMemoryBarrier imageBarrier = barrierBuilder.NewBarrier(m_lightImages[m_currentFrame].vkImage,
 			//VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
 			_GetImageLayout(m_lightImages[m_currentFrame].vkImage, 0, 1, 0, 1, VK_IMAGE_ASPECT_COLOR_BIT),
 			VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL,
@@ -2029,7 +2029,7 @@ void TransparentApp::_DrawFrame()
 			{ oitOutputImageBarrier }
 		);
 
-		VkClearColorValue clearColor32Ruint{ .uint32 = {0u} };
+		VkClearColorValue clearColor32Ruint = { 0u, 0u, 0u, 0u };
 		m_oitColorImages[m_currentFrame].Fill(clearColor32Ruint, m_oitColorImageViews[m_currentFrame].GetRange(), &cmd);
 
 		// wait clear done
@@ -2067,13 +2067,13 @@ void TransparentApp::_DrawFrame()
 	{
 		VkExtent2D extent2d = MyDevice::GetInstance().GetSwapchainExtent();
 		ComputePipeline::PipelineInput pipelineInput{};
-		pipelineInput.groupCountX = (extent2d.width * extent2d.height + 255)/ 256;
+		pipelineInput.groupCountX = (extent2d.width * extent2d.height + 255) / 256;
 		pipelineInput.groupCountY = 1;
 		pipelineInput.groupCountZ = 1;
 		pipelineInput.vkDescriptorSets = { m_oitDSets[m_currentFrame].vkDescriptorSet, m_oitColorDSets[m_currentFrame].vkDescriptorSet };
 		m_oitSortPipeline.Do(cmd.vkCommandBuffer, pipelineInput);
 	}
-	
+
 	// wait for oit sort, distort uv done
 	{
 		ImageBarrierBuilder barrierBuilder{};
@@ -2107,14 +2107,14 @@ void TransparentApp::_DrawFrame()
 			_GetImageLayout(m_gbufferAlbedoImages[m_currentFrame].vkImage, 0, 1, 0, 1, VK_IMAGE_ASPECT_COLOR_BIT),
 			VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 			VK_ACCESS_SHADER_READ_BIT, VK_ACCESS_TRANSFER_WRITE_BIT
-			);		
+		);
 		if (m_mipLevel > 1)
 		{
 			barrierBuilder.SetMipLevelRange(1, VK_REMAINING_MIP_LEVELS);
 			VkImageMemoryBarrier barrier = barrierBuilder.NewBarrier(
 				m_gbufferAlbedoImages[m_currentFrame].vkImage,
 				// VK_IMAGE_LAYOUT_UNDEFINED,
-				_GetImageLayout(m_gbufferAlbedoImages[m_currentFrame].vkImage, 0, 1, 1, VK_REMAINING_MIP_LEVELS,  VK_IMAGE_ASPECT_COLOR_BIT),
+				_GetImageLayout(m_gbufferAlbedoImages[m_currentFrame].vkImage, 0, 1, 1, VK_REMAINING_MIP_LEVELS, VK_IMAGE_ASPECT_COLOR_BIT),
 				VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL,
 				VK_ACCESS_NONE, VK_ACCESS_TRANSFER_WRITE_BIT);
 			cmd.AddPipelineBarrier(
@@ -2131,7 +2131,7 @@ void TransparentApp::_DrawFrame()
 	}
 
 	// generate gbuffer mipmaps
-	{		
+	{
 		ImageBlitBuilder blitBuilder{};
 		ImageBarrierBuilder barrierBuilder{};
 

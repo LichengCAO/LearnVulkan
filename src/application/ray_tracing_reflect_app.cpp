@@ -194,10 +194,10 @@ void RayTracingReflectApp::_CreateBuffers()
 	glTFData.pMaterialNames = &materialNames;
 	gltfLoader.Load("E:/GitStorage/LearnVulkan/res/models/cornell_box/scene.gltf");
 	gltfLoader.GetSceneData(glTFData);
-	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/bunny/bunny.obj", meshes);
-	meshColors.push_back(glm::vec4(1.0f));
-	modelMatrices.push_back(glm::mat4(1.0));
-	materialNames.push_back("bunny");
+	//MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/bunny/bunny.obj", meshes);
+	//meshColors.push_back(glm::vec4(1.0f));
+	//modelMatrices.push_back(glm::mat4(1.0));
+	//materialNames.push_back("bunny");
 	vdbLoader.Load("E:\\GitStorage\\LearnVulkan\\res\\models\\cloud\\Stratocumulus 1.nvdb", vdbData);
 
 	// mesh data
@@ -336,7 +336,7 @@ void RayTracingReflectApp::_CreateBuffers()
 		m_uptrAABBBuffer = std::make_unique<Buffer>();
 		aabbBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		aabbBufferInfo.size = 24;
-		aabbBufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT  | VK_BUFFER_USAGE_2_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
+		aabbBufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT  | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_2_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
 
 		m_uptrAABBBuffer->Init(aabbBufferInfo);
 		m_uptrAABBBuffer->CopyFromHost(&vdbData.minBound, 0, 12);

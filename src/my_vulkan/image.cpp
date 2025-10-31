@@ -30,11 +30,9 @@ void Image::Init()
 		if (vkImage != VK_NULL_HANDLE) return;
 		VkImageCreateInfo imgInfo{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
 		imgInfo.imageType = m_imageInformation.imageType;
-		imgInfo.extent = {
-			.width = m_imageInformation.width,
-			.height = m_imageInformation.height,
-			.depth = m_imageInformation.depth
-		};
+		imgInfo.extent.width = m_imageInformation.width;
+		imgInfo.extent.height = m_imageInformation.height;
+		imgInfo.extent.depth = m_imageInformation.depth;
 		imgInfo.mipLevels = m_imageInformation.mipLevels;
 		imgInfo.arrayLayers = m_imageInformation.arrayLayers;
 		imgInfo.format = m_imageInformation.format;
@@ -246,19 +244,20 @@ void Image::CopyFromBuffer(const Buffer& stagingBuffer)
 
 	cmdSubmit.StartOneTimeCommands({});
 
-	VkBufferImageCopy region = {
-	.bufferOffset = 0,
-	.bufferRowLength = 0,
-	.bufferImageHeight = 0,
-	.imageSubresource = {
-		.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT,
-		.mipLevel = 0,
-		.baseArrayLayer = 0,
-		.layerCount = 1
-	},
-	.imageOffset = {0,0,0},
-	.imageExtent = {m_imageInformation.width, m_imageInformation.height, 1},
-	};
+	VkBufferImageCopy region{};
+	region.bufferOffset = 0;
+	region.bufferRowLength = 0;
+	region.bufferImageHeight = 0;
+	region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+	region.imageSubresource.mipLevel = 0;
+	region.imageSubresource.baseArrayLayer = 0;
+	region.imageSubresource.layerCount = 1;
+	region.imageOffset.x = 0;
+	region.imageOffset.y = 0;
+	region.imageOffset.z = 0;
+	region.imageExtent.width = m_imageInformation.width;
+	region.imageExtent.height = m_imageInformation.height;
+	region.imageExtent.depth = 1;
 
 	cmdSubmit.CopyBufferToImage(
 		stagingBuffer.vkBuffer,
@@ -378,19 +377,24 @@ void ImageView::Init()
 {
 	CHECK_TRUE(pImage != nullptr, "No image!");
 	CHECK_TRUE(m_viewInformation.layerCount != 0, "No layer count!");
-	VkImageViewCreateInfo viewInfo = {
-	.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO,
-	.image = pImage->vkImage,
-	.viewType = m_viewInformation.type,
-	.format = pImage->GetImageInformation().format,
-	.subresourceRange = {
-		.aspectMask = m_viewInformation.aspectMask,
-		.baseMipLevel = m_viewInformation.baseMipLevel,
-		.levelCount = m_viewInformation.levelCount,
-		.baseArrayLayer = m_viewInformation.baseArrayLayer,
-		.layerCount = m_viewInformation.layerCount
-	}
-	};
+	VkImageViewCreateInfo viewInfo{};
+	viewInfo.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+	viewInfo.pNext = nullptr;  // Ensure this is set explicitly if pNext isn't used.
+	viewInfo.flags = 0;     // Set flags to 0 unless specific flags are required.
+	viewInfo.image = pImage->vkImage;
+	viewInfo.viewType = m_viewInformation.type;
+	viewInfo.format = pImage->GetImageInformation().format;
+
+	viewInfo.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;  // Default swizzle values if not specified.
+	viewInfo.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+	viewInfo.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+	viewInfo.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+
+	viewInfo.subresourceRange.aspectMask = m_viewInformation.aspectMask;
+	viewInfo.subresourceRange.baseMipLevel = m_viewInformation.baseMipLevel;
+	viewInfo.subresourceRange.levelCount = m_viewInformation.levelCount;
+	viewInfo.subresourceRange.baseArrayLayer = m_viewInformation.baseArrayLayer;
+	viewInfo.subresourceRange.layerCount = m_viewInformation.layerCount;
 	CHECK_TRUE(vkImageView == VK_NULL_HANDLE, "VkImageView is already created!");
 	VK_CHECK(vkCreateImageView(MyDevice::GetInstance().vkDevice, &viewInfo, nullptr, &vkImageView), "Failed to create image view!");
 }
