@@ -93,7 +93,7 @@ private:
 	void _AddPipelineBarrier2(const VkDependencyInfo& _dependency);
 
 public:
-	void SetQueueFamilyIndex(uint32_t _queueFamilyIndex);
+	void PresetQueueFamilyIndex(uint32_t _queueFamilyIndex);
 	
 	std::optional<uint32_t> GetQueueFamilyIndex() const;
 	

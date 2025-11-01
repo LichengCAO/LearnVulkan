@@ -9,10 +9,10 @@ int main() {
 	//RayQueryApp app;
 	//RayTracingApp app;
 	//RayTracingThousandsApp app;
-	RayTracingReflectApp app;
+	//RayTracingReflectApp app;
 	MyVDBLoader loader{};
 	MyVDBLoader::Level1Data vdbData{};
-	//TransparentApp app;
+	TransparentApp app;
 	app.Run(); // easier to debug this way
 	//try {
 	//	app.Run();

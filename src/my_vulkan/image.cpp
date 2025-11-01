@@ -8,6 +8,20 @@
 //#endif defined in tinyglTF
 #include "stb_image.h"
 
+void Image::_InitAsSwapchainImage(VkImage _vkImage, VkImageUsageFlags _usage, VkFormat _format)
+{
+	CreateInformation createInfo{};
+
+	createInfo.usage = _usage;
+	createInfo.optFormat = _format;
+
+	PresetCreateInformation(createInfo);
+
+	m_imageInformation.isSwapchainImage = true;
+	vkImage = _vkImage;
+	Init();
+}
+
 Image::~Image()
 {
 	if (!m_initCalled) return;
@@ -15,17 +29,51 @@ Image::~Image()
 	//assert(vkDeviceMemory == VK_NULL_HANDLE);
 }
 
-void Image::SetImageInformation(const Information& imageInfo)
+void Image::PresetCreateInformation(const CreateInformation& imageInfo)
 {
 	CHECK_TRUE(vkImage == VK_NULL_HANDLE, "Image is already initialized!");
-	m_imageInformation = imageInfo;
+	bool useSwapchainSize = !imageInfo.optWidth.has_value();
+
+	if (useSwapchainSize)
+	{
+		m_imageInformation.width = MyDevice::GetInstance().GetSwapchainExtent().width;
+		m_imageInformation.height = MyDevice::GetInstance().GetSwapchainExtent().height;
+		m_imageInformation.depth = 1;
+		m_imageInformation.imageType = VK_IMAGE_TYPE_2D;
+	}
+	else
+	{
+		m_imageInformation.width =  imageInfo.optWidth.value();
+		m_imageInformation.height = imageInfo.optHeight.has_value() ? imageInfo.optHeight.value() : 1;
+		m_imageInformation.depth = imageInfo.optDepth.has_value() ? imageInfo.optDepth.value() : 1;
+		if (imageInfo.optDepth.has_value())
+		{
+			m_imageInformation.imageType = VK_IMAGE_TYPE_3D;
+		}
+		else if (imageInfo.optHeight.has_value())
+		{
+			m_imageInformation.imageType = VK_IMAGE_TYPE_2D;
+		}
+		else
+		{
+			m_imageInformation.imageType = VK_IMAGE_TYPE_1D;
+		}
+	}
+	m_imageInformation.mipLevels = imageInfo.optMipLevels.has_value() ? imageInfo.optMipLevels.value() : 1;
+	m_imageInformation.arrayLayers = imageInfo.optArrayLayers.has_value() ? imageInfo.optArrayLayers.value() : 1;
+	m_imageInformation.format = imageInfo.optFormat.has_value() ? imageInfo.optFormat.value() : VK_FORMAT_R32G32B32A32_SFLOAT;
+	m_imageInformation.tiling = imageInfo.optTiling.has_value() ? imageInfo.optTiling.value() : VK_IMAGE_TILING_OPTIMAL;
+	m_imageInformation.usage = imageInfo.usage;
+	m_imageInformation.samples = imageInfo.optSampleCount.has_value() ? imageInfo.optSampleCount.value() : VK_SAMPLE_COUNT_1_BIT;
+	m_imageInformation.memoryProperty = imageInfo.optMemoryProperty.has_value() ? imageInfo.optMemoryProperty.value() : VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	m_imageInformation.layout = VK_IMAGE_LAYOUT_UNDEFINED;
 }
 
 void Image::Init()
 {
 	if (m_initCalled) return;
 	m_initCalled = true;
-	if (!m_imageInformation.inSwapchain)
+	if (!m_imageInformation.isSwapchainImage)
 	{
 		if (vkImage != VK_NULL_HANDLE) return;
 		VkImageCreateInfo imgInfo{ VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO };
@@ -37,9 +85,9 @@ void Image::Init()
 		imgInfo.arrayLayers = m_imageInformation.arrayLayers;
 		imgInfo.format = m_imageInformation.format;
 		imgInfo.tiling = m_imageInformation.tiling;
-		CHECK_TRUE(m_imageInformation.initialLayout == VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED || m_imageInformation.initialLayout == VkImageLayout::VK_IMAGE_LAYOUT_PREINITIALIZED,
-			"According to the Vulkan specification, VkImageCreateInfo::initialLayout must be set to VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED at image creation.");
-		imgInfo.initialLayout = m_imageInformation.initialLayout;
+		//CHECK_TRUE(m_imageInformation.initialLayout == VkImageLayout::VK_IMAGE_LAYOUT_UNDEFINED || m_imageInformation.initialLayout == VkImageLayout::VK_IMAGE_LAYOUT_PREINITIALIZED,
+		//	"According to the Vulkan specification, VkImageCreateInfo::initialLayout must be set to VK_IMAGE_LAYOUT_UNDEFINED or VK_IMAGE_LAYOUT_PREINITIALIZED at image creation.");
+		imgInfo.initialLayout = m_imageInformation.layout;
 		imgInfo.usage = m_imageInformation.usage;
 		imgInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		imgInfo.samples = m_imageInformation.samples;
@@ -51,7 +99,6 @@ void Image::Init()
 	}
 	else
 	{
-		CHECK_TRUE(vkImage != VK_NULL_HANDLE, "Set vkImage manually if it's a swapchain image!");
 		_AddImageLayout();
 	}
 }
@@ -60,7 +107,7 @@ void Image::Uninit()
 {
 	if (!m_initCalled) return;
 	m_initCalled = false;
-	if (m_imageInformation.inSwapchain)
+	if (m_imageInformation.isSwapchainImage)
 	{
 		if (vkImage != VK_NULL_HANDLE)
 		{
@@ -96,7 +143,7 @@ void Image::_AddImageLayout() const
 {
 	MyDevice& device = MyDevice::GetInstance();
 	ImageLayout layout{};
-	layout.Reset(m_imageInformation.arrayLayers, m_imageInformation.mipLevels, m_imageInformation.initialLayout);
+	layout.Reset(m_imageInformation.arrayLayers, m_imageInformation.mipLevels, m_imageInformation.layout);
 	device.imageLayouts.insert({ vkImage, layout });
 }
 
@@ -192,7 +239,7 @@ void Image::_NewImageView(
 	}
 }
 
-void Image::TransitionLayout(VkImageLayout newLayout)
+void Image::TransitLayout(VkImageLayout newLayout)
 {
 	VkImageLayout oldLayout = _GetImageLayout();
 	if (oldLayout == newLayout) return;
@@ -206,7 +253,9 @@ void Image::TransitionLayout(VkImageLayout newLayout)
 
 	if (newLayout == VK_IMAGE_LAYOUT_DEPTH_STENCIL_ATTACHMENT_OPTIMAL) 
 	{
-		bool hasStencilComponent = (m_imageInformation.format == VK_FORMAT_D32_SFLOAT_S8_UINT || m_imageInformation.format == VK_FORMAT_D24_UNORM_S8_UINT);
+		bool hasStencilComponent = 
+			(m_imageInformation.format == VK_FORMAT_D32_SFLOAT_S8_UINT 
+				|| m_imageInformation.format == VK_FORMAT_D24_UNORM_S8_UINT);
 		if (hasStencilComponent) 
 		{
 			barrier.subresourceRange.aspectMask = VK_IMAGE_ASPECT_DEPTH_BIT | VK_IMAGE_ASPECT_STENCIL_BIT;
@@ -458,26 +507,28 @@ void Texture::Init()
 
 	// copy host image to device
 	Buffer stagingBuffer;
-	Buffer::Information bufferInfo;
-	bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+	Buffer::CreateInformation bufferInfo;
+	bufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 	bufferInfo.size = imageSize;
 	bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-	stagingBuffer.Init(bufferInfo);
+	stagingBuffer.PresetCreateInformation(bufferInfo);
+	stagingBuffer.Init();
 	stagingBuffer.CopyFromHost(pixels);
 
 	stbi_image_free(pixels);
 
-	Image::Information imageInfo;
-	imageInfo.width = static_cast<uint32_t>(texWidth);
-	imageInfo.height = static_cast<uint32_t>(texHeight);
-	imageInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	Image::CreateInformation imageInfo;
+	imageInfo.optWidth = static_cast<uint32_t>(texWidth);
+	imageInfo.optHeight = static_cast<uint32_t>(texHeight);
+	imageInfo.optFormat = VK_FORMAT_R8G8B8A8_SRGB;
+	imageInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 	imageInfo.usage = VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-	image.SetImageInformation(imageInfo);
+	image.PresetCreateInformation(imageInfo);
 	image.Init();
-	image.TransitionLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+	image.TransitLayout(VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 	image.CopyFromBuffer(stagingBuffer);
 	//image.TransitionLayout(VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
-	image.TransitionLayout(VK_IMAGE_LAYOUT_GENERAL);
+	image.TransitLayout(VK_IMAGE_LAYOUT_GENERAL);
 
 	stagingBuffer.Uninit();
 

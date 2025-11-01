@@ -60,7 +60,7 @@ void DescriptorSetManager::_InitDescriptorSetLayouts()
 			uint32_t bindingId = binding.first;
 			const VkDescriptorSetLayoutBinding& vkBinding = binding.second;
 
-			uptrLayout->AddBinding(
+			uptrLayout->PreAddBinding(
 				vkBinding.binding,
 				vkBinding.descriptorCount,
 				vkBinding.descriptorType,
@@ -779,7 +779,7 @@ void GraphicsProgram::_UninitPipeline()
 	}
 }
 
-void GraphicsProgram::SetUpRenderPass(const RenderPass* _pRenderPass, uint32_t _subpass)
+void GraphicsProgram::PresetRenderPass(const RenderPass* _pRenderPass, uint32_t _subpass)
 {
 	bool bPipelineInitialized = (m_uptrPipeline.get() != nullptr);
 
@@ -1150,7 +1150,7 @@ void RayTracingProgram::_UninitPipeline()
 	}
 }
 
-void RayTracingProgram::AddRayGenerationShader(const std::string& _path)
+void RayTracingProgram::PreAddRayGenerationShader(const std::string& _path)
 {
 	uint32_t index = 0u;
 	if (m_mapShaderToIndex.find(_path) == m_mapShaderToIndex.end())
@@ -1169,7 +1169,7 @@ void RayTracingProgram::AddRayGenerationShader(const std::string& _path)
 	);
 }
 
-void RayTracingProgram::AddTriangleHitShaders(const std::string& _closestHit, const std::optional<std::string>& _anyHit)
+void RayTracingProgram::PreAddTriangleHitShaders(const std::string& _closestHit, const std::optional<std::string>& _anyHit)
 {
 	uint32_t closestHit = 0u;
 	uint32_t anyHit = VK_SHADER_UNUSED_KHR;
@@ -1201,7 +1201,7 @@ void RayTracingProgram::AddTriangleHitShaders(const std::string& _closestHit, co
 	);
 }
 
-void RayTracingProgram::AddProceduralHitShaders(const std::string& _closestHit, const std::string& _intersection, const std::optional<std::string>& _anyHit)
+void RayTracingProgram::PreAddProceduralHitShaders(const std::string& _closestHit, const std::string& _intersection, const std::optional<std::string>& _anyHit)
 {
 	uint32_t closestHit = 0u;
 	uint32_t intersection = 0u;
@@ -1239,7 +1239,7 @@ void RayTracingProgram::AddProceduralHitShaders(const std::string& _closestHit, 
 	);
 }
 
-void RayTracingProgram::AddMissShader(const std::string& _miss)
+void RayTracingProgram::PreAddMissShader(const std::string& _miss)
 {
 	uint32_t miss = 0u;
 
@@ -1258,7 +1258,7 @@ void RayTracingProgram::AddMissShader(const std::string& _miss)
 	);
 }
 
-void RayTracingProgram::SetMaxRecursion(uint32_t _maxRecur)
+void RayTracingProgram::PresetMaxRecursion(uint32_t _maxRecur)
 {
 	m_lateInitialization.push_back(
 		[_maxRecur](RayTracingPipeline* _pipeline)

@@ -99,20 +99,9 @@ void GUIPass::_UninitSampler()
 void GUIPass::_InitImageAndViews()
 {
 	auto imageSize = MyDevice::GetInstance().GetSwapchainExtent();
-	Image::Information imageInfo{};
+	Image::CreateInformation imageInfo{};
 
-	imageInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-	imageInfo.imageType = VK_IMAGE_TYPE_2D;
-	imageInfo.arrayLayers = 1;
-	imageInfo.depth = 1;
-	imageInfo.height = imageSize.height;
-	imageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-	imageInfo.inSwapchain = false;
-	imageInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-	imageInfo.mipLevels = 1;
-	imageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
 	imageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-	imageInfo.width = imageSize.width;
 
 	for (uint32_t i = 0; i < m_uMaxFrameCount; ++i)
 	{
@@ -120,7 +109,7 @@ void GUIPass::_InitImageAndViews()
 		std::unique_ptr<ImageView> uptrView;
 		ImageView* pView = nullptr;
 
-		uptrImage->SetImageInformation(imageInfo);
+		uptrImage->PresetCreateInformation(imageInfo);
 		uptrImage->Init();
 		uptrImage->NewImageView(pView);
 		uptrView.reset(pView);
@@ -151,8 +140,8 @@ void GUIPass::_InitRenderPass()
 
 	m_uptrRenderPass = std::make_unique<RenderPass>();
 	subpass.AddColorAttachment(0);
-	m_uptrRenderPass->AddAttachment(RenderPass::AttachmentPreset::COLOR_OUTPUT);
-	m_uptrRenderPass->AddSubpass(subpass);
+	m_uptrRenderPass->PreAddAttachment(RenderPass::AttachmentPreset::COLOR_OUTPUT);
+	m_uptrRenderPass->PreAddSubpass(subpass);
 	m_uptrRenderPass->Init();
 }
 
@@ -191,7 +180,7 @@ void GUIPass::_InitPipeline()
 {
 	m_uptrProgram = std::make_unique<GraphicsProgram>();
 
-	m_uptrProgram->SetUpRenderPass(m_uptrRenderPass.get(), 0);
+	m_uptrProgram->PresetRenderPass(m_uptrRenderPass.get(), 0);
 	m_uptrProgram->Init({ "E:/GitStorage/LearnVulkan/bin/shaders/pass_through.vert.spv", "E:/GitStorage/LearnVulkan/bin/shaders/pass_through.frag.spv" }, m_uMaxFrameCount);
 }
 

@@ -25,16 +25,24 @@ Buffer::~Buffer()
 	assert(m_mappedMemory == nullptr);
 }
 
-void Buffer::Init(Information info)
+void Buffer::Init()
 {
 	VkBufferCreateInfo bufferInfo = { VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO };
-	bufferInfo.size = info.size;
-	bufferInfo.usage = info.usage;
-	bufferInfo.sharingMode = info.sharingMode;
-	m_bufferInformation = info;
+	bufferInfo.size = m_bufferInformation.size;
+	bufferInfo.usage = m_bufferInformation.usage;
+	bufferInfo.sharingMode = m_bufferInformation.sharingMode;
 	CHECK_TRUE(vkBuffer == VK_NULL_HANDLE, "VkBuffer is already created!");
 	VK_CHECK(vkCreateBuffer(MyDevice::GetInstance().vkDevice, &bufferInfo, nullptr, &vkBuffer), "Failed to create buffer!");
 	_AllocateMemory();
+}
+
+void Buffer::PresetCreateInformation(const CreateInformation& _info)
+{
+	m_bufferInformation.size = _info.size;
+	m_bufferInformation.usage = _info.usage;
+	m_bufferInformation.sharingMode = _info.optSharingMode.has_value() ? _info.optSharingMode.value() : VK_SHARING_MODE_EXCLUSIVE;
+	m_bufferInformation.memoryProperty = _info.optMemoryProperty.has_value() ? _info.optMemoryProperty.value() : VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	m_bufferInformation.optAlignment = _info.optAlignment;
 }
 
 void Buffer::Uninit()
@@ -60,20 +68,17 @@ void Buffer::_AllocateMemory()
 	//VkMemoryAllocateFlagsInfo allocFlags{ VK_STRUCTURE_TYPE_MEMORY_ALLOCATE_FLAGS_INFO };
 	//
 	//vkGetBufferMemoryRequirements(MyDevice::GetInstance().vkDevice, vkBuffer, &memRequirements);
-
 	//allocInfo.allocationSize = memRequirements.size; //could be different from size on Host!
 	//allocInfo.memoryTypeIndex = _FindMemoryTypeIndex(memRequirements.memoryTypeBits, m_bufferInformation.memoryProperty);
-
 	//if ((m_bufferInformation.usage & VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT) != 0u)
 	//{
 	//	allocFlags.flags = VK_MEMORY_ALLOCATE_DEVICE_ADDRESS_BIT;
 	//	allocInfo.pNext = &allocFlags;
 	//}
-
 	//VK_CHECK(vkAllocateMemory(MyDevice::GetInstance().vkDevice, &allocInfo, nullptr, &vkDeviceMemory), "Failed to allocate buffer memory!");
-
 	//VkDeviceSize offset = 0; // should be divisible by memRequirements.alignment
 	//vkBindBufferMemory(MyDevice::GetInstance().vkDevice, vkBuffer, vkDeviceMemory, offset);
+	
 	MemoryAllocator* pAllocator = _GetMemoryAllocator();
 	if (m_bufferInformation.optAlignment.has_value())
 	{
@@ -97,6 +102,7 @@ void Buffer::_FreeMemory()
 	//	vkFreeMemory(MyDevice::GetInstance().vkDevice, vkDeviceMemory, nullptr);
 	//	vkDeviceMemory = VK_NULL_HANDLE;
 	//}
+
 	MemoryAllocator* pAllocator = _GetMemoryAllocator();
 	if (m_mappedMemory != nullptr)
 	{
@@ -132,14 +138,14 @@ void Buffer::_CopyFromHostWithMappedMemory(const void* src, size_t bufferOffest,
 
 void Buffer::_CopyFromHostWithStaggingBuffer(const void* src, size_t bufferOffest, size_t size)
 {
-	Information stagBufInfo{};
+	CreateInformation stagBufInfo{};
 	Buffer stagBuf{};
 
-	stagBufInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+	stagBufInfo.optMemoryProperty = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 	stagBufInfo.size = static_cast<VkDeviceSize>(size);
 	stagBufInfo.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
-
-	stagBuf.Init(stagBufInfo);
+	stagBuf.PresetCreateInformation(stagBufInfo);
+	stagBuf.Init();
 	stagBuf.CopyFromHost(src);
 
 	CopyFromBuffer(&stagBuf, 0, bufferOffest, size);
@@ -294,85 +300,4 @@ void BufferView::Uninit()
 		vkBufferView = VK_NULL_HANDLE;
 	}
 	pBuffer = nullptr;
-}
-
-void BufferBuilder::SetBufferUsage(VkBufferUsageFlags _flags)
-{
-	m_vkUsageSetting = _flags;
-}
-
-void BufferBuilder::SetBufferSharingMode(VkSharingMode _mode)
-{
-	m_vkSharingModeSetting = _mode;
-}
-
-void BufferBuilder::SetBufferMemoryProperty(VkMemoryPropertyFlags _property)
-{
-	m_vkMemoryPropertySetting = _property;
-}
-
-void BufferBuilder::SetBufferAlignment(VkDeviceSize _alignment)
-{
-	m_vkAlignmentSetting = _alignment;
-}
-
-void BufferBuilder::StartBuild()
-{
-	m_uBufferSize = 0u;
-	m_vecHostData.clear();
-}
-
-VkDeviceSize BufferBuilder::AppendToBuffer(const void* _pData, size_t _size, VkDeviceSize _alignment)
-{
-	VkDeviceSize currentOffset = CommonUtils::AlignUp(m_uBufferSize, _alignment);
-	HostData hostData{};
-	
-	m_uBufferSize += _size;
-	hostData.dataSize = _size;
-	hostData.offset = currentOffset;
-	hostData.pData = _pData;
-
-	m_vecHostData.push_back(hostData);
-
-	return currentOffset;
-}
-
-VkDeviceSize BufferBuilder::AppendToBuffer(const void* _pData, size_t _size)
-{
-	VkDeviceSize currentOffset = m_uBufferSize;
-	HostData hostData{};
-
-	m_uBufferSize += _size;
-	hostData.dataSize = _size;
-	hostData.offset = currentOffset;
-	hostData.pData = _pData;
-
-	m_vecHostData.push_back(hostData);
-
-	return currentOffset;
-}
-
-void BufferBuilder::FinishBuild(Buffer*& _initedBuffer)
-{
-	std::vector<uint8_t> dataToCopy(m_uBufferSize);
-	Buffer::Information bufferInfo{};
-
-	_initedBuffer = new Buffer();
-
-	for (const auto& _data : m_vecHostData)
-	{
-		memcpy(dataToCopy.data() + _data.offset, _data.pData, _data.dataSize);
-	}
-
-	bufferInfo.memoryProperty = m_vkMemoryPropertySetting;
-	if (m_vkAlignmentSetting != 0)
-	{
-		bufferInfo.optAlignment = m_vkAlignmentSetting;
-	}
-	bufferInfo.sharingMode = m_vkSharingModeSetting;
-	bufferInfo.size = m_uBufferSize;
-	bufferInfo.usage = m_vkUsageSetting;
-
-	_initedBuffer->Init(bufferInfo);
-	_initedBuffer->CopyFromHost(dataToCopy.data());
 }

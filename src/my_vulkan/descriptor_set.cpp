@@ -2,7 +2,7 @@
 #include "device.h"
 #include "buffer.h"
 
-void DescriptorSet::SetLayout(const DescriptorSetLayout* _layout)
+void DescriptorSet::PresetLayout(const DescriptorSetLayout* _layout)
 {
 	m_pLayout = _layout;
 }
@@ -131,7 +131,7 @@ DescriptorSetLayout::~DescriptorSetLayout()
 	assert(vkDescriptorSetLayout == VK_NULL_HANDLE);
 }
 
-uint32_t DescriptorSetLayout::AddBinding(
+uint32_t DescriptorSetLayout::PreAddBinding(
 	uint32_t descriptorCount,
 	VkDescriptorType descriptorType,
 	VkShaderStageFlags stageFlags,
@@ -139,10 +139,10 @@ uint32_t DescriptorSetLayout::AddBinding(
 {
 	uint32_t binding = static_cast<uint32_t>(bindings.size());
 
-	return AddBinding(binding, descriptorCount, descriptorType, stageFlags, pImmutableSamplers);
+	return PreAddBinding(binding, descriptorCount, descriptorType, stageFlags, pImmutableSamplers);
 }
 
-uint32_t DescriptorSetLayout::AddBinding(
+uint32_t DescriptorSetLayout::PreAddBinding(
 	uint32_t binding,
 	uint32_t descriptorCount,
 	VkDescriptorType descriptorType,
@@ -179,14 +179,14 @@ void DescriptorSetLayout::Init()
 DescriptorSet DescriptorSetLayout::NewDescriptorSet() const
 {
 	DescriptorSet result{};
-	result.SetLayout(this);
+	result.PresetLayout(this);
 	return result;
 }
 
 DescriptorSet* DescriptorSetLayout::NewDescriptorSetPointer() const
 {
 	DescriptorSet* pDescriptor = new DescriptorSet();
-	pDescriptor->SetLayout(this);
+	pDescriptor->PresetLayout(this);
 	return pDescriptor;
 }
 

@@ -172,14 +172,14 @@ public:
 
 	// Add a BLAS to this acceleration structure, 
 	// return the index of this BLAS in the vector of BLASs this acceleration structure holds
-	uint32_t AddBLAS(
+	uint32_t PreAddBLAS(
 		const std::vector<TriangleData>& geomData,
 		VkBuildAccelerationStructureFlagsKHR flags = 
 		VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR 
 		| VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_UPDATE_BIT_KHR 
 		| VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
 
-	uint32_t AddBLAS(
+	uint32_t PreAddBLAS(
 		const std::vector<AABBData>& geomData,
 		VkBuildAccelerationStructureFlagsKHR flags =
 		VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_BUILD_BIT_KHR
@@ -187,7 +187,7 @@ public:
 		| VK_BUILD_ACCELERATION_STRUCTURE_ALLOW_COMPACTION_BIT_KHR);
 
 	// Set up TLAS after all BLASs are added, TLAS will not be created or be built, we do it in Init
-	void SetUpTLAS(
+	void PresetTLAS(
 		const std::vector<InstanceData>& instData, 
 		VkBuildAccelerationStructureFlagsKHR flags = 
 		VK_BUILD_ACCELERATION_STRUCTURE_PREFER_FAST_TRACE_BIT_KHR 

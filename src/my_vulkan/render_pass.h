@@ -58,11 +58,11 @@ public:
 
 	~RenderPass();
 
-	uint32_t AddAttachment(const Attachment& _info);
+	uint32_t PreAddAttachment(const Attachment& _info);
 
-	uint32_t AddAttachment(AttachmentPreset _preset);
+	uint32_t PreAddAttachment(AttachmentPreset _preset);
 
-	uint32_t AddSubpass(Subpass _subpass);
+	uint32_t PreAddSubpass(Subpass _subpass);
 
 	void Init();
 

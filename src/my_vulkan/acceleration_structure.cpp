@@ -12,13 +12,13 @@ void RayTracingAccelerationStructure::_InitScratchBuffer(
 	Buffer& scratchBufferToInit,
 	std::vector<VkDeviceAddress>& slotAddresses)
 {
-	Buffer::Information scratchBufferInfo{};
+	Buffer::CreateInformation scratchBufferInfo{};
 	uint32_t	uMinAlignment = 128; /*m_rtASProperties.minAccelerationStructureScratchOffsetAlignment*/
 	VkDeviceSize maxScratchChunk = 0;
 	VkDeviceSize fullScratchSize = 0;
 	uint64_t	uSlotCount = 0;
 	scratchBufferInfo.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
-	scratchBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	scratchBufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
 	// setup maxScratchChunk, fullScratchSize
 	for (const auto& sizeInfo : buildSizeInfo)
@@ -44,8 +44,8 @@ void RayTracingAccelerationStructure::_InitScratchBuffer(
 	}
 
 	scratchBufferInfo.optAlignment = static_cast<VkDeviceSize>(uMinAlignment);
-
-	scratchBufferToInit.Init(scratchBufferInfo);
+	scratchBufferToInit.PresetCreateInformation(scratchBufferInfo);
+	scratchBufferToInit.Init();
 
 	// fill slotAddresses
 	slotAddresses.clear();
@@ -415,14 +415,14 @@ void RayTracingAccelerationStructure::_FillTLASInput(const std::vector<InstanceD
 
 	// setup instance buffer
 	{
-		Buffer::Information bufferInfo{};
+		Buffer::CreateInformation bufferInfo{};
 		inputToFill.uptrInstanceBuffer = std::make_unique<Buffer>();
 
-		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		bufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		bufferInfo.usage = VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 		bufferInfo.size = ASInstances.size() * sizeof(VkAccelerationStructureInstanceKHR);
-
-		inputToFill.uptrInstanceBuffer->Init(bufferInfo);
+		inputToFill.uptrInstanceBuffer->PresetCreateInformation(bufferInfo);
+		inputToFill.uptrInstanceBuffer->Init();
 		inputToFill.uptrInstanceBuffer->CopyFromHost(ASInstances.data());
 	}
 
@@ -576,7 +576,7 @@ RayTracingAccelerationStructure::~RayTracingAccelerationStructure()
 	assert(vkAccelerationStructure == VK_NULL_HANDLE);
 }
 
-uint32_t RayTracingAccelerationStructure::AddBLAS(const std::vector<TriangleData>& geomData, VkBuildAccelerationStructureFlagsKHR flags)
+uint32_t RayTracingAccelerationStructure::PreAddBLAS(const std::vector<TriangleData>& geomData, VkBuildAccelerationStructureFlagsKHR flags)
 {
 	uint32_t uRet = static_cast<uint32_t>(m_BLASInputs.size());
 	BLASInput blas{};
@@ -594,7 +594,7 @@ uint32_t RayTracingAccelerationStructure::AddBLAS(const std::vector<TriangleData
     return uRet;
 }
 
-uint32_t RayTracingAccelerationStructure::AddBLAS(const std::vector<AABBData>& geomData, VkBuildAccelerationStructureFlagsKHR flags)
+uint32_t RayTracingAccelerationStructure::PreAddBLAS(const std::vector<AABBData>& geomData, VkBuildAccelerationStructureFlagsKHR flags)
 {
 	uint32_t uRet = static_cast<uint32_t>(m_BLASInputs.size());
 	BLASInput blas{};
@@ -612,7 +612,7 @@ uint32_t RayTracingAccelerationStructure::AddBLAS(const std::vector<AABBData>& g
 	return uRet;
 }
 
-void RayTracingAccelerationStructure::SetUpTLAS(const std::vector<InstanceData>& instData, VkBuildAccelerationStructureFlagsKHR flags)
+void RayTracingAccelerationStructure::PresetTLAS(const std::vector<InstanceData>& instData, VkBuildAccelerationStructureFlagsKHR flags)
 {	
 	_BuildBLASs();
 	m_BLASInputs.clear();
@@ -709,7 +709,7 @@ void RayTracingAccelerationStructure::RecordPipelineBarrier(CommandSubmission* p
 
 void RayTracingAccelerationStructure::BLAS::Init(VkDeviceSize size)
 {
-	Buffer::Information bufferInfo{};
+	Buffer::CreateInformation bufferInfo{};
 	VkAccelerationStructureCreateInfoKHR info{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR };
 	VkAccelerationStructureDeviceAddressInfoKHR vkASAddrInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR };
 
@@ -717,11 +717,11 @@ void RayTracingAccelerationStructure::BLAS::Init(VkDeviceSize size)
 	info.size = size;
 	uptrBuffer = std::make_unique<Buffer>();
 
-	bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	bufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 	bufferInfo.usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 	bufferInfo.size = info.size;
-
-	uptrBuffer->Init(bufferInfo);
+	uptrBuffer->PresetCreateInformation(bufferInfo);
+	uptrBuffer->Init();
 	info.buffer = uptrBuffer->vkBuffer;
 
 	VK_CHECK(vkCreateAccelerationStructureKHR(MyDevice::GetInstance().vkDevice, &info, nullptr, &vkAccelerationStructure), "Failed to create BLAS!");
@@ -750,7 +750,7 @@ void RayTracingAccelerationStructure::TLAS::Init(VkDeviceSize ASSize)
 	// create VkAcceleartionStructure
 	VkAccelerationStructureCreateInfoKHR createInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_CREATE_INFO_KHR };
 	VkAccelerationStructureDeviceAddressInfoKHR addrInfo{ VK_STRUCTURE_TYPE_ACCELERATION_STRUCTURE_DEVICE_ADDRESS_INFO_KHR };
-	Buffer::Information bufferInfo{};
+	Buffer::CreateInformation bufferInfo{};
 
 	if (uptrBuffer.get() != nullptr)
 	{
@@ -758,10 +758,11 @@ void RayTracingAccelerationStructure::TLAS::Init(VkDeviceSize ASSize)
 		uptrBuffer.reset();
 	}
 	uptrBuffer = std::make_unique<Buffer>();
-	bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+	bufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 	bufferInfo.size = ASSize;
 	bufferInfo.usage = VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_STORAGE_BIT_KHR | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
-	uptrBuffer->Init(bufferInfo);
+	uptrBuffer->PresetCreateInformation(bufferInfo);
+	uptrBuffer->Init();
 
 	createInfo.type = VK_ACCELERATION_STRUCTURE_TYPE_TOP_LEVEL_KHR;
 	createInfo.size = ASSize;

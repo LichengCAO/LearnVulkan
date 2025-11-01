@@ -33,9 +33,9 @@ void SwapchainPass::_InitRenderPass()
 	RenderPass::Subpass subpass{};
 
 	m_renderPass = std::make_unique<RenderPass>();
-	m_renderPass->AddAttachment(RenderPass::AttachmentPreset::SWAPCHAIN);
+	m_renderPass->PreAddAttachment(RenderPass::AttachmentPreset::SWAPCHAIN);
 	subpass.AddColorAttachment(0);
-	m_renderPass->AddSubpass(subpass);
+	m_renderPass->PreAddSubpass(subpass);
 
 	m_renderPass->Init();
 }
@@ -52,7 +52,7 @@ void SwapchainPass::_UninitRenderPass()
 void SwapchainPass::_InitPipeline()
 {
 	m_program = std::make_unique<GraphicsProgram>();
-	m_program->SetUpRenderPass(m_renderPass.get(), 0);
+	m_program->PresetRenderPass(m_renderPass.get(), 0);
 	m_program->Init({ "E:/GitStorage/LearnVulkan/bin/shaders/pass_through.vert.spv", "E:/GitStorage/LearnVulkan/bin/shaders/swapchain.frag.spv" }, m_uMaxFrameCount);
 }
 

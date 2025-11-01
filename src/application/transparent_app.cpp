@@ -119,10 +119,10 @@ void TransparentApp::_InitRenderPass()
 		readOnlyDepthInfo.attachmentDescription.storeOp = VK_ATTACHMENT_STORE_OP_DONT_CARE;
 		readOnlyDepthInfo.attachmentDescription.initialLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 		readOnlyDepthInfo.attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
-		m_oitRenderPass.AddAttachment(readOnlyDepthInfo);
+		m_oitRenderPass.PreAddAttachment(readOnlyDepthInfo);
 		RenderPass::Subpass oitSubpassInfo{};
 		oitSubpassInfo.SetDepthStencilAttachment(0, true);
-		m_oitRenderPass.AddSubpass(oitSubpassInfo);
+		m_oitRenderPass.PreAddSubpass(oitSubpassInfo);
 		m_oitRenderPass.Init();
 	}
 
@@ -149,12 +149,12 @@ void TransparentApp::_InitRenderPass()
 		depthInfo.attachmentDescription.loadOp = VkAttachmentLoadOp::VK_ATTACHMENT_LOAD_OP_LOAD;
 		depthInfo.attachmentDescription.storeOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_DONT_CARE;
 
-		m_distortRenderPass.AddAttachment(uvDistortInfo);
-		m_distortRenderPass.AddAttachment(depthInfo);
+		m_distortRenderPass.PreAddAttachment(uvDistortInfo);
+		m_distortRenderPass.PreAddAttachment(depthInfo);
 		RenderPass::Subpass distortSubpassInfo{};
 		distortSubpassInfo.AddColorAttachment(0);
 		distortSubpassInfo.SetDepthStencilAttachment(1, true);
-		m_distortRenderPass.AddSubpass(distortSubpassInfo);
+		m_distortRenderPass.PreAddSubpass(distortSubpassInfo);
 		m_distortRenderPass.Init();
 	}
 
@@ -167,38 +167,38 @@ void TransparentApp::_InitRenderPass()
 		RenderPass::Attachment depthInfo  = RenderPass::GetPresetAttachment(RenderPass::AttachmentPreset::DEPTH);
 		depthInfo.attachmentDescription.finalLayout = VK_IMAGE_LAYOUT_DEPTH_STENCIL_READ_ONLY_OPTIMAL;
 		depthInfo.attachmentDescription.storeOp = VkAttachmentStoreOp::VK_ATTACHMENT_STORE_OP_STORE;
-		m_gbufferRenderPass.AddAttachment(albedoInfo);
-		m_gbufferRenderPass.AddAttachment(posInfo);
-		m_gbufferRenderPass.AddAttachment(normalInfo);
-		m_gbufferRenderPass.AddAttachment(gDepthInfo);
-		m_gbufferRenderPass.AddAttachment(depthInfo);
+		m_gbufferRenderPass.PreAddAttachment(albedoInfo);
+		m_gbufferRenderPass.PreAddAttachment(posInfo);
+		m_gbufferRenderPass.PreAddAttachment(normalInfo);
+		m_gbufferRenderPass.PreAddAttachment(gDepthInfo);
+		m_gbufferRenderPass.PreAddAttachment(depthInfo);
 		RenderPass::Subpass gSubpassInfo{};
 		gSubpassInfo.AddColorAttachment(0);
 		gSubpassInfo.AddColorAttachment(1);
 		gSubpassInfo.AddColorAttachment(2);
 		gSubpassInfo.AddColorAttachment(3);
 		gSubpassInfo.SetDepthStencilAttachment(4);
-		m_gbufferRenderPass.AddSubpass(gSubpassInfo);
+		m_gbufferRenderPass.PreAddSubpass(gSubpassInfo);
 		m_gbufferRenderPass.Init();
 	}
 
 	// light pass
 	{
 		RenderPass::Attachment lightInfo = RenderPass::GetPresetAttachment(RenderPass::AttachmentPreset::GBUFFER_ALBEDO);
-		m_lightRenderPass.AddAttachment(lightInfo);
+		m_lightRenderPass.PreAddAttachment(lightInfo);
 		RenderPass::Subpass subpassInfo{};
 		subpassInfo.AddColorAttachment(0);
-		m_lightRenderPass.AddSubpass(subpassInfo);
+		m_lightRenderPass.PreAddSubpass(subpassInfo);
 		m_lightRenderPass.Init();
 	}
 
 	// final present
 	{
 		RenderPass::Attachment swapchainInfo = RenderPass::GetPresetAttachment(RenderPass::AttachmentPreset::SWAPCHAIN);
-		m_renderPass.AddAttachment(swapchainInfo);
+		m_renderPass.PreAddAttachment(swapchainInfo);
 		RenderPass::Subpass subpassInfo{};
 		subpassInfo.AddColorAttachment(0);
-		m_renderPass.AddSubpass(subpassInfo);
+		m_renderPass.PreAddSubpass(subpassInfo);
 		m_renderPass.Init();
 	}
 }
@@ -215,73 +215,73 @@ void TransparentApp::_InitDescriptorSetLayouts()
 {
 	// OIT front device write read
 	{
-		m_oitSampleDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT); // sample image
-		m_oitSampleDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT); // sample count
-		m_oitSampleDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT); // in use
-		m_oitSampleDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT); // viewport
+		m_oitSampleDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_TEXEL_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT); // sample image
+		m_oitSampleDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT); // sample count
+		m_oitSampleDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT); // in use
+		m_oitSampleDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT); // viewport
 		m_oitSampleDSetLayout.Init();
 	}
 
 	// OIT sorting device write
 	{
-		m_oitColorDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT);
+		m_oitColorDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_FRAGMENT_BIT | VK_SHADER_STAGE_COMPUTE_BIT);
 		m_oitColorDSetLayout.Init();
 	}
 
 	// model related host write device read
 	{
-		m_modelDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT);
-		m_modelDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+		m_modelDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT);
+		m_modelDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 		m_modelDSetLayout.Init();
 	}
 
 	//camera host write device read
 	{
-		m_cameraDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
+		m_cameraDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT);
 		m_cameraDSetLayout.Init();
 	}
 
 	// gbuffer device read
 	{
-		m_gbufferDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT); // albedo
-		m_gbufferDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT); // position
-		m_gbufferDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT); // normal
-		m_gbufferDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT); // depth
+		m_gbufferDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT); // albedo
+		m_gbufferDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT); // position
+		m_gbufferDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT); // normal
+		m_gbufferDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT); // depth
 		m_gbufferDSetLayout.Init();
 	}
 
 	// distort host write device read
 	{
-		m_distortDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT); // camera view information
+		m_distortDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT | VK_SHADER_STAGE_FRAGMENT_BIT); // camera view information
 		m_distortDSetLayout.Init();
 	}
 
 	// transparent device read
 	{
-		m_transOutputDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT); // oit
-		m_transOutputDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT); // distort uv
+		m_transOutputDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT); // oit
+		m_transOutputDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT); // distort uv
 		m_transOutputDSetLayout.Init();
 	}
 
 	// material host write device read
 	{
-		m_materialDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT);
+		m_materialDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT);
 		m_materialDSetLayout.Init();
 	}
 
 	// blur device write and read
 	{
-		m_blurDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_COMPUTE_BIT); // read only image
-		m_blurDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT); // write only image
-		m_blurDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT); // viewport information
-		m_blurDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT); // blur information
-		m_blurDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT); // kernel
+		m_blurDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_COMPUTE_BIT); // read only image
+		m_blurDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_COMPUTE_BIT); // write only image
+		m_blurDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT); // viewport information
+		m_blurDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT); // blur information
+		m_blurDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT); // kernel
 		m_blurDSetLayout.Init();
 	}
 
 	// blur output device read
 	{
-		m_blurOutputDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
+		m_blurOutputDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_COMBINED_IMAGE_SAMPLER, VK_SHADER_STAGE_FRAGMENT_BIT);
 		m_blurOutputDSetLayout.Init();
 	}
 }
@@ -343,16 +343,17 @@ void TransparentApp::_InitBuffers()
 		uint32_t width = MyDevice::GetInstance().GetSwapchainExtent().width;
 		uint32_t height = MyDevice::GetInstance().GetSwapchainExtent().height;
 
-		Buffer::Information oitViewportBufferInfo{};
+		Buffer::CreateInformation oitViewportBufferInfo{};
 		oitViewportBufferInfo.size = sizeof(glm::ivec3);
-		oitViewportBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-		oitViewportBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
-		m_oitViewportBuffer.Init(oitViewportBufferInfo);
+		oitViewportBufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+		oitViewportBufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		m_oitViewportBuffer.PresetCreateInformation(oitViewportBufferInfo);
+		m_oitViewportBuffer.Init();
 
-		Buffer::Information oitSampleTexelBufferInfo{};
+		Buffer::CreateInformation oitSampleTexelBufferInfo{};
 		oitSampleTexelBufferInfo.size = sizeof(glm::uvec4) * width * height * 5/* OIT_LAYER */;
 		oitSampleTexelBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_STORAGE_TEXEL_BUFFER_BIT | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT; // we need to clear it first
-		oitSampleTexelBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		oitSampleTexelBufferInfo.optMemoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
 		ViewportInformation info{};
 		info.extent = glm::ivec4(width, height, width * height, 0);
@@ -363,7 +364,8 @@ void TransparentApp::_InitBuffers()
 		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 		{
 			m_oitSampleTexelBuffers.push_back(Buffer{});
-			m_oitSampleTexelBuffers[i].Init(oitSampleTexelBufferInfo);
+			m_oitSampleTexelBuffers[i].PresetCreateInformation(oitSampleTexelBufferInfo);
+			m_oitSampleTexelBuffers[i].Init();
 			m_oitSampleTexelBufferViews.push_back(m_oitSampleTexelBuffers[i].NewBufferView(VkFormat::VK_FORMAT_R32G32B32A32_UINT));
 			m_oitSampleTexelBufferViews[i].Init();
 		}
@@ -371,10 +373,10 @@ void TransparentApp::_InitBuffers()
 
 	// model
 	{
-		Buffer::Information modelBufferInfo;
+		Buffer::CreateInformation modelBufferInfo;
 		modelBufferInfo.size = sizeof(ModelTransform);
 		modelBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-		modelBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		modelBufferInfo.optMemoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 		m_vecModelBuffers.reserve(MAX_FRAME_COUNT);
 		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 		{
@@ -384,7 +386,8 @@ void TransparentApp::_InitBuffers()
 			for (int j = 0; j < n; ++j)
 			{
 				m_vecModelBuffers[i].push_back(Buffer{});
-				m_vecModelBuffers[i].back().Init(modelBufferInfo);
+				m_vecModelBuffers[i].back().PresetCreateInformation(modelBufferInfo);
+				m_vecModelBuffers[i].back().Init();
 			}
 		}
 		m_vecTransModelBuffers.reserve(MAX_FRAME_COUNT);
@@ -396,17 +399,18 @@ void TransparentApp::_InitBuffers()
 			for (int j = 0; j < n; ++j)
 			{
 				m_vecTransModelBuffers[i].push_back(Buffer{});
-				m_vecTransModelBuffers[i][j].Init(modelBufferInfo);
+				m_vecTransModelBuffers[i][j].PresetCreateInformation(modelBufferInfo);
+				m_vecTransModelBuffers[i][j].Init();
 			}
 		}
 	}
 
 	// material
 	{
-		Buffer::Information materialBufferInfo;
+		Buffer::CreateInformation materialBufferInfo;
 		materialBufferInfo.size = sizeof(SimpleMaterial);
-		materialBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-		materialBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		materialBufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+		materialBufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 		m_vecMaterialBuffers.reserve(MAX_FRAME_COUNT);
 		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 		{
@@ -416,59 +420,64 @@ void TransparentApp::_InitBuffers()
 			for (int j = 0; j < n; ++j)
 			{
 				m_vecMaterialBuffers[i].push_back(Buffer{});
-				m_vecMaterialBuffers[i].back().Init(materialBufferInfo);
+				m_vecMaterialBuffers[i].back().PresetCreateInformation(materialBufferInfo);
+				m_vecMaterialBuffers[i].back().Init();
 			}
 		}
 	}
 
 	// camera
 	{
-		Buffer::Information bufferInfo;
+		Buffer::CreateInformation bufferInfo;
 		bufferInfo.size = sizeof(CameraUBO);
-		bufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;// | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT; this is use for device to device transfer
-		bufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;// | VkBufferUsageFlagBits::VK_BUFFER_USAGE_TRANSFER_DST_BIT; this is use for device to device transfer
+		bufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 		m_cameraBuffers.reserve(MAX_FRAME_COUNT);
 		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 		{
 			m_cameraBuffers.push_back(Buffer{});
-			m_cameraBuffers.back().Init(bufferInfo);
+			m_cameraBuffers.back().PresetCreateInformation(bufferInfo);
+			m_cameraBuffers.back().Init();
 		}
 	}
 
 	// distort camera view info
 	{
-		Buffer::Information bufferInfo;
+		Buffer::CreateInformation bufferInfo;
 		bufferInfo.size = sizeof(CameraViewInformation);
 		bufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-		bufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		bufferInfo.optMemoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 		m_distortBuffers.reserve(MAX_FRAME_COUNT);
 		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 		{
 			m_distortBuffers.push_back(Buffer{});
-			m_distortBuffers[i].Init(bufferInfo);
+			m_distortBuffers[i].PresetCreateInformation(bufferInfo);
+			m_distortBuffers[i].Init();
 		}
 	}
 
 	// blur
 	{
-		Buffer::Information bufferInfo;
+		Buffer::CreateInformation bufferInfo;
 		bufferInfo.size = sizeof(GaussianBlurInformation);
 		bufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-		bufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+		bufferInfo.optMemoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 
-		Buffer::Information kernelBufferInfo;
+		Buffer::CreateInformation kernelBufferInfo;
 		kernelBufferInfo.size = (m_blurRadius + 1 + 15) / 16 * sizeof(GaussianKernels);
 		kernelBufferInfo.usage = VkBufferUsageFlagBits::VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
-		kernelBufferInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+		kernelBufferInfo.optMemoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 
 		m_blurBuffers.reserve(MAX_FRAME_COUNT);
 		m_kernelBuffers.reserve(MAX_FRAME_COUNT);
 		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 		{
 			m_blurBuffers.push_back(Buffer{});
-			m_blurBuffers[i].Init(bufferInfo);
+			m_blurBuffers[i].PresetCreateInformation(bufferInfo);
+			m_blurBuffers[i].Init();
 			m_kernelBuffers.push_back(Buffer{});
-			m_kernelBuffers[i].Init(kernelBufferInfo);
+			m_kernelBuffers[i].PresetCreateInformation(kernelBufferInfo);
+			m_kernelBuffers[i].Init();
 		}
 	}
 }
@@ -597,26 +606,17 @@ void TransparentApp::_InitImagesAndViews()
 
 	// OIT images
 	{
-		Image::Information oitSampleCountImageInfo{};
-		oitSampleCountImageInfo.format = VkFormat::VK_FORMAT_R32_UINT;
-		oitSampleCountImageInfo.width = width;
-		oitSampleCountImageInfo.height = height;
-		oitSampleCountImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_STORAGE_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT;// | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
-		oitSampleCountImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		Image::CreateInformation oitSampleCountImageInfo{};
+		oitSampleCountImageInfo.optFormat = VK_FORMAT_R32_UINT;
+		oitSampleCountImageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;// | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
 
-		Image::Information oitInUseImageInfo{};
-		oitInUseImageInfo.format = VkFormat::VK_FORMAT_R32_UINT;
-		oitInUseImageInfo.width = width;
-		oitInUseImageInfo.height = height;
-		oitInUseImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_STORAGE_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT;// | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
-		oitInUseImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		Image::CreateInformation oitInUseImageInfo{};
+		oitInUseImageInfo.optFormat = VK_FORMAT_R32_UINT;
+		oitInUseImageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;// | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
 
-		Image::Information oitOutputImageInfo{};
-		oitOutputImageInfo.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
-		oitOutputImageInfo.width = width;
-		oitOutputImageInfo.height = height;
-		oitOutputImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_STORAGE_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_TRANSFER_DST_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
-		oitOutputImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		Image::CreateInformation oitOutputImageInfo{};
+		oitOutputImageInfo.optFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
+		oitOutputImageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
 		std::vector<std::vector<Image>*> vecOITImages = {
 			&m_oitSampleCountImages,
@@ -628,7 +628,7 @@ void TransparentApp::_InitImagesAndViews()
 			&m_oitInUseImageViews,
 			&m_oitColorImageViews,
 		};
-		std::vector<Image::Information*> oitImageInfos = {
+		std::vector<Image::CreateInformation*> oitImageInfos = {
 			&oitSampleCountImageInfo,
 			&oitInUseImageInfo,
 			&oitOutputImageInfo
@@ -642,9 +642,9 @@ void TransparentApp::_InitImagesAndViews()
 				auto& imageInfo = *oitImageInfos[j];
 				oitImages.push_back(Image{});
 				Image& oitImage = oitImages.back();
-				oitImage.SetImageInformation(imageInfo);
+				oitImage.PresetCreateInformation(imageInfo);
 				oitImage.Init();
-				oitImage.TransitionLayout(VK_IMAGE_LAYOUT_GENERAL);
+				oitImage.TransitLayout(VK_IMAGE_LAYOUT_GENERAL);
 				oitViews.push_back(oitImage.NewImageView());
 				oitViews.back().Init();
 			}
@@ -653,18 +653,15 @@ void TransparentApp::_InitImagesAndViews()
 
 	// depth image and view
 	{
-		Image::Information depthImageInfo;
-		depthImageInfo.width = width;
-		depthImageInfo.height = height;
-		depthImageInfo.usage = VkImageUsageFlagBits::VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT;
-		depthImageInfo.format = MyDevice::GetInstance().GetDepthFormat();
-		depthImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		Image::CreateInformation depthImageInfo{};
+		depthImageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
+		depthImageInfo.optFormat = MyDevice::GetInstance().GetDepthFormat();
 
 		for (int i = 0; i < n; ++i)
 		{
 			m_depthImages.push_back(Image{});
 			Image& depthImage = m_depthImages.back();
-			depthImage.SetImageInformation(depthImageInfo);
+			depthImage.PresetCreateInformation(depthImageInfo);
 			depthImage.Init();
 			m_depthImageViews.push_back(depthImage.NewImageView(VK_IMAGE_ASPECT_DEPTH_BIT));
 			m_depthImageViews.back().Init();
@@ -674,37 +671,21 @@ void TransparentApp::_InitImagesAndViews()
 	// gbuffer images and views
 	{
 		m_mipLevel = static_cast<uint32_t>(std::floor(std::log2(std::max(width, height)))) + 1;
-		Image::Information gbufferAlbedoImageInfo;
-		gbufferAlbedoImageInfo.mipLevels = m_mipLevel;
-		gbufferAlbedoImageInfo.width = width;
-		gbufferAlbedoImageInfo.height = height;
-		gbufferAlbedoImageInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-		gbufferAlbedoImageInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		Image::CreateInformation gbufferAlbedoImageInfo;
+		gbufferAlbedoImageInfo.optMipLevels = m_mipLevel;
 		gbufferAlbedoImageInfo.usage = 
 			VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT 
 			| VK_IMAGE_USAGE_SAMPLED_BIT 
 			| VK_IMAGE_USAGE_TRANSFER_DST_BIT 
 			| VK_IMAGE_USAGE_TRANSFER_SRC_BIT;
 
-		Image::Information gbufferPosImageInfo;
-		gbufferPosImageInfo.width = width;
-		gbufferPosImageInfo.height = height;
-		gbufferPosImageInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-		gbufferPosImageInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		Image::CreateInformation gbufferPosImageInfo;
 		gbufferPosImageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
-		Image::Information gbufferNormalImageInfo;
-		gbufferNormalImageInfo.width = width;
-		gbufferNormalImageInfo.height = height;
-		gbufferNormalImageInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-		gbufferNormalImageInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		Image::CreateInformation gbufferNormalImageInfo;
 		gbufferNormalImageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
-		Image::Information gbufferDepthImageInfo;
-		gbufferDepthImageInfo.width = width;
-		gbufferDepthImageInfo.height = height;
-		gbufferDepthImageInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-		gbufferDepthImageInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		Image::CreateInformation gbufferDepthImageInfo;
 		gbufferDepthImageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
 
 		std::vector<std::vector<Image>*> vecGbufferImages = {
@@ -719,7 +700,7 @@ void TransparentApp::_InitImagesAndViews()
 			&m_gbufferNormalImageViews,
 			&m_gbufferDepthImageViews,
 		};
-		std::vector<Image::Information*> gbufferImageInfos = {
+		std::vector<Image::CreateInformation*> gbufferImageInfos = {
 			&gbufferAlbedoImageInfo,
 			&gbufferPosImageInfo,
 			&gbufferNormalImageInfo,
@@ -734,7 +715,7 @@ void TransparentApp::_InitImagesAndViews()
 				auto& imageInfo = *gbufferImageInfos[j];
 				gbufferImages.push_back(Image{});
 				Image& gbufferImage = gbufferImages.back();
-				gbufferImage.SetImageInformation(imageInfo);
+				gbufferImage.PresetCreateInformation(imageInfo);
 				gbufferImage.Init();
 				gbufferViews.push_back(gbufferImage.NewImageView());
 				gbufferViews.back().Init();
@@ -767,12 +748,8 @@ void TransparentApp::_InitImagesAndViews()
 
 	// distort image and view
 	{
-		Image::Information distortUVImageInfo{};
-		distortUVImageInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-		distortUVImageInfo.width = width;
-		distortUVImageInfo.height = height;
+		Image::CreateInformation distortUVImageInfo{};
 		distortUVImageInfo.usage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_SAMPLED_BIT;
-		distortUVImageInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 
 		std::vector<std::vector<Image>*> vecDistortImages = 
 		{
@@ -782,7 +759,7 @@ void TransparentApp::_InitImagesAndViews()
 		{
 			&m_distortImageViews
 		};
-		std::vector<Image::Information*> distortImageInfos =
+		std::vector<Image::CreateInformation*> distortImageInfos =
 		{
 			&distortUVImageInfo,
 		};
@@ -795,9 +772,9 @@ void TransparentApp::_InitImagesAndViews()
 				auto& imageInfo = *distortImageInfos[j];
 				images.push_back(Image{});
 				Image& oitImage = images.back();
-				oitImage.SetImageInformation(imageInfo);
+				oitImage.PresetCreateInformation(imageInfo);
 				oitImage.Init();
-				oitImage.TransitionLayout(VK_IMAGE_LAYOUT_GENERAL);
+				oitImage.TransitLayout(VK_IMAGE_LAYOUT_GENERAL);
 				views.push_back(oitImage.NewImageView());
 				views.back().Init();
 			}
@@ -806,21 +783,17 @@ void TransparentApp::_InitImagesAndViews()
 
 	// light image and view for post rendering and blur
 	{
-		Image::Information lightImageInfo{};
-		lightImageInfo.format = VkFormat::VK_FORMAT_R32G32B32A32_SFLOAT;
-		lightImageInfo.width = width;
-		lightImageInfo.height = height;
+		Image::CreateInformation lightImageInfo{};
 		lightImageInfo.usage = 
-			VkImageUsageFlagBits::VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | 
-			VkImageUsageFlagBits::VK_IMAGE_USAGE_SAMPLED_BIT | 
-			VkImageUsageFlagBits::VK_IMAGE_USAGE_STORAGE_BIT;
-		lightImageInfo.memoryProperty = VkMemoryPropertyFlagBits::VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		lightImageInfo.arrayLayers = m_blurLayers + 1;
+			VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | 
+			VK_IMAGE_USAGE_SAMPLED_BIT | 
+			VK_IMAGE_USAGE_STORAGE_BIT;
+		lightImageInfo.optArrayLayers = m_blurLayers + 1;
 
 		for (int i = 0; i < n; ++i)
 		{
 			m_lightImages.push_back(Image{});
-			m_lightImages[i].SetImageInformation(lightImageInfo);
+			m_lightImages[i].PresetCreateInformation(lightImageInfo);
 			m_lightImages[i].Init();
 			
 			m_lightImageLayerViews.push_back({});
@@ -1001,7 +974,7 @@ void TransparentApp::_InitDescriptorSets()
 			inUseImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;			  // Commonly used layout for storage images
 
 			m_oitDSets.push_back(DescriptorSet{});
-			m_oitDSets[i].SetLayout(&m_oitSampleDSetLayout);
+			m_oitDSets[i].PresetLayout(&m_oitSampleDSetLayout);
 			m_oitDSets[i].Init();
 			m_oitDSets[i].StartUpdate();
 			m_oitDSets[i].UpdateBinding(0, { m_oitSampleTexelBufferViews[i].vkBufferView });
@@ -1020,7 +993,7 @@ void TransparentApp::_InitDescriptorSets()
 			outputImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;			  // Commonly used layout for storage images
 
 			m_oitColorDSets.push_back(DescriptorSet{});
-			m_oitColorDSets[i].SetLayout(&m_oitColorDSetLayout);
+			m_oitColorDSets[i].PresetLayout(&m_oitColorDSetLayout);
 			m_oitColorDSets[i].Init();
 			m_oitColorDSets[i].StartUpdate();
 			m_oitColorDSets[i].UpdateBinding(0, { outputImageInfo });
@@ -1034,7 +1007,7 @@ void TransparentApp::_InitDescriptorSets()
 		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 		{
 			m_distortDSets.push_back(DescriptorSet{});
-			m_distortDSets[i].SetLayout(&m_distortDSetLayout);
+			m_distortDSets[i].PresetLayout(&m_distortDSetLayout);
 			m_distortDSets[i].Init();
 			m_distortDSets[i].StartUpdate();
 			m_distortDSets[i].UpdateBinding(0, { (&m_distortBuffers[i])->GetDescriptorInfo() });
@@ -1053,7 +1026,7 @@ void TransparentApp::_InitDescriptorSets()
 			for (int j = 0; j < n; ++j)
 			{
 				m_vecModelDSets[i].push_back(DescriptorSet{});
-				m_vecModelDSets[i][j].SetLayout(&m_modelDSetLayout);
+				m_vecModelDSets[i][j].PresetLayout(&m_modelDSetLayout);
 				m_vecModelDSets[i][j].Init();
 				m_vecModelDSets[i][j].StartUpdate();
 				m_vecModelDSets[i][j].UpdateBinding(0, { m_vecModelBuffers[i][j].GetDescriptorInfo() });
@@ -1071,7 +1044,7 @@ void TransparentApp::_InitDescriptorSets()
 			for (int j = 0; j < n; ++j)
 			{
 				m_vecTransModelDSets[i].push_back(DescriptorSet{});
-				m_vecTransModelDSets[i][j].SetLayout(&m_modelDSetLayout);
+				m_vecTransModelDSets[i][j].PresetLayout(&m_modelDSetLayout);
 				m_vecTransModelDSets[i][j].Init();
 				m_vecTransModelDSets[i][j].StartUpdate();
 				m_vecTransModelDSets[i][j].UpdateBinding(0, { m_vecTransModelBuffers[i][j].GetDescriptorInfo() });
@@ -1091,7 +1064,7 @@ void TransparentApp::_InitDescriptorSets()
 			for (int j = 0; j < n; ++j)
 			{
 				m_vecMaterialDSets[i].push_back(DescriptorSet{});
-				m_vecMaterialDSets[i][j].SetLayout(&m_materialDSetLayout);
+				m_vecMaterialDSets[i][j].PresetLayout(&m_materialDSetLayout);
 				m_vecMaterialDSets[i][j].Init();
 				m_vecMaterialDSets[i][j].StartUpdate();
 				m_vecMaterialDSets[i][j].UpdateBinding(0, { m_vecMaterialBuffers[i][j].GetDescriptorInfo() });
@@ -1106,7 +1079,7 @@ void TransparentApp::_InitDescriptorSets()
 		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 		{
 			m_cameraDSets.push_back(DescriptorSet{});
-			m_cameraDSets.back().SetLayout(&m_cameraDSetLayout);
+			m_cameraDSets.back().PresetLayout(&m_cameraDSetLayout);
 			m_cameraDSets.back().Init();
 			m_cameraDSets.back().StartUpdate();
 			m_cameraDSets.back().UpdateBinding(0, { m_cameraBuffers[i].GetDescriptorInfo() });
@@ -1145,7 +1118,7 @@ void TransparentApp::_InitDescriptorSets()
 			//imageInfo4.sampler = m_vkSampler;
 
 			m_gbufferDSets.push_back(DescriptorSet{});
-			m_gbufferDSets.back().SetLayout(&m_gbufferDSetLayout);
+			m_gbufferDSets.back().PresetLayout(&m_gbufferDSetLayout);
 			m_gbufferDSets.back().Init();
 			m_gbufferDSets.back().StartUpdate();
 			m_gbufferDSets.back().UpdateBinding(0, { imageInfo0 });
@@ -1172,7 +1145,7 @@ void TransparentApp::_InitDescriptorSets()
 			distortOutputImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 			m_transOutputDSets.push_back(DescriptorSet{});
-			m_transOutputDSets[i].SetLayout(&m_transOutputDSetLayout);
+			m_transOutputDSets[i].PresetLayout(&m_transOutputDSetLayout);
 			m_transOutputDSets[i].Init();
 			m_transOutputDSets[i].StartUpdate();
 			m_transOutputDSets[i].UpdateBinding(0, { oitOutputImageInfo });
@@ -1217,7 +1190,7 @@ void TransparentApp::_InitDescriptorSets()
 				blurOutputImageInfoX.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
 				m_blurLayeredDSetsX[i].push_back(DescriptorSet{});
-				m_blurLayeredDSetsX[i][j].SetLayout(&m_blurDSetLayout);
+				m_blurLayeredDSetsX[i][j].PresetLayout(&m_blurDSetLayout);
 				m_blurLayeredDSetsX[i][j].Init();
 				m_blurLayeredDSetsX[i][j].StartUpdate();
 				m_blurLayeredDSetsX[i][j].UpdateBinding(0, { blurInputImageInfoX });
@@ -1238,7 +1211,7 @@ void TransparentApp::_InitDescriptorSets()
 				blurOutputImageInfoY.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
 				m_blurLayeredDSetsY[i].push_back(DescriptorSet{});
-				m_blurLayeredDSetsY[i][j].SetLayout(&m_blurDSetLayout);
+				m_blurLayeredDSetsY[i][j].PresetLayout(&m_blurDSetLayout);
 				m_blurLayeredDSetsY[i][j].Init();
 				m_blurLayeredDSetsY[i][j].StartUpdate();
 				m_blurLayeredDSetsY[i][j].UpdateBinding(0, { blurInputImageInfoY });
@@ -1262,7 +1235,7 @@ void TransparentApp::_InitDescriptorSets()
 			blurOutputImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			blurOutputImageInfo.imageView = m_lightImageBlurViews[i].vkImageView;
 			m_blurOutputDSets.push_back(DescriptorSet{});
-			m_blurOutputDSets[i].SetLayout(&m_blurOutputDSetLayout);
+			m_blurOutputDSets[i].PresetLayout(&m_blurOutputDSetLayout);
 			m_blurOutputDSets[i].Init();
 			m_blurOutputDSets[i].StartUpdate();
 			m_blurOutputDSets[i].UpdateBinding(0, { blurOutputImageInfo });
@@ -1337,7 +1310,7 @@ void TransparentApp::_InitVertexInputs()
 		m_gbufferIndexBuffers.reserve(m_models.size());
 		for (int i = 0; i < m_models.size(); ++i)
 		{
-			Buffer::Information localBufferInfo;
+			Buffer::CreateInformation localBufferInfo;
 			std::vector<NormalVertex> vertices;
 			std::vector<uint32_t> indices;
 			std::vector<StaticMesh> scene;
@@ -1363,14 +1336,16 @@ void TransparentApp::_InitVertexInputs()
 
 			localBufferInfo.size = sizeof(NormalVertex) * vertices.size();
 			localBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-			localBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-			m_gbufferVertBuffers.back().Init(localBufferInfo);
+			localBufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+			m_gbufferVertBuffers.back().PresetCreateInformation(localBufferInfo);
+			m_gbufferVertBuffers.back().Init();
 			m_gbufferVertBuffers.back().CopyFromHost(vertices.data());
 
 			localBufferInfo.size = sizeof(uint32_t) * indices.size();;
 			localBufferInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-			localBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-			m_gbufferIndexBuffers.back().Init(localBufferInfo);
+			localBufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+			m_gbufferIndexBuffers.back().PresetCreateInformation(localBufferInfo);
+			m_gbufferIndexBuffers.back().Init();
 			m_gbufferIndexBuffers.back().CopyFromHost(indices.data());
 		}
 	}
@@ -1393,7 +1368,7 @@ void TransparentApp::_InitVertexInputs()
 			std::vector<uint32_t> indices{};
 			std::vector<TransparentVertex> vertices{};
 			glm::vec4 color(uniformDist(rnd), uniformDist(rnd), uniformDist(rnd), uniformDist(rnd));
-			Buffer::Information localBufferInfo;
+			Buffer::CreateInformation localBufferInfo;
 			// init color
 			{
 				color.x *= color.x;
@@ -1420,21 +1395,23 @@ void TransparentApp::_InitVertexInputs()
 
 			localBufferInfo.size = sizeof(TransparentVertex) * vertices.size();
 			localBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-			localBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-			m_transModelVertBuffers.back().Init(localBufferInfo);
+			localBufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+			m_transModelVertBuffers.back().PresetCreateInformation(localBufferInfo);
+			m_transModelVertBuffers.back().Init();
 			m_transModelVertBuffers.back().CopyFromHost(vertices.data());
 
 			localBufferInfo.size = sizeof(uint32_t) * indices.size();;
 			localBufferInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-			localBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-			m_transModelIndexBuffers.back().Init(localBufferInfo);
+			localBufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+			m_transModelIndexBuffers.back().PresetCreateInformation(localBufferInfo);
+			m_transModelIndexBuffers.back().Init();
 			m_transModelIndexBuffers.back().CopyFromHost(indices.data());
 		}
 	}
 
 	// setup postprocess vertex input layout
 	{
-		Buffer::Information localBufferInfo;
+		Buffer::CreateInformation localBufferInfo;
 		std::vector<uint32_t> indices = { 2, 1, 0, 0, 3, 2 };
 		std::vector<QuadVertex> vertices = {
 			{{-1.f, -1.f}, {0.0f, 0.0f}},
@@ -1449,14 +1426,16 @@ void TransparentApp::_InitVertexInputs()
 
 		localBufferInfo.size = sizeof(QuadVertex) * vertices.size();
 		localBufferInfo.usage = VK_BUFFER_USAGE_VERTEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-		localBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		m_quadVertBuffer.Init(localBufferInfo);
+		localBufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		m_quadVertBuffer.PresetCreateInformation(localBufferInfo);
+		m_quadVertBuffer.Init();
 		m_quadVertBuffer.CopyFromHost(vertices.data());
 
 		localBufferInfo.size = sizeof(uint32_t) * indices.size();;
 		localBufferInfo.usage = VK_BUFFER_USAGE_INDEX_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-		localBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		m_quadIndexBuffer.Init(localBufferInfo);
+		localBufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		m_quadIndexBuffer.PresetCreateInformation(localBufferInfo);
+		m_quadIndexBuffer.Init();
 		m_quadIndexBuffer.CopyFromHost(indices.data());
 	}
 }

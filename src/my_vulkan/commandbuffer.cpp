@@ -42,7 +42,7 @@ void CommandSubmission::_AddPipelineBarrier2(const VkDependencyInfo& _dependency
 	vkCmdPipelineBarrier2KHR(vkCommandBuffer, &_dependency);
 }
 
-void CommandSubmission::SetQueueFamilyIndex(uint32_t _queueFamilyIndex)
+void CommandSubmission::PresetQueueFamilyIndex(uint32_t _queueFamilyIndex)
 {
 	m_optQueueFamilyIndex = _queueFamilyIndex;
 }

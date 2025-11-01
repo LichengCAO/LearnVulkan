@@ -1,7 +1,6 @@
 #pragma once
 #include "common.h"
 
-// TODO: use VMA
 // ref: https://stackoverflow.com/questions/73512602/using-vulkan-memory-allocator-with-volk
 class BufferView;
 class CommandSubmission;
@@ -10,12 +9,20 @@ class MemoryAllocator;
 class Buffer final
 {
 public:
+	struct CreateInformation
+	{
+		VkDeviceSize size;
+		VkBufferUsageFlags usage;
+		std::optional<VkSharingMode>			optSharingMode;		//optional, default: VK_SHARING_MODE_EXCLUSIVE;
+		std::optional<VkMemoryPropertyFlags> optMemoryProperty; // optional, default: VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+		std::optional<VkDeviceSize>				optAlignment;			// buffer may have alignment requirements, i.e. Scratch Buffer
+	};
 	struct Information
 	{
-		VkDeviceSize size = 0;
-		VkBufferUsageFlags usage = 0;
-		VkSharingMode sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-		VkMemoryPropertyFlags memoryProperty = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		VkDeviceSize size;
+		VkBufferUsageFlags usage;
+		VkSharingMode sharingMode;
+		VkMemoryPropertyFlags	memoryProperty;// = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 		std::optional<VkDeviceSize> optAlignment; // buffer may have alignment requirements, i.e. Scratch Buffer
 	};
 
@@ -51,7 +58,9 @@ public:
 	Buffer(Buffer& _toCopy) = delete;
 	~Buffer();
 
-	void Init(Information bufferInfo);
+	void PresetCreateInformation(const CreateInformation& _info);
+
+	void Init();
 	
 	void Uninit();
 
@@ -100,49 +109,6 @@ public:
 	void Uninit();
 
 	friend class Buffer;
-};
-
-class BufferBuilder
-{
-private:
-	struct HostData
-	{
-		VkDeviceSize offset = 0u;
-		const void* pData = nullptr;
-		size_t dataSize = 0u;
-	};
-
-private:
-	VkBufferUsageFlags		m_vkUsageSetting = 0;
-	VkSharingMode			m_vkSharingModeSetting = VK_SHARING_MODE_EXCLUSIVE;
-	VkMemoryPropertyFlags	m_vkMemoryPropertySetting = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-	VkDeviceSize			m_vkAlignmentSetting = 0;
-
-	VkDeviceSize			m_uBufferSize = 0u;
-	std::vector<HostData>	m_vecHostData;
-
-public:
-	// optional
-	void SetBufferUsage(VkBufferUsageFlags _flags);
-
-	// optional
-	void SetBufferSharingMode(VkSharingMode _mode);
-
-	// optional
-	void SetBufferMemoryProperty(VkMemoryPropertyFlags _property);
-
-	// optional
-	void SetBufferAlignment(VkDeviceSize _alignment);
-
-	void StartBuild();
-
-	// _pData must be valid till the end of build
-	VkDeviceSize AppendToBuffer(const void* _pData, size_t _size, VkDeviceSize _alignment);
-
-	// _pData must be valid till the end of build
-	VkDeviceSize AppendToBuffer(const void* _pData, size_t _size);
-
-	void FinishBuild(Buffer*& _initedBuffer);
 };
 
 //Resource Type :

@@ -134,7 +134,7 @@ RenderPass::Attachment RenderPass::GetPresetAttachment(AttachmentPreset _preset)
 	return info;
 }
 
-uint32_t RenderPass::AddAttachment(const Attachment& _info)
+uint32_t RenderPass::PreAddAttachment(const Attachment& _info)
 {
 	uint32_t ret = static_cast<uint32_t>(attachments.size());
 	assert(vkRenderPass == VK_NULL_HANDLE);
@@ -143,12 +143,12 @@ uint32_t RenderPass::AddAttachment(const Attachment& _info)
 	return ret;
 }
 
-uint32_t RenderPass::AddAttachment(AttachmentPreset _preset)
+uint32_t RenderPass::PreAddAttachment(AttachmentPreset _preset)
 {
-	return AddAttachment(GetPresetAttachment(_preset));
+	return PreAddAttachment(GetPresetAttachment(_preset));
 }
 
-uint32_t RenderPass::AddSubpass(Subpass _subpass)
+uint32_t RenderPass::PreAddSubpass(Subpass _subpass)
 {
 	uint32_t ret = static_cast<uint32_t>(subpasses.size());
 	assert(vkRenderPass == VK_NULL_HANDLE);
@@ -362,8 +362,7 @@ VkExtent2D Framebuffer::GetImageSize() const
 {
 	CHECK_TRUE(attachedViews.size() > 0, "No image in this framebuffer!");
 	VkExtent2D ret{};
-	Image::Information imageInfo = attachedViews[0]->pImage->GetImageInformation();
-	ret.width = imageInfo.width;
-	ret.height = imageInfo.height;
+	ret.width = attachedViews[0]->pImage->GetImageSize().width;
+	ret.height = attachedViews[0]->pImage->GetImageSize().height;
 	return ret;
 }

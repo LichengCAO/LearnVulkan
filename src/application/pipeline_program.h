@@ -218,7 +218,7 @@ private:
 	void _UninitPipeline();
 
 public:
-	void SetUpRenderPass(const RenderPass* _pRenderPass, uint32_t _subpass);
+	void PresetRenderPass(const RenderPass* _pRenderPass, uint32_t _subpass);
 
 	void Init(const std::vector<std::string>& _shaderPaths, uint32_t _frameInFlight);
 
@@ -309,11 +309,11 @@ private:
 	void _UninitPipeline();
 
 public:
-	void AddRayGenerationShader(const std::string& _path);
-	void AddTriangleHitShaders(const std::string& _closestHit, const std::optional<std::string>& _anyHit);
-	void AddProceduralHitShaders(const std::string& _closestHit, const std::string& _intersection, const std::optional<std::string>& _anyHit);
-	void AddMissShader(const std::string& _miss);
-	void SetMaxRecursion(uint32_t _maxRecur);
+	void PreAddRayGenerationShader(const std::string& _path);
+	void PreAddTriangleHitShaders(const std::string& _closestHit, const std::optional<std::string>& _anyHit);
+	void PreAddProceduralHitShaders(const std::string& _closestHit, const std::string& _intersection, const std::optional<std::string>& _anyHit);
+	void PreAddMissShader(const std::string& _miss);
+	void PresetMaxRecursion(uint32_t _maxRecur);
 
 	void Init(uint32_t _frameInFlight);
 

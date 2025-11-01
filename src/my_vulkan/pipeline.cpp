@@ -742,17 +742,17 @@ void RayTracingPipeline::ShaderBindingTable::Init(const RayTracingPipeline* pRay
 
 	// bind shader group(shader record) handle to table on device
 	{
-		Buffer::Information bufferInfo{};
+		Buffer::CreateInformation bufferInfo{};
 		VkDeviceAddress SBTAddress = 0;
 		std::vector<uint8_t> dataToDevice;
 		auto funcGetGroupHandle = [&](int i) { return groupData.data() + i * static_cast<int>(uHandleSizeHost); };
 		m_uptrBuffer = std::make_unique<Buffer>();
 
-		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		bufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		bufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_SHADER_BINDING_TABLE_BIT_KHR;
 		bufferInfo.size = vkRayGenRegion.size + vkMissRegion.size + vkHitRegion.size + vkCallRegion.size;
-
-		m_uptrBuffer->Init(bufferInfo);
+		m_uptrBuffer->PresetCreateInformation(bufferInfo);
+		m_uptrBuffer->Init();
 		
 		SBTAddress = m_uptrBuffer->GetDeviceAddress();
 		dataToDevice.resize(bufferInfo.size, 0u);

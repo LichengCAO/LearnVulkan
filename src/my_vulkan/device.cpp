@@ -302,12 +302,12 @@ std::vector<Image> MyDevice::GetSwapchainImages() const
 	for (const auto& vkImage : swapchainImages)
 	{
 		Image tmpImage{};
-		Image::Information imageInfo;
-		imageInfo.width = m_swapchain.extent.width;
-		imageInfo.height = m_swapchain.extent.height;
+		Image::CreateInformation imageInfo;
+		imageInfo.optWidth = m_swapchain.extent.width;
+		imageInfo.optHeight = m_swapchain.extent.height;
 		imageInfo.usage = m_swapchain.image_usage_flags;
-		imageInfo.format = m_swapchain.image_format;
-		tmpImage.SetImageInformation(imageInfo);
+		imageInfo.optFormat = m_swapchain.image_format;
+		tmpImage.PresetCreateInformation(imageInfo);
 		tmpImage.vkImage = vkImage;
 		ret.push_back(tmpImage);
 	}
@@ -542,16 +542,8 @@ void MyDevice::_UpdateSwapchainImages()
 	for (size_t i = 0; i < vkImages.size(); ++i)
 	{
 		std::unique_ptr<Image>& uptrImage = m_uptrSwapchainImages[i];
-		Image::Information imageInfo{};
-		imageInfo.width = m_swapchain.extent.width;
-		imageInfo.height = m_swapchain.extent.height;
-		imageInfo.usage = m_swapchain.image_usage_flags;
-		imageInfo.format = m_swapchain.image_format;
-		imageInfo.inSwapchain = true;
 		uptrImage = std::make_unique<Image>();
-		uptrImage->SetImageInformation(imageInfo);
-		uptrImage->vkImage = vkImages[i];
-		uptrImage->Init();
+		uptrImage->_InitAsSwapchainImage(vkImages[i], m_swapchain.image_usage_flags, m_swapchain.image_format);
 	}
 }
 

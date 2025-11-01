@@ -6,20 +6,21 @@ class Image;
 class Texture;
 class CommandSubmission;
 class MemoryAllocator;
+class MyDevice;
 
 class ImageView
 {
 public:
 	struct Information
 	{
-		uint32_t baseMipLevel = 0;
-		uint32_t levelCount = VK_REMAINING_MIP_LEVELS;
-		uint32_t baseArrayLayer = 0;
-		uint32_t layerCount = VK_REMAINING_ARRAY_LAYERS;
-		VkFormat format = VK_FORMAT_UNDEFINED; // https://stackoverflow.com/questions/58600143/why-would-vkimageview-format-differ-from-the-underlying-vkimage-format
-		VkImageAspectFlags aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-		VkImageViewType type = VK_IMAGE_VIEW_TYPE_2D;
-		VkImage vkImage = VK_NULL_HANDLE;
+		uint32_t baseMipLevel				= 0;
+		uint32_t levelCount					= VK_REMAINING_MIP_LEVELS;
+		uint32_t baseArrayLayer				= 0;
+		uint32_t layerCount					= VK_REMAINING_ARRAY_LAYERS;
+		VkFormat format						= VK_FORMAT_UNDEFINED; // https://stackoverflow.com/questions/58600143/why-would-vkimageview-format-differ-from-the-underlying-vkimage-format
+		VkImageAspectFlags aspectMask;
+		VkImageViewType type;
+		VkImage vkImage						= VK_NULL_HANDLE;
 	};
 
 private:
@@ -85,21 +86,35 @@ public:
 class Image
 {
 public:
+	struct CreateInformation
+	{
+		VkImageUsageFlags usage = 0;
+
+		std::optional<uint32_t> optWidth;					// optional, if unset image will be swapchain size
+		std::optional<uint32_t> optHeight;				// optional, don't set it if image isn't 2D
+		std::optional<uint32_t> optDepth;					// optional, don't set it if image isn't 3D
+		std::optional<uint32_t> optMipLevels;			// optional, default value: 1
+		std::optional<uint32_t> optArrayLayers;			// optional, default value: 1
+		std::optional<VkFormat> optFormat;				// optional, default value: VK_FORMAT_R32G32B32A32_SFLOAT;
+		std::optional<VkImageTiling> optTiling;			// optional, default value: VK_IMAGE_TILING_OPTIMAL;
+		std::optional<VkMemoryPropertyFlags> optMemoryProperty; // optional, default value: VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT
+		std::optional<VkSampleCountFlagBits> optSampleCount;		// optional, default value: VK_SAMPLE_COUNT_1_BIT;
+	};
 	struct Information
 	{
-		uint32_t width = 0;
-		uint32_t height = 0;
-		uint32_t depth = 1;
-		uint32_t mipLevels = 1;
-		uint32_t arrayLayers = 1;
-		VkFormat format = VK_FORMAT_R8G8B8A8_SRGB;
-		VkImageType imageType = VK_IMAGE_TYPE_2D;
-		VkImageTiling tiling = VK_IMAGE_TILING_OPTIMAL;
-		VkImageUsageFlags usage = 0;
-		VkSampleCountFlagBits samples = VK_SAMPLE_COUNT_1_BIT;
-		VkMemoryPropertyFlags memoryProperty = 0; // image memory
-		VkImageLayout initialLayout = VK_IMAGE_LAYOUT_UNDEFINED; // transfer layout
-		bool inSwapchain = false;
+		uint32_t width;
+		uint32_t height;
+		uint32_t depth;
+		uint32_t mipLevels;
+		uint32_t arrayLayers;
+		VkFormat format;
+		VkImageType imageType;
+		VkImageTiling tiling;
+		VkImageUsageFlags usage;
+		VkSampleCountFlagBits samples;
+		VkMemoryPropertyFlags memoryProperty;						// image memory
+		VkImageLayout layout = VK_IMAGE_LAYOUT_UNDEFINED; // transfer layout
+		bool isSwapchainImage = false;
 	};
 
 private:
@@ -130,16 +145,18 @@ private:
 		uint32_t _baseArrayLayer,
 		uint32_t _layerCount) const;
 
+	void _InitAsSwapchainImage(VkImage _vkImage, VkImageUsageFlags _usage, VkFormat _format);
+
 public:
 	~Image();
 
-	void SetImageInformation(const Information& imageInfo);
+	void PresetCreateInformation(const CreateInformation& imageInfo);
 
 	void Init();
 
 	void Uninit();
 	
-	void TransitionLayout(VkImageLayout newLayout);
+	void TransitLayout(VkImageLayout newLayout);
 
 	void CopyFromBuffer(const Buffer& stagingBuffer);
 
@@ -190,6 +207,7 @@ public:
 	VkExtent3D GetImageSize() const;
 
 	friend class Texture;
+	friend class MyDevice;
 };
 
 class Texture

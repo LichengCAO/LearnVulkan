@@ -66,14 +66,14 @@ void MeshletApp::_InitRenderPass()
 {
 	m_renderPass = RenderPass();
 
-	m_renderPass.AddAttachment(RenderPass::AttachmentPreset::SWAPCHAIN);
-	m_renderPass.AddAttachment(RenderPass::AttachmentPreset::DEPTH);
+	m_renderPass.PreAddAttachment(RenderPass::AttachmentPreset::SWAPCHAIN);
+	m_renderPass.PreAddAttachment(RenderPass::AttachmentPreset::DEPTH);
 
 	RenderPass::Subpass subpassInfo{};
 	subpassInfo.AddColorAttachment(0);
 	subpassInfo.SetDepthStencilAttachment(1);
 	
-	m_renderPass.AddSubpass(subpassInfo);
+	m_renderPass.PreAddSubpass(subpassInfo);
 	m_renderPass.Init();
 }
 void MeshletApp::_UninitRenderPass()
@@ -129,22 +129,24 @@ void MeshletApp::_InitBuffers()
 	{
 		std::unique_ptr<Buffer> cameraBuffer = std::make_unique<Buffer>(Buffer{});
 		std::unique_ptr<Buffer> frustumBuffer = std::make_unique<Buffer>(Buffer{});
-		Buffer::Information bufferInfo{};
-		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
+		Buffer::CreateInformation bufferInfo{};
+		bufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT | VK_MEMORY_PROPERTY_HOST_COHERENT_BIT;
 		bufferInfo.size = static_cast<uint32_t>(sizeof(CameraUBO));
 		bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 		
-		cameraBuffer->Init(bufferInfo);
+		cameraBuffer->PresetCreateInformation(bufferInfo);
+		cameraBuffer->Init();
 		m_cameraBuffers.push_back(std::move(cameraBuffer));
 
 		bufferInfo.size = static_cast<uint32_t>(sizeof(FrustumUBO));
-		frustumBuffer->Init(bufferInfo);
+		frustumBuffer->PresetCreateInformation(bufferInfo);
+		frustumBuffer->Init();
 		m_frustumBuffers.push_back(std::move(frustumBuffer));
 	}
 
 	for (int i = 0; i < n; ++i)
 	{
-		Buffer::Information bufferInfo;
+		Buffer::CreateInformation bufferInfo;
 		Model& curModel = m_models[i];
 		std::unique_ptr<Buffer> meshletBuffer = std::make_unique<Buffer>(Buffer{});
 		std::unique_ptr<Buffer> meshletBoundsBuffer = std::make_unique<Buffer>(Buffer{});
@@ -153,7 +155,7 @@ void MeshletApp::_InitBuffers()
 		std::unique_ptr<Buffer> meshletVBOBuffer = std::make_unique<Buffer>(Buffer{});
 		std::unique_ptr<Buffer> meshUBOBuffer = std::make_unique<Buffer>(Buffer{});
 		
-		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		bufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 		
 		{
@@ -169,7 +171,8 @@ void MeshletApp::_InitBuffers()
 				sbos.push_back(sbo);
 			}
 			bufferInfo.size = static_cast<uint32_t>(sizeof(MeshletSBO)) * static_cast<uint32_t>(sbos.size());
-			meshletBuffer->Init(bufferInfo);
+			meshletBuffer->PresetCreateInformation(bufferInfo);
+			meshletBuffer->Init();
 			meshletBuffer->CopyFromHost(sbos.data());
 		}
 
@@ -186,16 +189,19 @@ void MeshletApp::_InitBuffers()
 			}
 			bufferInfo.size = static_cast<uint32_t>(sizeof(MeshletBoundsSBO)) * static_cast<uint32_t>(sbos.size());
 			m_tBound = sbos;
-			meshletBoundsBuffer->Init(bufferInfo);
+			meshletBoundsBuffer->PresetCreateInformation(bufferInfo);
+			meshletBoundsBuffer->Init();
 			meshletBoundsBuffer->CopyFromHost(sbos.data());
 		}
 		
 		bufferInfo.size = static_cast<uint32_t>(sizeof(uint32_t)) * static_cast<uint32_t>(curModel.vecVertexRemap.size());
-		meshletVertexBuffer->Init(bufferInfo);
+		meshletVertexBuffer->PresetCreateInformation(bufferInfo);
+		meshletVertexBuffer->Init();
 		meshletVertexBuffer->CopyFromHost(curModel.vecVertexRemap.data());
 
 		bufferInfo.size = static_cast<uint32_t>(sizeof(uint8_t)) * static_cast<uint32_t>(curModel.vecTriangleIndex.size());
-		meshletTriangleBuffer->Init(bufferInfo);
+		meshletTriangleBuffer->PresetCreateInformation(bufferInfo);
+		meshletTriangleBuffer->Init();
 		meshletTriangleBuffer->CopyFromHost(curModel.vecTriangleIndex.data());
 
 		{
@@ -209,7 +215,8 @@ void MeshletApp::_InitBuffers()
 				vbos.push_back(vbo);
 			}
 			bufferInfo.size = static_cast<uint32_t>(sizeof(VBO)) * static_cast<uint32_t>(curModel.mesh.verts.size());
-			meshletVBOBuffer->Init(bufferInfo);
+			meshletVBOBuffer->PresetCreateInformation(bufferInfo);
+			meshletVBOBuffer->Init();
 			meshletVBOBuffer->CopyFromHost(vbos.data());
 		}
 
@@ -235,7 +242,8 @@ void MeshletApp::_InitBuffers()
 			bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 
 			bufferInfo.size = static_cast<uint32_t>(sizeof(ModelUBO));
-			meshUBOBuffer->Init(bufferInfo);
+			meshUBOBuffer->PresetCreateInformation(bufferInfo);
+			meshUBOBuffer->Init();
 			meshUBOBuffer->CopyFromHost(&ubo);
 		}
 
@@ -285,21 +293,12 @@ void MeshletApp::_InitImagesAndViews()
 	int n = m_swapchainImages.size();
 	for (int i = 0; i < n; ++i)
 	{
-		Image::Information depthImageInfo{};
-		depthImageInfo.arrayLayers = 1;
-		depthImageInfo.depth = 1;
-		depthImageInfo.format = pDevice->GetDepthFormat();
-		depthImageInfo.height = pDevice->GetSwapchainExtent().height;
-		depthImageInfo.width = pDevice->GetSwapchainExtent().width;
-		depthImageInfo.imageType = VK_IMAGE_TYPE_2D;
-		depthImageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		depthImageInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		depthImageInfo.mipLevels = 1;
-		depthImageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
+		Image::CreateInformation depthImageInfo{};
+		depthImageInfo.optFormat = pDevice->GetDepthFormat();
 		depthImageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
 
 		std::unique_ptr<Image> uptrDepthImage = std::make_unique<Image>();
-		uptrDepthImage->SetImageInformation(depthImageInfo);
+		uptrDepthImage->PresetCreateInformation(depthImageInfo);
 		uptrDepthImage->Init();
 
 		std::unique_ptr<ImageView> uptrDepthView = std::make_unique<ImageView>(uptrDepthImage->NewImageView(VK_IMAGE_ASPECT_DEPTH_BIT));
@@ -357,7 +356,7 @@ void MeshletApp::_UninitFramebuffers()
 
 void MeshletApp::_InitPipelines()
 {
-	m_program.SetUpRenderPass(&m_renderPass, 0);
+	m_program.PresetRenderPass(&m_renderPass, 0);
 	m_program.Init({ 
 		"E:/GitStorage/LearnVulkan/bin/shaders/flat_task.task.spv",
 		"E:/GitStorage/LearnVulkan/bin/shaders/flat_task.mesh.spv",

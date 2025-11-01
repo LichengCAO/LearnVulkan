@@ -38,14 +38,14 @@ void RayTracingApp::_Uninit()
 
 void RayTracingApp::_InitDescriptorSetLayouts()
 {
-	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_RAYGEN_BIT_KHR); // camera info
-	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_RAYGEN_BIT_KHR); // AS
-	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_RAYGEN_BIT_KHR); // image output
-	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR); // instance data
+	m_rtDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_RAYGEN_BIT_KHR); // camera info
+	m_rtDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_RAYGEN_BIT_KHR); // AS
+	m_rtDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_RAYGEN_BIT_KHR); // image output
+	m_rtDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR); // instance data
 	m_rtDSetLayout.Init();
 
 	//m_compDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT); // time
-	m_compDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT); // vertex buffer
+	m_compDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_COMPUTE_BIT); // vertex buffer
 	m_compDSetLayout.Init();
 }
 
@@ -96,9 +96,9 @@ void RayTracingApp::_InitBuffers()
 {
 	// vertex, index buffers
 	{
-		Buffer::Information vertBufferInfo{};
+		Buffer::CreateInformation vertBufferInfo{};
 
-		vertBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		vertBufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		vertBufferInfo.usage =
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT
 			| VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
@@ -129,10 +129,12 @@ void RayTracingApp::_InitBuffers()
 				}
 
 				vertBufferInfo.size = vertData.size() * sizeof(VBO);
-				uptrVertexBuffer->Init(vertBufferInfo);
+				uptrVertexBuffer->PresetCreateInformation(vertBufferInfo);
+				uptrVertexBuffer->Init();
 
 				vertBufferInfo.size = model.mesh.indices.size() * sizeof(uint32_t);
-				uptrIndexBuffer->Init(vertBufferInfo);
+				uptrIndexBuffer->PresetCreateInformation(vertBufferInfo);
+				uptrIndexBuffer->Init();
 
 				uptrVertexBuffer->CopyFromHost(vertData.data());
 				uptrIndexBuffer->CopyFromHost(model.mesh.indices.data());
@@ -151,7 +153,7 @@ void RayTracingApp::_InitBuffers()
 		for (int j = 0; j < MAX_FRAME_COUNT; ++j)
 		{
 			int n = m_models.size();
-			Buffer::Information instBufferInfo{};
+			Buffer::CreateInformation instBufferInfo{};
 			std::vector<InstanceInformation> instInfos{};
 			std::unique_ptr<Buffer> uptrInstanceBuffer = std::make_unique<Buffer>();
 
@@ -166,10 +168,11 @@ void RayTracingApp::_InitBuffers()
 				instInfos.push_back(instInfo);
 			}
 
-			instBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+			instBufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 			instBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 			instBufferInfo.size = instInfos.size() * sizeof(InstanceInformation);
-			uptrInstanceBuffer->Init(instBufferInfo);
+			uptrInstanceBuffer->PresetCreateInformation(instBufferInfo);
+			uptrInstanceBuffer->Init();
 			uptrInstanceBuffer->CopyFromHost(instInfos.data());
 
 			m_instanceBuffer.push_back(std::move(uptrInstanceBuffer));
@@ -178,17 +181,17 @@ void RayTracingApp::_InitBuffers()
 
 	// Camera buffer
 	{
-		Buffer::Information cameraBufferInfo{};
+		Buffer::CreateInformation cameraBufferInfo{};
 
-		cameraBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+		cameraBufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 		cameraBufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 		cameraBufferInfo.size = sizeof(CameraUBO);
 
 		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 		{
 			std::unique_ptr<Buffer> uptrCamera = std::make_unique<Buffer>();
-			
-			uptrCamera->Init(cameraBufferInfo);
+			uptrCamera->PresetCreateInformation(cameraBufferInfo);
+			uptrCamera->Init();
 
 			// the buffer is update every frame, so I don't write to it here
 
@@ -257,7 +260,7 @@ void RayTracingApp::_InitAS()
 			trigData.uVertexStride = sizeof(VBO);
 			trigData.vkDeviceAddressVertex = uptrVertexBuffer[j]->GetDeviceAddress();
 
-			instData.uBLASIndex = AS.AddBLAS({ trigData });
+			instData.uBLASIndex = AS.PreAddBLAS({ trigData });
 			instData.transformMatrix = model.transform.GetModelMatrix();
 			if (i == 0)
 			{
@@ -267,7 +270,7 @@ void RayTracingApp::_InitAS()
 			instDatas.push_back(instData);
 		}
 
-		AS.SetUpTLAS(instDatas);
+		AS.PresetTLAS(instDatas);
 		AS.Init();
 		m_rtAccelStruct.push_back(std::move(AS));
 		m_TLASInputs = instDatas;
@@ -291,22 +294,11 @@ void RayTracingApp::_InitImagesAndViews()
 	{
 		std::unique_ptr<Image> rtImage = std::make_unique<Image>();
 		std::unique_ptr<ImageView> rtView{};
-		Image::Information imgInfo{};
+		Image::CreateInformation imgInfo{};
 
-		imgInfo.arrayLayers = 1u;
-		imgInfo.depth = 1u;
-		imgInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-		imgInfo.imageType = VK_IMAGE_TYPE_2D;
-		imgInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		imgInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		imgInfo.mipLevels = 1u;
-		imgInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-		imgInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 		imgInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-		imgInfo.width = MyDevice::GetInstance().GetSwapchainExtent().width;
-		imgInfo.height = MyDevice::GetInstance().GetSwapchainExtent().height;
 
-		rtImage->SetImageInformation(imgInfo);
+		rtImage->PresetCreateInformation(imgInfo);
 		rtImage->Init();
 		rtView = std::make_unique<ImageView>(rtImage->NewImageView());
 		rtView->Init();
@@ -689,10 +681,10 @@ void RayTracingThousandsApp::_Uninit()
 
 void RayTracingThousandsApp::_InitDescriptorSetLayouts()
 {
-	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_RAYGEN_BIT_KHR); // camera info
-	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_RAYGEN_BIT_KHR); // AS
-	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_RAYGEN_BIT_KHR); // image output
-	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR); // instance data
+	m_rtDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_RAYGEN_BIT_KHR); // camera info
+	m_rtDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_RAYGEN_BIT_KHR); // AS
+	m_rtDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_RAYGEN_BIT_KHR); // image output
+	m_rtDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR); // instance data
 	m_rtDSetLayout.Init();
 }
 
@@ -737,9 +729,9 @@ void RayTracingThousandsApp::_InitBuffers()
 {
 	// vertex, index buffers
 	{
-		Buffer::Information vertBufferInfo{};
+		Buffer::CreateInformation vertBufferInfo{};
 
-		vertBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		vertBufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		vertBufferInfo.usage =
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT
 			| VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
@@ -770,10 +762,12 @@ void RayTracingThousandsApp::_InitBuffers()
 				}
 
 				vertBufferInfo.size = vertData.size() * sizeof(VBO);
-				uptrVertexBuffer->Init(vertBufferInfo);
+				uptrVertexBuffer->PresetCreateInformation(vertBufferInfo);
+				uptrVertexBuffer->Init();
 
 				vertBufferInfo.size = model.mesh.indices.size() * sizeof(uint32_t);
-				uptrIndexBuffer->Init(vertBufferInfo);
+				uptrIndexBuffer->PresetCreateInformation(vertBufferInfo);
+				uptrIndexBuffer->Init();
 
 				uptrVertexBuffer->CopyFromHost(vertData.data());
 				uptrIndexBuffer->CopyFromHost(model.mesh.indices.data());
@@ -792,7 +786,7 @@ void RayTracingThousandsApp::_InitBuffers()
 		for (int j = 0; j < MAX_FRAME_COUNT; ++j)
 		{
 			int n = m_models.size();
-			Buffer::Information instBufferInfo{};
+			Buffer::CreateInformation instBufferInfo{};
 			std::vector<InstanceInformation> instInfos{};
 			std::unique_ptr<Buffer> uptrInstanceBuffer = std::make_unique<Buffer>();
 
@@ -807,10 +801,11 @@ void RayTracingThousandsApp::_InitBuffers()
 				instInfos.push_back(instInfo);
 			}
 
-			instBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+			instBufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 			instBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 			instBufferInfo.size = instInfos.size() * sizeof(InstanceInformation);
-			uptrInstanceBuffer->Init(instBufferInfo);
+			uptrInstanceBuffer->PresetCreateInformation(instBufferInfo);
+			uptrInstanceBuffer->Init();
 			uptrInstanceBuffer->CopyFromHost(instInfos.data());
 
 			m_instanceBuffer.push_back(std::move(uptrInstanceBuffer));
@@ -819,17 +814,17 @@ void RayTracingThousandsApp::_InitBuffers()
 
 	// Camera buffer
 	{
-		Buffer::Information cameraBufferInfo{};
+		Buffer::CreateInformation cameraBufferInfo{};
 
-		cameraBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+		cameraBufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 		cameraBufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 		cameraBufferInfo.size = sizeof(CameraUBO);
 
 		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 		{
 			std::unique_ptr<Buffer> uptrCamera = std::make_unique<Buffer>();
-
-			uptrCamera->Init(cameraBufferInfo);
+			uptrCamera->PresetCreateInformation(cameraBufferInfo);
+			uptrCamera->Init();
 
 			// the buffer is update every frame, so I don't write to it here
 
@@ -898,13 +893,13 @@ void RayTracingThousandsApp::_InitAS()
 			trigData.uVertexStride = sizeof(VBO);
 			trigData.vkDeviceAddressVertex = uptrVertexBuffer[j]->GetDeviceAddress();
 
-			instData.uBLASIndex = AS.AddBLAS({ trigData });
+			instData.uBLASIndex = AS.PreAddBLAS({ trigData });
 			instData.transformMatrix = model.transform.GetModelMatrix();
 
 			instDatas.push_back(instData);
 		}
 
-		AS.SetUpTLAS(instDatas);
+		AS.PresetTLAS(instDatas);
 		AS.Init();
 		m_rtAccelStruct.push_back(std::move(AS));
 	}
@@ -927,22 +922,11 @@ void RayTracingThousandsApp::_InitImagesAndViews()
 	{
 		std::unique_ptr<Image> rtImage = std::make_unique<Image>();
 		std::unique_ptr<ImageView> rtView{};
-		Image::Information imgInfo{};
+		Image::CreateInformation imgInfo{};
 
-		imgInfo.arrayLayers = 1u;
-		imgInfo.depth = 1u;
-		imgInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-		imgInfo.imageType = VK_IMAGE_TYPE_2D;
-		imgInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		imgInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		imgInfo.mipLevels = 1u;
-		imgInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-		imgInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 		imgInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-		imgInfo.width = MyDevice::GetInstance().GetSwapchainExtent().width;
-		imgInfo.height = MyDevice::GetInstance().GetSwapchainExtent().height;
 
-		rtImage->SetImageInformation(imgInfo);
+		rtImage->PresetCreateInformation(imgInfo);
 		rtImage->Init();
 		rtView = std::make_unique<ImageView>(rtImage->NewImageView());
 		rtView->Init();
@@ -1259,11 +1243,11 @@ void RayTracingAABBsApp::_Uninit()
 
 void RayTracingAABBsApp::_InitDescriptorSetLayouts()
 {
-	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_RAYGEN_BIT_KHR); // camera info
-	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_RAYGEN_BIT_KHR); // AS
-	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_RAYGEN_BIT_KHR); // image output
-	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR); // instance data
-	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_INTERSECTION_BIT_KHR); // sphere data
+	m_rtDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_RAYGEN_BIT_KHR); // camera info
+	m_rtDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_RAYGEN_BIT_KHR); // AS
+	m_rtDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_IMAGE, VK_SHADER_STAGE_RAYGEN_BIT_KHR); // image output
+	m_rtDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR); // instance data
+	m_rtDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_INTERSECTION_BIT_KHR); // sphere data
 	m_rtDSetLayout.Init();
 }
 
@@ -1300,9 +1284,9 @@ void RayTracingAABBsApp::_InitBuffers()
 {
 	// vertex, index buffers
 	{
-		Buffer::Information vertBufferInfo{};
+		Buffer::CreateInformation vertBufferInfo{};
 
-		vertBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		vertBufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		vertBufferInfo.usage =
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT
 			| VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
@@ -1323,10 +1307,12 @@ void RayTracingAABBsApp::_InitBuffers()
 				vertData.push_back(std::move(vbo));
 			}
 			vertBufferInfo.size = vertData.size() * sizeof(VBO);
-			uptrVertexBuffer->Init(vertBufferInfo);
+			uptrVertexBuffer->PresetCreateInformation(vertBufferInfo);
+			uptrVertexBuffer->Init();
 
 			vertBufferInfo.size = model.mesh.indices.size() * sizeof(uint32_t);
-			uptrIndexBuffer->Init(vertBufferInfo);
+			uptrIndexBuffer->PresetCreateInformation(vertBufferInfo);
+			uptrIndexBuffer->Init();
 
 			uptrVertexBuffer->CopyFromHost(vertData.data());
 			uptrIndexBuffer->CopyFromHost(model.mesh.indices.data());
@@ -1338,7 +1324,7 @@ void RayTracingAABBsApp::_InitBuffers()
 
 	// AABB
 	{
-		Buffer::Information bufferInfo;
+		Buffer::CreateInformation bufferInfo;
 		size_t sphereCount = s_SphereCount;
 		std::random_device                    rd{};
 		std::mt19937                          gen{ rd() };
@@ -1351,7 +1337,7 @@ void RayTracingAABBsApp::_InitBuffers()
 		m_AABBsBuffer = std::make_unique<Buffer>();
 		m_spheresBuffer = std::make_unique<Buffer>();
 
-		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		bufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT 
 			| VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR
 			| VK_BUFFER_USAGE_TRANSFER_DST_BIT;
@@ -1376,18 +1362,20 @@ void RayTracingAABBsApp::_InitBuffers()
 		}
 
 		bufferInfo.size = static_cast<uint32_t>(spheres.size()) * sizeof(glm::vec4);
-		m_spheresBuffer->Init(bufferInfo);
+		m_spheresBuffer->PresetCreateInformation(bufferInfo);
+		m_spheresBuffer->Init();
 		m_spheresBuffer->CopyFromHost(spheres.data());
 
 		bufferInfo.usage |= VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 		bufferInfo.size = static_cast<uint32_t>(AABBs.size()) * sizeof(AABB);
-		m_AABBsBuffer->Init(bufferInfo);
+		m_AABBsBuffer->PresetCreateInformation(bufferInfo);
+		m_AABBsBuffer->Init();
 		m_AABBsBuffer->CopyFromHost(AABBs.data());
 	}
 
 	// Instance buffer
 	{
-		Buffer::Information instBufferInfo{};
+		Buffer::CreateInformation instBufferInfo{};
 		std::vector<InstanceInformation> instInfos{};
 		m_instanceBuffer = std::make_unique<Buffer>();
 
@@ -1400,27 +1388,27 @@ void RayTracingAABBsApp::_InitBuffers()
 			instInfos.push_back(std::move(instInfo));
 		}
 
-		instBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		instBufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		instBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 		instBufferInfo.size = instInfos.size() * sizeof(InstanceInformation);
-
-		m_instanceBuffer->Init(instBufferInfo);
+		m_instanceBuffer->PresetCreateInformation(instBufferInfo);
+		m_instanceBuffer->Init();
 		m_instanceBuffer->CopyFromHost(instInfos.data());
 	}
 
 	// Camera buffer
 	{
-		Buffer::Information cameraBufferInfo{};
+		Buffer::CreateInformation cameraBufferInfo{};
 
-		cameraBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+		cameraBufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 		cameraBufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 		cameraBufferInfo.size = sizeof(CameraUBO);
 
 		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 		{
 			std::unique_ptr<Buffer> uptrCamera = std::make_unique<Buffer>();
-
-			uptrCamera->Init(cameraBufferInfo);
+			uptrCamera->PresetCreateInformation(cameraBufferInfo);
+			uptrCamera->Init();
 
 			// the buffer is update every frame, so I don't write to it here
 
@@ -1483,7 +1471,7 @@ void RayTracingAABBsApp::_InitAS()
 		trigData.uVertexStride = sizeof(VBO);
 		trigData.vkDeviceAddressVertex = uptrVertexBuffer->GetDeviceAddress();
 
-		instData.uBLASIndex = AS.AddBLAS({ trigData });
+		instData.uBLASIndex = AS.PreAddBLAS({ trigData });
 		instData.transformMatrix = model.transform.GetModelMatrix();
 
 		instDatas.push_back(instData);
@@ -1498,13 +1486,13 @@ void RayTracingAABBsApp::_InitAS()
 		aabbData.vkDeviceAddressAABB = m_AABBsBuffer->GetDeviceAddress();
 
 		instData.transformMatrix = glm::identity<glm::mat4>();
-		instData.uBLASIndex = AS.AddBLAS({ aabbData });
+		instData.uBLASIndex = AS.PreAddBLAS({ aabbData });
 		instData.uHitShaderGroupIndexOffset = 1;
 
 		instDatas.push_back(std::move(instData));
 	}
 
-	AS.SetUpTLAS(instDatas);
+	AS.PresetTLAS(instDatas);
 	AS.Init();
 	m_rtAccelStruct = std::move(AS);
 }
@@ -1522,22 +1510,11 @@ void RayTracingAABBsApp::_InitImagesAndViews()
 	{
 		std::unique_ptr<Image> rtImage = std::make_unique<Image>();
 		std::unique_ptr<ImageView> rtView{};
-		Image::Information imgInfo{};
+		Image::CreateInformation imgInfo{};
 
-		imgInfo.arrayLayers = 1u;
-		imgInfo.depth = 1u;
-		imgInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-		imgInfo.imageType = VK_IMAGE_TYPE_2D;
-		imgInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		imgInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		imgInfo.mipLevels = 1u;
-		imgInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-		imgInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 		imgInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_STORAGE_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
-		imgInfo.width = MyDevice::GetInstance().GetSwapchainExtent().width;
-		imgInfo.height = MyDevice::GetInstance().GetSwapchainExtent().height;
 
-		rtImage->SetImageInformation(imgInfo);
+		rtImage->PresetCreateInformation(imgInfo);
 		rtImage->Init();
 		rtView = std::make_unique<ImageView>(rtImage->NewImageView());
 		rtView->Init();

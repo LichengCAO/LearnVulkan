@@ -41,12 +41,12 @@ void RayQueryApp::_Uninit()
 
 void RayQueryApp::_InitDescriptorSetLayouts()
 {
-	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT); // camera info
-	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, VK_SHADER_STAGE_FRAGMENT_BIT); // AS
-	m_rtDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT); // instance data
+	m_rtDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT); // camera info
+	m_rtDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_ACCELERATION_STRUCTURE_KHR, VK_SHADER_STAGE_FRAGMENT_BIT); // AS
+	m_rtDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_STORAGE_BUFFER, VK_SHADER_STAGE_FRAGMENT_BIT); // instance data
 	m_rtDSetLayout.Init();
 
-	m_modelDSetLayout.AddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT); // object model matrix
+	m_modelDSetLayout.PreAddBinding(1, VK_DESCRIPTOR_TYPE_UNIFORM_BUFFER, VK_SHADER_STAGE_VERTEX_BIT); // object model matrix
 	m_modelDSetLayout.Init();
 }
 
@@ -92,11 +92,11 @@ void RayQueryApp::_InitBuffers()
 {
 	// vertex, index, model buffers
 	{
-		Buffer::Information vertBufferInfo{};
-		Buffer::Information indexBufferInfo{};
-		Buffer::Information modelBufferInfo{};
+		Buffer::CreateInformation vertBufferInfo{};
+		Buffer::CreateInformation indexBufferInfo{};
+		Buffer::CreateInformation modelBufferInfo{};
 
-		vertBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		vertBufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		vertBufferInfo.usage =
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT
 			| VK_BUFFER_USAGE_VERTEX_BUFFER_BIT
@@ -104,7 +104,7 @@ void RayQueryApp::_InitBuffers()
 			| VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR
 			| VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
-		indexBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		indexBufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		indexBufferInfo.usage = 
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT
 			| VK_BUFFER_USAGE_INDEX_BUFFER_BIT
@@ -112,7 +112,7 @@ void RayQueryApp::_InitBuffers()
 			| VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR
 			| VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT;
 
-		modelBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		modelBufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		modelBufferInfo.usage =
 			VK_BUFFER_USAGE_TRANSFER_DST_BIT
 			| VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
@@ -135,13 +135,16 @@ void RayQueryApp::_InitBuffers()
 			}
 
 			vertBufferInfo.size = vertData.size() * sizeof(VBO);
-			uptrVertexBuffer->Init(vertBufferInfo);
+			uptrVertexBuffer->PresetCreateInformation(vertBufferInfo);
+			uptrVertexBuffer->Init();
 
 			indexBufferInfo.size = model.mesh.indices.size() * sizeof(uint32_t);
-			uptrIndexBuffer->Init(indexBufferInfo);
+			uptrIndexBuffer->PresetCreateInformation(indexBufferInfo);
+			uptrIndexBuffer->Init();
 
 			modelBufferInfo.size = sizeof(ObjectUBO);
-			uptrModelBuffer->Init(modelBufferInfo);
+			uptrModelBuffer->PresetCreateInformation(modelBufferInfo);
+			uptrModelBuffer->Init();
 
 			uptrVertexBuffer->CopyFromHost(vertData.data());
 			uptrIndexBuffer->CopyFromHost(model.mesh.indices.data());
@@ -161,7 +164,7 @@ void RayQueryApp::_InitBuffers()
 	// Instance buffer
 	{
 		int n = m_models.size();
-		Buffer::Information instBufferInfo{};
+		Buffer::CreateInformation instBufferInfo{};
 		std::vector<InstanceInformation> instInfos{};
 		std::unique_ptr<Buffer> uptrInstanceBuffer = std::make_unique<Buffer>();
 
@@ -176,10 +179,11 @@ void RayQueryApp::_InitBuffers()
 			instInfos.push_back(instInfo);
 		}
 
-		instBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		instBufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		instBufferInfo.usage = VK_BUFFER_USAGE_TRANSFER_DST_BIT | VK_BUFFER_USAGE_STORAGE_BUFFER_BIT;
 		instBufferInfo.size = instInfos.size() * sizeof(InstanceInformation);
-		uptrInstanceBuffer->Init(instBufferInfo);
+		uptrInstanceBuffer->PresetCreateInformation(instBufferInfo);
+		uptrInstanceBuffer->Init();
 		uptrInstanceBuffer->CopyFromHost(instInfos.data());
 
 		m_instanceBuffer = std::move(uptrInstanceBuffer);
@@ -187,9 +191,9 @@ void RayQueryApp::_InitBuffers()
 
 	// Camera buffer
 	{
-		Buffer::Information cameraBufferInfo{};
+		Buffer::CreateInformation cameraBufferInfo{};
 
-		cameraBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+		cameraBufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 		cameraBufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 		cameraBufferInfo.size = sizeof(CameraUBO);
 
@@ -197,7 +201,8 @@ void RayQueryApp::_InitBuffers()
 		{
 			std::unique_ptr<Buffer> uptrCamera = std::make_unique<Buffer>();
 
-			uptrCamera->Init(cameraBufferInfo);
+			uptrCamera->PresetCreateInformation(cameraBufferInfo);
+			uptrCamera->Init();
 
 			// the buffer is update every frame, so I don't write to it here
 			m_cameraBuffers.push_back(std::move(uptrCamera));
@@ -257,13 +262,13 @@ void RayQueryApp::_InitAS()
 		trigData.uVertexStride = sizeof(VBO);
 		trigData.vkDeviceAddressVertex = uptrVertexBuffer->GetDeviceAddress();
 
-		instData.uBLASIndex = AS.AddBLAS({ trigData });
+		instData.uBLASIndex = AS.PreAddBLAS({ trigData });
 		instData.transformMatrix = model.transform.GetModelMatrix();
 
 		instDatas.push_back(instData);
 	}
 
-	AS.SetUpTLAS(instDatas);
+	AS.PresetTLAS(instDatas);
 	AS.Init();
 	m_rtAccelStruct = std::move(AS);
 }
@@ -281,41 +286,20 @@ void RayQueryApp::_InitImagesAndViews()
 		std::unique_ptr<Image> uptrDepthImage = std::make_unique<Image>();
 		std::unique_ptr<ImageView> uptrColorView{};
 		std::unique_ptr<ImageView> uptrDepthView{};
-		Image::Information colorImageInfo{};
-		Image::Information depthImageInfo{};
+		Image::CreateInformation colorImageInfo{};
+		Image::CreateInformation depthImageInfo{};
 
-		colorImageInfo.arrayLayers = 1u;
-		colorImageInfo.depth = 1u;
-		colorImageInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-		colorImageInfo.imageType = VK_IMAGE_TYPE_2D;
-		colorImageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		colorImageInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		colorImageInfo.mipLevels = 1u;
-		colorImageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-		colorImageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
 		colorImageInfo.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT;
-		colorImageInfo.width = MyDevice::GetInstance().GetSwapchainExtent().width;
-		colorImageInfo.height = MyDevice::GetInstance().GetSwapchainExtent().height;
 
-		depthImageInfo.arrayLayers = 1u;
-		depthImageInfo.depth = 1u;
-		depthImageInfo.format = MyDevice::GetInstance().GetDepthFormat();
-		depthImageInfo.imageType = VK_IMAGE_TYPE_2D;
-		depthImageInfo.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
-		depthImageInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		depthImageInfo.mipLevels = 1u;
-		depthImageInfo.samples = VK_SAMPLE_COUNT_1_BIT;
-		depthImageInfo.tiling = VK_IMAGE_TILING_OPTIMAL;
+		depthImageInfo.optFormat = MyDevice::GetInstance().GetDepthFormat();
 		depthImageInfo.usage = VK_IMAGE_USAGE_DEPTH_STENCIL_ATTACHMENT_BIT;
-		depthImageInfo.width = MyDevice::GetInstance().GetSwapchainExtent().width;
-		depthImageInfo.height = MyDevice::GetInstance().GetSwapchainExtent().height;
 
-		uptrColorImage->SetImageInformation(colorImageInfo);
+		uptrColorImage->PresetCreateInformation(colorImageInfo);
 		uptrColorImage->Init();
 		uptrColorView = std::make_unique<ImageView>(uptrColorImage->NewImageView());
 		uptrColorView->Init();
 
-		uptrDepthImage->SetImageInformation(depthImageInfo);
+		uptrDepthImage->PresetCreateInformation(depthImageInfo);
 		uptrDepthImage->Init();
 		uptrDepthView = std::make_unique<ImageView>(uptrDepthImage->NewImageView(VK_IMAGE_ASPECT_DEPTH_BIT));
 		uptrDepthView->Init();
@@ -360,13 +344,13 @@ void RayQueryApp::_InitRenderPass()
 
 	m_uptrRenderPass = std::make_unique<RenderPass>();
 
-	m_uptrRenderPass->AddAttachment(RenderPass::AttachmentPreset::COLOR_OUTPUT);
-	m_uptrRenderPass->AddAttachment(RenderPass::AttachmentPreset::DEPTH);
+	m_uptrRenderPass->PreAddAttachment(RenderPass::AttachmentPreset::COLOR_OUTPUT);
+	m_uptrRenderPass->PreAddAttachment(RenderPass::AttachmentPreset::DEPTH);
 
 	subpass.AddColorAttachment(0);
 	subpass.SetDepthStencilAttachment(1);
 
-	m_uptrRenderPass->AddSubpass(subpass);
+	m_uptrRenderPass->PreAddSubpass(subpass);
 
 	m_uptrRenderPass->Init();
 }

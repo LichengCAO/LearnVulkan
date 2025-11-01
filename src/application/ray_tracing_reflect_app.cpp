@@ -38,7 +38,7 @@ void RayTracingReflectApp::_InitAccelerationStructures()
 		RayTracingAccelerationStructure::InstanceData curInstData{};
 
 		curInstData.transformMatrix = m_rayTracingGeometryTransform[i];
-		curInstData.uBLASIndex = m_uptrAccelStruct->AddBLAS({ m_rayTracingGeometryData[i] }); // single BLAS can hold multiple geometries, but here i bind single geometry with one BLAS
+		curInstData.uBLASIndex = m_uptrAccelStruct->PreAddBLAS({ m_rayTracingGeometryData[i] }); // single BLAS can hold multiple geometries, but here i bind single geometry with one BLAS
 
 		instData.push_back(curInstData);
 	}
@@ -54,10 +54,10 @@ void RayTracingReflectApp::_InitAccelerationStructures()
 
 		curInstData.uHitShaderGroupIndexOffset = 1;
 		curInstData.transformMatrix = glm::mat4(1.0f);
-		curInstData.uBLASIndex = m_uptrAccelStruct->AddBLAS({ aabbData });
+		curInstData.uBLASIndex = m_uptrAccelStruct->PreAddBLAS({ aabbData });
 	}
 
-	m_uptrAccelStruct->SetUpTLAS(instData);
+	m_uptrAccelStruct->PresetTLAS(instData);
 	m_uptrAccelStruct->Init();
 }
 
@@ -75,11 +75,11 @@ void RayTracingReflectApp::_InitPipeline()
 	std::vector<VkDescriptorImageInfo> passThroughImages;
 
 	m_uptrPipeline = std::make_unique<RayTracingProgram>();
-	m_uptrPipeline->SetMaxRecursion(2);
-	m_uptrPipeline->AddMissShader("E:/GitStorage/LearnVulkan/bin/shaders/rt_pbr.rmiss.spv");
-	m_uptrPipeline->AddRayGenerationShader("E:/GitStorage/LearnVulkan/bin/shaders/rt_pbr.rgen.spv");
-	m_uptrPipeline->AddTriangleHitShaders("E:/GitStorage/LearnVulkan/bin/shaders/rt_pbr.rchit.spv", {});
-	m_uptrPipeline->AddProceduralHitShaders("E:/GitStorage/LearnVulkan/bin/shaders/rt_vdb.rchit.spv", "E:/GitStorage/LearnVulkan/bin/shaders/rt_vdb.rint.spv", {});
+	m_uptrPipeline->PresetMaxRecursion(2);
+	m_uptrPipeline->PreAddMissShader("E:/GitStorage/LearnVulkan/bin/shaders/rt_pbr.rmiss.spv");
+	m_uptrPipeline->PreAddRayGenerationShader("E:/GitStorage/LearnVulkan/bin/shaders/rt_pbr.rgen.spv");
+	m_uptrPipeline->PreAddTriangleHitShaders("E:/GitStorage/LearnVulkan/bin/shaders/rt_pbr.rchit.spv", {});
+	m_uptrPipeline->PreAddProceduralHitShaders("E:/GitStorage/LearnVulkan/bin/shaders/rt_vdb.rchit.spv", "E:/GitStorage/LearnVulkan/bin/shaders/rt_vdb.rint.spv", {});
 	m_uptrPipeline->Init(1);
 
 	m_uptrSwapchainPass = std::make_unique<SwapchainPass>();
@@ -117,16 +117,16 @@ void RayTracingReflectApp::_CreateImagesAndViews()
 		std::unique_ptr<Image> uptrImage = std::make_unique<Image>();
 		std::unique_ptr<ImageView> uptrView;
 		ImageView* pView = nullptr;
-		Image::Information imageInfo{};
+		Image::CreateInformation imageInfo{};
 
-		imageInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-		imageInfo.width = windowSize.width;
-		imageInfo.height = windowSize.height;
+		imageInfo.optFormat = VK_FORMAT_R32G32B32A32_SFLOAT;
+		imageInfo.optWidth = windowSize.width;
+		imageInfo.optHeight = windowSize.height;
 		imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT 
 			| VK_IMAGE_USAGE_TRANSFER_DST_BIT 
 			| VK_IMAGE_USAGE_SAMPLED_BIT;
 
-		uptrImage->SetImageInformation(imageInfo);
+		uptrImage->PresetCreateInformation(imageInfo);
 		uptrImage->Init();
 		uptrImage->ChangeLayoutAndFill(VK_IMAGE_LAYOUT_GENERAL, { 0, 0, 0, 1 });
 		uptrImage->NewImageView(pView);
@@ -203,7 +203,7 @@ void RayTracingReflectApp::_CreateBuffers()
 	// mesh data
 	for (size_t i = 0; i < meshes.size(); ++i)
 	{
-		Buffer::Information bufferInfo{};
+		Buffer::CreateInformation bufferInfo{};
 		RayTracingAccelerationStructure::TriangleData trigData{};
 		AddressData instanceAddressData{};
 		std::unique_ptr<Buffer> uptrVertexBuffer = std::make_unique<Buffer>();
@@ -212,17 +212,19 @@ void RayTracingReflectApp::_CreateBuffers()
 
 		if (materialNames[i] == "shortBox" || materialNames[i] == "tallBox") continue;
 
-		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
-		bufferInfo.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+		bufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		bufferInfo.optSharingMode = VK_SHARING_MODE_EXCLUSIVE;
 		bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT
 			| VK_BUFFER_USAGE_TRANSFER_DST_BIT
 			| VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
 			| VK_BUFFER_USAGE_2_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
 		bufferInfo.size = meshes[i].verts.size() * sizeof(Vertex);
-		uptrVertexBuffer->Init(bufferInfo);
+		uptrVertexBuffer->PresetCreateInformation(bufferInfo);
+		uptrVertexBuffer->Init();
 
 		bufferInfo.size = meshes[i].indices.size() * sizeof(uint32_t);
-		uptrIndexBuffer->Init(bufferInfo);
+		uptrIndexBuffer->PresetCreateInformation(bufferInfo);
+		uptrIndexBuffer->Init();
 
 		for (size_t j = 0; j < meshes[i].verts.size(); ++j)
 		{
@@ -250,7 +252,7 @@ void RayTracingReflectApp::_CreateBuffers()
 
 	// material data
 	{
-		Buffer::Information bufferInfo{};
+		Buffer::CreateInformation bufferInfo{};
 		std::vector<Material> mtls;
 		static const std::vector<std::string> mtlNames = {
 			"unknown",     // 0
@@ -284,11 +286,11 @@ void RayTracingReflectApp::_CreateBuffers()
 		}
 
 		m_uptrMaterialBuffer = std::make_unique<Buffer>();
-		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		bufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		bufferInfo.size = static_cast<uint32_t>(sizeof(Material) * mtls.size());
 		bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-
-		m_uptrMaterialBuffer->Init(bufferInfo);
+		m_uptrMaterialBuffer->PresetCreateInformation(bufferInfo);
+		m_uptrMaterialBuffer->Init();
 		m_uptrMaterialBuffer->CopyFromHost(mtls.data());
 	}
 
@@ -296,49 +298,49 @@ void RayTracingReflectApp::_CreateBuffers()
 	for (size_t i = 0; i < 1; ++i)
 	{
 		std::unique_ptr<Buffer> uptrBuffer = std::make_unique<Buffer>();
-		Buffer::Information bufferInfo{};
+		Buffer::CreateInformation bufferInfo{};
 
-		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+		bufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
 		bufferInfo.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
 		bufferInfo.size = static_cast<uint32_t>(sizeof(CameraUBO));
-
-		uptrBuffer->Init(bufferInfo);
+		uptrBuffer->PresetCreateInformation(bufferInfo);
+		uptrBuffer->Init();
 
 		m_uptrCameraBuffers.push_back(std::move(uptrBuffer));
 	}
 
 	// address data
 	{
-		Buffer::Information bufferInfo{};
+		Buffer::CreateInformation bufferInfo{};
 		m_uptrAddressBuffer = std::make_unique<Buffer>();
-		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		bufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		bufferInfo.size = static_cast<uint32_t>(sizeof(AddressData) * addrData.size());
 		bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-
-		m_uptrAddressBuffer->Init(bufferInfo);
+		m_uptrAddressBuffer->PresetCreateInformation(bufferInfo);
+		m_uptrAddressBuffer->Init();
 		m_uptrAddressBuffer->CopyFromHost(addrData.data());
 	}
 
 	// cloud data
 	{
-		Buffer::Information bufferInfo{};
-		Buffer::Information aabbBufferInfo{};
+		Buffer::CreateInformation bufferInfo{};
+		Buffer::CreateInformation aabbBufferInfo{};
 
 		m_uptrNanoVDBBuffer = std::make_unique<Buffer>();
-		bufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		bufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		bufferInfo.size = sizeof(uint32_t) + vdbData.data.size();
 		bufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-		
-		m_uptrNanoVDBBuffer->Init(bufferInfo);
+		m_uptrNanoVDBBuffer->PresetCreateInformation(bufferInfo);
+		m_uptrNanoVDBBuffer->Init();
 		m_uptrNanoVDBBuffer->CopyFromHost(&vdbData.offsets[3], 0, sizeof(vdbData.offsets[3]));
 		m_uptrNanoVDBBuffer->CopyFromHost(vdbData.data.data(), sizeof(vdbData.offsets[3]), vdbData.data.size());
 
 		m_uptrAABBBuffer = std::make_unique<Buffer>();
-		aabbBufferInfo.memoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+		aabbBufferInfo.optMemoryProperty = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
 		aabbBufferInfo.size = 24;
 		aabbBufferInfo.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT  | VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT | VK_BUFFER_USAGE_2_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR;
-
-		m_uptrAABBBuffer->Init(aabbBufferInfo);
+		m_uptrAABBBuffer->PresetCreateInformation(aabbBufferInfo);
+		m_uptrAABBBuffer->Init();
 		m_uptrAABBBuffer->CopyFromHost(&vdbData.minBound, 0, 12);
 		m_uptrAABBBuffer->CopyFromHost(&vdbData.maxBound, 12, 12);
 	}
@@ -565,10 +567,10 @@ void RayTracingNanoVDBApp::_InitProgram()
 {
 	m_uptrProgram = std::make_unique<RayTracingProgram>();
 
-	m_uptrProgram->AddMissShader("E:/GitStorage/LearnVulkan/bin/shaders/rt_pbr.rmiss.spv");
-	m_uptrProgram->AddProceduralHitShaders("E:/GitStorage/LearnVulkan/bin/shaders/rt_vdb.rchit.spv", "E:/GitStorage/LearnVulkan/bin/shaders/rt_pbr.rint.spv", {});
-	m_uptrProgram->AddRayGenerationShader("E:/GitStorage/LearnVulkan/bin/shaders/rt_vdb.rgen.spv");
-	m_uptrProgram->SetMaxRecursion(2);
+	m_uptrProgram->PreAddMissShader("E:/GitStorage/LearnVulkan/bin/shaders/rt_pbr.rmiss.spv");
+	m_uptrProgram->PreAddProceduralHitShaders("E:/GitStorage/LearnVulkan/bin/shaders/rt_vdb.rchit.spv", "E:/GitStorage/LearnVulkan/bin/shaders/rt_pbr.rint.spv", {});
+	m_uptrProgram->PreAddRayGenerationShader("E:/GitStorage/LearnVulkan/bin/shaders/rt_vdb.rgen.spv");
+	m_uptrProgram->PresetMaxRecursion(2);
 	m_uptrProgram->Init(1);
 
 	m_uptrGUIPass = std::make_unique<GUIPass>();
@@ -616,21 +618,34 @@ void RayTracingNanoVDBApp::_UpdateUniformBuffer()
 
 void RayTracingNanoVDBApp::_CreateImageAndViews()
 {
-	Image::Information imageInfo{};
-	m_uptrOutputImage = std::make_unique<Image>();
+	Image::CreateInformation imageInfo{};
+	ImageView* pImageView = nullptr;
 
-	imageInfo.format = VK_FORMAT_R32G32B32A32_SFLOAT;
-	imageInfo.width = MyDevice::GetInstance().GetSwapchainExtent().width;
-	imageInfo.height = MyDevice::GetInstance().GetSwapchainExtent().height;
+	m_uptrOutputImage = std::make_unique<Image>();
 	imageInfo.usage = VK_IMAGE_USAGE_STORAGE_BIT
 		| VK_IMAGE_USAGE_TRANSFER_DST_BIT
 		| VK_IMAGE_USAGE_SAMPLED_BIT;
-	m_uptrOutputImage->SetImageInformation(imageInfo);
+	m_uptrOutputImage->PresetCreateInformation(imageInfo);
+	m_uptrOutputImage->Init();
+	m_uptrOutputImage->ChangeLayoutAndFill(VK_IMAGE_LAYOUT_GENERAL, { 0u, 0u, 0u, 0u });
+	m_uptrOutputImage->NewImageView(pImageView);
+	m_uptrOutputView.reset(pImageView);
+	m_uptrOutputView->Init();
 }
 
 void RayTracingNanoVDBApp::_DestroyImageAndViews()
 {
+	if (m_uptrOutputView)
+	{
+		m_uptrOutputView->Uninit();
+		m_uptrOutputView.reset();
+	}
 
+	if (m_uptrOutputImage)
+	{
+		m_uptrOutputImage->Uninit();
+		m_uptrOutputImage.reset();
+	}
 }
 
 void RayTracingNanoVDBApp::_InitAccelerationStructure()
