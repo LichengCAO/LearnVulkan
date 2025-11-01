@@ -1326,3 +1326,45 @@ void RayTracingProgram::Uninit()
 	m_mapShaderToIndex.clear();
 	m_lateInitialization.clear();
 }
+
+void CameraComponent::UpdateCamera()
+{
+	UserInput userInput = MyDevice::GetInstance().GetUserInput();
+	VkExtent2D swapchainExtent = MyDevice::GetInstance().GetSwapchainExtent();
+	float xoffset;
+	float yoffset;
+	if (m_lastTime < 0)
+	{
+		m_lastTime = MyDevice::GetInstance().GetTime();
+	}
+
+	if (!userInput.RMB)
+	{
+		m_lastX = userInput.xPos;
+		m_lastY = userInput.yPos;
+	}
+	xoffset = m_lastX.has_value() ? static_cast<float>(userInput.xPos) - m_lastX.value() : 0.0f;
+	yoffset = m_lastY.has_value() ? m_lastY.value() - static_cast<float>(userInput.yPos) : 0.0f;
+	m_currentTime = MyDevice::GetInstance().GetTime();
+	m_lastX = userInput.xPos;
+	m_lastY = userInput.yPos;
+	xoffset *= m_sensitivity;
+	yoffset *= m_sensitivity;
+	camera.RotateAboutWorldUp(glm::radians(-xoffset));
+	camera.RotateAboutRight(glm::radians(yoffset));
+	if (userInput.RMB)
+	{
+		glm::vec3 fwd = glm::normalize(glm::cross(camera.world_up, camera.right));
+		float speed = 0.5 * static_cast<float>(m_currentTime - m_lastTime);
+		glm::vec3 mov = camera.eye;
+		if (userInput.W) mov += (speed * fwd);
+		if (userInput.S) mov += (-speed * fwd);
+		if (userInput.Q) mov += (speed * camera.world_up);
+		if (userInput.E) mov += (-speed * camera.world_up);
+		if (userInput.A) mov += (-speed * camera.right);
+		if (userInput.D) mov += (speed * camera.right);
+		camera.MoveTo(mov);
+	}
+
+	m_lastTime = m_currentTime;
+}

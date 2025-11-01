@@ -4,6 +4,7 @@
 #include "render_object/camera.h"
 
 class RayTracingProgram;
+class CameraComponent;
 class SwapchainPass;
 class GUIPass;
 class Buffer;
@@ -113,31 +114,37 @@ public:
 class RayTracingNanoVDBApp
 {
 private:
+	struct CameraUBO
+	{
+		glm::mat4 inverseViewProj;
+		glm::vec4 eye;
+	};
+private:
 	std::unique_ptr<Buffer> m_uptrAABBBuffer;
 	std::unique_ptr<Buffer> m_uptrCameraBuffer;
 	std::unique_ptr<Buffer> m_uptrVDBBuffer;
-	std::unique_ptr<RayTracingProgram>							m_uptrProgram;
+	std::unique_ptr<RayTracingProgram>						m_uptrProgram;
 	std::unique_ptr<RayTracingAccelerationStructure>	m_uptrAccelerationStructure;
-	std::unique_ptr<GUIPass>				m_uptrGUIPass;
-	std::unique_ptr<SwapchainPass>	m_uptrSwapchainPass;
+	std::unique_ptr<GUIPass>					m_uptrGUIPass;
+	std::unique_ptr<SwapchainPass>			m_uptrSwapchainPass;
 	std::unique_ptr<Image>						m_uptrOutputImage;
 	std::unique_ptr<ImageView>				m_uptrOutputView;
 	std::unique_ptr<CommandSubmission> m_uptrCmd;
-
+	VkSampler										m_sampler;
+	VkSemaphore									m_semaphore;
+	uint32_t											m_frameCount = 0;
+	std::unique_ptr<CameraComponent>		m_camera;
 
 private:
 	void _InitProgram();
 	void _UnintProgram();
 
-	void _InitBuffers();
-	void _UninitBuffers();
+	void _InitBuffersAndSceneObjects();
+	void _UninitBuffersAndSceneObjects();
 	void _UpdateUniformBuffer();
 
 	void _CreateImageAndViews();
 	void _DestroyImageAndViews();
-
-	void _InitAccelerationStructure();
-	void _UninitAccelerationStructure();
 
 	void _Init();
 	void _Uninit();

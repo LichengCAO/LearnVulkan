@@ -3,6 +3,7 @@
 #include "pipeline_io.h"
 #include "pipeline.h"
 #include <functional>
+#include "render_object/camera.h"
 
 class DescriptorBindRecord;
 class GraphicsProgram;
@@ -329,4 +330,25 @@ public:
 		uint32_t _uHeight);
 
 	void Uninit();
+};
+
+// helper class that gives you a user controlled camera
+class CameraComponent
+{
+private:
+	std::optional<float> m_lastX;
+	std::optional<float> m_lastY;
+	double	m_lastTime = -1.0f;
+	double	m_currentTime = 0.0;
+	float		m_sensitivity = 0.3f;
+public:
+	PersCamera camera;
+
+public:
+	CameraComponent(unsigned int w, unsigned int h, const glm::vec3& e, const glm::vec3& r, const glm::vec3& worldUp) 
+		:camera(w, h, e, r, worldUp)
+	{};
+	
+	// update camera based on user input, call it every frame
+	void UpdateCamera();
 };

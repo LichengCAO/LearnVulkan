@@ -10,22 +10,6 @@ public:
 	// so i think if we can get the relative index we can map it to an index in next level pool0
 	// perhaps do a parallel prefix sum (scan) to find out which data to read
 	// the iterate order is z -> y -> x
-	struct Pool0Data
-	{
-		uint8_t level = 0;				  // leaf level is 0, root level is 3
-		glm::vec3 index;				  // bounding box's min corner, note this is not relative index in a level
-		uint32_t parentIndex = ~0;		  // parent index in pool0
-		uint32_t childOffset = 0;		  // child index offset in pool1
-		std::vector<uint8_t> activeChild; // present how many child is active, one bit for one child, so the length of this should be CHILDREN_COUNT / 8
-	};
-
-	struct Level1Data
-	{
-		glm::mat4 indexToWorld;				// apply this model matrix to index to convert it to world position
-		std::vector<Pool0Data> level1Pool0; // store the level nodes
-		std::vector<Pool0Data> level0Pool0; // points to data in voxel data
-		std::vector<std::array<float, 512>> voxelData; // for now i assume the data is only float not considering vec3 or other
-	};
 
 	// GPU friendly data to update to GPU
 	struct CompactData

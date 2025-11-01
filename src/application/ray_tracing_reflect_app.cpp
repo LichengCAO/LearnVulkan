@@ -7,6 +7,11 @@
 #include "utility/glTF_loader.h"
 #include "utility/vdb_loader.h"
 
+#define UNINIT_UPTR(_x) if(_x)\
+									{\
+									_x->Uninit();\
+									_x.reset();\
+									}
 void RayTracingReflectApp::_CreateCommandBuffers()
 {
 	for (int i = 0; i < 1; ++i)
@@ -601,19 +606,77 @@ void RayTracingNanoVDBApp::_UnintProgram()
 	}
 }
 
-void RayTracingNanoVDBApp::_InitBuffers()
+void RayTracingNanoVDBApp::_InitBuffersAndSceneObjects()
 {
+	Buffer::CreateInformation createInfo{};
+	Buffer::CreateInformation createInfo2{};
+	Buffer::CreateInformation createInfo3{};
+	MyVDBLoader loader{};
+	MyVDBLoader::CompactData sceneData{};
+	RayTracingAccelerationStructure::AABBData aabbData{};
+	RayTracingAccelerationStructure::InstanceData instData{};
+	VkAabbPositionsKHR bbox{};
 
+	m_uptrAABBBuffer = std::make_unique<Buffer>();
+	m_uptrCameraBuffer = std::make_unique<Buffer>();
+	m_uptrVDBBuffer = std::make_unique<Buffer>();
+	m_uptrAccelerationStructure = std::make_unique<RayTracingAccelerationStructure>();
+
+	loader.Load("E:/GitStorage/LearnVulkan/res/models/cloud/Stratocumulus 1.vdb", sceneData);
+	bbox.minX = sceneData.minBound.r;
+	bbox.minY = sceneData.minBound.g;
+	bbox.minZ = sceneData.minBound.b;
+	bbox.maxX = sceneData.maxBound.r;
+	bbox.maxY = sceneData.maxBound.g;
+	bbox.maxZ = sceneData.maxBound.b;
+
+	createInfo.usage =
+		VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR
+		| VK_BUFFER_USAGE_SHADER_DEVICE_ADDRESS_BIT
+		| VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	createInfo.size = sizeof(bbox);
+	m_uptrAABBBuffer->PresetCreateInformation(createInfo);
+	m_uptrAABBBuffer->Init();
+	m_uptrAABBBuffer->CopyFromHost(&bbox);
+	aabbData.uAABBCount = 1;
+	aabbData.uAABBStride = sizeof(bbox);
+	aabbData.vkDeviceAddressAABB = m_uptrAABBBuffer->GetDeviceAddress();
+	instData.uBLASIndex = m_uptrAccelerationStructure->PreAddBLAS({ aabbData });
+	instData.uHitShaderGroupIndexOffset = 0;
+	m_uptrAccelerationStructure->PresetTLAS({ instData });
+	m_uptrAccelerationStructure->Init();
+
+	createInfo2.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT;
+	createInfo2.size = sizeof(CameraUBO);
+	createInfo2.optMemoryProperty = VK_MEMORY_PROPERTY_HOST_COHERENT_BIT | VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+	m_uptrCameraBuffer->PresetCreateInformation(createInfo2);
+	m_uptrCameraBuffer->Init();
+
+	createInfo3.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	createInfo3.size = 4 + sceneData.data.size();
+	m_uptrVDBBuffer->PresetCreateInformation(createInfo);
+	m_uptrVDBBuffer->Init();
+	m_uptrVDBBuffer->CopyFromHost(&sceneData.offsets[3], 0, 4);
+	m_uptrVDBBuffer->CopyFromHost(sceneData.data.data(), 4, sceneData.data.size());
 }
 
-void RayTracingNanoVDBApp::_UninitBuffers()
+void RayTracingNanoVDBApp::_UninitBuffersAndSceneObjects()
 {
-
+	UNINIT_UPTR(m_uptrVDBBuffer);
+	UNINIT_UPTR(m_uptrCameraBuffer);
+	UNINIT_UPTR(m_uptrAccelerationStructure);
+	UNINIT_UPTR(m_uptrAABBBuffer);
 }
 
 void RayTracingNanoVDBApp::_UpdateUniformBuffer()
 {
-
+	UserInput userInput = MyDevice::GetInstance().GetUserInput();
+	CameraUBO ubo{};
+	m_camera->UpdateCamera();
+	m_frameCount = userInput.RMB ? 0 : m_frameCount + 1;
+	ubo.inverseViewProj = glm::inverse(m_camera->camera.GetViewProjectionMatrix());
+	ubo.eye = glm::vec4(m_camera->camera.eye, 1.0f);
+	m_uptrCameraBuffer->CopyFromHost(&ubo);
 }
 
 void RayTracingNanoVDBApp::_CreateImageAndViews()
@@ -635,45 +698,90 @@ void RayTracingNanoVDBApp::_CreateImageAndViews()
 
 void RayTracingNanoVDBApp::_DestroyImageAndViews()
 {
-	if (m_uptrOutputView)
-	{
-		m_uptrOutputView->Uninit();
-		m_uptrOutputView.reset();
-	}
-
-	if (m_uptrOutputImage)
-	{
-		m_uptrOutputImage->Uninit();
-		m_uptrOutputImage.reset();
-	}
-}
-
-void RayTracingNanoVDBApp::_InitAccelerationStructure()
-{
-
-}
-
-void RayTracingNanoVDBApp::_UninitAccelerationStructure()
-{
-
+	UNINIT_UPTR(m_uptrOutputView);
+	UNINIT_UPTR(m_uptrOutputImage);
 }
 
 void RayTracingNanoVDBApp::_Init()
 {
+	MyDevice::GetInstance().Init();
+	m_uptrCmd = std::make_unique<CommandSubmission>();
+	m_uptrCmd->Init();
+	_CreateImageAndViews();
+	_InitBuffersAndSceneObjects();
+	_InitProgram();
 
+	m_camera = std::make_unique<CameraComponent>(400, 300, glm::vec3(2, 2, 2), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+	m_sampler = MyDevice::GetInstance().samplerPool.GetSampler(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER);
+	m_semaphore = MyDevice::GetInstance().CreateVkSemaphore();
 }
 
 void RayTracingNanoVDBApp::_Uninit()
 {
-
+	MyDevice::GetInstance().DestroyVkSemaphore(m_semaphore);
+	MyDevice::GetInstance().samplerPool.ReturnSampler(m_sampler);
+	_UnintProgram();
+	_UninitBuffersAndSceneObjects();
+	_DestroyImageAndViews();
+	UNINIT_UPTR(m_uptrCmd);
+	MyDevice::GetInstance().Uninit();
 }
 
 void RayTracingNanoVDBApp::_ResizeWindow()
 {
-
+	MyDevice::GetInstance().WaitIdle();
+	MyDevice::GetInstance().RecreateSwapchain();
+	m_uptrGUIPass->OnSwapchainRecreated();
+	m_uptrSwapchainPass->OnSwapchainRecreated();
+	_DestroyImageAndViews();
+	_CreateImageAndViews();
 }
 
 void RayTracingNanoVDBApp::_DrawFrame()
 {
+	if (MyDevice::GetInstance().NeedRecreateSwapchain())
+	{
+		_ResizeWindow();
+		return;
+	}
+	m_uptrCmd->WaitTillAvailable();
+	_UpdateUniformBuffer();
+	m_uptrCmd->StartCommands({});
+	auto& binder = m_uptrProgram->GetDescriptorSetManager();
+	binder.StartBind();
+	binder.BindDescriptor(0, 0, { m_uptrCameraBuffer->GetDescriptorInfo() });
+	binder.BindDescriptor(0, 1, { m_uptrAccelerationStructure->vkAccelerationStructure });
+	binder.BindDescriptor(0, 2, { m_uptrOutputView->GetDescriptorInfo(m_sampler, VK_IMAGE_LAYOUT_GENERAL) });
+	binder.BindDescriptor(1, 1, { m_uptrVDBBuffer->GetDescriptorInfo() });
+	binder.EndBind();
+	m_uptrProgram->PushConstant(VK_SHADER_STAGE_RAYGEN_BIT_KHR, &m_frameCount);
+	m_uptrProgram->TraceRay(m_uptrCmd.get(), m_uptrOutputImage->GetImageSize().width, m_uptrOutputImage->GetImageSize().height);
+	auto semaphore = m_uptrCmd->SubmitCommands();
+	auto& gui = m_uptrGUIPass->StartPass(m_uptrOutputView->GetDescriptorInfo(m_sampler, VK_IMAGE_LAYOUT_GENERAL), { semaphore });
+	gui.StartWindow("VDB test");
+	gui.FrameRateText();
+	gui.EndWindow();
+	VkDescriptorImageInfo imageInfo{};
+	m_uptrGUIPass->EndPass({ m_semaphore }, imageInfo);
+	m_uptrSwapchainPass->Execute(imageInfo, { m_semaphore });
+	m_uptrProgram->EndFrame();
+}
 
+RayTracingNanoVDBApp::RayTracingNanoVDBApp()
+{
+}
+
+RayTracingNanoVDBApp::~RayTracingNanoVDBApp()
+{
+}
+
+void RayTracingNanoVDBApp::Run()
+{
+	_Init();
+	while (!MyDevice::GetInstance().NeedCloseWindow())
+	{
+		MyDevice::GetInstance().StartFrame();
+		_DrawFrame();
+	}
+	_Uninit();
 }
