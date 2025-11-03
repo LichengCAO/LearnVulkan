@@ -572,9 +572,9 @@ void RayTracingNanoVDBApp::_InitProgram()
 {
 	m_uptrProgram = std::make_unique<RayTracingProgram>();
 
-	m_uptrProgram->PreAddMissShader("E:/GitStorage/LearnVulkan/bin/shaders/rt_pbr.rmiss.spv");
-	m_uptrProgram->PreAddProceduralHitShaders("E:/GitStorage/LearnVulkan/bin/shaders/rt_vdb.rchit.spv", "E:/GitStorage/LearnVulkan/bin/shaders/rt_pbr.rint.spv", {});
-	m_uptrProgram->PreAddRayGenerationShader("E:/GitStorage/LearnVulkan/bin/shaders/rt_vdb.rgen.spv");
+	m_uptrProgram->PreAddMissShader("E:/GitStorage/LearnVulkan/bin/shaders/vdb.rmiss.spv");
+	m_uptrProgram->PreAddProceduralHitShaders("E:/GitStorage/LearnVulkan/bin/shaders/vdb.rchit.spv", "E:/GitStorage/LearnVulkan/bin/shaders/vdb.rint.spv", {});
+	m_uptrProgram->PreAddRayGenerationShader("E:/GitStorage/LearnVulkan/bin/shaders/vdb.rgen.spv");
 	m_uptrProgram->PresetMaxRecursion(2);
 	m_uptrProgram->Init(1);
 
@@ -629,6 +629,7 @@ void RayTracingNanoVDBApp::_InitBuffersAndSceneObjects()
 	bbox.maxX = sceneData.maxBound.r;
 	bbox.maxY = sceneData.maxBound.g;
 	bbox.maxZ = sceneData.maxBound.b;
+	//std::cout << "to GPU: " << bbox.minX << ", " << bbox.minY << ", " << bbox.minZ << "; " << bbox.maxX << ", " << bbox.maxY << ", " << bbox.maxZ << std::endl;
 
 	createInfo.usage =
 		VK_BUFFER_USAGE_ACCELERATION_STRUCTURE_BUILD_INPUT_READ_ONLY_BIT_KHR
@@ -643,6 +644,7 @@ void RayTracingNanoVDBApp::_InitBuffersAndSceneObjects()
 	aabbData.vkDeviceAddressAABB = m_uptrAABBBuffer->GetDeviceAddress();
 	instData.uBLASIndex = m_uptrAccelerationStructure->PreAddBLAS({ aabbData });
 	instData.uHitShaderGroupIndexOffset = 0;
+	instData.transformMatrix = glm::mat4(1.0f);
 	m_uptrAccelerationStructure->PresetTLAS({ instData });
 	m_uptrAccelerationStructure->Init();
 
@@ -652,9 +654,9 @@ void RayTracingNanoVDBApp::_InitBuffersAndSceneObjects()
 	m_uptrCameraBuffer->PresetCreateInformation(createInfo2);
 	m_uptrCameraBuffer->Init();
 
-	createInfo3.usage = VK_BUFFER_USAGE_UNIFORM_BUFFER_BIT | VK_BUFFER_USAGE_TRANSFER_DST_BIT;
+	createInfo3.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT| VK_BUFFER_USAGE_TRANSFER_DST_BIT;
 	createInfo3.size = 4 + sceneData.data.size();
-	m_uptrVDBBuffer->PresetCreateInformation(createInfo);
+	m_uptrVDBBuffer->PresetCreateInformation(createInfo3);
 	m_uptrVDBBuffer->Init();
 	m_uptrVDBBuffer->CopyFromHost(&sceneData.offsets[3], 0, 4);
 	m_uptrVDBBuffer->CopyFromHost(sceneData.data.data(), 4, sceneData.data.size());
@@ -672,8 +674,8 @@ void RayTracingNanoVDBApp::_UpdateUniformBuffer()
 {
 	UserInput userInput = MyDevice::GetInstance().GetUserInput();
 	CameraUBO ubo{};
-	m_camera->UpdateCamera();
-	m_frameCount = userInput.RMB ? 0 : m_frameCount + 1;
+	m_camera->UpdateCamera(10);
+	m_frameCount = userInput.RMB ? 1 : m_frameCount + 1;
 	ubo.inverseViewProj = glm::inverse(m_camera->camera.GetViewProjectionMatrix());
 	ubo.eye = glm::vec4(m_camera->camera.eye, 1.0f);
 	m_uptrCameraBuffer->CopyFromHost(&ubo);
@@ -711,13 +713,14 @@ void RayTracingNanoVDBApp::_Init()
 	_InitBuffersAndSceneObjects();
 	_InitProgram();
 
-	m_camera = std::make_unique<CameraComponent>(400, 300, glm::vec3(2, 2, 2), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
+	m_camera = std::make_unique<CameraComponent>(400, 300, glm::vec3(50, 50, 50), glm::vec3(0, 0, 0), glm::vec3(0, 1, 0));
 	m_sampler = MyDevice::GetInstance().samplerPool.GetSampler(VK_FILTER_LINEAR, VK_SAMPLER_ADDRESS_MODE_CLAMP_TO_BORDER);
 	m_semaphore = MyDevice::GetInstance().CreateVkSemaphore();
 }
 
 void RayTracingNanoVDBApp::_Uninit()
 {
+	MyDevice::GetInstance().WaitIdle();
 	MyDevice::GetInstance().DestroyVkSemaphore(m_semaphore);
 	MyDevice::GetInstance().samplerPool.ReturnSampler(m_sampler);
 	_UnintProgram();
@@ -759,6 +762,9 @@ void RayTracingNanoVDBApp::_DrawFrame()
 	auto semaphore = m_uptrCmd->SubmitCommands();
 	auto& gui = m_uptrGUIPass->StartPass(m_uptrOutputView->GetDescriptorInfo(m_sampler, VK_IMAGE_LAYOUT_GENERAL), { semaphore });
 	gui.StartWindow("VDB test");
+	std::stringstream ss;
+	ss << "camera position: " << m_camera->camera.eye.x << ", " << m_camera->camera.eye.y << ", " << m_camera->camera.eye.z;
+	gui.Text(ss.str());
 	gui.FrameRateText();
 	gui.EndWindow();
 	VkDescriptorImageInfo imageInfo{};

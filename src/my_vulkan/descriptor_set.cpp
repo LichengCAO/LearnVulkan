@@ -75,11 +75,21 @@ void DescriptorSet::FinishUpdate()
 	for (auto& eUpdate : m_updates)
 	{
 		VkWriteDescriptorSet wds{ VK_STRUCTURE_TYPE_WRITE_DESCRIPTOR_SET };
+		bool bindingFound = false;
 		wds.dstSet = vkDescriptorSet;
 		wds.dstBinding = eUpdate.binding;
 		wds.dstArrayElement = eUpdate.startElement;
-		CHECK_TRUE(m_pLayout->bindings.size() > static_cast<size_t>(eUpdate.binding), "The descriptor doesn't have this binding!");
-		wds.descriptorType = m_pLayout->bindings[eUpdate.binding].descriptorType;
+		for (const auto& binding : m_pLayout->bindings)
+		{
+			if (binding.binding == eUpdate.binding)
+			{
+				wds.descriptorType = binding.descriptorType;
+				bindingFound = true;
+				break;
+			}
+		}
+		CHECK_TRUE(bindingFound, "The descriptor doesn't have this binding!");
+		
 		// wds.descriptorCount = m_pLayout->bindings[eUpdate.binding].descriptorCount; the number of elements to update doens't need to be the same as the total number of the elements
 		switch (eUpdate.descriptorType)
 		{

@@ -255,6 +255,22 @@ void MyVDBLoader::_ExportCompactDataFromGridHandle(const nanovdb::GridHandle<>& 
 	// bounding box
 	_output.minBound = glm::vec3(pFloatGrid->worldBBox().min()[0], pFloatGrid->worldBBox().min()[1], pFloatGrid->worldBBox().min()[2]);
 	_output.maxBound = glm::vec3(pFloatGrid->worldBBox().max()[0], pFloatGrid->worldBBox().max()[1], pFloatGrid->worldBBox().max()[2]);
+	
+	// max voxel value & min voxel value
+	float minValue = std::numeric_limits<float>::max();
+	float maxValue = std::numeric_limits<float>::lowest();
+	for (uint32_t i = 0; i < pFloatGrid->tree().nodeCount<Node0T>(); ++i)
+	{
+		auto pLeaf = pFloatGrid->tree().getFirstLeaf() + i;
+		for (auto voxelOn = pLeaf->cbeginValueOn(); voxelOn; voxelOn++)
+		{
+			float val = pFloatGrid->tree().getValue(voxelOn.getCoord()); 
+			minValue = std::min(val, minValue);
+			maxValue = std::max(val, maxValue);
+		}
+	}
+	_output.maxValue = maxValue;
+	_output.minValue = minValue;
 
 	_PrintCompactData(_output);
 }
@@ -315,10 +331,10 @@ std::string MyVDBLoader::_CreateNanoVDBFromOpenVDB(const std::string& _openVDB) 
 	try
 	{
 		auto srcGrid = openvdb::gridPtrCast<openvdb::FloatGrid>(baseGrid);
-		srcGrid->setTransform(openvdb::math::Transform::createLinearTransform(/*voxelSize=*/0.01));
+		//srcGrid->setTransform(openvdb::math::Transform::createLinearTransform(voxelSize));
 		auto handle = nanovdb::tools::createNanoGrid(*srcGrid); // Convert from OpenVDB to NanoVDB and return a shared pointer to a GridHandle.
 		auto* dstGrid = handle.grid<float>();										// Get a (raw) pointer to the NanoVDB grid form the GridManager.
-		
+
 		if (!dstGrid)
 		{
 			throw std::runtime_error("GridHandle does not contain a grid with value type float");

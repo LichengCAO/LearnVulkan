@@ -350,5 +350,5 @@ public:
 	{};
 	
 	// update camera based on user input, call it every frame
-	void UpdateCamera();
+	void UpdateCamera(float _moveSpeed);
 };

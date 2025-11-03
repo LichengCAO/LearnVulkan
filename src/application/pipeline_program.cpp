@@ -1327,7 +1327,7 @@ void RayTracingProgram::Uninit()
 	m_lateInitialization.clear();
 }
 
-void CameraComponent::UpdateCamera()
+void CameraComponent::UpdateCamera(float _moveSpeed)
 {
 	UserInput userInput = MyDevice::GetInstance().GetUserInput();
 	VkExtent2D swapchainExtent = MyDevice::GetInstance().GetSwapchainExtent();
@@ -1355,7 +1355,7 @@ void CameraComponent::UpdateCamera()
 	if (userInput.RMB)
 	{
 		glm::vec3 fwd = glm::normalize(glm::cross(camera.world_up, camera.right));
-		float speed = 0.5 * static_cast<float>(m_currentTime - m_lastTime);
+		float speed = _moveSpeed * static_cast<float>(m_currentTime - m_lastTime);
 		glm::vec3 mov = camera.eye;
 		if (userInput.W) mov += (speed * fwd);
 		if (userInput.S) mov += (-speed * fwd);

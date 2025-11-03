@@ -1,0 +1,50 @@
+#version 460
+#extension GL_EXT_ray_tracing : require
+#extension GL_EXT_nonuniform_qualifier : enable
+#extension GL_EXT_scalar_block_layout : enable
+#extension GL_GOOGLE_include_directive : enable
+#extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
+#extension GL_EXT_buffer_reference2 : require
+
+layout(set = 1, binding = 1) buffer nanovdb_
+{
+  uint rootOffset;
+  uint pnanovdb_buf_data[];
+};
+
+#include "nanovdb_adaptor.glsl"
+
+// Ray-AABB intersection
+float hitAABB(const vec3 minimum, const vec3 maximum, const vec3 rayOrigin, const vec3 rayDirection)
+{
+  vec3  invDir = 1.0 / rayDirection;
+  vec3  tbot   = invDir * (minimum - rayOrigin);
+  vec3  ttop   = invDir * (maximum - rayOrigin);
+  vec3  tmin   = min(ttop, tbot);
+  vec3  tmax   = max(ttop, tbot);
+  float t0     = max(tmin.x, max(tmin.y, tmin.z));
+  float t1     = min(tmax.x, min(tmax.y, tmax.z));
+  return t1 > max(t0, 0.0) ? t0 : -1.0;
+}
+
+void main()
+{
+  NanoVDB_Init(rootOffset);
+  vec3 indexPosition = NanoVDB_WorldToIndex(gl_WorldRayOriginEXT);
+  vec3 indexDirection = NanoVDB_WorldToIndexDirection(gl_WorldRayDirectionEXT);
+  float tHit = -1.0f;
+  float value = 0.0f;
+  float tMin = 0.001;
+  float tMax = 1000.0f;
+  vec3 bboxMin;
+  vec3 bboxMax;
+  NanoVDB_GetGridWorldBoundingBox(bboxMin, bboxMax);
+  if (NanoVDB_HDDARayClip(bboxMin, bboxMax, gl_WorldRayOriginEXT, gl_WorldRayDirectionEXT, tMin, tMax))
+  {
+    reportIntersectionEXT(tMin, 0);
+  }
+  // if (NanoVDB_HDDAZeroCrossing(indexPosition, indexDirection, tHit, value))
+  // {
+  //   reportIntersectionEXT(tHit, 0);
+  // }
+}

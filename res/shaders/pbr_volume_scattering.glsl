@@ -73,7 +73,7 @@ void SampleVolume(
     const float u4 = rand2.x;
     const float u5 = rand2.y;
 
-    t1 = _SampleExponential(u, sigma_majorant); // t' use delta tracking instead
+    t1 = _SampleExponential(u, sigma_majorant); // t'
     if (t1 > t)
     {
         // evaluate first term of 14.3 in PBRTv4

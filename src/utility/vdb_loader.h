@@ -21,6 +21,8 @@ public:
 
 		glm::vec3 minBound;
 		glm::vec3 maxBound;
+		float maxValue;
+		float minValue;
 	};
 private:
 	std::string _CreateNanoVDBFromOpenVDB(const std::string& _openVDB) const;

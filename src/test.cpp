@@ -3,14 +3,14 @@
 #include "ray_tracing_app.h"
 #include "ray_tracing_reflect_app.h"
 #include "ray_query_app.h"
-#include "utility/vdb_loader.h"
 
 int main() {
 	//RayQueryApp app;
 	//RayTracingApp app;
 	//RayTracingThousandsApp app;
 	//RayTracingReflectApp app;
-	TransparentApp app;
+	//TransparentApp app;
+	RayTracingNanoVDBApp app;
 	app.Run(); // easier to debug this way
 	//try {
 	//	app.Run();

@@ -101,7 +101,7 @@ public:
 		// and different shader group need to be used,
 		// but in rgen we can only set 1 shader hit group when traceRayEXT
 		uint32_t	uHitShaderGroupIndexOffset; 
-		glm::mat4   transformMatrix;
+		glm::mat4   transformMatrix = glm::mat4(1.0f);
 		// By default, I just use the index of input array for gl_InstanceCustomIndex;
 		std::optional<uint32_t> optCustomIndex;
 	};

@@ -93,6 +93,15 @@ void NanoVDB_GetGridWorldBoundingBox(out vec3 _min, out vec3 _max)
         pnanovdb_grid_get_world_bbox(g_unusedBuffer, g_gridHandle, 5));
 }
 
+void NanoVDB_GetIndexBoundingBox(out vec3 _min, out vec3 _max)
+{
+    ivec3 bbox_min = pnanovdb_root_get_bbox_min(g_unusedBuffer, g_accessor.root);
+    ivec3 bbox_max = pnanovdb_root_get_bbox_max(g_unusedBuffer, g_accessor.root);
+    _min = pnanovdb_coord_to_vec3(bbox_min);
+    _max = pnanovdb_coord_to_vec3(pnanovdb_coord_add(bbox_max, pnanovdb_coord_uniform(1)));
+}
+
+// return true if the ray transfer from + to - or - to +
 // _origin: index space
 // _direction: index space
 bool NanoVDB_HDDAZeroCrossing(
@@ -111,6 +120,18 @@ bool NanoVDB_HDDAZeroCrossing(
         1000.0f,
         _tHit,
         _value);
+}
+
+// return true if the ray intersect with the domain
+bool NanoVDB_HDDARayClip(
+    in vec3 _minBBox,
+    in vec3 _maxBBox,
+    in vec3 _origin,
+    in vec3 _direction,
+    inout float _tMin,
+    inout float _tFar)
+{
+    return pnanovdb_hdda_ray_clip(_minBBox, _maxBBox, _origin, _tMin, _direction, _tFar);
 }
 
 #endif //NANOVDB_ADAPTOR
