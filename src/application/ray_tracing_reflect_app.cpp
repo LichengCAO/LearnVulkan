@@ -769,8 +769,10 @@ void RayTracingNanoVDBApp::_DrawFrame()
 	gui.StartWindow("VDB test");
 	{
 		float lastSingleScatterAlbedo = m_singleScatterAlbedo;
-		gui.SliderFloat("single scatter albedo: ", m_singleScatterAlbedo, 0.0f, 1.0f);
-		m_needReaccumulate = m_needReaccumulate || (m_singleScatterAlbedo != lastSingleScatterAlbedo);
+		float lastDensity = m_density;
+		gui.SliderFloat("single scatter albedo", m_singleScatterAlbedo, 0.0f, 1.0f);
+		gui.SliderFloat("density", m_density, 0.0f, 1.0f);
+		m_needReaccumulate = m_needReaccumulate || (m_singleScatterAlbedo != lastSingleScatterAlbedo) || (m_density != lastDensity);
 	}
 	std::stringstream ss;
 	ss << "camera position: " << m_camera->camera.eye.x << ", " << m_camera->camera.eye.y << ", " << m_camera->camera.eye.z;

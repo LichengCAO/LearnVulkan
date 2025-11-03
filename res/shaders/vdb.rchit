@@ -22,6 +22,7 @@ layout(location = 1) rayPayloadInEXT PBRPayload payload;
 layout(push_constant) uniform shaderInformation
 {
   layout(offset = 4)float single_scatter_albedo;
+  float density;
 } mediumInfo;
 
 void main()
@@ -66,7 +67,7 @@ void main()
     if (NanoVDB_IsActive(ijk))
     {
       // sample medium properties
-      float sigma_t = NanoVDB_ReadFloat(ijk);
+      float sigma_t = mediumInfo.density * NanoVDB_ReadFloat(ijk);
       sigma_s = mediumInfo.single_scatter_albedo * sigma_t;
       sigma_a = sigma_t - sigma_s;
       sigma_n = majorant - sigma_t;
