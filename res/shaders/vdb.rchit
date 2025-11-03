@@ -27,10 +27,11 @@ void main()
   vec3 indexDir = NanoVDB_WorldToIndexDirection(gl_ObjectRayDirectionEXT);
   vec3 indexMinBBox;
   vec3 indexMaxBBox;
-  uint state = 0;
+  uint state = 2;
+  int i = 0;
 
   NanoVDB_GetIndexBoundingBox(indexMinBBox, indexMaxBBox);
-  for (int i = 0; i < 8; ++i)
+  while(state == 2)
   {
     float density = 0.0f;
     ivec3 ijk = NanoVDB_IndexToIJK(indexPos);
@@ -40,34 +41,42 @@ void main()
     {
       density = NanoVDB_ReadFloat(ijk);
     }
-    NanoVDB_HDDARayClip(
-      indexMinBBox,
-      indexMaxBBox,
-      indexPos,
-      indexDir,
-      tMin,
-      tMax);
+    if (
+      !NanoVDB_HDDARayClip(
+        indexMinBBox,
+        indexMaxBBox,
+        indexPos,
+        indexDir,
+        tMin,
+        tMax)
+    )
+    {
+      throughPut *= 0.0f;
+      break;
+    }
+
     SampleVolume(        
-      pcg3d(uvec3(gl_LaunchIDEXT.xy, i)),
-      pcg3d_2(uvec3(gl_LaunchIDEXT.xy, i)),
+      pcg3d(uvec3(gl_LaunchIDEXT.xy, payload.randomSeed + i)),
+      pcg3d_2(uvec3(gl_LaunchIDEXT.xy, payload.randomSeed + i)),
       tMin,
       0,
       0.5 * density,
       0.5 * density,
-      5.0f - density,
+      max(0, 1.0f - density),
       throughPut,
       indexPos,
       indexDir,
       state);
     if (state == 0)
     {
-      throughPut *= (gl_ObjectRayDirectionEXT * 0.5 + vec3(0.5f));
+      throughPut *= (normalize(NanoVDB_IndexToWorldDirection(indexDir)) * 0.5 + vec3(0.5f));
       break;
     }
     else if (state == 1)
     {
       break;
     }
+    i++;
   }
   
   payload.traceEnd = true;

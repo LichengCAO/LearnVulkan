@@ -622,7 +622,7 @@ void RayTracingNanoVDBApp::_InitBuffersAndSceneObjects()
 	m_uptrVDBBuffer = std::make_unique<Buffer>();
 	m_uptrAccelerationStructure = std::make_unique<RayTracingAccelerationStructure>();
 
-	loader.Load("E:/GitStorage/LearnVulkan/res/models/cloud/Stratocumulus 1.vdb", sceneData);
+	loader.Load("E:/GitStorage/LearnVulkan/res/models/cloud/Cumulus Congestus.vdb", sceneData);
 	bbox.minX = sceneData.minBound.r;
 	bbox.minY = sceneData.minBound.g;
 	bbox.minZ = sceneData.minBound.b;
