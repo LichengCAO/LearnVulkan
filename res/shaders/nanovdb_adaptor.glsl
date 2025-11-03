@@ -134,4 +134,21 @@ bool NanoVDB_HDDARayClip(
     return pnanovdb_hdda_ray_clip(_minBBox, _maxBBox, _origin, _tMin, _direction, _tFar);
 }
 
+bool NanoVDB_HitAABB(
+    in vec3 _minBBox,
+    in vec3 _maxBBox,
+    in vec3 _origin,
+    in vec3 _direction,
+    out float _t)
+{
+    float tMin = 0.0f;
+    float tMax = 10000.0f;
+    bool hit = pnanovdb_hdda_ray_clip(_minBBox, _maxBBox, _origin, tMin, _direction, tMax);
+    if (hit)
+    {
+        _t = abs(tMin) < 0.0001f ? tMax : tMin;
+    }
+    return hit;
+}
+
 #endif //NANOVDB_ADAPTOR

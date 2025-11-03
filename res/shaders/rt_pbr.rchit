@@ -73,7 +73,7 @@ uint ApplyVolumeScattering(uint seed, inout vec3 rayOrigin, inout vec3 rayDirect
 {
     uint state = 0;
 
-    SampleVolume(
+    SampleHomogeneousVolume(
         pcg3d(uvec3(gl_LaunchIDEXT.xy, seed)),
         pcg3d_2(uvec3(gl_LaunchIDEXT.xy, seed)),
         gl_HitTEXT,         // distance from ray origin to surface hit

@@ -655,11 +655,12 @@ void RayTracingNanoVDBApp::_InitBuffersAndSceneObjects()
 	m_uptrCameraBuffer->Init();
 
 	createInfo3.usage = VK_BUFFER_USAGE_STORAGE_BUFFER_BIT| VK_BUFFER_USAGE_TRANSFER_DST_BIT;
-	createInfo3.size = 4 + sceneData.data.size();
+	createInfo3.size = 4 + 4 + sceneData.data.size();
 	m_uptrVDBBuffer->PresetCreateInformation(createInfo3);
 	m_uptrVDBBuffer->Init();
 	m_uptrVDBBuffer->CopyFromHost(&sceneData.offsets[3], 0, 4);
-	m_uptrVDBBuffer->CopyFromHost(sceneData.data.data(), 4, sceneData.data.size());
+	m_uptrVDBBuffer->CopyFromHost(&sceneData.maxValue, 4, 4);
+	m_uptrVDBBuffer->CopyFromHost(sceneData.data.data(), 8, sceneData.data.size());
 }
 
 void RayTracingNanoVDBApp::_UninitBuffersAndSceneObjects()

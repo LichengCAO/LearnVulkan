@@ -13,6 +13,6 @@ layout(location = 1) rayPayloadInEXT PBRPayload payload;
 
 void main()
 {
-    payload.hitValue = gl_WorldRayDirectionEXT * 0.5 + vec3(0.5f);
+    payload.hitValue = vec3(0.0f);
     payload.traceEnd = true;
 }

@@ -12,6 +12,7 @@
 layout(set = 1, binding = 1) buffer nanovdb_
 {
   uint rootOffset;
+  float majorant;
   uint pnanovdb_buf_data[];
 };
 
@@ -23,62 +24,67 @@ void main()
 {
   NanoVDB_Init(rootOffset);
   vec3 throughPut = vec3(1.0f);
-  vec3 indexPos = NanoVDB_WorldToIndex(gl_WorldRayOriginEXT);
-  vec3 indexDir = NanoVDB_WorldToIndexDirection(gl_ObjectRayDirectionEXT);
+  vec3 indexPos = NanoVDB_WorldToIndex(gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT);
+  vec3 indexDir = NanoVDB_WorldToIndexDirection(gl_WorldRayDirectionEXT);
   vec3 indexMinBBox;
   vec3 indexMaxBBox;
-  uint state = 2;
   int i = 0;
+  bool fogged = false;
 
   NanoVDB_GetIndexBoundingBox(indexMinBBox, indexMaxBBox);
-  while(state == 2)
+  while(i < 800)
   {
-    float density = 0.0f;
-    ivec3 ijk = NanoVDB_IndexToIJK(indexPos);
-    float tMin = 0.001f;
-    float tMax = 1000.0f;
-    if (NanoVDB_IsActive(ijk))
+    float t;
+
+    if (!NanoVDB_HitAABB(indexMinBBox, indexMaxBBox, indexPos, indexDir, t))
     {
-      density = NanoVDB_ReadFloat(ijk);
-    }
-    if (
-      !NanoVDB_HDDARayClip(
-        indexMinBBox,
-        indexMaxBBox,
-        indexPos,
-        indexDir,
-        tMin,
-        tMax)
-    )
-    {
-      throughPut *= 0.0f;
       break;
     }
+    float t1 = SampleExponential(pcg3d(uvec3(gl_LaunchIDEXT.xy, payload.randomSeed + i)).x, majorant);
 
-    SampleVolume(        
-      pcg3d(uvec3(gl_LaunchIDEXT.xy, payload.randomSeed + i)),
-      pcg3d_2(uvec3(gl_LaunchIDEXT.xy, payload.randomSeed + i)),
-      tMin,
-      0,
-      0.5 * density,
-      0.5 * density,
-      max(0, 1.0f - density),
-      throughPut,
-      indexPos,
-      indexDir,
-      state);
-    if (state == 0)
+    // Lo
+    if (t1 > t)
     {
       throughPut *= (normalize(NanoVDB_IndexToWorldDirection(indexDir)) * 0.5 + vec3(0.5f));
       break;
     }
-    else if (state == 1)
+
+    // else, Ln
+    // update ray origin
+    indexPos = t1 * indexDir + indexPos;
+    
+    float sigma_a = 0.0f;
+    float sigma_s = 0.0f;
+    float sigma_n = majorant;
+    float g = 0.0f;
+    ivec3 ijk = NanoVDB_IndexToIJK(indexPos);
+    bool absorbed;
+    if (NanoVDB_IsActive(ijk))
     {
+      // sample medium properties
+      sigma_a = NanoVDB_ReadFloat(ijk);
+      sigma_s = 0.5 * sigma_a;
+      sigma_n = majorant - sigma_a - sigma_s;
+      // update g maybe
+    }
+    uint state;
+    Ln(pcg3d_2(uvec3(gl_LaunchIDEXT.xy, payload.randomSeed + i)), g, sigma_a, sigma_s, sigma_n, indexDir, throughPut, state);
+    if (state == 0)
+    {
+      fogged = true;
       break;
     }
+    else if (state == 1)
+    {
+      fogged = true;
+    }
+
     i++;
   }
-  
+  if (!fogged)
+  {
+    throughPut = vec3(0.0);
+  }
   payload.traceEnd = true;
   payload.hitValue = throughPut;
 }

@@ -8,7 +8,7 @@
 // sigma_majorant = sigma_t for homogeneous medium
 
 // pdf: a * exp(-a * xi)
-float _SampleExponential(in float xi, in float a)
+float SampleExponential(in float xi, in float a)
 {
     return -log(1.0f - xi) / a;
 }
@@ -52,7 +52,48 @@ void _SampleHenyeyGreenstein(
     pdf = phase_function; // true for henyey greenstein
 }
 
-void SampleVolume(
+// evaluate second term of 14.3 in PBRTv4
+void Ln(
+    in vec3 rand,
+    in float g,
+    in float sigma_a,
+    in float sigma_s,
+    in float sigma_n,
+    inout vec3 rayDirection,
+    inout vec3 throughput,
+    out uint state) // 0: absorb 1: scatter 2: null
+{
+    float sigma_majorant = sigma_a + sigma_s + sigma_n;
+
+    // first term in 14.5
+    if (sigma_a / sigma_majorant > rand.x)
+    {
+        // ends here
+        // should apply Le(p')
+        // since we have no emission in homogeneous medium, we ends like t1 > t
+        vec3 Le = vec3(0.0f); // if there is emission, we need to tell that do not proceed anymore
+        throughput *= Le;
+        state = 0;
+    }
+    // second term in 14.5
+    else if ((sigma_a + sigma_s) / sigma_majorant > rand.x)
+    {
+        vec3 nextRayDirection;
+        float phase_function = 1.0f;
+        float pdf = 1.0f;
+        _SampleHenyeyGreenstein(-rayDirection, g, vec2(rand.y, rand.z), nextRayDirection, pdf, phase_function);
+        rayDirection = nextRayDirection;
+        throughput *= (phase_function / pdf); // weighted by the ratio of the phase function and the probability of sampling the direction, don't know why
+        state = 1;
+    }
+    // third term in 14.5
+    else
+    {
+        state = 3;
+    }
+}
+
+void SampleHomogeneousVolume(
     in vec3 rand,
     in vec3 rand2,
     in float t,             // distance from ray origin to surface hit
@@ -73,7 +114,7 @@ void SampleVolume(
     const float u4 = rand2.x;
     const float u5 = rand2.y;
 
-    t1 = _SampleExponential(u, sigma_majorant); // t'
+    t1 = SampleExponential(u, sigma_majorant); // t'
     if (t1 > t)
     {
         // evaluate first term of 14.3 in PBRTv4
@@ -88,37 +129,13 @@ void SampleVolume(
         // we have samples in 0-t instead of 0-inifinity 
         // and with monte carlo integration our pdf becomes pdf_origin / (1 - q) 
         // the result becomes integral from 0 to t instead of 0 to infinity
+        uint LnState;
+        rayOrigin = rayOrigin + t1 * rayDirection;
+        // we need update sigma_a, sigma_s, sigma_n here for heterogeneous medium
 
-        // evaluate second term of 14.3 in PBRTv4
-        if (sigma_a / sigma_majorant > u3)
-        {
-            // first term in 14.5, ends here
-            // should apply Le(p')
-            // since we have no emission in homogeneous medium, we ends like t1 > t
-            vec3 Le = vec3(0.0f); // if there is emission, we need to tell that do not proceed anymore
-            throughput *= Le;
-            state = 1;
-        }
-        // second term in 14.5
-        else if ((sigma_a + sigma_s) / sigma_majorant > u3)
-        {
-            vec3 nextRayDirection;
-            float phase_function = 1.0f;
-            float pdf = 1.0f;
-            _SampleHenyeyGreenstein(-rayDirection, g, vec2(u4, u5), nextRayDirection, pdf, phase_function);
-            rayOrigin = rayOrigin + t1 * rayDirection;
-            rayDirection = nextRayDirection;
-            throughput *= (phase_function / pdf); // weighted by the ratio of the phase function and the probability of sampling the direction, don't know why
-            // apply SampleHomogenousMedium again
-            state = 2;
-        }
-        // third term in 14.5
-        else
-        {
-            rayOrigin = rayOrigin + t1 * rayDirection;
-            // apply SampleHomogenousMedium again
-            state = 2;
-        }
+        Ln(rand2, g, sigma_a, sigma_s, sigma_n, rayDirection, throughput, LnState);
+        if (LnState == 0) state = 1;
+        else state = 2;
     }
 }
 

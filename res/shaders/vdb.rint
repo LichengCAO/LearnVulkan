@@ -9,23 +9,11 @@
 layout(set = 1, binding = 1) buffer nanovdb_
 {
   uint rootOffset;
+  float majorant;
   uint pnanovdb_buf_data[];
 };
 
 #include "nanovdb_adaptor.glsl"
-
-// Ray-AABB intersection
-float hitAABB(const vec3 minimum, const vec3 maximum, const vec3 rayOrigin, const vec3 rayDirection)
-{
-  vec3  invDir = 1.0 / rayDirection;
-  vec3  tbot   = invDir * (minimum - rayOrigin);
-  vec3  ttop   = invDir * (maximum - rayOrigin);
-  vec3  tmin   = min(ttop, tbot);
-  vec3  tmax   = max(ttop, tbot);
-  float t0     = max(tmin.x, max(tmin.y, tmin.z));
-  float t1     = min(tmax.x, min(tmax.y, tmax.z));
-  return t1 > max(t0, 0.0) ? t0 : -1.0;
-}
 
 void main()
 {
@@ -43,8 +31,4 @@ void main()
   {
     reportIntersectionEXT(tMin, 0);
   }
-  // if (NanoVDB_HDDAZeroCrossing(indexPosition, indexDirection, tHit, value))
-  // {
-  //   reportIntersectionEXT(tHit, 0);
-  // }
 }
