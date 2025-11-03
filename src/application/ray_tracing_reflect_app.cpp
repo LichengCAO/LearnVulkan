@@ -676,10 +676,12 @@ void RayTracingNanoVDBApp::_UpdateUniformBuffer()
 	UserInput userInput = MyDevice::GetInstance().GetUserInput();
 	CameraUBO ubo{};
 	m_camera->UpdateCamera(10);
-	m_frameCount = userInput.RMB ? 1 : m_frameCount + 1;
+	m_needReaccumulate = m_needReaccumulate || userInput.RMB;
+	m_frameCount = m_needReaccumulate ? 1 : m_frameCount + 1;
 	ubo.inverseViewProj = glm::inverse(m_camera->camera.GetViewProjectionMatrix());
 	ubo.eye = glm::vec4(m_camera->camera.eye, 1.0f);
 	m_uptrCameraBuffer->CopyFromHost(&ubo);
+	m_needReaccumulate = false;
 }
 
 void RayTracingNanoVDBApp::_CreateImageAndViews()
@@ -745,6 +747,7 @@ void RayTracingNanoVDBApp::_DrawFrame()
 {
 	if (MyDevice::GetInstance().NeedRecreateSwapchain())
 	{
+		m_needReaccumulate = true;
 		_ResizeWindow();
 		return;
 	}
@@ -759,10 +762,16 @@ void RayTracingNanoVDBApp::_DrawFrame()
 	binder.BindDescriptor(1, 1, { m_uptrVDBBuffer->GetDescriptorInfo() });
 	binder.EndBind();
 	m_uptrProgram->PushConstant(VK_SHADER_STAGE_RAYGEN_BIT_KHR, &m_frameCount);
+	m_uptrProgram->PushConstant(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, &m_singleScatterAlbedo);
 	m_uptrProgram->TraceRay(m_uptrCmd.get(), m_uptrOutputImage->GetImageSize().width, m_uptrOutputImage->GetImageSize().height);
 	auto semaphore = m_uptrCmd->SubmitCommands();
 	auto& gui = m_uptrGUIPass->StartPass(m_uptrOutputView->GetDescriptorInfo(m_sampler, VK_IMAGE_LAYOUT_GENERAL), { semaphore });
 	gui.StartWindow("VDB test");
+	{
+		float lastSingleScatterAlbedo = m_singleScatterAlbedo;
+		gui.SliderFloat("single scatter albedo: ", m_singleScatterAlbedo, 0.0f, 1.0f);
+		m_needReaccumulate = m_needReaccumulate || (m_singleScatterAlbedo != lastSingleScatterAlbedo);
+	}
 	std::stringstream ss;
 	ss << "camera position: " << m_camera->camera.eye.x << ", " << m_camera->camera.eye.y << ", " << m_camera->camera.eye.z;
 	gui.Text(ss.str());

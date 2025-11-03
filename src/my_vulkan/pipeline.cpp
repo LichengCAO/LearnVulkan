@@ -57,12 +57,11 @@ std::vector<VkShaderStageFlagBits> PushConstantManager::_GetBitsFromStageFlags(V
 void PushConstantManager::AddConstantRange(VkShaderStageFlags _stages, uint32_t _offset, uint32_t _size)
 {
 	uint32_t sizeAligned = CommonUtils::AlignUp(_size, 4); // Both offset and size are in units of bytes and must be a multiple of 4.
-	uint32_t currentOffset = m_currentSize;
 	CHECK_TRUE((m_usedStages & _stages) == 0, "Some stage already used!");
 	m_usedStages = m_usedStages | _stages;
 	m_currentSize += sizeAligned;
 	CHECK_TRUE(m_currentSize <= 128, "Push constant cannot be larger than 128 bytes!");
-	m_mapRange.insert({ _stages, { currentOffset, _size } });
+	m_mapRange.insert({ _stages, { _offset, _size } });
 }
 
 void PushConstantManager::PushConstant(VkCommandBuffer _cmd, VkPipelineLayout _layout, VkShaderStageFlags _stage, const void* _data) const

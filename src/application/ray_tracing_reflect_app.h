@@ -134,6 +134,8 @@ private:
 	VkSemaphore									m_semaphore;
 	uint32_t											m_frameCount = 0;
 	std::unique_ptr<CameraComponent>		m_camera;
+	float												m_singleScatterAlbedo = 0.5f;
+	bool												m_needReaccumulate = false;
 
 private:
 	void _InitProgram();

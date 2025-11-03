@@ -19,6 +19,10 @@ layout(set = 1, binding = 1) buffer nanovdb_
 #include "nanovdb_adaptor.glsl"
 
 layout(location = 1) rayPayloadInEXT PBRPayload payload;
+layout(push_constant) uniform shaderInformation
+{
+  layout(offset = 4)float single_scatter_albedo;
+} mediumInfo;
 
 void main()
 {
@@ -62,9 +66,10 @@ void main()
     if (NanoVDB_IsActive(ijk))
     {
       // sample medium properties
-      sigma_a = NanoVDB_ReadFloat(ijk);
-      sigma_s = 0.5 * sigma_a;
-      sigma_n = majorant - sigma_a - sigma_s;
+      float sigma_t = NanoVDB_ReadFloat(ijk);
+      sigma_s = mediumInfo.single_scatter_albedo * sigma_t;
+      sigma_a = sigma_t - sigma_s;
+      sigma_n = majorant - sigma_t;
       // update g maybe
     }
     uint state;
