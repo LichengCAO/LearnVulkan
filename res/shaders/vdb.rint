@@ -57,7 +57,7 @@ void main()
 
   // find first position where ray does scatter or absorption
   int i = 0;
-  while(i < 800)
+  while(true)
   {
     float d;
     vec3 rand = pcg3d(uvec3(gl_LaunchIDEXT.xy, seed + i));

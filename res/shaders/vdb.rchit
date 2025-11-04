@@ -37,7 +37,7 @@ layout(push_constant) uniform shaderInformation
 void main()
 {
   NanoVDB_Init(rootOffset);
-  vec3 throughPut = vec3(1.0f);
+  vec3 throughPut = payload.hitValue;
   vec3 indexPos = NanoVDB_WorldToIndex(gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT);
   vec3 indexDir = NanoVDB_WorldToIndexDirection(attribs.nextDirection); // the ray may be scattered in intersection shader
   vec3 indexMinBBox;
@@ -45,23 +45,25 @@ void main()
   int i = 0;
   float majorant = _majorant * pushConstants.density;
   bool done = attribs.absorb;// if we already hit absorb in intersection, we stop ray trace
+  payload.hitValue = vec3(0);
 
   NanoVDB_GetIndexBoundingBox(indexMinBBox, indexMaxBBox);
   
   while(!done)
   {
     float t;
-
+    vec3 rand = pcg3d(uvec3(gl_LaunchIDEXT.xy, payload.randomSeed + i));
     if (!NanoVDB_HitAABB(indexMinBBox, indexMaxBBox, indexPos, indexDir, t))
     {
       break;
     }
-    float t1 = SampleExponential(pcg3d(uvec3(gl_LaunchIDEXT.xy, payload.randomSeed + i)).x, majorant);
+    float t1 = SampleExponential(rand.x, majorant);
 
     // Lo
     if (t1 > t)
     {
       throughPut *= (normalize(NanoVDB_IndexToWorldDirection(indexDir)) * 0.5 + vec3(0.5f));
+      payload.hitValue = throughPut * attribs.throughput;
       break;
     }
 
@@ -85,15 +87,16 @@ void main()
       // update g maybe
     }
     uint state;
-    Ln(pcg3d_2(uvec3(gl_LaunchIDEXT.xy, payload.randomSeed + i)), g, sigma_a, sigma_s, sigma_n, indexDir, throughPut, state);
+    Ln(rand, g, sigma_a, sigma_s, sigma_n, indexDir, throughPut, state);
     if (state == 0)
     {
+      payload.hitValue = throughPut * attribs.throughput;
       break;
     }
     ++i;
-    done = i > 800;
+    float p = 0.99;
+    done = rand.y > p;
+    throughPut /= p;
   }
-
   payload.traceEnd = true;
-  payload.hitValue = payload.hitValue * throughPut * attribs.throughput;
 }
