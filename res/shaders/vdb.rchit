@@ -6,38 +6,49 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference2 : require
 
-#include "rt_common.glsl"
-#include "pbr_common.glsl"
-#include "pbr_volume_scattering.glsl"
+struct HitAttributes {
+    vec3 barycentric; // Barycentric coordinates or other position-related data, so to be work with builtin hitAttributeEXT
+    vec3 nextDirection;
+    vec3 throughput;
+    bool absorb;
+};
+
 layout(set = 1, binding = 1) buffer nanovdb_
 {
   uint rootOffset;
-  float majorant;
+  float _majorant;
   uint pnanovdb_buf_data[];
 };
+hitAttributeEXT HitAttributes attribs;
 
+#include "rt_common.glsl"
+#include "pbr_common.glsl"
+#include "pbr_volume_scattering.glsl"
 #include "nanovdb_adaptor.glsl"
 
 layout(location = 1) rayPayloadInEXT PBRPayload payload;
 layout(push_constant) uniform shaderInformation
 {
-  layout(offset = 4)float single_scatter_albedo;
+  uint uFrameIndex;
+  float single_scatter_albedo;
   float density;
-} mediumInfo;
+} pushConstants;
 
 void main()
 {
   NanoVDB_Init(rootOffset);
   vec3 throughPut = vec3(1.0f);
   vec3 indexPos = NanoVDB_WorldToIndex(gl_WorldRayOriginEXT + gl_WorldRayDirectionEXT * gl_HitTEXT);
-  vec3 indexDir = NanoVDB_WorldToIndexDirection(gl_WorldRayDirectionEXT);
+  vec3 indexDir = NanoVDB_WorldToIndexDirection(attribs.nextDirection); // the ray may be scattered in intersection shader
   vec3 indexMinBBox;
   vec3 indexMaxBBox;
   int i = 0;
-  bool fogged = false;
+  float majorant = _majorant * pushConstants.density;
+  bool done = attribs.absorb;// if we already hit absorb in intersection, we stop ray trace
 
   NanoVDB_GetIndexBoundingBox(indexMinBBox, indexMaxBBox);
-  while(i < 800)
+  
+  while(!done)
   {
     float t;
 
@@ -67,8 +78,8 @@ void main()
     if (NanoVDB_IsActive(ijk))
     {
       // sample medium properties
-      float sigma_t = mediumInfo.density * NanoVDB_ReadFloat(ijk);
-      sigma_s = mediumInfo.single_scatter_albedo * sigma_t;
+      float sigma_t = pushConstants.density * NanoVDB_ReadFloat(ijk);
+      sigma_s = pushConstants.single_scatter_albedo * sigma_t;
       sigma_a = sigma_t - sigma_s;
       sigma_n = majorant - sigma_t;
       // update g maybe
@@ -77,20 +88,12 @@ void main()
     Ln(pcg3d_2(uvec3(gl_LaunchIDEXT.xy, payload.randomSeed + i)), g, sigma_a, sigma_s, sigma_n, indexDir, throughPut, state);
     if (state == 0)
     {
-      fogged = true;
       break;
     }
-    else if (state == 1)
-    {
-      fogged = true;
-    }
+    ++i;
+    done = i > 800;
+  }
 
-    i++;
-  }
-  if (!fogged)
-  {
-    throughPut = vec3(0.0);
-  }
   payload.traceEnd = true;
-  payload.hitValue = throughPut;
+  payload.hitValue = payload.hitValue * throughPut * attribs.throughput;
 }

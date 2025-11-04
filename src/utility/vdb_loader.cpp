@@ -331,7 +331,7 @@ std::string MyVDBLoader::_CreateNanoVDBFromOpenVDB(const std::string& _openVDB) 
 	try
 	{
 		auto srcGrid = openvdb::gridPtrCast<openvdb::FloatGrid>(baseGrid);
-		//srcGrid->setTransform(openvdb::math::Transform::createLinearTransform(voxelSize));
+		//srcGrid->setTransform(openvdb::math::Transform::createLinearTransform(0.05));
 		auto handle = nanovdb::tools::createNanoGrid(*srcGrid); // Convert from OpenVDB to NanoVDB and return a shared pointer to a GridHandle.
 		auto* dstGrid = handle.grid<float>();										// Get a (raw) pointer to the NanoVDB grid form the GridManager.
 

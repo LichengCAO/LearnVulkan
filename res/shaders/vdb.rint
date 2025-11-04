@@ -6,29 +6,104 @@
 #extension GL_EXT_shader_explicit_arithmetic_types_int64 : require
 #extension GL_EXT_buffer_reference2 : require
 
+struct HitAttributes {
+    vec3 barycentric; // Barycentric coordinates or other position-related data, so to be work with builtin hitAttributeEXT
+    vec3 nextDirection;
+    vec3 throughput;
+    bool absorb;
+};
+
 layout(set = 1, binding = 1) buffer nanovdb_
 {
   uint rootOffset;
-  float majorant;
+  float _majorant;
   uint pnanovdb_buf_data[];
 };
+layout(push_constant) uniform shaderInformation
+{
+  uint uFrameIndex;
+  float single_scatter_albedo;
+  float density;
+} pushConstants;
+hitAttributeEXT HitAttributes attribs;
 
+#include "pbr_volume_scattering.glsl"
 #include "nanovdb_adaptor.glsl"
 
 void main()
 {
   NanoVDB_Init(rootOffset);
-  vec3 indexPosition = NanoVDB_WorldToIndex(gl_WorldRayOriginEXT);
-  vec3 indexDirection = NanoVDB_WorldToIndexDirection(gl_WorldRayDirectionEXT);
-  float tHit = -1.0f;
-  float value = 0.0f;
+  attribs.throughput = vec3(1.0);
+  attribs.nextDirection = gl_WorldRayDirectionEXT;
+  vec3 indexPos = NanoVDB_WorldToIndex(gl_WorldRayOriginEXT);
+  vec3 indexDir = NanoVDB_WorldToIndexDirection(gl_WorldRayDirectionEXT);
+  float t = 0.0f;
   float tMin = 0.001;
   float tMax = 1000.0f;
-  vec3 bboxMin;
-  vec3 bboxMax;
-  NanoVDB_GetGridWorldBoundingBox(bboxMin, bboxMax);
-  if (NanoVDB_HDDARayClip(bboxMin, bboxMax, gl_WorldRayOriginEXT, gl_WorldRayDirectionEXT, tMin, tMax))
+  vec3 indexMinBBox;
+  vec3 indexMaxBBox;
+  float majorant = _majorant * pushConstants.density;
+  uint seed = pushConstants.uFrameIndex * 1973 + 1 * 9277 + uint(gl_LaunchIDEXT.x) * 26699 + uint(gl_LaunchIDEXT.y) * 8191;
+  NanoVDB_GetIndexBoundingBox(indexMinBBox, indexMaxBBox);
+  // not in bouding box, there is no intersection
+  if (!NanoVDB_HDDARayClip(indexMinBBox, indexMaxBBox, indexPos, indexDir, tMin, tMax))
   {
-    reportIntersectionEXT(tMin, 0);
+    return;
+  }
+
+  // proceed ray to the bounding box
+  t += tMin;
+  indexPos = indexPos + indexDir * t;
+
+  // find first position where ray does scatter or absorption
+  int i = 0;
+  while(i < 800)
+  {
+    float d;
+    vec3 rand = pcg3d(uvec3(gl_LaunchIDEXT.xy, seed + i));
+
+    // ray no longer in the bounding box, and sample is not in the bounding box
+    if (!NanoVDB_HitAABB(indexMinBBox, indexMaxBBox, indexPos, indexDir, d))
+    {
+      break;
+    }
+
+    float t1 = SampleExponential(rand.x, majorant);
+    // calculate Lo, the sample is out side the bounding box
+    if (t1 > d)
+    {
+      break;
+    }
+    t += t1;
+    indexPos = t1 * indexDir + indexPos;
+
+    // calculate Ln, the ray may hit absorb, scatter or null
+    float sigma_a = 0.0f;
+    float sigma_s = 0.0f;
+    float sigma_n = majorant;
+    float g = 0.0f;
+    ivec3 ijk = NanoVDB_IndexToIJK(indexPos);
+    if (NanoVDB_IsActive(ijk))
+    {
+      float sigma_t = pushConstants.density * NanoVDB_ReadFloat(ijk);
+      sigma_s = pushConstants.single_scatter_albedo * sigma_t;
+      sigma_a = sigma_t - sigma_s;
+      sigma_n = majorant - sigma_t;
+    }
+    uint state;
+    Ln(rand, g, sigma_a, sigma_s, sigma_n, indexDir, attribs.throughput, state);
+    if (state == 0 || state == 1)
+    {
+      // we have scatter or absorb now, report intersection
+      attribs.nextDirection = NanoVDB_IndexToWorldDirection(indexDir);
+      attribs.absorb = (state == 0);
+      reportIntersectionEXT(t, 0);
+      return;
+    }
+    else
+    {
+      // we hit null, continue
+    }
+    ++i;
   }
 }

@@ -16,6 +16,8 @@ layout(location = 0) rayPayloadEXT PBRPayload payload;
 layout(push_constant) uniform shaderInformation
 {
   uint uFrameIndex;
+  float single_scatter_albedo;
+  float density;
 } pushConstants;
 
 void GetRayOriginAndDirection(out vec3 rayOrigin, out vec3 rayDirection)

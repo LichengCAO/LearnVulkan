@@ -761,8 +761,21 @@ void RayTracingNanoVDBApp::_DrawFrame()
 	binder.BindDescriptor(0, 2, { m_uptrOutputView->GetDescriptorInfo(m_sampler, VK_IMAGE_LAYOUT_GENERAL) });
 	binder.BindDescriptor(1, 1, { m_uptrVDBBuffer->GetDescriptorInfo() });
 	binder.EndBind();
-	m_uptrProgram->PushConstant(VK_SHADER_STAGE_RAYGEN_BIT_KHR, &m_frameCount);
-	m_uptrProgram->PushConstant(VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR, &m_singleScatterAlbedo);
+	{
+		struct PushValue
+		{
+			uint32_t frameCount;
+			float singleScatter;
+			float density;
+		};
+
+		PushValue val{};
+		val.frameCount = m_frameCount;
+		val.singleScatter = m_singleScatterAlbedo;
+		val.density = m_density;
+
+		m_uptrProgram->PushConstant(VK_SHADER_STAGE_RAYGEN_BIT_KHR | VK_SHADER_STAGE_CLOSEST_HIT_BIT_KHR | VK_SHADER_STAGE_INTERSECTION_BIT_KHR, &val);
+	}
 	m_uptrProgram->TraceRay(m_uptrCmd.get(), m_uptrOutputImage->GetImageSize().width, m_uptrOutputImage->GetImageSize().height);
 	auto semaphore = m_uptrCmd->SubmitCommands();
 	auto& gui = m_uptrGUIPass->StartPass(m_uptrOutputView->GetDescriptorInfo(m_sampler, VK_IMAGE_LAYOUT_GENERAL), { semaphore });
