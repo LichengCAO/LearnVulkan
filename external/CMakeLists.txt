@@ -16,6 +16,7 @@ set(VMA_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/vma")
 set(SPIRV_REFLECT_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/spirv_reflect")
 set(IMGUI_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/imgui" "${CMAKE_CURRENT_SOURCE_DIR}/imgui/backends")
 set(VDB_DIR "${CMAKE_CURRENT_SOURCE_DIR}/openvdb/openvdb/openvdb" "${CMAKE_CURRENT_SOURCE_DIR}/openvdb/nanovdb/nanovdb")
+set(METIS_INCLUDE_DIR "${CMAKE_CURRENT_SOURCE_DIR}/include")
 
 set(INCLUDE_DIRS 
     ${GLM_INCLUDE_DIR}
@@ -24,6 +25,7 @@ set(INCLUDE_DIRS
     ${SPIRV_REFLECT_INCLUDE_DIR}
     ${IMGUI_INCLUDE_DIR}
     ${OPENVDB_INCLUDE_DIRS}
+    ${METIS_INCLUDE_DIR}
 )
 
 set(EXT_LIBS
@@ -117,6 +119,8 @@ target_compile_features(imgui PUBLIC cxx_std_11)
 # Setup openvdb
 #find_package(OpenVDB CONFIG REQUIRED)
 
+#find_package(metis CONFIG REQUIRED)
+
 #add directories by their names on current computer
 add_subdirectory(GLFW)
 add_subdirectory(glm)
@@ -128,7 +132,7 @@ add_subdirectory(vma)
 add_subdirectory(tinygltf)
 add_subdirectory(spirv_reflect)
 add_subdirectory(openvdb)
-target_link_libraries(ExternalLibs INTERFACE ${EXT_LIBS})
+target_link_libraries(ExternalLibs INTERFACE ${EXT_LIBS} metis)
 target_include_directories(ExternalLibs INTERFACE ${INCLUDE_DIRS}) 
 
 set_target_properties(${EXT_LIBS} PROPERTIES FOLDER "ThirdParty")

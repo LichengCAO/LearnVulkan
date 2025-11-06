@@ -21,7 +21,7 @@ public:
 	* outMeshletTriangles serves as something like indices buffers for these subsets of vertices.
 	*/
 	static void BuildMeshlets(
-		StaticMesh& inMesh,
+		const StaticMesh& inMesh,
 		std::vector<Meshlet>& outMeshlets,
 		std::vector<uint32_t>& outMeshletVertices,
 		std::vector<uint8_t>& outMeshletTriangles);

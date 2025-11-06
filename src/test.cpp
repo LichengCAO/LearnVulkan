@@ -10,7 +10,8 @@ int main() {
 	//RayTracingThousandsApp app;
 	//RayTracingReflectApp app;
 	//TransparentApp app;
-	RayTracingNanoVDBApp app;
+	//RayTracingNanoVDBApp app;
+	MeshletApp app;
 	app.Run(); // easier to debug this way
 	//try {
 	//	app.Run();

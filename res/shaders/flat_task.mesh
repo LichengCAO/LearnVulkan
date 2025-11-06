@@ -89,12 +89,12 @@ vec3 randomColor(uint seed) {
 
 void main()
 {
-	Meshlet vecMeshlets[MESHLETS_PER_MESH_WORKGROUP];
-	uint uMeshOutputVertexCount = 0u;
-	uint uMeshOutputPrimitiveCount = 0u;
-	uint uValidIndexCount = 0u;
-	const uint uPrimitiveBaseOffset = getLocalInvocationID() * PRIMITIVE_ITERATION_COUNT;
-	const uint uVertexBaseOffset    = getLocalInvocationID() * VERTEX_ITERATION_COUNT;
+	Meshlet vecMeshlets[MESHLETS_PER_MESH_WORKGROUP]; // all meshlets processed by parent workgroup
+	uint uWorkGroupOutputVertexCount = 0u;	// number of vertices processed by parent workgroup
+	uint uWorkGroupOutputPrimitiveCount = 0u; // number of primitives/triangles processed by parent workgroup
+	uint uWorkGroupMeshlet = 0u; // number of meshlets processed by parent workgroup
+	const uint uThreadPrimitiveOffset = getLocalInvocationID() * PRIMITIVE_ITERATION_COUNT; // each thread only process partial of the whole meshlet
+	const uint uThreadVertexOffset    = getLocalInvocationID() * VERTEX_ITERATION_COUNT; // each thread only process partial of the whole meshlet
 	
 	for (uint i = 0u; i < MESHLETS_PER_MESH_WORKGROUP; ++i)
 	{
@@ -104,56 +104,60 @@ void main()
 			break;
 		}
 		vecMeshlets[i]             = meshlets[uMeshletID];
-		uMeshOutputVertexCount    += vecMeshlets[i].vertexCount;
-		uMeshOutputPrimitiveCount += vecMeshlets[i].triangleCount;
-		++uValidIndexCount;
+		uWorkGroupOutputVertexCount    += vecMeshlets[i].vertexCount;
+		uWorkGroupOutputPrimitiveCount += vecMeshlets[i].triangleCount;
+		++uWorkGroupMeshlet;
 	}
 	// Should be the same for all mesh shader invocations in the same workgroup
-	SetMeshOutputsEXT(uMeshOutputVertexCount, uMeshOutputPrimitiveCount);
+	SetMeshOutputsEXT(uWorkGroupOutputVertexCount, uWorkGroupOutputPrimitiveCount);
 	
 	// Emit meshlet vertices and triangles
-	uint uMeshVerticesOffset = 0u;
-	uint uPrimitiveTriangleOffset = 0u;
-	for (uint i = 0u; i < uValidIndexCount; ++i)
+	uint uMeshVerticesOffset = 0u; 		// for the case where we process more than one meshlet 
+										// in a work group, ignore it if we only have one 
+										// meshlet in each workgroup
+	uint uPrimitiveTriangleOffset = 0u; // for the case where we process more than one meshlet 
+										// in a work group, ignore it if we only have one meshlet 
+										// in each workgroup
+	for (uint i = 0u; i < uWorkGroupMeshlet; ++i)
 	{
 		// each mesh shader invocation doesn't process a complete meshlet, 
 		// but processes only part of the meshlet owned by the same mesh workgroup
 		// it's the mesh workgroup that processes complete meshlets
 		const vec3 color = randomColor(getMeshletID(i));
-		const uint uVertexCount = vecMeshlets[i].vertexCount;
-		const uint uPrimitiveCount = vecMeshlets[i].triangleCount;
-		const uint uVertexOffset = vecMeshlets[i].vertexOffset;
-		const uint uTriangleOffset = vecMeshlets[i].triangleOffset;
+		const uint uMeshletVertexCount = vecMeshlets[i].vertexCount;
+		const uint uMeshletPrimitiveCount = vecMeshlets[i].triangleCount;
+		const uint uMeshletVertexOffset = vecMeshlets[i].vertexOffset;
+		const uint uMeshletTriangleOffset = vecMeshlets[i].triangleOffset;
 
 		for (uint j = 0u; j < VERTEX_ITERATION_COUNT; ++j)
 		{
-			uint uMeshletVertexIndex = uVertexBaseOffset + j; // the index of the vertex in the meshlet
-			if (uMeshletVertexIndex >= uVertexCount)
+			uint uMeshletLocalVertexIndex = uThreadVertexOffset + j; // the index of the vertex in the meshlet
+			if (uMeshletLocalVertexIndex >= uMeshletVertexCount)
 				break; // prevent out of bounds access
 			
-			uint uGlobalVertexIndex = meshletVertices[uVertexOffset + uMeshletVertexIndex];
+			uint uGlobalVertexIndex = meshletVertices[uMeshletVertexOffset + uMeshletLocalVertexIndex];
 			VBO vertex = getVertex(uGlobalVertexIndex);
 			
-			gl_MeshVerticesEXT[uMeshletVertexIndex + uMeshVerticesOffset].gl_Position = ubo.proj * ubo.view * modelUBO.model * vec4(vertex.position, 1.0);
-			v_out[uMeshletVertexIndex + uMeshVerticesOffset].colorRGB = normalize(modelUBO.inverseTransposeModel * vec4(vertex.normal, 0)).xyz * 0.5 + 0.5;
+			gl_MeshVerticesEXT[uMeshletLocalVertexIndex + uMeshVerticesOffset].gl_Position = ubo.proj * ubo.view * modelUBO.model * vec4(vertex.position, 1.0);
+			v_out[uMeshletLocalVertexIndex + uMeshVerticesOffset].colorRGB = normalize(modelUBO.inverseTransposeModel * vec4(vertex.normal, 0)).xyz * 0.5 + 0.5;
 		}
 
 		for (uint j = 0u; j < PRIMITIVE_ITERATION_COUNT; ++j)
 		{
-			uint uMeshletPrimitiveIndex = uPrimitiveBaseOffset + j; // the index of the primitive in the meshlet
-			if (uMeshletPrimitiveIndex >= uPrimitiveCount)
+			uint uMeshletLocalPrimitiveIndex = uThreadPrimitiveOffset + j; // the index of the primitive in the meshlet
+			if (uMeshletLocalPrimitiveIndex >= uMeshletPrimitiveCount)
 				break; // prevent out of bounds access
 			
-			uint uGlobalTriangleOffset = uTriangleOffset + uMeshletPrimitiveIndex * 3;
+			uint uGlobalTriangleOffset = uMeshletTriangleOffset + uMeshletLocalPrimitiveIndex * 3;
 			
-			gl_PrimitiveTriangleIndicesEXT[uMeshletPrimitiveIndex + uPrimitiveTriangleOffset] = uvec3(
-				meshletTriangles[uGlobalTriangleOffset + 0],
-				meshletTriangles[uGlobalTriangleOffset + 1],
-				meshletTriangles[uGlobalTriangleOffset + 2]
+			gl_PrimitiveTriangleIndicesEXT[uMeshletLocalPrimitiveIndex + uPrimitiveTriangleOffset] = uvec3(
+				meshletTriangles[uGlobalTriangleOffset + 0] + uMeshVerticesOffset,
+				meshletTriangles[uGlobalTriangleOffset + 1] + uMeshVerticesOffset,
+				meshletTriangles[uGlobalTriangleOffset + 2] + uMeshVerticesOffset
 			);
 		}
 
-		uMeshVerticesOffset += uVertexCount;
-		uPrimitiveTriangleOffset += uPrimitiveCount;
+		uMeshVerticesOffset += uMeshletVertexCount;
+		uPrimitiveTriangleOffset += uMeshletPrimitiveCount;
 	}
 }

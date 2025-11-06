@@ -3,7 +3,7 @@
 #define GLM_ENABLE_EXPERIMENTAL
 #include <glm/gtx/hash.hpp>
 
-struct Vertex
+struct Vertex final
 {
 	// make sure position is the first attribute, it is used by mesh optimizer
 	alignas(16) glm::vec3 position{};
@@ -15,19 +15,31 @@ struct Vertex
 	}
 };
 
-struct StaticMesh
+struct StaticMesh final
 {
 	std::vector<Vertex> verts;
 	std::vector<uint32_t> indices;
 };
 
-struct Meshlet
+struct Meshlet final
 {
 	uint32_t vertexOffset;
 	uint32_t vertexCount;
 
 	uint32_t triangleOffset;
 	uint32_t triangleCount;
+
+	// Get number _index triangle of this meshlet
+	// _index: the index of the triangle in this meshlet, start from 0
+	// _srcMesh: the static mesh that the meshlet comes from
+	// _meshletVertices: vertex remap information that we get when build meshlets
+	// _meshletTriangles: index remap information that we get when build meshlets
+	// _outTriangle: indices of vertices of the output triangle
+	void GetTriangle(
+		uint32_t _index,
+		const std::vector<uint32_t>& _meshletVertices,
+		const std::vector<uint8_t>& _meshletTriangles,
+		std::array<uint32_t, 3>& _outTriangle) const;
 };
 
 struct MeshletBounds

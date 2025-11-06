@@ -56,14 +56,12 @@ bool MeshUtility::Load(const std::string& objFile, std::vector<StaticMesh>& outM
 }
 
 void MeshUtility::BuildMeshlets(
-	StaticMesh& inMesh,
+	const StaticMesh& inMesh,
 	std::vector<Meshlet>& outMeshlets,
 	std::vector<uint32_t>& outMeshletVertices,
 	std::vector<uint8_t>& outMeshletTriangles
 )
 {	
-	_OptimizeMesh(inMesh);
-
 	const std::vector<uint32_t>& indices = inMesh.indices;
 	const std::vector<Vertex>& vertices = inMesh.verts;
 	const float coneWeight = 0.0f;
