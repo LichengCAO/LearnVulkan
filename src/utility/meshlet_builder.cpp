@@ -32,12 +32,13 @@ void MeshletBuilder::BuildMeshlet(
 		sizeof(Vertex),
 		maxIndices,
 		maxTriangles,
-		coneWeight
-	);
+		coneWeight);
+
 	meshoptMeshlets.resize(meshletCount);
 	outMeshletVertices.resize(meshoptMeshlets.back().vertex_offset + meshoptMeshlets.back().vertex_count);
 	// This expression is performing an operation that ensures the result is rounded up to the next multiple of 4.
-	outMeshletTriangles.resize(meshoptMeshlets.back().triangle_offset + ((meshoptMeshlets.back().triangle_count * 3 + 3) & ~3));
+	//outMeshletTriangles.resize(meshoptMeshlets.back().triangle_offset + ((meshoptMeshlets.back().triangle_count * 3 + 3) & ~3));
+	outMeshletTriangles.resize(meshoptMeshlets.back().triangle_offset + meshoptMeshlets.back().triangle_count * 3);
 
 	// further optimize meshlets
 	for (const auto& m : meshoptMeshlets)
@@ -45,15 +46,14 @@ void MeshletBuilder::BuildMeshlet(
 		Meshlet outMeshlet{};
 
 		outMeshlet.triangleCount = m.triangle_count;
-		outMeshlet.triangleOffset = m.triangle_offset;
+		outMeshlet.triangleOffset = m.triangle_offset + _outMeshletLocalIndex.size();
 		outMeshlet.vertexCount = m.vertex_count;
-		outMeshlet.vertexOffset = m.vertex_offset;
+		outMeshlet.vertexOffset = m.vertex_offset + _outMeshletVertex.size();
 		meshopt_optimizeMeshlet(
 			static_cast<unsigned int*>(&outMeshletVertices[m.vertex_offset]),
 			static_cast<unsigned char*>(&outMeshletTriangles[m.triangle_offset]),
 			m.triangle_count,
-			m.vertex_count
-		);
+			m.vertex_count);
 		outMeshlets.push_back(outMeshlet);
 	}
 
