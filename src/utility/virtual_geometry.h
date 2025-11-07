@@ -11,8 +11,14 @@ private:
 	struct MyMeshlet
 	{
 		Meshlet meshlet;
+		MeshletBounds bounds;
 		std::set<std::pair<uint32_t, uint32_t>> boundaries;				// edges on the boundary, built with virtual indices of 2 ends
 		std::unordered_map<uint32_t, uint32_t> adjacentWeight;	// index of adjacent meshlets in array -> number of shared edges
+		std::vector<uint32_t> siblings;												// meshlets built from the same simplified triangle group
+		uint32_t child = ~0;																	// one of children whose LOD is higher, that is, meshlet built from the group of this meshlet and its siblings
+		uint32_t parent = ~0;																// one of parents whose LOD is lower, that is, the original meshlet of the group this meshlet built from, LOD0 meshlets don't have parent
+		uint32_t lod = 0;
+		float error;
 	};
 
 private:
@@ -23,6 +29,19 @@ private:
 																								// to a vertex in the static mesh that has the postion that differentiate this virtual index from others
 
 private:
+	// Build a MyMeshlet object and add it to the right place of m_meshlets, update parent MyMeshlet's child info
+	void _AddMyMeshlet(
+		uint32_t _lod, 
+		const Meshlet& _meshlet, 
+		const MeshletBounds& _bounds,
+		const std::vector<uint32_t>& _siblings,
+		uint32_t _parent, 
+		float error);
+
+	// Update self and siblings' parent MyMeshlet's child info
+	// _id: index of the current MyMeshlet
+	void _UpdateParents(uint32_t _lod, uint32_t _id);
+
 	// Build m_realToVirtual for the m_pBaseMesh
 	void _BuildVirtualIndexMap();
 

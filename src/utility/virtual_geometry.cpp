@@ -3,6 +3,11 @@
 #include "utils.h"
 #include <functional>
 
+void VirtualGeometry::_AddMyMeshlet(uint32_t _lod, const Meshlet& _meshlet, uint32_t _parent, float error, const std::vector<uint32_t>& _siblings)
+{
+	uint32_t 
+}
+
 void VirtualGeometry::_BuildVirtualIndexMap()
 {
 	const StaticMesh& staticMesh = *m_pBaseMesh;
@@ -264,6 +269,28 @@ void VirtualGeometry::Init()
 		if (i == 0)
 		{
 			optimizer.BuildMeshlet(m_pBaseMesh->verts, m_pBaseMesh->indices, m_meshletTable[i], meshlets);
+
+			// fill up LOD i meshlets
+			{
+				uint32_t firstSibling = m_meshlets[i].size();
+				std::vector<uint32_t> siblings;
+				for (int j = 0; j < meshlets.size(); ++j)
+				{
+					MyMeshlet myMeshlet{};
+
+					myMeshlet.lod = i;
+					myMeshlet.meshlet = meshlets[j];
+					siblings.push_back(m_meshlets.size());
+					m_meshlets[i].push_back(myMeshlet);
+				}
+
+				for (int j = 0; j < meshlets.size(); ++j)
+				{
+					auto& myMeshlet = m_meshlets[i][firstSibling + j];
+					myMeshlet.siblings = siblings;
+					myMeshlet.parent
+				}
+			}
 		}
 		else
 		{
@@ -279,15 +306,6 @@ void VirtualGeometry::Init()
 				// For each simplified group, break them apart into new meshlets
 				_BuildMeshletFromGroup(simplifiedIndex, m_meshletTable[i], meshlets);
 			}
-		}
-
-		// fill up LOD i meshlets
-		for (int j = 0; j < meshlets.size(); ++j)
-		{
-			MyMeshlet myMeshlet{};
-
-			myMeshlet.meshlet = meshlets[j];
-			m_meshlets[i].push_back(myMeshlet);
 		}
 
 		// if LOD reaches max we don't need to group meshlet any more, break;
@@ -306,7 +324,7 @@ void VirtualGeometry::Init()
 		meshletGroups.clear();
 		auto divideSuccess = _DivideMeshletGroup(i, meshletGroups);
 
-		// remove data we don't fill
+		// Remove data we don't fill
 		if (!divideSuccess)
 		{
 			m_meshlets.resize(i + 1);
