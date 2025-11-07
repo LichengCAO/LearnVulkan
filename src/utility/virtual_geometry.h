@@ -1,6 +1,6 @@
 #pragma once
 
-struct VirtualGeometry
+class VirtualGeometry
 {
 private:
 	// stores data of meshlet building
@@ -12,7 +12,7 @@ private:
 	struct MyMeshlet
 	{
 		Meshlet meshlet;
-		std::set<std::pair<uint32_t, uint32_t>> boundaries;			// edges on the boundary
+		std::set<std::pair<uint32_t, uint32_t>> boundaries;			// edges on the boundary, built with virtual indices of 2 ends
 		std::unordered_map<uint32_t, uint32_t> adjacentWeight;	// index of adjacent meshlets in array -> number of shared edges
 	};
 
@@ -20,24 +20,30 @@ private:
 	const StaticMesh* m_pBaseMesh = nullptr;
 	std::vector<MeshletDataTable> m_meshletTable;			// meshlet table for different LODs
 	std::vector<std::vector<MyMeshlet>> m_meshlets;		// meshlets of different LODs
-	std::vector<uint32_t> m_virtualIndex;							// maps real index to virtual index based on vertex positions
+	std::vector<uint32_t> m_realToVirtual;						// maps real index to virtual index based on vertex positions, virtual index points
+																			// to a vertex in the static mesh that has the postion that differentiate this virtual index from others
 
 private:
-	// fill structure used in METIS
+	// Build m_realToVirtual for the m_pBaseMesh
+	void _BuildVirtualIndexMap();
+
+	// Fill structure used in METIS,
+	// _xadj, _adjncy describes a meshlet connection graph
+	// _adjwgt describes weight of each connection
 	// _lod: LOD of meshlets of the graph
-	void _FillCSR(
+	void _PrepareMETIS(
 		uint32_t _lod, 
 		std::vector<uint32_t>& _xadj, 
 		std::vector<uint32_t>& _adjncy, 
 		std::vector<uint32_t>& _adjwgt) const;
 
-	// There may be some vertices that share same positions but store different information,
+	// There may be some vertices that share same the position but store different information(normal, uv),
 	// but in this case we only want to differentiate them based on their positions,
 	// i.e. if 2 vertices are close enough, it should be treated as the same vertex,
 	// so i create this function,
 	// _realIndex: vertex index in Static Mesh
 	// return virtual index used to compare if the 2 vertices are same
-	uint32_t _IdentifyVertexBasedOnPosition(uint32_t _realIndex) const;
+	uint32_t _GetVirtualIndex(uint32_t _realIndex) const;
 
 	// Find boundary of the meshlet, fill boundaries
 	void _FindMeshletBoundary(
@@ -51,16 +57,18 @@ private:
 
 	// Divide meshlet into groups based on edges they shader
 	// _lod: lod of meshlets to group
-	// _meshletGroups: index of meshlets in a group
+	// _meshletGroups: array of indices of meshlets in a group
 	void _DivideMeshletGroup(
 		uint32_t _lod, 
 		std::vector<std::vector<uint32_t>>& _meshletGroups);
 
 	// Simplify triangles in meshlet groups
-	// _meshlets: meshlets that divided into a group
+	// 	// _lod: lod of meshlets to group
+	// _meshletGroup: indices of meshlets in a group
 	// _outIndex: indices that build simplified triangles
 	void _SimplifyGroupTriangles(
-		const std::vector<Meshlet>& _meshlets,
+		uint32_t _lod,
+		const std::vector<uint32_t>& _meshletGroup,
 		std::vector<uint32_t>& _outIndex);
 
 	// Build new meshlets from simplified triangles in the group 

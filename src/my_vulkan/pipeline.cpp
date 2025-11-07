@@ -56,7 +56,7 @@ std::vector<VkShaderStageFlagBits> PushConstantManager::_GetBitsFromStageFlags(V
 
 void PushConstantManager::AddConstantRange(VkShaderStageFlags _stages, uint32_t _offset, uint32_t _size)
 {
-	uint32_t sizeAligned = CommonUtils::AlignUp(_size, 4); // Both offset and size are in units of bytes and must be a multiple of 4.
+	uint32_t sizeAligned = common_utils::AlignUp(_size, 4); // Both offset and size are in units of bytes and must be a multiple of 4.
 	CHECK_TRUE((m_usedStages & _stages) == 0, "Some stage already used!");
 	m_usedStages = m_usedStages | _stages;
 	m_currentSize += sizeAligned;

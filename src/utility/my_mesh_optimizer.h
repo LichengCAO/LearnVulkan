@@ -3,7 +3,8 @@
 #include "common.h"
 #include "geometry.h"
 
-class MeshletBuilder
+// Adaptor for meshoptimizer lib
+class MeshOptimizer
 {
 public:
 	// Build meshlets from vertices and indices,
@@ -22,4 +23,10 @@ public:
 		std::vector<uint32_t>& _outMeshletVertex,
 		std::vector<uint8_t>& _outMeshletLocalIndex,
 		std::vector<Meshlet>& _outMeshlet) const;
+
+	void SimplifyMesh(
+		const std::vector<Vertex>& _vertex,
+		const std::vector<uint32_t>& _index,
+		std::vector<uint32_t>& _outIndex,
+		float& _error) const;
 };

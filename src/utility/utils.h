@@ -34,7 +34,7 @@ public:
 		std::vector<uint8_t>& outMeshletTriangles);
 };
 
-namespace CommonUtils
+namespace common_utils
 {
 	// code from Nvidia vk_raytracing_tutorial
 	template <class intType>
@@ -56,7 +56,22 @@ namespace CommonUtils
 		return out_matrix;
 	}
 
+	// Read file from file path
 	void ReadFile(const std::string& _filePath, std::vector<uint8_t>& _output);
 
+	// Get extension name from file path
 	std::string GetFileExtension(const std::string& _filePath);
+
+	// Used for unordered_... when std::pair as key
+	// e.g. unordered_map<pair<T1, T2>, int, common_utils::PairHash>
+	struct PairHash
+	{
+		template<typename T1, typename T2>
+		std::size_t operator() (const std::pair<T1, T2>& p) const 
+		{
+			auto h1 = std::hash<T1>{}(p.first);
+			auto h2 = std::hash<T2>{}(p.second);
+			return h1 ^ h2;
+		}
+	};
 }

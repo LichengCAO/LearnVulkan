@@ -23,7 +23,7 @@ void RayTracingAccelerationStructure::_InitScratchBuffer(
 	// setup maxScratchChunk, fullScratchSize
 	for (const auto& sizeInfo : buildSizeInfo)
 	{
-		VkDeviceSize chunkSizeAligned = bForBuild ? CommonUtils::AlignUp(sizeInfo.buildScratchSize, uMinAlignment) : CommonUtils::AlignUp(sizeInfo.updateScratchSize, uMinAlignment);
+		VkDeviceSize chunkSizeAligned = bForBuild ? common_utils::AlignUp(sizeInfo.buildScratchSize, uMinAlignment) : common_utils::AlignUp(sizeInfo.updateScratchSize, uMinAlignment);
 
 		maxScratchChunk = std::max(maxScratchChunk, chunkSizeAligned);
 		fullScratchSize += chunkSizeAligned;
@@ -56,7 +56,7 @@ void RayTracingAccelerationStructure::_InitScratchBuffer(
 		for (int i = 0; i < buildSizeInfo.size(); ++i)
 		{
 			const auto& sizeInfo = buildSizeInfo[i];
-			VkDeviceSize chunkSizeAligned = bForBuild ? CommonUtils::AlignUp(sizeInfo.buildScratchSize, uMinAlignment) : CommonUtils::AlignUp(sizeInfo.updateScratchSize, uMinAlignment);
+			VkDeviceSize chunkSizeAligned = bForBuild ? common_utils::AlignUp(sizeInfo.buildScratchSize, uMinAlignment) : common_utils::AlignUp(sizeInfo.updateScratchSize, uMinAlignment);
 
 			slotAddresses.push_back(curAddress);
 			curAddress += chunkSizeAligned;
@@ -407,7 +407,7 @@ void RayTracingAccelerationStructure::_FillTLASInput(const std::vector<InstanceD
 		vkASInst.instanceCustomIndex = instInfo.optCustomIndex.has_value() ? instInfo.optCustomIndex.value() : gl_InstanceCustomIndex;
 		vkASInst.accelerationStructureReference = m_uptrBLASes[instInfo.uBLASIndex]->vkDeviceAddress;
 		vkASInst.instanceShaderBindingTableRecordOffset = instInfo.uHitShaderGroupIndexOffset;
-		vkASInst.transform = CommonUtils::ToTransformMatrixKHR(instInfo.transformMatrix);
+		vkASInst.transform = common_utils::ToTransformMatrixKHR(instInfo.transformMatrix);
 
 		gl_InstanceCustomIndex++;
 		ASInstances.push_back(vkASInst);

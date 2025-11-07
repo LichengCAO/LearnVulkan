@@ -1,6 +1,6 @@
-#include "meshlet_builder.h"
+#include "my_mesh_optimizer.h"
 
-void MeshletBuilder::BuildMeshlet(
+void MeshOptimizer::BuildMeshlet(
 	const std::vector<Vertex>& _vertex, 
 	const std::vector<uint32_t>& _index, 
 	std::vector<uint32_t>& _outMeshletVertex,
@@ -60,4 +60,29 @@ void MeshletBuilder::BuildMeshlet(
 	_outMeshletVertex.insert(_outMeshletVertex.end(), outMeshletVertices.begin(), outMeshletVertices.end());
 	_outMeshletLocalIndex.insert(_outMeshletLocalIndex.end(), outMeshletTriangles.begin(), outMeshletTriangles.end());
 	_outMeshlet.insert(_outMeshlet.end(), outMeshlets.begin(), outMeshlets.end());
+}
+
+void MeshOptimizer::SimplifyMesh(
+	const std::vector<Vertex>& _vertex, 
+	const std::vector<uint32_t>& _index, 
+	std::vector<uint32_t>& _outIndex, 
+	float& _error) const
+{
+	std::vector<uint32_t> dstIndex;
+	dstIndex.reserve(_index.size());
+
+	auto indexSize = meshopt_simplify(
+		dstIndex.data(),
+		_index.data(),
+		_index.size(),
+		reinterpret_cast<const float*>(_vertex.data()),
+		_vertex.size(),
+		sizeof(Vertex),
+		_index.size() / 2,
+		0.2,
+		meshopt_SimplifyLockBorder,
+		&_error);
+
+	dstIndex.resize(indexSize);
+	_outIndex.insert(_outIndex.end(), dstIndex.begin(), dstIndex.end());
 }

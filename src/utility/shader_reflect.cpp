@@ -134,7 +134,7 @@ void ShaderReflector::Init(const std::vector<std::string>& _spirvFiles)
 		std::vector<uint8_t> spirvData;
 		auto eResult = SPV_REFLECT_RESULT_SUCCESS;
 
-		CommonUtils::ReadFile(_shader, spirvData);
+		common_utils::ReadFile(_shader, spirvData);
 
 		eResult = spvReflectCreateShaderModule(spirvData.size(), spirvData.data(), uptrReflectModule.get());
 		assert(eResult == SPV_REFLECT_RESULT_SUCCESS);

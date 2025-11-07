@@ -229,7 +229,7 @@ MeshletBounds MeshUtility::_ComputeMeshletBounds(
 	return meshletBounds;
 }
 
-void CommonUtils::ReadFile(const std::string& _filePath, std::vector<uint8_t>& _output)
+void common_utils::ReadFile(const std::string& _filePath, std::vector<uint8_t>& _output)
 {
 	std::ifstream file(_filePath, std::ios::ate | std::ios::binary);
 
@@ -242,7 +242,7 @@ void CommonUtils::ReadFile(const std::string& _filePath, std::vector<uint8_t>& _
 	file.close();
 }
 
-std::string CommonUtils::GetFileExtension(const std::string& _filePath)
+std::string common_utils::GetFileExtension(const std::string& _filePath)
 {
 	std::string ret;
 	size_t pos = _filePath.rfind('.'); // Find the last dot in the filename

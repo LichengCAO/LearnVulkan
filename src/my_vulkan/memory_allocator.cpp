@@ -100,7 +100,7 @@ void MemoryAllocator::AllocateForVkBuffer(VkBuffer _vkBuffer, VkMemoryPropertyFl
 	{
 		VkMemoryRequirements req;
 		vkGetBufferMemoryRequirements(_GetVkDevice(), _vkBuffer, &req);
-		req.alignment = std::max(CommonUtils::AlignUp(req.alignment, _alignment), _alignment);
+		req.alignment = std::max(common_utils::AlignUp(req.alignment, _alignment), _alignment);
 		VK_CHECK(vmaAllocateMemory(*_GetPtrVmaAllocator(), &req, &allocCreateInfo, &allocResult, &allocInfo), "Failed to allocate memory!");
 	}
 	else

@@ -49,14 +49,14 @@ namespace {
 
 	void _PrintFloat(const std::vector<uint8_t>& _data, size_t& _offset, std::ostream& os)
 	{
-		_offset = CommonUtils::AlignUp(_offset, 4);
+		_offset = common_utils::AlignUp(_offset, 4);
 		os << *(float*)(_data.data() + _offset);
 		_offset += 4;
 	}
 
 	void _PrintDouble(const std::vector<uint8_t>& _data, size_t& _offset, std::ostream& os)
 	{
-		_offset = CommonUtils::AlignUp(_offset, 8);
+		_offset = common_utils::AlignUp(_offset, 8);
 		os << *(double*)(_data.data() + _offset);
 		_offset += 8;
 	}
@@ -293,7 +293,7 @@ MyVDBLoader::MyVDBLoader()
 
 void MyVDBLoader::Load(const std::string& _file, CompactData& _output) const
 {
-	auto strExtension = CommonUtils::GetFileExtension(_file);
+	auto strExtension = common_utils::GetFileExtension(_file);
 	std::string strPath;
 	if (strExtension == "vdb")
 	{
@@ -313,7 +313,7 @@ void MyVDBLoader::Load(const std::string& _file, CompactData& _output) const
 
 std::string MyVDBLoader::_CreateNanoVDBFromOpenVDB(const std::string& _openVDB) const
 {
-	CHECK_TRUE(CommonUtils::GetFileExtension(_openVDB) == "vdb", "This is not a openVDB file!");
+	CHECK_TRUE(common_utils::GetFileExtension(_openVDB) == "vdb", "This is not a openVDB file!");
 	std::string nanoVDB = _openVDB.substr(0, _openVDB.size() - 4) + ".nvdb";
 	openvdb::io::File file(_openVDB);
 	
