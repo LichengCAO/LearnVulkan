@@ -3,8 +3,7 @@
 void MeshOptimizer::BuildMeshlet(
 	const std::vector<Vertex>& _vertex, 
 	const std::vector<uint32_t>& _index, 
-	std::vector<uint32_t>& _outMeshletVertex,
-	std::vector<uint8_t>& _outMeshletLocalIndex, 
+	MeshletDeviceData& _outMeshletData, 
 	std::vector<Meshlet>& _outMeshlet) const
 {
 	std::vector<Meshlet> outMeshlets{};
@@ -46,9 +45,9 @@ void MeshOptimizer::BuildMeshlet(
 		Meshlet outMeshlet{};
 
 		outMeshlet.triangleCount = m.triangle_count;
-		outMeshlet.triangleOffset = m.triangle_offset + _outMeshletLocalIndex.size();
+		outMeshlet.triangleOffset = m.triangle_offset + _outMeshletData.meshletIndices.size();
 		outMeshlet.vertexCount = m.vertex_count;
-		outMeshlet.vertexOffset = m.vertex_offset + _outMeshletVertex.size();
+		outMeshlet.vertexOffset = m.vertex_offset + _outMeshletData.meshletVertices.size();
 		meshopt_optimizeMeshlet(
 			static_cast<unsigned int*>(&outMeshletVertices[m.vertex_offset]),
 			static_cast<unsigned char*>(&outMeshletTriangles[m.triangle_offset]),
@@ -57,8 +56,8 @@ void MeshOptimizer::BuildMeshlet(
 		outMeshlets.push_back(outMeshlet);
 	}
 
-	_outMeshletVertex.insert(_outMeshletVertex.end(), outMeshletVertices.begin(), outMeshletVertices.end());
-	_outMeshletLocalIndex.insert(_outMeshletLocalIndex.end(), outMeshletTriangles.begin(), outMeshletTriangles.end());
+	_outMeshletData.meshletVertices.insert(_outMeshletData.meshletVertices.end(), outMeshletVertices.begin(), outMeshletVertices.end());
+	_outMeshletData.meshletIndices.insert(_outMeshletData.meshletIndices.end(), outMeshletTriangles.begin(), outMeshletTriangles.end());
 	_outMeshlet.insert(_outMeshlet.end(), outMeshlets.begin(), outMeshlets.end());
 }
 
@@ -85,4 +84,73 @@ void MeshOptimizer::SimplifyMesh(
 
 	dstIndex.resize(indexSize);
 	_outIndex.insert(_outIndex.end(), dstIndex.begin(), dstIndex.end());
+}
+
+void MeshOptimizer::OptimizeMesh(std::vector<Vertex>& _vertex, std::vector<uint32_t>& _index) const
+{
+	std::vector<uint32_t> remap(std::max(_vertex.size(), _index.size()));
+	std::vector<uint32_t> dstIndices(_index.size());
+	std::vector<Vertex> dstVerts(_vertex.size());
+	size_t indexCount = _index.size();
+	size_t vertexCount = meshopt_generateVertexRemapCustom(
+		remap.data(),
+		_index.data(),
+		_index.size(),
+		reinterpret_cast<const float*>(_vertex.data()),
+		_vertex.size(),
+		sizeof(Vertex),
+		[&](unsigned int l, unsigned int r) {
+			const Vertex& lv = _vertex[l];
+			const Vertex& rv = _vertex[r];
+			return lv == rv;
+		}
+	);
+	dstIndices.resize(indexCount);
+	dstVerts.resize(vertexCount);
+	meshopt_remapVertexBuffer(dstVerts.data(), _vertex.data(), _vertex.size(), sizeof(Vertex), remap.data());
+	meshopt_remapIndexBuffer(dstIndices.data(), _index.data(), indexCount, remap.data());
+	meshopt_optimizeVertexCache(_index.data(), dstIndices.data(), indexCount, vertexCount);
+	meshopt_optimizeOverdraw(
+		dstIndices.data(),
+		_index.data(),
+		indexCount,
+		reinterpret_cast<const float*>(dstVerts.data()),
+		vertexCount,
+		sizeof(Vertex),
+		1.0f
+	);
+	vertexCount = meshopt_optimizeVertexFetch(
+		_vertex.data(),
+		dstIndices.data(),
+		indexCount,
+		dstVerts.data(),
+		vertexCount,
+		sizeof(Vertex)
+	);
+	_vertex.resize(vertexCount);
+	_index = std::move(dstIndices);
+}
+
+MeshletBounds MeshOptimizer::ComputeMeshletBounds(
+	const std::vector<Vertex>& _vertex,
+	const MeshletDeviceData& _meshletData, 
+	const Meshlet& _meshlet) const
+{
+	MeshletBounds retBounds{};
+	meshopt_Bounds bounds{};
+
+	bounds = meshopt_computeMeshletBounds(
+		&_meshletData.meshletVertices[_meshlet.vertexOffset],
+		&_meshletData.meshletIndices[_meshlet.triangleOffset],
+		_meshlet.triangleCount,
+		reinterpret_cast<const float*>(_vertex.data()),
+		_vertex.size(),
+		sizeof(Vertex));
+	retBounds.center = glm::vec3(bounds.center[0], bounds.center[1], bounds.center[2]);
+	retBounds.radius = bounds.radius;
+	retBounds.coneApex = glm::vec3(bounds.cone_apex[0], bounds.cone_apex[1], bounds.cone_apex[2]);
+	retBounds.coneAxis = glm::vec3(bounds.cone_axis[0], bounds.cone_axis[1], bounds.cone_axis[2]);
+	retBounds.coneCutoff = bounds.cone_cutoff;
+
+	return retBounds;
 }

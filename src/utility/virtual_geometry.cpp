@@ -1,11 +1,7 @@
-
-#define IDXTYPEWIDTH 32
-#define REALTYPEWIDTH 32
-#include <metis/include/metis.h>
 #include "virtual_geometry.h"
 #include "my_mesh_optimizer.h"
-#include "common.h"
 #include "utils.h"
+#include <functional>
 
 void VirtualGeometry::_BuildVirtualIndexMap()
 {
@@ -39,9 +35,9 @@ void VirtualGeometry::_BuildVirtualIndexMap()
 
 void VirtualGeometry::_PrepareMETIS(
 	uint32_t _lod, 
-	std::vector<uint32_t>& _xadj, 
-	std::vector<uint32_t>& _adjncy, 
-	std::vector<uint32_t>& _adjwgt) const
+	std::vector<idx_t>& _xadj, 
+	std::vector<idx_t>& _adjncy, 
+	std::vector<idx_t>& _adjwgt) const
 {
 	const uint32_t n = m_meshlets[_lod].size();
 	_xadj.clear();
@@ -51,16 +47,16 @@ void VirtualGeometry::_PrepareMETIS(
 	_adjncy.reserve(8 * n);
 	_adjwgt.reserve(8 * n);
 
-	_xadj.push_back(_adjncy.size());
+	_xadj.push_back(static_cast<idx_t>(_adjncy.size()));
 	for (uint32_t i = 0; i < n; ++i)
 	{
 		const auto& curMeshlet = m_meshlets[_lod][i];
 		for (const auto& p : curMeshlet.adjacentWeight)
 		{
-			_adjncy.push_back(p.first);		// index of the adjacent meshlet
-			_adjwgt.push_back(p.second);	// number of shared edges
+			_adjncy.push_back(static_cast<idx_t>(p.first));		// index of the adjacent meshlet
+			_adjwgt.push_back(static_cast<idx_t>(p.second));	// number of shared edges
 		}
-		_xadj.push_back(_adjncy.size());
+		_xadj.push_back(static_cast<idx_t>(_adjncy.size()));
 	}
 }
 
@@ -70,9 +66,8 @@ uint32_t VirtualGeometry::_GetVirtualIndex(uint32_t _realIndex) const
 }
 
 void VirtualGeometry::_FindMeshletBoundary(
+	const MeshletDeviceData& _meshletData, 
 	const Meshlet& _meshlet, 
-	const std::vector<uint32_t>& _meshletVertexIndex, 
-	const std::vector<uint8_t>& _meshletLocalIndex, 
 	std::set<std::pair<uint32_t, uint32_t>>& _boundaries) const
 {
 	std::unordered_map<std::pair<uint32_t, uint32_t>, uint32_t, common_utils::PairHash> edgeSeen;
@@ -83,16 +78,16 @@ void VirtualGeometry::_FindMeshletBoundary(
 		std::array<uint32_t, 3> indices;
 		std::array<std::pair<uint32_t, uint32_t>, 3> sides;
 
-		_meshlet.GetTriangle(i, _meshletVertexIndex, _meshletLocalIndex, indices);
+		_meshlet.GetTriangle(i, _meshletData, indices);
 		sides[0] = { _GetVirtualIndex(indices[0]), _GetVirtualIndex(indices[1]) };
 		sides[1] = { _GetVirtualIndex(indices[1]), _GetVirtualIndex(indices[2]) };
 		sides[2] = { _GetVirtualIndex(indices[2]), _GetVirtualIndex(indices[0]) };
-		
+
 		for (int j = 0; j < 3; ++j)
 		{
 			uint32_t head = std::min(sides[j].first, sides[j].second);
 			uint32_t tail = std::max(sides[j].first, sides[j].second);
-			
+
 			sides[j] = { head, tail };
 			if (edgeSeen.find(sides[j]) == edgeSeen.end())
 			{
@@ -163,44 +158,161 @@ void VirtualGeometry::_RecordMeshletConnections(uint32_t _lod)
 	}
 }
 
-void VirtualGeometry::_DivideMeshletGroup(uint32_t _lod, std::vector<std::vector<uint32_t>>& _meshletGroups)
+bool VirtualGeometry::_DivideMeshletGroup(uint32_t _lod, std::vector<std::vector<uint32_t>>& _meshletGroups)
 {
-	std::vector<uint32_t> xadj;
-	std::vector<uint32_t> adjncy;
-	std::vector<uint32_t> adjwgt;
-	uint32_t nvtxs = m_meshlets[_lod].size();
-	uint32_t ncon = 1;
+	std::vector<idx_t> xadj;
+	std::vector<idx_t> adjncy;
+	std::vector<idx_t> adjwgt;
+	std::vector<idx_t> part;
+	idx_t nvtxs = m_meshlets[_lod].size();
+	idx_t nparts = std::max( static_cast<idx_t>(m_meshlets[_lod].size() / 4), 1);
+	idx_t edgecut = 0;
+	idx_t options[METIS_NOPTIONS];
+	std::function<int(idx_t*, idx_t*, idx_t*, idx_t*, idx_t*, idx_t*, idx_t*, idx_t*, real_t*, real_t*, idx_t*, idx_t*, idx_t*)> metisFunc;
+	int result = 0;
 
-	uint32_t nPart = std::max( static_cast<uint32_t>(m_meshlets[_lod].size() / 4), 1u);
-
+	METIS_SetDefaultOptions(options);  // Initialize default options
+	part.resize(nvtxs);
 	_PrepareMETIS(_lod, xadj, adjncy, adjwgt);
-	if (nPart > 8)
+
+	if (nparts > 8)
 	{
-		METIS_PartGraphKway(
-			&nvtxs,				//nvtxs
-			&ncon,				//ncon
-			xadj.data(),			//xadj
-			adjncy.data(),		//adjncy
-			nullptr,				//vwgt
-			nullptr,				//vsize
-			adjwgt.data(),		//adjwgt
-			&nPart,				//nparts
-			nullptr,				//tpwgts
-			nullptr,				//ubvec
-			nullptr,				//options
-			nullptr,				//edgecut
-			nullptr);				//part
+		metisFunc = METIS_PartGraphKway;
 	}
 	else
 	{
-
+		metisFunc = METIS_PartGraphRecursive;
 	}
+
+	result = metisFunc(
+		&nvtxs,				// nvtxs, Number of vertices
+		NULL,					// ncon, Number of balancing constraints (usually NULL)
+		xadj.data(),			// xadj, Pointer to xadj array
+		adjncy.data(),		// adjncy, Pointer to adjncy array
+		NULL,					// vwgt, Vertex weights (NULL if not used)
+		NULL,					// vsize, Sizes of vertex weights (NULL if not used)
+		adjwgt.data(),		// adjwgt, Edge weights (NULL if not used)
+		&nparts,				// nparts, Number of parts
+		NULL,					// tpwgts, Imbalance tolerance (NULL uses default)
+		NULL,					// ubvec, Edge weight factor (NULL uses default)
+		options,				// options, Options array
+		&edgecut,			// edgecut, Output: Edge cut value
+		part.data());			// part, Output: Partition vector
+
+	if (result == METIS_OK)
+	{
+		_meshletGroups.resize(nparts, {});
+		for (uint32_t i = 0; i < nvtxs; ++i)
+		{
+			idx_t groupId = part[i];
+			_meshletGroups[groupId].push_back(i);
+		}
+	}
+
+	return result == METIS_OK;
 }
 
-void VirtualGeometry::_SimplifyGroupTriangles(
+float VirtualGeometry::_SimplifyGroupTriangles(
 	uint32_t _lod, 
 	const std::vector<uint32_t>& _meshletGroup, 
 	std::vector<uint32_t>& _outIndex)
 {
+	std::vector<uint32_t> meshletIndex;
+	MeshOptimizer optimizer{};
+	float error = 0.0f;
 
+	for (size_t i = 0; i < _meshletGroup.size(); ++i)
+	{
+		const auto& meshlet = m_meshlets[_lod][_meshletGroup[i]].meshlet;
+		meshlet.GetIndices(m_meshletTable[_lod], meshletIndex);
+	}
+
+	optimizer.SimplifyMesh(m_pBaseMesh->verts, meshletIndex, _outIndex, error);
+
+	return error;
+}
+
+void VirtualGeometry::_BuildMeshletFromGroup(
+	const std::vector<uint32_t>& _index, 
+	MeshletDeviceData& _meshletData, 
+	std::vector<Meshlet>& _meshlet)
+{
+	MeshOptimizer optimizer{};
+	optimizer.BuildMeshlet(m_pBaseMesh->verts, _index, _meshletData, _meshlet);
+}
+
+void VirtualGeometry::PresetStaticMesh(const StaticMesh& _original)
+{
+	m_pBaseMesh = &_original;
+}
+
+void VirtualGeometry::Init()
+{
+	int maxLOD = 5;
+	MeshOptimizer optimizer{};
+	std::vector<std::vector<uint32_t>> meshletGroups;
+	m_meshlets.resize(maxLOD + 1);
+	m_meshletTable.resize(maxLOD + 1);
+
+	_BuildVirtualIndexMap();
+
+	for (int i = 0; i < (maxLOD + 1); ++i)
+	{
+		std::vector<Meshlet> meshlets{};
+
+		// Build meshlets for current LOD
+		if (i == 0)
+		{
+			optimizer.BuildMeshlet(m_pBaseMesh->verts, m_pBaseMesh->indices, m_meshletTable[i], meshlets);
+		}
+		else
+		{
+			// For each group of meshlets, build a new list of triangles approximating the original group
+			// For each simplified group, break them apart into new meshlets
+			for (const auto& group : meshletGroups)
+			{
+				std::vector<uint32_t> simplifiedIndex;
+
+				// For each group of meshlets, build a new list of triangles approximating the original group
+				_SimplifyGroupTriangles(i, group, simplifiedIndex);
+
+				// For each simplified group, break them apart into new meshlets
+				_BuildMeshletFromGroup(simplifiedIndex, m_meshletTable[i], meshlets);
+			}
+		}
+
+		// fill up LOD i meshlets
+		for (int j = 0; j < meshlets.size(); ++j)
+		{
+			MyMeshlet myMeshlet{};
+
+			myMeshlet.meshlet = meshlets[j];
+			m_meshlets[i].push_back(myMeshlet);
+		}
+
+		// if LOD reaches max we don't need to group meshlet any more, break;
+		if (i == maxLOD) break;
+
+		// For each meshlet, find the set of all edges making up the triangles within the meshlet
+		for (int j = 0; j < m_meshlets[i].size(); ++j)
+		{
+			_FindMeshletBoundary(m_meshletTable[i], m_meshlets[i][j].meshlet, m_meshlets[i][j].boundaries);
+		}
+
+		// For each meshlet, find the set of connected meshlets(sharing an edge)
+		_RecordMeshletConnections(i);
+
+		// Divide meshlets into groups of roughly 4
+		meshletGroups.clear();
+		auto divideSuccess = _DivideMeshletGroup(i, meshletGroups);
+
+		// remove data we don't fill
+		if (!divideSuccess)
+		{
+			m_meshlets.resize(i + 1);
+			m_meshletTable.resize(i + 1);
+			std::cout << "ERROR: Cannot divide meshlet groups, break!" << std::endl;
+			break;
+		}
+	}
 }
