@@ -1,21 +1,83 @@
 #include "virtual_geometry.h"
 #include "my_mesh_optimizer.h"
 #include "utils.h"
+#include <unordered_set>
 #include <functional>
-
-void VirtualGeometry::_AddMyMeshlet(uint32_t _lod, const Meshlet& _meshlet, uint32_t _parent, float error, const std::vector<uint32_t>& _siblings)
+ 
+void VirtualGeometry::_AddMyMeshlet(
+	uint32_t _lod, 
+	float _error, 
+	const std::vector<Meshlet>& _newMeshlets, 
+	const std::vector<uint32_t>& _parents, 
+	uint32_t* _pFirstIndex, 
+	uint32_t* _pNumAdded)
 {
-	uint32_t 
+	auto& vectorToAdd = m_meshlets[_lod];
+	uint32_t firstIndex = vectorToAdd.size();
+	uint32_t numAdded = _newMeshlets.size();
+	uint32_t errorId = m_errorInfo.size();
+	float parentGroupError = 0.0f;
+	ErrorInfo errorInfo{};
+	
+	if (_pFirstIndex != nullptr)
+	{
+		*_pFirstIndex = firstIndex;
+	}
+	if (_pNumAdded != nullptr)
+	{
+		*_pNumAdded = numAdded;
+	}
+
+	for (uint32_t i = 0; i < numAdded; ++i)
+	{
+		MyMeshlet myMeshlet{};
+
+		myMeshlet.eldsetSibling = firstIndex;
+		myMeshlet.siblingCount = numAdded;
+		myMeshlet.errorId = errorId;
+		myMeshlet.lod = _lod;
+		myMeshlet.meshlet = _newMeshlets[i];
+		myMeshlet.parents = _parents;
+
+		vectorToAdd.push_back(myMeshlet);
+	}
+
+	// update parent
+	if (_lod > 0)
+	{
+		uint32_t parentLod = _lod - 1;
+		MeshOptimizer optimizer{};
+		std::vector<uint32_t> parentIndices;
+		std::vector<Vertex>* pVert = nullptr;
+		std::vector<uint32_t>* pindex = nullptr;
+		for (size_t i = 0; i < _parents.size(); ++i)
+		{
+			MyMeshlet& parentMeshlet = m_meshlets[parentLod][_parents[i]];
+			const ErrorInfo& parentErrorInfo = m_errorInfo[parentMeshlet.errorId];
+			parentMeshlet.child = firstIndex;
+			parentGroupError = std::max(parentGroupError, parentErrorInfo.error);
+			parentMeshlet.meshlet.GetIndices(m_meshletTable[parentLod], parentIndices);
+		}
+
+		errorInfo.bounds = optimizer.ComputeBounds(m_pBaseMesh->verts, parentIndices);
+	}
+
+	// update error info
+	errorInfo.error = _error + parentGroupError; // so that parent error will always be smaller than child error
+	m_errorInfo.push_back(errorInfo);
 }
 
+// TODO: improve this
 void VirtualGeometry::_BuildVirtualIndexMap()
 {
 	const StaticMesh& staticMesh = *m_pBaseMesh;
-	std::set<uint32_t> existVirtualIndex;
+	std::unordered_set<uint32_t> existVirtualIndex;
  	size_t n = staticMesh.verts.size();
+	float percent = 0.2f;
 	
 	m_realToVirtual.clear();
 	m_realToVirtual.resize(n, 0);
+	std::cout << "Start build virtual index map...";
 	for (size_t i = 0; i < n; ++i)
 	{
 		const glm::vec3& curPosition = staticMesh.verts[i].position;
@@ -35,7 +97,13 @@ void VirtualGeometry::_BuildVirtualIndexMap()
 			m_realToVirtual[i] = i;
 			existVirtualIndex.insert(i);
 		}
+		if ((float(i) / float(n)) > percent)
+		{
+			std::cout << percent * 100 << "%";
+			percent += 0.2;
+		}
 	}
+	std::cout << "DONE" << std::endl;
 }
 
 void VirtualGeometry::_PrepareMETIS(
@@ -67,11 +135,12 @@ void VirtualGeometry::_PrepareMETIS(
 
 uint32_t VirtualGeometry::_GetVirtualIndex(uint32_t _realIndex) const
 {
-	return m_realToVirtual[_realIndex];
+	return _realIndex;
+	//return m_realToVirtual[_realIndex];
 }
 
 void VirtualGeometry::_FindMeshletBoundary(
-	const MeshletDeviceData& _meshletData, 
+	const MeshletData& _meshletData, 
 	const Meshlet& _meshlet, 
 	std::set<std::pair<uint32_t, uint32_t>>& _boundaries) const
 {
@@ -163,23 +232,25 @@ void VirtualGeometry::_RecordMeshletConnections(uint32_t _lod)
 	}
 }
 
-bool VirtualGeometry::_DivideMeshletGroup(uint32_t _lod, std::vector<std::vector<uint32_t>>& _meshletGroups)
+bool VirtualGeometry::_DivideMeshletGroup(uint32_t _lod, std::vector<std::vector<uint32_t>>& _meshletGroups) const
 {
 	std::vector<idx_t> xadj;
 	std::vector<idx_t> adjncy;
 	std::vector<idx_t> adjwgt;
 	std::vector<idx_t> part;
 	idx_t nvtxs = m_meshlets[_lod].size();
-	idx_t nparts = std::max( static_cast<idx_t>(m_meshlets[_lod].size() / 4), 1);
+	//idx_t nparts = std::max(static_cast<idx_t>(m_meshlets[_lod].size() / 4), 1);
+	idx_t nparts = static_cast<idx_t>(m_meshlets[_lod].size() / 8);
 	idx_t edgecut = 0;
 	idx_t options[METIS_NOPTIONS];
+	idx_t ncon = 1;
 	std::function<int(idx_t*, idx_t*, idx_t*, idx_t*, idx_t*, idx_t*, idx_t*, idx_t*, real_t*, real_t*, idx_t*, idx_t*, idx_t*)> metisFunc;
 	int result = 0;
 
 	METIS_SetDefaultOptions(options);  // Initialize default options
 	part.resize(nvtxs);
 	_PrepareMETIS(_lod, xadj, adjncy, adjwgt);
-
+	std::cout << "Try to divide to " << nparts;
 	if (nparts > 8)
 	{
 		metisFunc = METIS_PartGraphKway;
@@ -188,10 +259,9 @@ bool VirtualGeometry::_DivideMeshletGroup(uint32_t _lod, std::vector<std::vector
 	{
 		metisFunc = METIS_PartGraphRecursive;
 	}
-
 	result = metisFunc(
 		&nvtxs,				// nvtxs, Number of vertices
-		NULL,					// ncon, Number of balancing constraints (usually NULL)
+		&ncon,				// ncon, Number of balancing constraints (usually NULL)
 		xadj.data(),			// xadj, Pointer to xadj array
 		adjncy.data(),		// adjncy, Pointer to adjncy array
 		NULL,					// vwgt, Vertex weights (NULL if not used)
@@ -220,7 +290,7 @@ bool VirtualGeometry::_DivideMeshletGroup(uint32_t _lod, std::vector<std::vector
 float VirtualGeometry::_SimplifyGroupTriangles(
 	uint32_t _lod, 
 	const std::vector<uint32_t>& _meshletGroup, 
-	std::vector<uint32_t>& _outIndex)
+	std::vector<uint32_t>& _outIndex) const
 {
 	std::vector<uint32_t> meshletIndex;
 	MeshOptimizer optimizer{};
@@ -238,12 +308,13 @@ float VirtualGeometry::_SimplifyGroupTriangles(
 }
 
 void VirtualGeometry::_BuildMeshletFromGroup(
+	const std::vector<Vertex>& _vertex,
 	const std::vector<uint32_t>& _index, 
-	MeshletDeviceData& _meshletData, 
-	std::vector<Meshlet>& _meshlet)
+	MeshletData& _meshletData, 
+	std::vector<Meshlet>& _meshlet) const
 {
 	MeshOptimizer optimizer{};
-	optimizer.BuildMeshlet(m_pBaseMesh->verts, _index, _meshletData, _meshlet);
+	optimizer.BuildMeshlets(_vertex, _index, _meshletData, _meshlet);
 }
 
 void VirtualGeometry::PresetStaticMesh(const StaticMesh& _original)
@@ -259,53 +330,51 @@ void VirtualGeometry::Init()
 	m_meshlets.resize(maxLOD + 1);
 	m_meshletTable.resize(maxLOD + 1);
 
-	_BuildVirtualIndexMap();
-
+	std::cout << "Start build virtual geometry..." << std::endl;
+	std::cout << "===============================" << std::endl;
+	//_BuildVirtualIndexMap();
 	for (int i = 0; i < (maxLOD + 1); ++i)
 	{
-		std::vector<Meshlet> meshlets{};
-
 		// Build meshlets for current LOD
 		if (i == 0)
-		{
-			optimizer.BuildMeshlet(m_pBaseMesh->verts, m_pBaseMesh->indices, m_meshletTable[i], meshlets);
+		{	
+			std::vector<Meshlet> meshlets{};
+			uint32_t firstIndx;
+			uint32_t numAdded;
 
-			// fill up LOD i meshlets
-			{
-				uint32_t firstSibling = m_meshlets[i].size();
-				std::vector<uint32_t> siblings;
-				for (int j = 0; j < meshlets.size(); ++j)
-				{
-					MyMeshlet myMeshlet{};
-
-					myMeshlet.lod = i;
-					myMeshlet.meshlet = meshlets[j];
-					siblings.push_back(m_meshlets.size());
-					m_meshlets[i].push_back(myMeshlet);
-				}
-
-				for (int j = 0; j < meshlets.size(); ++j)
-				{
-					auto& myMeshlet = m_meshlets[i][firstSibling + j];
-					myMeshlet.siblings = siblings;
-					myMeshlet.parent
-				}
-			}
+			std::cout << "Start build LOD " << i << " meshlets...";
+			optimizer.BuildMeshlets(m_pBaseMesh->verts, m_pBaseMesh->indices, m_meshletTable[i], meshlets);
+			_AddMyMeshlet(i, 0.0f, meshlets, {}, &firstIndx, &numAdded);
+			std::cout << "DONE, meshlets added: " << numAdded << std::endl;
+			std::cout << "Triangle count: " << m_pBaseMesh->indices.size() / 3 << std::endl;
 		}
 		else
 		{
 			// For each group of meshlets, build a new list of triangles approximating the original group
 			// For each simplified group, break them apart into new meshlets
+			uint32_t firstIndx;
+			uint32_t numAdded = 0u;
+			uint32_t numTrig = 0u;
+
+			std::cout << "Start build LOD " << i << " meshlets...";
 			for (const auto& group : meshletGroups)
 			{
 				std::vector<uint32_t> simplifiedIndex;
+				std::vector<Meshlet> meshlets{};
+				uint32_t subNumAdded;
 
 				// For each group of meshlets, build a new list of triangles approximating the original group
-				_SimplifyGroupTriangles(i, group, simplifiedIndex);
+				float error = _SimplifyGroupTriangles(i - 1, group, simplifiedIndex);
 
 				// For each simplified group, break them apart into new meshlets
-				_BuildMeshletFromGroup(simplifiedIndex, m_meshletTable[i], meshlets);
+				_BuildMeshletFromGroup(m_pBaseMesh->verts, simplifiedIndex, m_meshletTable[i], meshlets);
+
+				_AddMyMeshlet(i, error, meshlets, group, &firstIndx, &subNumAdded);
+				numAdded += subNumAdded;
+				numTrig += simplifiedIndex.size() / 3;
 			}
+			std::cout << "DONE, meshlets added: " << numAdded << std::endl;
+			std::cout << "Triangle count: " << numTrig << std::endl;
 		}
 
 		// if LOD reaches max we don't need to group meshlet any more, break;
@@ -322,6 +391,7 @@ void VirtualGeometry::Init()
 
 		// Divide meshlets into groups of roughly 4
 		meshletGroups.clear();
+		std::cout << "Start LOD " << i << " meshlets partition...";
 		auto divideSuccess = _DivideMeshletGroup(i, meshletGroups);
 
 		// Remove data we don't fill
@@ -332,5 +402,7 @@ void VirtualGeometry::Init()
 			std::cout << "ERROR: Cannot divide meshlet groups, break!" << std::endl;
 			break;
 		}
+		std::cout << "DONE, divides meshlets into " << meshletGroups.size() << " groups.\r\n" << std::endl;
 	}
+	std::cout << "===============================\r\n" << std::endl;
 }

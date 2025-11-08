@@ -8,39 +8,70 @@
 class VirtualGeometry
 {
 private:
+	// Describes error of a simplified triangle group,
+	// for meshlets, this is the error of the set of triangle group they generated from after simplification
+	struct ErrorInfo
+	{
+		float error;					// error of meshlet group simplified
+		MeshletBounds bounds; // boundary of simplified meshlet group
+	};
 	struct MyMeshlet
 	{
-		Meshlet meshlet;
-		MeshletBounds bounds;
-		std::set<std::pair<uint32_t, uint32_t>> boundaries;				// edges on the boundary, built with virtual indices of 2 ends
-		std::unordered_map<uint32_t, uint32_t> adjacentWeight;	// index of adjacent meshlets in array -> number of shared edges
-		std::vector<uint32_t> siblings;												// meshlets built from the same simplified triangle group
-		uint32_t child = ~0;																	// one of children whose LOD is higher, that is, meshlet built from the group of this meshlet and its siblings
-		uint32_t parent = ~0;																// one of parents whose LOD is lower, that is, the original meshlet of the group this meshlet built from, LOD0 meshlets don't have parent
 		uint32_t lod = 0;
-		float error;
+		
+		// index pointing to error information of the meshlet
+		uint32_t errorId = ~0;
+		Meshlet meshlet;
+		
+		// edges on the boundary, built with virtual indices of 2 ends
+		std::set<std::pair<uint32_t, uint32_t>> boundaries;
+		
+		// index of adjacent meshlets in array -> number of shared edges
+		std::unordered_map<uint32_t, uint32_t> adjacentWeight;
+		
+		// I call meshlets built from the same simplified triangle group as siblings,
+		// when converting to smaller pieces all siblings must do the same
+		// eldestSibling is index of the first siblings in the vector
+		// since siblings are stored consecutively I only store the siblingCount addition to eldestSibling
+		uint32_t eldsetSibling;
+		uint32_t siblingCount;
+		
+		// one of children whose LOD is higher, that is, meshlet built from the group of this meshlet and its siblings
+		uint32_t child = ~0;
+		
+		// parent meshlets whose LOD is lower, that is, the original meshlet of the group this meshlet built from, 
+		// LOD0 meshlets don't have parent, basically parent meshlets are the whole meshlets of a group
+		std::vector<uint32_t> parents;
 	};
 
 private:
 	const StaticMesh* m_pBaseMesh = nullptr;
-	std::vector<MeshletDeviceData> m_meshletTable;		// meshlet table for different LODs
+	std::vector<ErrorInfo> m_errorInfo;							// error information of simplified meshlet
+	std::vector<MeshletData> m_meshletTable;		// meshlet table for different LODs
 	std::vector<std::vector<MyMeshlet>> m_meshlets;		// meshlets of different LODs
-	std::vector<uint32_t> m_realToVirtual;								// maps real index to virtual index based on vertex positions, virtual index points
-																								// to a vertex in the static mesh that has the postion that differentiate this virtual index from others
+	std::vector<uint32_t> m_realToVirtual;						// maps real index to virtual index based on vertex positions, virtual index points
+																			// to a vertex in the static mesh that has the postion that differentiate this virtual index from others
 
+	// Debug use
+	//std::vector<std::vector<Vertex>> m_verts;
+	//std::vector<std::vector<uint32_t>> m_indices;
+	//const std::vector<Vertex>& _GetVertices(uint32_t _lod) { return m_pBaseMesh->verts; };
+	//const std::vector<uint32_t>& _GetIndices(uint32_t _lod) { return m_pBaseMesh->indices; };
 private:
-	// Build a MyMeshlet object and add it to the right place of m_meshlets, update parent MyMeshlet's child info
+	// Add MyMeshlet objects, note it will also update parent MyMeshlet's child attribute
+	// _lod: LOD of new meshlets
+	// _error: error when simplifiy triangles to serve as the input to build new meshlets
+	// _newMeshlets: meshlets built from simplified triangles
+	// _parents: index of meshlets from the group before triangle simplification
+	// _pFirstIndex: output, if not nullptr, fill first index of newly added MyMeshlet objects
+	// _pNumAdded: output, if not nullptr, fill number of MyMeshlet objects added
 	void _AddMyMeshlet(
-		uint32_t _lod, 
-		const Meshlet& _meshlet, 
-		const MeshletBounds& _bounds,
-		const std::vector<uint32_t>& _siblings,
-		uint32_t _parent, 
-		float error);
-
-	// Update self and siblings' parent MyMeshlet's child info
-	// _id: index of the current MyMeshlet
-	void _UpdateParents(uint32_t _lod, uint32_t _id);
+		uint32_t _lod,
+		float _error,
+		const std::vector<Meshlet>& _newMeshlets, 
+		const std::vector<uint32_t>& _parents,
+		uint32_t* _pFirstIndex = nullptr,
+		uint32_t* _pNumAdded = nullptr);
 
 	// Build m_realToVirtual for the m_pBaseMesh
 	void _BuildVirtualIndexMap();
@@ -48,7 +79,7 @@ private:
 	// Fill structure used in METIS,
 	// _xadj, _adjncy describes a meshlet connection graph,
 	// _xadj[i] is the beginning index of _adjncy that describes the connection of meshlet i
-	// note that _xadj is 1 more lengther than meshlet list because it needs last element to 
+	// note that _xadj is 1 more longer than meshlet list because it needs last element to 
 	// identify the end of last connection information of the last meshlet
 	// _adjwgt describes weight of each connection
 	// _lod: LOD of meshlets of the graph
@@ -68,7 +99,7 @@ private:
 
 	// Find boundary of the meshlet, fill boundaries
 	void _FindMeshletBoundary(
-		const MeshletDeviceData& _meshletData,
+		const MeshletData& _meshletData,
 		const Meshlet& _meshlet, 
 		std::set<std::pair<uint32_t, uint32_t>>& _boundaries) const;
 
@@ -81,7 +112,7 @@ private:
 	// return if division is successful
 	bool _DivideMeshletGroup(
 		uint32_t _lod, 
-		std::vector<std::vector<uint32_t>>& _meshletGroups);
+		std::vector<std::vector<uint32_t>>& _meshletGroups) const;
 
 	// Simplify triangles in meshlet groups, return error compared to the original mesh
 	// _lod: lod of meshlets to group
@@ -90,7 +121,7 @@ private:
 	float _SimplifyGroupTriangles(
 		uint32_t _lod,
 		const std::vector<uint32_t>& _meshletGroup,
-		std::vector<uint32_t>& _outIndex);
+		std::vector<uint32_t>& _outIndex) const;
 
 	// Build new meshlets from simplified triangles in the group,
 	// result will be added to the output, data already stored in output will be intact
@@ -98,9 +129,10 @@ private:
 	// _meshletData: local index points to the vertex in meshlet
 	// _meshlet: output meshlet
 	void _BuildMeshletFromGroup(
+		const std::vector<Vertex>& _verts,
 		const std::vector<uint32_t>& _index,
-		MeshletDeviceData& _meshletData,
-		std::vector<Meshlet>& _meshlet);
+		MeshletData& _meshletData,
+		std::vector<Meshlet>& _meshlet) const;
 
 public:
 	void PresetStaticMesh(const StaticMesh& _original);

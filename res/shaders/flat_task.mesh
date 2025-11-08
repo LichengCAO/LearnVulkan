@@ -8,8 +8,8 @@
 #define TASK_WORKGROUP_SIZE 32
 #define MESH_WORKGROUP_SIZE 64
 #define MESHLETS_PER_MESH_WORKGROUP 1
-#define MAX_PRIMITIVES_PER_MESHLET 124
-#define MAX_VERTICES_PER_MESHLET 64
+#define MAX_PRIMITIVES_PER_MESHLET 124 * MESHLETS_PER_MESH_WORKGROUP
+#define MAX_VERTICES_PER_MESHLET 64 * MESHLETS_PER_MESH_WORKGROUP
 
 const uint MESHLETS_PER_TASK_INVOCATION = (MESHLETS_PER_TASK_WORKGROUP + TASK_WORKGROUP_SIZE - 1) / TASK_WORKGROUP_SIZE;
 const uint PRIMITIVE_ITERATION_COUNT = (MAX_PRIMITIVES_PER_MESHLET + MESH_WORKGROUP_SIZE - 1) / MESH_WORKGROUP_SIZE;
@@ -109,6 +109,11 @@ void main()
 		++uWorkGroupMeshlet;
 	}
 	// Should be the same for all mesh shader invocations in the same workgroup
+	// All output variables must only be accessed after SetMeshOutputsEXT
+    // has been called in the current invocation group. Only through the use of this
+    // function primitives can be emitted from the group. In contrast to other
+    // shaders, mesh shaders do not permit read access on output variables and
+    // doing so results in undefined behavior.
 	SetMeshOutputsEXT(uWorkGroupOutputVertexCount, uWorkGroupOutputPrimitiveCount);
 	
 	// Emit meshlet vertices and triangles

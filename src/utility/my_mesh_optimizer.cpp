@@ -1,9 +1,9 @@
 #include "my_mesh_optimizer.h"
 
-void MeshOptimizer::BuildMeshlet(
+void MeshOptimizer::BuildMeshlets(
 	const std::vector<Vertex>& _vertex, 
 	const std::vector<uint32_t>& _index, 
-	MeshletDeviceData& _outMeshletData, 
+	MeshletData& _outMeshletData, 
 	std::vector<Meshlet>& _outMeshlet) const
 {
 	std::vector<Meshlet> outMeshlets{};
@@ -13,7 +13,7 @@ void MeshOptimizer::BuildMeshlet(
 	const float coneWeight = 0.0f;
 	const size_t maxIndices = 64;
 	const size_t maxTriangles = 124; // must be divisible by 4
-	size_t maxMeshlets = meshopt_buildMeshletsBound(_vertex.size(), maxIndices, maxTriangles);
+	size_t maxMeshlets = meshopt_buildMeshletsBound(_index.size(), maxIndices, maxTriangles);
 	size_t meshletCount = 0;
 
 	meshoptMeshlets.resize(maxMeshlets, meshopt_Meshlet{});
@@ -68,7 +68,7 @@ void MeshOptimizer::SimplifyMesh(
 	float& _error) const
 {
 	std::vector<uint32_t> dstIndex;
-	dstIndex.reserve(_index.size());
+	dstIndex.resize(_index.size());
 
 	auto indexSize = meshopt_simplify(
 		dstIndex.data(),
@@ -78,7 +78,7 @@ void MeshOptimizer::SimplifyMesh(
 		_vertex.size(),
 		sizeof(Vertex),
 		_index.size() / 2,
-		0.2,
+		0.5,
 		meshopt_SimplifyLockBorder,
 		&_error);
 
@@ -133,7 +133,7 @@ void MeshOptimizer::OptimizeMesh(std::vector<Vertex>& _vertex, std::vector<uint3
 
 MeshletBounds MeshOptimizer::ComputeMeshletBounds(
 	const std::vector<Vertex>& _vertex,
-	const MeshletDeviceData& _meshletData, 
+	const MeshletData& _meshletData, 
 	const Meshlet& _meshlet) const
 {
 	MeshletBounds retBounds{};
@@ -146,6 +146,33 @@ MeshletBounds MeshOptimizer::ComputeMeshletBounds(
 		reinterpret_cast<const float*>(_vertex.data()),
 		_vertex.size(),
 		sizeof(Vertex));
+	retBounds.center = glm::vec3(bounds.center[0], bounds.center[1], bounds.center[2]);
+	retBounds.radius = bounds.radius;
+	retBounds.coneApex = glm::vec3(bounds.cone_apex[0], bounds.cone_apex[1], bounds.cone_apex[2]);
+	retBounds.coneAxis = glm::vec3(bounds.cone_axis[0], bounds.cone_axis[1], bounds.cone_axis[2]);
+	retBounds.coneCutoff = bounds.cone_cutoff;
+
+	return retBounds;
+}
+
+MeshletBounds MeshOptimizer::ComputeBounds(const std::vector<Vertex>& _vertex, const std::vector<uint32_t>& _index) const
+{
+	MeshletBounds retBounds{};
+	meshopt_Bounds bounds{};
+	std::vector<glm::vec3> pos;
+
+	pos.resize(_index.size());
+	for (int i = 0; i < _index.size(); ++i)
+	{
+		pos[i] = _vertex[_index[i]].position;
+	}
+	bounds = meshopt_computeSphereBounds(
+		reinterpret_cast<const float*>(pos.data()), 
+		pos.size(), 
+		sizeof(glm::vec3), 
+		NULL, 
+		0);
+
 	retBounds.center = glm::vec3(bounds.center[0], bounds.center[1], bounds.center[2]);
 	retBounds.radius = bounds.radius;
 	retBounds.coneApex = glm::vec3(bounds.cone_apex[0], bounds.cone_apex[1], bounds.cone_apex[2]);

@@ -445,9 +445,9 @@ void ShaderReflector::PrintReflectResult() const
 			for (const auto pVariable : pInputInfo)
 			{
 				if (COMPARE_BITS(pVariable->decoration_flags, SPV_REFLECT_DECORATION_BUILT_IN)) continue;
-				std::cout << "\tname: " << pVariable->name << std::endl;
-				std::cout << "\tlocation: " << pVariable->location << std::endl;
-				std::cout << "\tformat: ";
+				std::cout << "    name: " << pVariable->name << std::endl;
+				std::cout << "    location: " << pVariable->location << std::endl;
+				std::cout << "    format: ";
 				_PrintVkFormat(std::cout, static_cast<VkFormat>(pVariable->format));
 				std::cout << "\n\n";
 			}
@@ -459,9 +459,9 @@ void ShaderReflector::PrintReflectResult() const
 			for (const auto pVariable : pOutputInfo)
 			{
 				if (COMPARE_BITS(pVariable->decoration_flags, SPV_REFLECT_DECORATION_BUILT_IN)) continue;
-				std::cout << "\tname: " << pVariable->name << std::endl;
-				std::cout << "\tlocation: " << pVariable->location << std::endl;
-				std::cout << "\tformat: ";
+				std::cout << "    name: " << pVariable->name << std::endl;
+				std::cout << "    location: " << pVariable->location << std::endl;
+				std::cout << "    format: ";
 				_PrintVkFormat(std::cout, static_cast<VkFormat>(pVariable->format));
 				std::cout << "\n\n";
 			}
@@ -472,9 +472,9 @@ void ShaderReflector::PrintReflectResult() const
 			std::cout << "Push constant:\r\n";
 			for (const auto pReflectBlock : pPushConstInfo)
 			{
-				std::cout << "\tname: " << pReflectBlock->name << std::endl;
-				std::cout << "\toffset: " << pReflectBlock->offset << std::endl;
-				std::cout << "\tsize: " << pReflectBlock->size << std::endl;
+				std::cout << "    name: " << pReflectBlock->name << std::endl;
+				std::cout << "    offset: " << pReflectBlock->offset << std::endl;
+				std::cout << "    size: " << pReflectBlock->size << std::endl;
 				std::cout << "\n\n";
 			}
 		}
@@ -484,7 +484,7 @@ void ShaderReflector::PrintReflectResult() const
 			std::cout << "Descriptor sets:\r\n";
 			for (const auto pDescriptorSet : pSetInfo)
 			{
-				std::cout << "\tset: " << pDescriptorSet->set << std::endl;
+				std::cout << "    set: " << pDescriptorSet->set << std::endl;
 				for (uint32_t i = 0; i < pDescriptorSet->binding_count; ++i)
 				{
 					const SpvReflectDescriptorBinding* pDescriptor = pDescriptorSet->bindings[i];
@@ -494,10 +494,10 @@ void ShaderReflector::PrintReflectResult() const
 						uDescriptorCount *= (pDescriptor->array.dims[uDim]);
 					}
 
-					std::cout << "\t\tname: " << pDescriptor->name << std::endl;
-					std::cout << "\t\tbinding: " << pDescriptor->binding << std::endl;
-					std::cout << "\t\tdescriptor count: " << uDescriptorCount << std::endl;
-					std::cout << "\t\ttype: ";
+					std::cout << "        name: " << pDescriptor->name << std::endl;
+					std::cout << "        binding: " << pDescriptor->binding << std::endl;
+					std::cout << "        descriptor count: " << uDescriptorCount << std::endl;
+					std::cout << "        type: ";
 					_PrintDescriptorType(std::cout, static_cast<VkDescriptorType>(pDescriptor->descriptor_type));
 					std::cout << "\n\n";
 				}

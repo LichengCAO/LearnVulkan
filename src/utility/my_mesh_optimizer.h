@@ -1,5 +1,6 @@
 #pragma once
 #include <meshoptimizer.h>
+#include <functional>
 #include "common.h"
 #include "geometry.h"
 
@@ -16,22 +17,62 @@ public:
 	// _index: index of the part of the mesh we want to build meshlet for
 	// _outMeshletData: data used by meshlet to get indices of the original mesh
 	// _outMeshlet: each element is an interval of _outMeshletVertex, _outMeshletLocalIndex that presents a meshlet
-	void BuildMeshlet(
+	void BuildMeshlets(
 		const std::vector<Vertex>& _vertex,
 		const std::vector<uint32_t>& _index,
-		MeshletDeviceData& _outMeshletData,
+		MeshletData& _outMeshletData,
 		std::vector<Meshlet>& _outMeshlet) const;
 
+	// Simplify mesh/meshlet while leaving border intact,
+	// reduce number of indices by 50% approximately
+	// _vertex: vertices of the original mesh
+	// _index: indices of the orignal mesh
+	// _outIndex: output simplified index
+	// _error: relative error from the original mesh
 	void SimplifyMesh(
 		const std::vector<Vertex>& _vertex,
 		const std::vector<uint32_t>& _index,
 		std::vector<uint32_t>& _outIndex,
 		float& _error) const;
 
+	// Optimize mesh by reordering vertex and index to GPU friendly layout
+	// removes duplicated vertices
 	void OptimizeMesh(std::vector<Vertex>& _vertex, std::vector<uint32_t>& _index) const;
 
+	// Compute meshlet bounds for culling
 	MeshletBounds ComputeMeshletBounds(
 		const std::vector<Vertex>& _vertex,
-		const MeshletDeviceData& _meshletData,
+		const MeshletData& _meshletData,
 		const Meshlet& _meshlet) const;
+
+	// Compute boundary of cluster of mesh
+	MeshletBounds ComputeBounds(
+		const std::vector<Vertex>& _vertex,
+		const std::vector<uint32_t>& _index) const;
+
+	// Remove duplication of vertices based on _equal
+	template<typename T>
+	void RemoveDuplication(std::vector<T>& _vertex, std::vector<uint32_t>& _index, std::function<bool(const T&, const T&)> _equal) const 
+	{
+		std::vector<uint32_t> remap(std::max(_vertex.size(), _index.size()));
+		std::vector<uint32_t> dstIndices(_index.size());
+		std::vector<T> dstVerts(_vertex.size());
+		size_t indexCount = _index.size();
+		size_t vertexCount = meshopt_generateVertexRemapCustom(
+			remap.data(),
+			_index.data(),
+			_index.size(),
+			reinterpret_cast<const float*>(_vertex.data()),
+			_vertex.size(),
+			sizeof(T),
+			[&](unsigned int l, unsigned int r) { return _equal(_vertex[l], _vertex[r]); }
+		);
+		dstIndices.resize(indexCount);
+		dstVerts.resize(vertexCount);
+		meshopt_remapVertexBuffer(dstVerts.data(), _vertex.data(), _vertex.size(), sizeof(T), remap.data());
+		meshopt_remapIndexBuffer(dstIndices.data(), _index.data(), indexCount, remap.data());
+		std::cout << "new vert count: " << vertexCount << std::endl;
+		_vertex = dstVerts;
+		_index = dstIndices;
+	};
 };

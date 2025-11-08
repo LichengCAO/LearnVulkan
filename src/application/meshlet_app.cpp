@@ -3,6 +3,8 @@
 #include "shader_reflect.h"
 #include "imgui.h"
 #include "utility/glTF_loader.h"
+#include "my_mesh_optimizer.h"
+#include "virtual_geometry.h"
 #define MAX_FRAME_COUNT 3
 
 void MeshletApp::_Init()
@@ -94,19 +96,46 @@ void MeshletApp::_InitModels()
 {
 	std::vector<StaticMesh> meshs;
 	std::vector<glm::mat4> matrices;
+	MeshOptimizer optimizer{};
+	Transform trans{};
 	//MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/sphere/sphere.obj", meshs);
 
 	glTFLoader gltfScene{};
 	gltfScene.Load("E:/GitStorage/LearnVulkan/res/models/cornell_box/scene.gltf");
 	gltfScene.GetSceneSimpleMeshes(meshs, matrices);
-	//MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/wahoo/wahoo.obj", meshs);
-	//matrices.push_back(glm::mat4(1.0));
+	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/bunny/bunny.obj", meshs);
+	//trans.SetScale(0.01, 0.01, 0.01);
+	matrices.push_back(trans.GetModelMatrix());
+	std::vector<uint32_t> idx = meshs.back().indices;
+	std::cout << "trig->" << idx.size() / 3 << std::endl;
+	for (int i = 0; i < 5; ++i)
+	{
+		float error;
+		std::vector<uint32_t> newIdx;
+		optimizer.SimplifyMesh(meshs.back().verts, idx, newIdx, error);
+		idx = newIdx;
+		std::cout << "trig->" << idx.size() / 3 << std::endl;
+	}
 	for (size_t i = 0; i < meshs.size(); ++i)
 	{
 		Model model{};
-		model.mesh = meshs[i];
+		MeshletData meshletData{};
+		VirtualGeometry virtualGeom{};
+		auto& staticMesh = meshs[i];
+
+		optimizer.OptimizeMesh(staticMesh.verts, staticMesh.indices);
+		virtualGeom.PresetStaticMesh(staticMesh);
+		virtualGeom.Init();
+		
+		model.mesh = staticMesh;
 		model.modelMatrix = matrices[i];
-		MeshUtility::BuildMeshlets(model.mesh, model.vecMeshlet, model.vecMeshletBounds, model.vecVertexRemap, model.vecTriangleIndex);
+		optimizer.BuildMeshlets(staticMesh.verts, staticMesh.indices, meshletData, model.vecMeshlet);
+		model.vecVertexRemap = meshletData.meshletVertices;
+		model.vecTriangleIndex = meshletData.meshletIndices;
+		for (const auto& meshlet : model.vecMeshlet)
+		{
+			model.vecMeshletBounds.push_back(optimizer.ComputeMeshletBounds(staticMesh.verts, meshletData, meshlet));
+		}
 		m_models.push_back(model);
 	}
 
