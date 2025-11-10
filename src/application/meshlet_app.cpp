@@ -104,7 +104,7 @@ void MeshletApp::_InitModels()
 	glTFLoader gltfScene{};
 	gltfScene.Load("E:/GitStorage/LearnVulkan/res/models/cornell_box/scene.gltf");
 	gltfScene.GetSceneSimpleMeshes(meshs, matrices);
-	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/girl.OBJ", objMeshs);
+	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/bunny/bunny.obj", objMeshs);
 	VirtualGeometry vg{};
 	vg.PresetStaticMesh(objMeshs[0]);
 	vg.Init();

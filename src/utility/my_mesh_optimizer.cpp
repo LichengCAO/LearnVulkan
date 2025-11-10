@@ -1,4 +1,5 @@
 #include "my_mesh_optimizer.h"
+#include "utils.h"
 
 void MeshOptimizer::BuildMeshlets(
 	const std::vector<Vertex>& _vertex, 
@@ -67,28 +68,58 @@ float MeshOptimizer::SimplifyMesh(
 	size_t _targetIndexCount, 
 	std::vector<uint32_t>& _outIndex) const
 {
-	std::vector<uint32_t> dstIndex;
-	size_t currentCount = _index.size();
 	float error = 0.0f;
-
+	size_t newIndexSize = 0;
+	std::vector<uint32_t> dstIndex;
+	std::vector<uint32_t> srcIndex;
+	
+	srcIndex.resize(_index.size());
 	dstIndex.resize(_index.size());
-
-	auto indexSize = meshopt_simplify(
-		dstIndex.data(),
+	meshopt_generateShadowIndexBuffer(
+		srcIndex.data(),
 		_index.data(),
 		_index.size(),
+		_vertex.data(),
+		_vertex.size(),
+		sizeof(glm::vec3),
+		sizeof(Vertex));
+
+	newIndexSize = meshopt_simplify(
+		dstIndex.data(),
+		srcIndex.data(),
+		srcIndex.size(),
 		reinterpret_cast<const float*>(_vertex.data()),
 		_vertex.size(),
 		sizeof(Vertex),
 		_targetIndexCount,
-		1.0,
-		meshopt_SimplifyLockBorder,
+		FLT_MAX,
+		meshopt_SimplifyLockBorder | meshopt_SimplifyPermissive,
 		&error);
-
-	dstIndex.resize(indexSize);
-	currentCount = indexSize;
+	dstIndex.resize(newIndexSize);
+	
+	// if normal simplification failed
+	if (newIndexSize == srcIndex.size())
+	{
+		newIndexSize = meshopt_simplify(
+			srcIndex.data(),
+			dstIndex.data(),
+			dstIndex.size(),
+			reinterpret_cast<const float*>(_vertex.data()),
+			_vertex.size(),
+			sizeof(Vertex),
+			_targetIndexCount,
+			FLT_MAX,
+			meshopt_SimplifyLockBorder | meshopt_SimplifyPermissive | meshopt_SimplifyPrune,
+			&error);
+		if (newIndexSize > 0)
+		{
+			srcIndex.resize(newIndexSize);
+			std::swap(srcIndex, dstIndex);
+		}
+	}
 
 	_outIndex.insert(_outIndex.end(), dstIndex.begin(), dstIndex.end());
+	
 	return error;
 }
 

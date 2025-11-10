@@ -366,6 +366,7 @@ void VirtualGeometry::Init()
 				// For each group of meshlets, build a new list of triangles approximating the original group
 				float error = _SimplifyGroupTriangles(i - 1, group, simplifiedIndex);
 
+				if (simplifiedIndex.size() == 0) continue;
 				// For each simplified group, break them apart into new meshlets
 				_BuildMeshletFromGroup(m_pBaseMesh->verts, simplifiedIndex, m_meshletTable[i], meshlets);
 
@@ -378,7 +379,7 @@ void VirtualGeometry::Init()
 		}
 
 		// if LOD reaches max we don't need to group meshlet any more, break;
-		if (i == maxLOD) break;
+		if (m_meshlets[i].size() <= 1) break;
 
 		// For each meshlet, find the set of all edges making up the triangles within the meshlet
 		for (int j = 0; j < m_meshlets[i].size(); ++j)
@@ -393,7 +394,8 @@ void VirtualGeometry::Init()
 		meshletGroups.clear();
 		std::cout << "Start LOD " << i << " meshlets partition...";
 		uint32_t div = 8 << i;
-		uint32_t groupCount = m_meshlets[i].size() / div;
+		uint32_t groupCount = m_meshlets[i].size() / 8;
+		groupCount = groupCount > 0 ? groupCount : 1;
 		auto divideSuccess = _DivideMeshletGroup(i, groupCount, meshletGroups);
 
 		// Remove data we don't fill
