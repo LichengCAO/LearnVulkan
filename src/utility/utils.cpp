@@ -14,10 +14,10 @@ bool MeshUtility::Load(const std::string& objFile, std::vector<StaticMesh>& outM
 	std::vector<tinyobj::material_t> materials;
 	std::string warn, err;
 	CHECK_TRUE(tinyobj::LoadObj(&attrib, &shapes, &materials, &warn, &err, objFile.c_str()), warn + err);
-	StaticMesh mesh{};
-	std::unordered_map<Vertex, uint32_t> uniqueVertices{};
+	
 	for (const auto& shape : shapes)
 	{
+		StaticMesh mesh{};
 		for (const auto& index : shape.mesh.indices)
 		{
 			Vertex vertex{};
@@ -44,13 +44,10 @@ bool MeshUtility::Load(const std::string& objFile, std::vector<StaticMesh>& outM
 			mesh.indices.push_back(static_cast<uint32_t>(mesh.verts.size()));
 			mesh.verts.push_back(vertex);
 		}
+		// apply optimizer
+		_OptimizeMesh(mesh);
+		outMesh.push_back(mesh);
 	}
-	mesh.indices.pop_back();
-	mesh.indices.pop_back();
-	mesh.indices.pop_back();
-	// apply optimizer
-	_OptimizeMesh(mesh);
-	outMesh.push_back(mesh);
 	bSuccess = true;
 	return bSuccess;
 }

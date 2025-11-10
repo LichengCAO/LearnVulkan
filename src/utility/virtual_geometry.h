@@ -111,7 +111,8 @@ private:
 	// _meshletGroups: array of indices of meshlets in a group
 	// return if division is successful
 	bool _DivideMeshletGroup(
-		uint32_t _lod, 
+		uint32_t _lod,
+		uint32_t _groupCount,
 		std::vector<std::vector<uint32_t>>& _meshletGroups) const;
 
 	// Simplify triangles in meshlet groups, return error compared to the original mesh

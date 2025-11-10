@@ -95,6 +95,7 @@ void MeshletApp::_UninitSampler()
 void MeshletApp::_InitModels()
 {
 	std::vector<StaticMesh> meshs;
+	std::vector<StaticMesh> objMeshs;
 	std::vector<glm::mat4> matrices;
 	MeshOptimizer optimizer{};
 	Transform trans{};
@@ -103,19 +104,11 @@ void MeshletApp::_InitModels()
 	glTFLoader gltfScene{};
 	gltfScene.Load("E:/GitStorage/LearnVulkan/res/models/cornell_box/scene.gltf");
 	gltfScene.GetSceneSimpleMeshes(meshs, matrices);
-	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/bunny/bunny.obj", meshs);
-	//trans.SetScale(0.01, 0.01, 0.01);
-	matrices.push_back(trans.GetModelMatrix());
-	std::vector<uint32_t> idx = meshs.back().indices;
-	std::cout << "trig->" << idx.size() / 3 << std::endl;
-	for (int i = 0; i < 5; ++i)
-	{
-		float error;
-		std::vector<uint32_t> newIdx;
-		optimizer.SimplifyMesh(meshs.back().verts, idx, newIdx, error);
-		idx = newIdx;
-		std::cout << "trig->" << idx.size() / 3 << std::endl;
-	}
+	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/girl.OBJ", objMeshs);
+	VirtualGeometry vg{};
+	vg.PresetStaticMesh(objMeshs[0]);
+	vg.Init();
+
 	for (size_t i = 0; i < meshs.size(); ++i)
 	{
 		Model model{};

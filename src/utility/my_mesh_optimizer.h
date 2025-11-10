@@ -24,16 +24,17 @@ public:
 		std::vector<Meshlet>& _outMeshlet) const;
 
 	// Simplify mesh/meshlet while leaving border intact,
+	// return relative error from the original mesh
 	// reduce number of indices by 50% approximately
 	// _vertex: vertices of the original mesh
 	// _index: indices of the orignal mesh
+	// _targetIndexCount: maximum number of indices returned
 	// _outIndex: output simplified index
-	// _error: relative error from the original mesh
-	void SimplifyMesh(
+	float SimplifyMesh(
 		const std::vector<Vertex>& _vertex,
 		const std::vector<uint32_t>& _index,
-		std::vector<uint32_t>& _outIndex,
-		float& _error) const;
+		size_t _targetIndexCount,
+		std::vector<uint32_t>& _outIndex) const;
 
 	// Optimize mesh by reordering vertex and index to GPU friendly layout
 	// removes duplicated vertices
@@ -71,7 +72,6 @@ public:
 		dstVerts.resize(vertexCount);
 		meshopt_remapVertexBuffer(dstVerts.data(), _vertex.data(), _vertex.size(), sizeof(T), remap.data());
 		meshopt_remapIndexBuffer(dstIndices.data(), _index.data(), indexCount, remap.data());
-		std::cout << "new vert count: " << vertexCount << std::endl;
 		_vertex = dstVerts;
 		_index = dstIndices;
 	};

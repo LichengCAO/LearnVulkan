@@ -61,13 +61,16 @@ void MeshOptimizer::BuildMeshlets(
 	_outMeshlet.insert(_outMeshlet.end(), outMeshlets.begin(), outMeshlets.end());
 }
 
-void MeshOptimizer::SimplifyMesh(
+float MeshOptimizer::SimplifyMesh(
 	const std::vector<Vertex>& _vertex, 
 	const std::vector<uint32_t>& _index, 
-	std::vector<uint32_t>& _outIndex, 
-	float& _error) const
+	size_t _targetIndexCount, 
+	std::vector<uint32_t>& _outIndex) const
 {
 	std::vector<uint32_t> dstIndex;
+	size_t currentCount = _index.size();
+	float error = 0.0f;
+
 	dstIndex.resize(_index.size());
 
 	auto indexSize = meshopt_simplify(
@@ -77,13 +80,16 @@ void MeshOptimizer::SimplifyMesh(
 		reinterpret_cast<const float*>(_vertex.data()),
 		_vertex.size(),
 		sizeof(Vertex),
-		_index.size() / 2,
-		0.5,
+		_targetIndexCount,
+		1.0,
 		meshopt_SimplifyLockBorder,
-		&_error);
+		&error);
 
 	dstIndex.resize(indexSize);
+	currentCount = indexSize;
+
 	_outIndex.insert(_outIndex.end(), dstIndex.begin(), dstIndex.end());
+	return error;
 }
 
 void MeshOptimizer::OptimizeMesh(std::vector<Vertex>& _vertex, std::vector<uint32_t>& _index) const

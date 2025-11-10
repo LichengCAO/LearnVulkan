@@ -232,7 +232,7 @@ void VirtualGeometry::_RecordMeshletConnections(uint32_t _lod)
 	}
 }
 
-bool VirtualGeometry::_DivideMeshletGroup(uint32_t _lod, std::vector<std::vector<uint32_t>>& _meshletGroups) const
+bool VirtualGeometry::_DivideMeshletGroup(uint32_t _lod, uint32_t _groupCount, std::vector<std::vector<uint32_t>>& _meshletGroups) const
 {
 	std::vector<idx_t> xadj;
 	std::vector<idx_t> adjncy;
@@ -240,7 +240,7 @@ bool VirtualGeometry::_DivideMeshletGroup(uint32_t _lod, std::vector<std::vector
 	std::vector<idx_t> part;
 	idx_t nvtxs = m_meshlets[_lod].size();
 	//idx_t nparts = std::max(static_cast<idx_t>(m_meshlets[_lod].size() / 4), 1);
-	idx_t nparts = static_cast<idx_t>(m_meshlets[_lod].size() / 8);
+	idx_t nparts = static_cast<idx_t>(_groupCount);
 	idx_t edgecut = 0;
 	idx_t options[METIS_NOPTIONS];
 	idx_t ncon = 1;
@@ -250,7 +250,6 @@ bool VirtualGeometry::_DivideMeshletGroup(uint32_t _lod, std::vector<std::vector
 	METIS_SetDefaultOptions(options);  // Initialize default options
 	part.resize(nvtxs);
 	_PrepareMETIS(_lod, xadj, adjncy, adjwgt);
-	std::cout << "Try to divide to " << nparts;
 	if (nparts > 8)
 	{
 		metisFunc = METIS_PartGraphKway;
@@ -302,7 +301,7 @@ float VirtualGeometry::_SimplifyGroupTriangles(
 		meshlet.GetIndices(m_meshletTable[_lod], meshletIndex);
 	}
 
-	optimizer.SimplifyMesh(m_pBaseMesh->verts, meshletIndex, _outIndex, error);
+	error = optimizer.SimplifyMesh(m_pBaseMesh->verts, meshletIndex, meshletIndex.size() / 2, _outIndex);
 
 	return error;
 }
@@ -324,7 +323,8 @@ void VirtualGeometry::PresetStaticMesh(const StaticMesh& _original)
 
 void VirtualGeometry::Init()
 {
-	int maxLOD = 5;
+	int maxLOD = 15;
+	uint32_t lastGroupSize = ~0;
 	MeshOptimizer optimizer{};
 	std::vector<std::vector<uint32_t>> meshletGroups;
 	m_meshlets.resize(maxLOD + 1);
@@ -389,10 +389,12 @@ void VirtualGeometry::Init()
 		// For each meshlet, find the set of connected meshlets(sharing an edge)
 		_RecordMeshletConnections(i);
 
-		// Divide meshlets into groups of roughly 4
+		// Divide meshlets into groups of roughly 8
 		meshletGroups.clear();
 		std::cout << "Start LOD " << i << " meshlets partition...";
-		auto divideSuccess = _DivideMeshletGroup(i, meshletGroups);
+		uint32_t div = 8 << i;
+		uint32_t groupCount = m_meshlets[i].size() / div;
+		auto divideSuccess = _DivideMeshletGroup(i, groupCount, meshletGroups);
 
 		// Remove data we don't fill
 		if (!divideSuccess)
@@ -403,6 +405,7 @@ void VirtualGeometry::Init()
 			break;
 		}
 		std::cout << "DONE, divides meshlets into " << meshletGroups.size() << " groups.\r\n" << std::endl;
+		lastGroupSize = meshletGroups.size();
 	}
 	std::cout << "===============================\r\n" << std::endl;
 }
