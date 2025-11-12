@@ -123,6 +123,104 @@ float MeshOptimizer::SimplifyMesh(
 	return error;
 }
 
+float MeshOptimizer::SimplifyMesh(
+	const std::vector<Vertex>& _vertex, 
+	const std::vector<uint32_t>& _index, 
+	size_t _targetIndexCount, 
+	std::vector<Vertex>& _outVertex, 
+	std::vector<uint32_t>& _outIndex) const
+{
+	struct FlatVertex
+	{
+		std::array<float, 8> data; // position, uv, normal
+	};
+	static const float weights[5] = { 1, 1, 1, 1, 1 };
+
+	float error = 0;
+	std::vector<FlatVertex> srcVerts;
+	std::vector<FlatVertex> dstVerts;
+	std::vector<uint32_t> dstIndex;
+	bool hasUV = _vertex[0].uv.has_value();
+	bool hasNormal = _vertex[0].normal.has_value();
+	size_t indexCount = 0;
+	
+	// fill _vertex into flat form
+	srcVerts.resize(_vertex.size());
+	for (size_t i = 0; i < _vertex.size(); ++i)
+	{
+		FlatVertex& mvert = srcVerts[i];
+		mvert.data[0] = _vertex[i].position.x;
+		mvert.data[1] = _vertex[i].position.y;
+		mvert.data[2] = _vertex[i].position.z;
+		if (hasUV)
+		{
+			mvert.data[3] = _vertex[i].uv.value().x;
+			mvert.data[4] = _vertex[i].uv.value().y;
+		}
+		if (hasNormal)
+		{
+			mvert.data[5] = _vertex[i].normal.value().x;
+			mvert.data[6] = _vertex[i].normal.value().y;
+			mvert.data[7] = _vertex[i].normal.value().z;
+		}
+	}
+
+	// simplify
+	dstVerts = srcVerts;
+	dstIndex = _index;
+	indexCount = meshopt_simplifyWithUpdate(
+		dstIndex.data(),
+		dstIndex.size(),
+		reinterpret_cast<float*>(dstVerts.data()),
+		dstVerts.size(),
+		sizeof(FlatVertex),
+		&dstVerts[0].data[3],
+		sizeof(FlatVertex),
+		weights,
+		5,
+		NULL,
+		_targetIndexCount,
+		FLT_MAX,
+		meshopt_SimplifyLockBorder | meshopt_SimplifyPermissive,
+		&error);
+
+	// try simplify more aggressively
+	if (indexCount > _targetIndexCount)
+	{
+		dstVerts = srcVerts;
+		dstIndex = _index;
+		indexCount = meshopt_simplifyWithUpdate(
+			dstIndex.data(),
+			dstIndex.size(),
+			reinterpret_cast<float*>(dstVerts.data()),
+			dstVerts.size(),
+			sizeof(FlatVertex),
+			&dstVerts[0].data[3],
+			sizeof(FlatVertex),
+			weights,
+			5,
+			NULL,
+			_targetIndexCount,
+			FLT_MAX,
+			meshopt_SimplifyLockBorder | meshopt_SimplifyPermissive | meshopt_SimplifyPrune,
+			&error);
+	}
+	dstIndex.resize(indexCount);
+
+	std::swap(dstVerts, srcVerts);
+	//meshopt_optimizeVertexFetch(
+	//	dstVerts.data(),
+	//	dstIndex.data(),
+	//	dstIndex.size(),
+	//	srcVerts.data(),
+	//)
+
+	_outVertex.resize(_vertex.size());
+	_outIndex.resize(_index.size());
+
+    return error;
+}
+
 void MeshOptimizer::OptimizeMesh(std::vector<Vertex>& _vertex, std::vector<uint32_t>& _index) const
 {
 	std::vector<uint32_t> remap(std::max(_vertex.size(), _index.size()));

@@ -25,15 +25,28 @@ public:
 
 	// Simplify mesh/meshlet while leaving border intact,
 	// return relative error from the original mesh
-	// reduce number of indices by 50% approximately
 	// _vertex: vertices of the original mesh
 	// _index: indices of the orignal mesh
-	// _targetIndexCount: maximum number of indices returned
-	// _outIndex: output simplified index
+	// _targetIndexCount: target index number returned may not reach this
+	// _outIndex: output simplified index, can draw new mesh with the original _vertex
 	float SimplifyMesh(
 		const std::vector<Vertex>& _vertex,
 		const std::vector<uint32_t>& _index,
 		size_t _targetIndexCount,
+		std::vector<uint32_t>& _outIndex) const;
+
+	// Simplify mesh/meshlet while leaving border intact,
+	// return relative error from the original mesh
+	// _vertex: vertices of the original mesh
+	// _index: indices of the orignal mesh
+	// _targetIndexCount: target index number returned may not reach this
+	// _outVertex: output simplified vertices
+	// _outIndex: output simplified index, can draw new mesh with _outVertex
+	float SimplifyMesh(
+		const std::vector<Vertex>& _vertex,
+		const std::vector<uint32_t>& _index,
+		size_t _targetIndexCount,
+		std::vector<Vertex>& _outVertex,
 		std::vector<uint32_t>& _outIndex) const;
 
 	// Optimize mesh by reordering vertex and index to GPU friendly layout
