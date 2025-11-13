@@ -5,21 +5,21 @@ void MeshOptimizer::BuildMeshlets(
 	const std::vector<Vertex>& _vertex, 
 	const std::vector<uint32_t>& _index, 
 	MeshletData& _outMeshletData, 
-	std::vector<Meshlet>& _outMeshlet) const
+	std::vector<Meshlet>& _outMeshlet,
+	size_t _maxPrimitiveCount, // must be divisible by 4
+	size_t _maxIndexCount) const
 {
 	std::vector<Meshlet> outMeshlets{};
 	std::vector<uint32_t> outMeshletVertices{};
 	std::vector<uint8_t> outMeshletTriangles{};
 	std::vector<meshopt_Meshlet> meshoptMeshlets{};
 	const float coneWeight = 0.0f;
-	const size_t maxIndices = 64;
-	const size_t maxTriangles = 124; // must be divisible by 4
-	size_t maxMeshlets = meshopt_buildMeshletsBound(_index.size(), maxIndices, maxTriangles);
+	size_t maxMeshlets = meshopt_buildMeshletsBound(_index.size(), _maxIndexCount, _maxPrimitiveCount);
 	size_t meshletCount = 0;
 
 	meshoptMeshlets.resize(maxMeshlets, meshopt_Meshlet{});
-	outMeshletVertices.resize(maxMeshlets * maxIndices, 0);
-	outMeshletTriangles.resize(maxMeshlets * maxTriangles * 3, 0);
+	outMeshletVertices.resize(maxMeshlets * _maxIndexCount, 0);
+	outMeshletTriangles.resize(maxMeshlets * _maxPrimitiveCount * 3, 0);
 
 	meshletCount = meshopt_buildMeshlets(
 		meshoptMeshlets.data(),
@@ -30,8 +30,8 @@ void MeshOptimizer::BuildMeshlets(
 		reinterpret_cast<const float*>(_vertex.data()),
 		_vertex.size(),
 		sizeof(Vertex),
-		maxIndices,
-		maxTriangles,
+		_maxIndexCount,
+		_maxPrimitiveCount,
 		coneWeight);
 
 	meshoptMeshlets.resize(meshletCount);
@@ -143,8 +143,9 @@ float MeshOptimizer::SimplifyMesh(
 	bool hasUV = _vertex[0].uv.has_value();
 	bool hasNormal = _vertex[0].normal.has_value();
 	size_t indexCount = 0;
+	uint32_t indexOffset = _outVertex.size();
 	
-	// fill _vertex into flat form
+	// fill _vertex into flat format
 	srcVerts.resize(_vertex.size());
 	for (size_t i = 0; i < _vertex.size(); ++i)
 	{
@@ -183,10 +184,9 @@ float MeshOptimizer::SimplifyMesh(
 		FLT_MAX,
 		meshopt_SimplifyLockBorder | meshopt_SimplifyPermissive,
 		&error);
-
-	// try simplify more aggressively
 	if (indexCount > _targetIndexCount)
 	{
+		// try simplify more aggressively
 		dstVerts = srcVerts;
 		dstIndex = _index;
 		indexCount = meshopt_simplifyWithUpdate(
@@ -207,16 +207,39 @@ float MeshOptimizer::SimplifyMesh(
 	}
 	dstIndex.resize(indexCount);
 
+	// reduce unused vertices
 	std::swap(dstVerts, srcVerts);
-	//meshopt_optimizeVertexFetch(
-	//	dstVerts.data(),
-	//	dstIndex.data(),
-	//	dstIndex.size(),
-	//	srcVerts.data(),
-	//)
+	size_t vertCount = meshopt_optimizeVertexFetch(
+		dstVerts.data(),
+		dstIndex.data(),
+		dstIndex.size(),
+		srcVerts.data(),
+		srcVerts.size(),
+		sizeof(FlatVertex));
+	dstVerts.resize(vertCount);
 
-	_outVertex.resize(_vertex.size());
-	_outIndex.resize(_index.size());
+	for (size_t i = 0; i < dstIndex.size(); ++i)
+	{
+		// _outVertex may already has vertices inside, so we need to add offset to index buffer
+		dstIndex[i] += indexOffset;
+	}
+	_outIndex.insert(_outIndex.end(), dstIndex.begin(), dstIndex.end());
+
+	for (size_t i = 0; i < dstVerts.size(); ++i)
+	{
+		const auto& flatVert = dstVerts[i];
+		Vertex vert{};
+		vert.position = glm::vec3(flatVert.data[0], flatVert.data[1], flatVert.data[2]);
+		if (hasUV)
+		{
+			vert.uv = glm::vec2(flatVert.data[3], flatVert.data[4]);
+		}
+		if (hasNormal)
+		{
+			vert.normal = glm::normalize(glm::vec3(flatVert.data[5], flatVert.data[6], flatVert.data[7]));
+		}
+		_outVertex.push_back(vert);
+	}
 
     return error;
 }
@@ -238,8 +261,8 @@ void MeshOptimizer::OptimizeMesh(std::vector<Vertex>& _vertex, std::vector<uint3
 			const Vertex& lv = _vertex[l];
 			const Vertex& rv = _vertex[r];
 			return lv == rv;
-		}
-	);
+		});
+
 	dstIndices.resize(indexCount);
 	dstVerts.resize(vertexCount);
 	meshopt_remapVertexBuffer(dstVerts.data(), _vertex.data(), _vertex.size(), sizeof(Vertex), remap.data());

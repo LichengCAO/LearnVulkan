@@ -17,13 +17,18 @@ public:
 	// _index: index of the part of the mesh we want to build meshlet for
 	// _outMeshletData: data used by meshlet to get indices of the original mesh
 	// _outMeshlet: each element is an interval of _outMeshletVertex, _outMeshletLocalIndex that presents a meshlet
+	// _maxPrimitiveCount: max primitive/triangle count of each meshlet
+	// _maxIndexCount: max index count of each meshlet
 	void BuildMeshlets(
 		const std::vector<Vertex>& _vertex,
 		const std::vector<uint32_t>& _index,
 		MeshletData& _outMeshletData,
-		std::vector<Meshlet>& _outMeshlet) const;
+		std::vector<Meshlet>& _outMeshlet,
+		size_t _maxPrimitiveCount = 124,
+		size_t _maxIndexCount = 64) const;
 
 	// Simplify mesh/meshlet while leaving border intact,
+	// use original vertices to draw simplified mesh
 	// return relative error from the original mesh
 	// _vertex: vertices of the original mesh
 	// _index: indices of the orignal mesh
@@ -35,7 +40,8 @@ public:
 		size_t _targetIndexCount,
 		std::vector<uint32_t>& _outIndex) const;
 
-	// Simplify mesh/meshlet while leaving border intact,
+	// Simplify mesh/meshlet while leaving border intact, 
+	// generate a new set of vertices used to draw simplified mesh
 	// return relative error from the original mesh
 	// _vertex: vertices of the original mesh
 	// _index: indices of the orignal mesh
@@ -66,7 +72,10 @@ public:
 
 	// Remove duplication of vertices based on _equal
 	template<typename T>
-	void RemoveDuplication(std::vector<T>& _vertex, std::vector<uint32_t>& _index, std::function<bool(const T&, const T&)> _equal) const 
+	void RemoveDuplication(
+		std::vector<T>& _vertex, 
+		std::vector<uint32_t>& _index, 
+		std::function<bool(const T&, const T&)> _equal) const 
 	{
 		std::vector<uint32_t> remap(std::max(_vertex.size(), _index.size()));
 		std::vector<uint32_t> dstIndices(_index.size());

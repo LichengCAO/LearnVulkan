@@ -93,6 +93,7 @@ void main()
 		s_uMeshletCount = 0u;
 		OUT.baseMeshletId = uBaseID;
 	}
+	memoryBarrierShared();
 	barrier();
 	
 	for (uint i = 0u; i < MESHLETS_PER_TASK_INVOCATION; i++)
@@ -106,6 +107,7 @@ void main()
 		uCurrentMeshletIdSlot = atomicAdd(s_uMeshletCount, 1u);
 		OUT.meshletIdOffset[uCurrentMeshletIdSlot] = uint8_t(uLaneID + i);
 	}
+	memoryBarrierShared();
 	barrier();
 
 	// Defines the mesh workgroup size for this task workgroup (NOT task invocation)
