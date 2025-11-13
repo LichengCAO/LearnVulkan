@@ -87,6 +87,21 @@ vec3 randomColor(uint seed) {
     return vec3(r, g, b); // Return the generated color
 }
 
+void GetTriangleIndex(in Meshlet _meshlet, in uint _primitiveIndex, out uvec3 _meshletIndices)
+{
+	uint begin = _meshlet.triangleOffset + _primitiveIndex * 3;
+	_meshletIndices = uvec3(
+		meshletTriangles[begin + 0],
+		meshletTriangles[begin + 1],
+		meshletTriangles[begin + 2]
+	);
+}
+
+uint GetMeshVertexIndex(in Meshlet _meshlet, in uint _meshletIndex)
+{
+	return meshletVertices[_meshlet.vertexOffset + _meshletIndex];
+}
+
 void main()
 {
 	Meshlet vecMeshlets[MESHLETS_PER_MESH_WORKGROUP]; // all meshlets processed by parent workgroup
@@ -117,12 +132,12 @@ void main()
 	SetMeshOutputsEXT(uWorkGroupOutputVertexCount, uWorkGroupOutputPrimitiveCount);
 	
 	// Emit meshlet vertices and triangles
-	uint uMeshVerticesOffset = 0u; 		// for the case where we process more than one meshlet 
-										// in a work group, ignore it if we only have one 
-										// meshlet in each workgroup
-	uint uPrimitiveTriangleOffset = 0u; // for the case where we process more than one meshlet 
-										// in a work group, ignore it if we only have one meshlet 
-										// in each workgroup
+	uint uPreviousMeshletsVertCount = 0u; 	// for the case where we process more than one meshlet 
+											// in a work group, ignore it if we only have one 
+											// meshlet in each workgroup
+	uint uPreviousMeshletsPrimitiveCount = 0u; 	// for the case where we process more than one meshlet 
+												// in a work group, ignore it if we only have one meshlet 
+												// in each workgroup
 	for (uint i = 0u; i < uWorkGroupMeshlet; ++i)
 	{
 		// each mesh shader invocation doesn't process a complete meshlet, 
@@ -131,38 +146,41 @@ void main()
 		const vec3 color = randomColor(getMeshletID(i));
 		const uint uMeshletVertexCount = vecMeshlets[i].vertexCount;
 		const uint uMeshletPrimitiveCount = vecMeshlets[i].triangleCount;
-		const uint uMeshletVertexOffset = vecMeshlets[i].vertexOffset;
-		const uint uMeshletTriangleOffset = vecMeshlets[i].triangleOffset;
 
 		for (uint j = 0u; j < VERTEX_ITERATION_COUNT; ++j)
 		{
-			uint uMeshletLocalVertexIndex = uThreadVertexOffset + j; // the index of the vertex in the meshlet
-			if (uMeshletLocalVertexIndex >= uMeshletVertexCount)
-				break; // prevent out of bounds access
+			uint uMeshletVertexIndex = uThreadVertexOffset + j; // the index of the vertex in the meshlet
+			uint uMeshVertexIndex;
 			
-			uint uGlobalVertexIndex = meshletVertices[uMeshletVertexOffset + uMeshletLocalVertexIndex];
-			VBO vertex = getVertex(uGlobalVertexIndex);
+			// prevent out of bounds access
+			if (uMeshletVertexIndex >= uMeshletVertexCount) 
+				break; 
 			
-			gl_MeshVerticesEXT[uMeshletLocalVertexIndex + uMeshVerticesOffset].gl_Position = ubo.proj * ubo.view * modelUBO.model * vec4(vertex.position, 1.0);
-			v_out[uMeshletLocalVertexIndex + uMeshVerticesOffset].colorRGB = normalize(modelUBO.inverseTransposeModel * vec4(vertex.normal, 0)).xyz * 0.5 + 0.5;
+			uMeshVertexIndex = GetMeshVertexIndex(vecMeshlets[i], uMeshletVertexIndex);
+			
+			VBO vertex = getVertex(uMeshVertexIndex);
+			gl_MeshVerticesEXT[uMeshletVertexIndex + uPreviousMeshletsVertCount].gl_Position = ubo.proj * ubo.view * modelUBO.model * vec4(vertex.position, 1.0);
+			v_out[uMeshletVertexIndex + uPreviousMeshletsVertCount].colorRGB = normalize(modelUBO.inverseTransposeModel * vec4(vertex.normal, 0)).xyz * 0.5 + 0.5;
 		}
 
 		for (uint j = 0u; j < PRIMITIVE_ITERATION_COUNT; ++j)
 		{
-			uint uMeshletLocalPrimitiveIndex = uThreadPrimitiveOffset + j; // the index of the primitive in the meshlet
-			if (uMeshletLocalPrimitiveIndex >= uMeshletPrimitiveCount)
-				break; // prevent out of bounds access
+			uint uMeshletPrimitiveIndex = uThreadPrimitiveOffset + j; // the index of the primitive in current meshlet
+			uvec3 u3MeshletTriangle;
+
+			// prevent out of bounds access
+			if (uMeshletPrimitiveIndex >= uMeshletPrimitiveCount) 
+				break;
 			
-			uint uGlobalTriangleOffset = uMeshletTriangleOffset + uMeshletLocalPrimitiveIndex * 3;
+			GetTriangleIndex(vecMeshlets[i], uMeshletPrimitiveIndex, u3MeshletTriangle);
 			
-			gl_PrimitiveTriangleIndicesEXT[uMeshletLocalPrimitiveIndex + uPrimitiveTriangleOffset] = uvec3(
-				meshletTriangles[uGlobalTriangleOffset + 0] + uMeshVerticesOffset,
-				meshletTriangles[uGlobalTriangleOffset + 1] + uMeshVerticesOffset,
-				meshletTriangles[uGlobalTriangleOffset + 2] + uMeshVerticesOffset
-			);
+			// indices of vertices emit by gl_MeshVerticesEXT of this workgroup
+			gl_PrimitiveTriangleIndicesEXT[uMeshletPrimitiveIndex + uPreviousMeshletsPrimitiveCount] = 
+				u3MeshletTriangle + 
+				uvec3(uPreviousMeshletsVertCount,uPreviousMeshletsVertCount,uPreviousMeshletsVertCount);
 		}
 
-		uMeshVerticesOffset += uMeshletVertexCount;
-		uPrimitiveTriangleOffset += uMeshletPrimitiveCount;
+	 	uPreviousMeshletsVertCount += uMeshletVertexCount;
+		uPreviousMeshletsPrimitiveCount += uMeshletPrimitiveCount;
 	}
 }
