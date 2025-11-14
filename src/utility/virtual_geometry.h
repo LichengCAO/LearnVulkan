@@ -59,18 +59,15 @@ private:
 		// parent meshlets whose LOD is lower, that is, the original meshlet of the group this meshlet built from, 
 		// LOD0 meshlets don't have parent, basically parent meshlets are the whole meshlets of a group before simplification
 		std::vector<uint32_t> parents;
+
+		// Describes error of a meshlet(cluster)
+		// use for culling and decide LOD
+		glm::vec4 boundingSphere;	// xyz: position, w: radius
+		float clusterError;			// all siblings should have the same cluster error
+		float groupError;			// all classmates should have the same group error
 	};
 
 public:
-	// Describes error of a meshlet(cluster)
-	// use for culling and decide LOD
-	struct ErrorInfo
-	{
-		// groupError > clusterError
-		float clusterError;	// all siblings should have the same cluster error
-		float groupError;	// all classmates should have the same group error
-		glm::vec4 boundingSphere;	// xyz: position, w: radius
-	};
 	// Use for upload page data
 	struct GroupData
 	{
@@ -81,7 +78,7 @@ public:
 
 private:
 	const StaticMesh* m_pBaseMesh = nullptr;
-	std::vector<ErrorInfo> m_errorInfo;				// error information of simplified meshlet
+	std::vector<StaticMesh> m_lodMesh; // LOD0 meshlets are built from m_pBaseMesh, higher LOD meshlets are built from simplified triangles of lower LOD meshlets
 	std::vector<MeshletData> m_meshletTable;		// meshlet table for different LODs
 	std::vector<std::vector<MyMeshlet>> m_meshlets;	// meshlets of different LODs
 	std::vector<uint32_t> m_realToVirtual;			// maps real index to virtual index based on vertex positions, virtual index points
@@ -93,6 +90,8 @@ private:
 	//const std::vector<Vertex>& _GetVertices(uint32_t _lod) { return m_pBaseMesh->verts; };
 	//const std::vector<uint32_t>& _GetIndices(uint32_t _lod) { return m_pBaseMesh->indices; };
 private:
+	const std::vector<Vertex>& _GetVertices(uint32_t _lod) const { return m_pBaseMesh->verts; };
+
 	// Add MyMeshlet objects, note it will also update parent MyMeshlet's child attribute
 	// _lod: LOD of new meshlets
 	// _error: error when simplifiy triangles to serve as the input to build new meshlets

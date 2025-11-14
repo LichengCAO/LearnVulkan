@@ -218,13 +218,7 @@ float MeshOptimizer::SimplifyMesh(
 		sizeof(FlatVertex));
 	dstVerts.resize(vertCount);
 
-	for (size_t i = 0; i < dstIndex.size(); ++i)
-	{
-		// _outVertex may already has vertices inside, so we need to add offset to index buffer
-		dstIndex[i] += indexOffset;
-	}
-	_outIndex.insert(_outIndex.end(), dstIndex.begin(), dstIndex.end());
-
+	_outVertex.reserve(_outVertex.size() + dstVerts.size());
 	for (size_t i = 0; i < dstVerts.size(); ++i)
 	{
 		const auto& flatVert = dstVerts[i];
@@ -240,6 +234,13 @@ float MeshOptimizer::SimplifyMesh(
 		}
 		_outVertex.push_back(vert);
 	}
+
+	for (size_t i = 0; i < dstIndex.size(); ++i)
+	{
+		// _outVertex may already has vertices inside, so we need to add offset to index buffer
+		dstIndex[i] += indexOffset;
+	}
+	_outIndex.insert(_outIndex.end(), dstIndex.begin(), dstIndex.end());
 
     return error;
 }

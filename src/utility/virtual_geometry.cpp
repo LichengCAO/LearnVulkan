@@ -15,9 +15,9 @@ void VirtualGeometry::_AddMyMeshlet(
 	auto& vectorToAdd = m_meshlets[_lod];
 	uint32_t firstIndex = vectorToAdd.size();
 	uint32_t numAdded = _newMeshlets.size();
-	uint32_t errorId = m_errorInfo.size();
-	float parentGroupError = 0.0f;
-	ErrorInfo errorInfo{};
+	float parentMaxClusterError = 0.0f; // maximum of all parents' cluster error
+	float clusterError = 0.0f; // all siblings have the same cluster error
+	MeshOptimizer optimizer{};
 	
 	if (_pFirstIndex != nullptr)
 	{
@@ -28,16 +28,35 @@ void VirtualGeometry::_AddMyMeshlet(
 		*_pNumAdded = numAdded;
 	}
 
+	// find maximum parent cluster error
+	if (_lod > 0)
+	{
+		uint32_t parentLod = _lod - 1;
+		for (size_t i = 0; i < _parents.size(); ++i)
+		{
+			const MyMeshlet& parentMeshlet = m_meshlets[parentLod][_parents[i]];
+			parentMaxClusterError = std::max(parentMaxClusterError, parentMeshlet.clusterError);
+		}
+	}
+	clusterError = _error + parentMaxClusterError;
+
+	// fill in new myMeshlets
 	for (uint32_t i = 0; i < numAdded; ++i)
 	{
 		MyMeshlet myMeshlet{};
+		std::vector<uint32_t> indices;
 
+		_newMeshlets[i].GetIndices(m_meshletTable[_lod], indices);
+		auto bounds = optimizer.ComputeBounds(_GetVertices(_lod), indices);
+		
 		myMeshlet.eldsetSibling = firstIndex;
 		myMeshlet.siblingCount = numAdded;
-		myMeshlet.errorId = errorId;
 		myMeshlet.lod = _lod;
 		myMeshlet.meshlet = _newMeshlets[i];
 		myMeshlet.parents = _parents;
+		myMeshlet.boundingSphere = glm::vec4(bounds.center, bounds.radius);
+		myMeshlet.clusterError = clusterError;
+		myMeshlet.groupError = 99.0f; // to be filled later by its children
 
 		vectorToAdd.push_back(myMeshlet);
 	}
@@ -46,25 +65,13 @@ void VirtualGeometry::_AddMyMeshlet(
 	if (_lod > 0)
 	{
 		uint32_t parentLod = _lod - 1;
-		MeshOptimizer optimizer{};
-		std::vector<uint32_t> parentIndices;
-		std::vector<Vertex>* pVert = nullptr;
-		std::vector<uint32_t>* pindex = nullptr;
 		for (size_t i = 0; i < _parents.size(); ++i)
 		{
 			MyMeshlet& parentMeshlet = m_meshlets[parentLod][_parents[i]];
-			const ErrorInfo& parentErrorInfo = m_errorInfo[parentMeshlet.errorId];
 			parentMeshlet.child = firstIndex;
-			parentGroupError = std::max(parentGroupError, parentErrorInfo.error);
-			parentMeshlet.meshlet.GetIndices(m_meshletTable[parentLod], parentIndices);
+			parentMeshlet.groupError = clusterError; // all parents have the same group error
 		}
-
-		errorInfo.bounds = optimizer.ComputeBounds(m_pBaseMesh->verts, parentIndices);
 	}
-
-	// update error info
-	errorInfo.error = _error + parentGroupError; // so that parent error will always be smaller than child error
-	m_errorInfo.push_back(errorInfo);
 }
 
 // TODO: improve this

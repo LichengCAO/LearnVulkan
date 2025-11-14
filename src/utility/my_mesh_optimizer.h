@@ -30,6 +30,7 @@ public:
 	// Simplify mesh/meshlet while leaving border intact,
 	// use original vertices to draw simplified mesh
 	// return relative error from the original mesh
+	// previous elements in _outIndex will remain intact
 	// _vertex: vertices of the original mesh
 	// _index: indices of the orignal mesh
 	// _targetIndexCount: target index number returned may not reach this
@@ -42,11 +43,12 @@ public:
 
 	// Simplify mesh/meshlet while leaving border intact, 
 	// generate a new set of vertices used to draw simplified mesh
-	// return relative error from the original mesh
+	// return relative error from the original mesh,
+	// previous elements in _outVertex and _outIndex will remain intact
 	// _vertex: vertices of the original mesh
 	// _index: indices of the orignal mesh
 	// _targetIndexCount: target index number returned may not reach this
-	// _outVertex: output simplified vertices
+	// _outVertex: output simplified vertices 
 	// _outIndex: output simplified index, can draw new mesh with _outVertex
 	float SimplifyMesh(
 		const std::vector<Vertex>& _vertex,
