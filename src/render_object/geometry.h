@@ -21,35 +21,52 @@ struct StaticMesh final
 	std::vector<uint32_t> indices;
 };
 
-struct MeshletData
+class Meshlet final
 {
-	std::vector<uint32_t> meshletVertices;	// stores the vertex index of the original static mesh
-	std::vector<uint8_t>	meshletIndices;		// stores indices of meshletVertices that forms triangles, 3 in a group
-};
+public:
+	// GPU friendly compact meshlet data
+	struct DeviceData
+	{
+		std::vector<uint32_t> meshletVertices;	// stores the vertex index of the original static mesh
+		std::vector<uint8_t> meshletIndices;	// stores indices of meshletVertices that forms triangles, 3 in a group
+	};
+	// GPU friendly form of meshlet, pointing to data in Meshlet::DeviceData
+	// To get ith triangle verts:
+	// first find "meshlet index": Meshlet::DeviceData.meshletIndices[indexOffset + i * 3 + 0/1/2];
+	// then find vertices in original mesh: Meshlet::DeviceData.meshletVertices["meshlet index" + vertexOffset];
+	struct DeviceDataRef
+	{
+		uint32_t vertexOffset;
+		uint32_t vertexCount;
+		uint32_t indexOffset;
+		uint32_t triangleCount;
+	};
 
-struct Meshlet final
-{
-	uint32_t vertexOffset;
-	uint32_t vertexCount;
+public:
+	std::vector<uint32_t> vertices;
+	std::vector<uint8_t> index;
 
-	uint32_t triangleOffset;
-	uint32_t triangleCount;
-
+public:
 	// Get number _index triangle of this meshlet
 	// _index: the index of the triangle in this meshlet, start from 0
-	// _meshletData: meshlet data we get when build meshlets
 	// _outTriangle: indices of vertices of original mesh that builds the triangle
-	void GetTriangle(
-		uint32_t _index,
-		const MeshletData& _meshletData,
-		std::array<uint32_t, 3>& _outTriangle) const;
+	void GetTriangle(uint32_t _index, std::array<uint32_t, 3>& _outTriangle) const;
 
 	// Get indices of this meshlet and push them into output, data already stored will be intact
-	// _meshletData: meshlet data we get when build meshlets
 	// _outIndices: indices of this meshlet, we can use this as index buffer to draw meshlet with the original mesh's vertex buffer,
-	void GetIndices(
-		const MeshletData& _meshletData,
-		std::vector<uint32_t>& _outIndices) const;
+	void GetIndices(std::vector<uint32_t>& _outIndices) const;
+
+	// Compress the input meshlet, and add it to GPU friendly data
+	// the original _outData and _outRef remains intact
+	static void CompressToDeviceData(
+		const Meshlet& _meshlet,
+		Meshlet::DeviceData& _outData,
+		std::vector<Meshlet::DeviceDataRef>& _outRef);
+
+	// Get meshlet from device data
+	static Meshlet GetFromDeviceData(
+		const Meshlet::DeviceData& _data,
+		const Meshlet::DeviceDataRef& _ref);
 };
 
 struct MeshletBounds

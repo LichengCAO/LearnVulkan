@@ -3,7 +3,22 @@
 #include "utils.h"
 #include <unordered_set>
 #include <functional>
+#include <numeric>
  
+std::vector<Vertex>& VirtualGeometry::_GetIncompleteVertices(uint32_t _lod)
+{
+	while (_lod >= m_lodVerts.size())
+	{
+		m_lodVerts.push_back({});
+	}
+	return m_lodVerts[_lod];
+}
+
+const std::vector<Vertex>& VirtualGeometry::_GetCompleteVertices(uint32_t _lod) const
+{
+	return m_lodVerts[_lod];
+}
+
 void VirtualGeometry::_AddMyMeshlet(
 	uint32_t _lod, 
 	float _error, 
@@ -46,8 +61,8 @@ void VirtualGeometry::_AddMyMeshlet(
 		MyMeshlet myMeshlet{};
 		std::vector<uint32_t> indices;
 
-		_newMeshlets[i].GetIndices(m_meshletTable[_lod], indices);
-		auto bounds = optimizer.ComputeBounds(_GetVertices(_lod), indices);
+		_newMeshlets[i].GetIndices(indices);
+		auto bounds = optimizer.ComputeBounds(_GetCompleteVertices(_lod), indices);
 		
 		myMeshlet.eldsetSibling = firstIndex;
 		myMeshlet.siblingCount = numAdded;
@@ -146,47 +161,58 @@ uint32_t VirtualGeometry::_GetVirtualIndex(uint32_t _realIndex) const
 	//return m_realToVirtual[_realIndex];
 }
 
-void VirtualGeometry::_FindMeshletBoundary(
-	const MeshletData& _meshletData, 
-	const Meshlet& _meshlet, 
-	std::set<std::pair<uint32_t, uint32_t>>& _boundaries) const
+void VirtualGeometry::_FindMeshletsBorder(uint32_t _lod)
 {
-	std::unordered_map<std::pair<uint32_t, uint32_t>, uint32_t, common_utils::PairHash> edgeSeen;
-	uint32_t n = _meshlet.triangleCount;
+	MeshOptimizer optimizer{};
+	std::vector<uint32_t> originIndex(_GetCompleteVertices(_lod).size());
+	std::vector<uint32_t> remapIndex(_GetCompleteVertices(_lod).size()); // remap the index based on position
+	
+	std::iota(originIndex.begin(), originIndex.end(), 0);
+	optimizer.RemapIndex(_GetCompleteVertices(_lod), originIndex, remapIndex);
 
-	for (uint32_t i = 0; i < n; ++i)
+	// for each meshlet of this LOD find its border
+	for (size_t i = 0; i < m_meshlets[_lod].size(); ++i)
 	{
-		std::array<uint32_t, 3> indices;
-		std::array<std::pair<uint32_t, uint32_t>, 3> sides;
-
-		_meshlet.GetTriangle(i, _meshletData, indices);
-		sides[0] = { _GetVirtualIndex(indices[0]), _GetVirtualIndex(indices[1]) };
-		sides[1] = { _GetVirtualIndex(indices[1]), _GetVirtualIndex(indices[2]) };
-		sides[2] = { _GetVirtualIndex(indices[2]), _GetVirtualIndex(indices[0]) };
-
-		for (int j = 0; j < 3; ++j)
+		std::unordered_map<std::pair<uint32_t, uint32_t>, uint32_t, common_utils::PairHash> edgeSeen;
+		MyMeshlet& myMeshlet = m_meshlets[_lod][i];
+		const Meshlet& meshlet = myMeshlet.meshlet;
+		 
+		// iterate all triangle of current meshlet
+		for (uint32_t j = 0; j < meshlet.index.size() / 3; ++j)
 		{
-			uint32_t head = std::min(sides[j].first, sides[j].second);
-			uint32_t tail = std::max(sides[j].first, sides[j].second);
+			std::array<uint32_t, 3> indices;
+			std::array<std::pair<uint32_t, uint32_t>, 3> edge;
 
-			sides[j] = { head, tail };
-			if (edgeSeen.find(sides[j]) == edgeSeen.end())
+			meshlet.GetTriangle(j, indices);
+			edge[0] = { remapIndex[indices[0]], remapIndex[indices[1]] };
+			edge[1] = { remapIndex[indices[1]], remapIndex[indices[2]] };
+			edge[2] = { remapIndex[indices[2]], remapIndex[indices[0]] };
+
+			for (int k = 0; k < 3; ++k)
 			{
-				edgeSeen.insert({ sides[j], 1 });
-			}
-			else
-			{
-				edgeSeen[sides[j]] = edgeSeen[sides[j]] + 1;
+				auto& currentEdge = edge[k];
+				uint32_t head = std::min(currentEdge.first, currentEdge.second);
+				uint32_t tail = std::max(currentEdge.first, currentEdge.second);
+
+				currentEdge = { head, tail };
+				if (edgeSeen.find(currentEdge) == edgeSeen.end())
+				{
+					edgeSeen.insert({ currentEdge, 1 });
+				}
+				else
+				{
+					edgeSeen[currentEdge] += 1;
+				}
 			}
 		}
-	}
 
-	for (const auto& p : edgeSeen)
-	{
-		// shows up only once
-		if (p.second == 1)
+		// find edges shows up only once as border of current meshlet
+		for (const auto& edgeAndCount : edgeSeen)
 		{
-			_boundaries.insert(p.first);
+			if (edgeAndCount.second == 1)
+			{
+				myMeshlet.boundaries.insert(edgeAndCount.first);
+			}
 		}
 	}
 }
@@ -239,7 +265,10 @@ void VirtualGeometry::_RecordMeshletConnections(uint32_t _lod)
 	}
 }
 
-bool VirtualGeometry::_DivideMeshletGroup(uint32_t _lod, uint32_t _groupCount, std::vector<std::vector<uint32_t>>& _meshletGroups) const
+bool VirtualGeometry::_DivideMeshletGroup(
+	uint32_t _lod, 
+	uint32_t _groupCount, 
+	std::vector<std::vector<uint32_t>>& _meshletGroups) const
 {
 	std::vector<idx_t> xadj;
 	std::vector<idx_t> adjncy;
@@ -294,21 +323,28 @@ bool VirtualGeometry::_DivideMeshletGroup(uint32_t _lod, uint32_t _groupCount, s
 }
 
 float VirtualGeometry::_SimplifyGroupTriangles(
-	uint32_t _lod, 
-	const std::vector<uint32_t>& _meshletGroup, 
+	uint32_t _srcLod, 
+	const std::vector<uint32_t>& _meshletGroup,
+	std::vector<Vertex>& _outVerts,
 	std::vector<uint32_t>& _outIndex) const
 {
 	std::vector<uint32_t> meshletIndex;
+	std::vector<Vertex> updatedVerts;
 	MeshOptimizer optimizer{};
 	float error = 0.0f;
 
 	for (size_t i = 0; i < _meshletGroup.size(); ++i)
 	{
-		const auto& meshlet = m_meshlets[_lod][_meshletGroup[i]].meshlet;
-		meshlet.GetIndices(m_meshletTable[_lod], meshletIndex);
+		const auto& meshlet = m_meshlets[_srcLod][_meshletGroup[i]].meshlet;
+		meshlet.GetIndices(meshletIndex);
 	}
 
-	error = optimizer.SimplifyMesh(m_pBaseMesh->verts, meshletIndex, meshletIndex.size() / 2, _outIndex);
+	error = optimizer.SimplifyMesh(
+		_GetCompleteVertices(_srcLod),
+		meshletIndex, 
+		meshletIndex.size() / 2, 
+		_outVerts,
+		_outIndex);
 
 	return error;
 }
@@ -316,11 +352,10 @@ float VirtualGeometry::_SimplifyGroupTriangles(
 void VirtualGeometry::_BuildMeshletFromGroup(
 	const std::vector<Vertex>& _vertex,
 	const std::vector<uint32_t>& _index, 
-	MeshletData& _meshletData, 
 	std::vector<Meshlet>& _meshlet) const
 {
 	MeshOptimizer optimizer{};
-	optimizer.BuildMeshlets(_vertex, _index, _meshletData, _meshlet);
+	optimizer.BuildMeshlets(_vertex, _index, _meshlet);
 }
 
 void VirtualGeometry::PresetStaticMesh(const StaticMesh& _original)
@@ -335,7 +370,6 @@ void VirtualGeometry::Init()
 	MeshOptimizer optimizer{};
 	std::vector<std::vector<uint32_t>> meshletGroups;
 	m_meshlets.resize(maxLOD + 1);
-	m_meshletTable.resize(maxLOD + 1);
 
 	std::cout << "Start build virtual geometry..." << std::endl;
 	std::cout << "===============================" << std::endl;
@@ -350,10 +384,12 @@ void VirtualGeometry::Init()
 			uint32_t numAdded;
 
 			std::cout << "Start build LOD " << i << " meshlets...";
-			optimizer.BuildMeshlets(m_pBaseMesh->verts, m_pBaseMesh->indices, m_meshletTable[i], meshlets);
+			optimizer.BuildMeshlets(m_pBaseMesh->verts, m_pBaseMesh->indices, meshlets);
+			_GetIncompleteVertices(i) = m_pBaseMesh->verts;
 			_AddMyMeshlet(i, 0.0f, meshlets, {}, &firstIndx, &numAdded);
+			std::cout << "triangle count: " << m_pBaseMesh->indices.size() / 3;
+			std::cout << ", vertex count: " << _GetCompleteVertices(i).size() << std::endl;
 			std::cout << "DONE, meshlets added: " << numAdded << std::endl;
-			std::cout << "Triangle count: " << m_pBaseMesh->indices.size() / 3 << std::endl;
 		}
 		else
 		{
@@ -361,38 +397,44 @@ void VirtualGeometry::Init()
 			// For each simplified group, break them apart into new meshlets
 			uint32_t firstIndx;
 			uint32_t numAdded = 0u;
+			uint32_t subNumAdded;
 			uint32_t numTrig = 0u;
+			std::vector<std::vector<uint32_t>> groupIndices;
+			std::vector<float> simplifyError;
 
 			std::cout << "Start build LOD " << i << " meshlets...";
 			for (const auto& group : meshletGroups)
 			{
 				std::vector<uint32_t> simplifiedIndex;
-				std::vector<Meshlet> meshlets{};
-				uint32_t subNumAdded;
-
+				float error = 0.0f;
+				
 				// For each group of meshlets, build a new list of triangles approximating the original group
-				float error = _SimplifyGroupTriangles(i - 1, group, simplifiedIndex);
-
-				if (simplifiedIndex.size() == 0) continue;
-				// For each simplified group, break them apart into new meshlets
-				_BuildMeshletFromGroup(m_pBaseMesh->verts, simplifiedIndex, m_meshletTable[i], meshlets);
-
-				_AddMyMeshlet(i, error, meshlets, group, &firstIndx, &subNumAdded);
-				numAdded += subNumAdded;
+				error = _SimplifyGroupTriangles(i - 1, group, _GetIncompleteVertices(i), simplifiedIndex);
 				numTrig += simplifiedIndex.size() / 3;
+				groupIndices.push_back(simplifiedIndex);
+				simplifyError.push_back(error);
+			}
+			std::cout << "triangle count: " << numTrig;
+			std::cout << ", vertex count: " << _GetCompleteVertices(i).size() << std::endl;
+
+			for (size_t j = 0; j < groupIndices.size(); ++j)
+			{
+				std::vector<Meshlet> meshlets{};
+				const auto& simplifiedIndices = groupIndices[j];
+				float error = simplifyError[j];
+				
+				_BuildMeshletFromGroup(_GetCompleteVertices(i), simplifiedIndices, meshlets);
+				_AddMyMeshlet(i, error, meshlets, meshletGroups[j], &firstIndx, &subNumAdded);
+				numAdded += subNumAdded;
 			}
 			std::cout << "DONE, meshlets added: " << numAdded << std::endl;
-			std::cout << "Triangle count: " << numTrig << std::endl;
 		}
 
 		// if LOD reaches max we don't need to group meshlet any more, break;
 		if (m_meshlets[i].size() <= 1) break;
 
 		// For each meshlet, find the set of all edges making up the triangles within the meshlet
-		for (int j = 0; j < m_meshlets[i].size(); ++j)
-		{
-			_FindMeshletBoundary(m_meshletTable[i], m_meshlets[i][j].meshlet, m_meshlets[i][j].boundaries);
-		}
+		_FindMeshletsBorder(i);
 
 		// For each meshlet, find the set of connected meshlets(sharing an edge)
 		_RecordMeshletConnections(i);
@@ -400,7 +442,6 @@ void VirtualGeometry::Init()
 		// Divide meshlets into groups of roughly 8
 		meshletGroups.clear();
 		std::cout << "Start LOD " << i << " meshlets partition...";
-		uint32_t div = 8 << i;
 		uint32_t groupCount = m_meshlets[i].size() / 8;
 		groupCount = groupCount > 0 ? groupCount : 1;
 		auto divideSuccess = _DivideMeshletGroup(i, groupCount, meshletGroups);
@@ -409,7 +450,6 @@ void VirtualGeometry::Init()
 		if (!divideSuccess)
 		{
 			m_meshlets.resize(i + 1);
-			m_meshletTable.resize(i + 1);
 			std::cout << "ERROR: Cannot divide meshlet groups, break!" << std::endl;
 			break;
 		}

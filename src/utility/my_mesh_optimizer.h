@@ -22,7 +22,13 @@ public:
 	void BuildMeshlets(
 		const std::vector<Vertex>& _vertex,
 		const std::vector<uint32_t>& _index,
-		MeshletData& _outMeshletData,
+		Meshlet::DeviceData& _outMeshletData,
+		std::vector<Meshlet::DeviceDataRef>& _outMeshlet,
+		size_t _maxPrimitiveCount = 124,
+		size_t _maxIndexCount = 64) const;
+	void BuildMeshlets(
+		const std::vector<Vertex>& _vertex,
+		const std::vector<uint32_t>& _index,
 		std::vector<Meshlet>& _outMeshlet,
 		size_t _maxPrimitiveCount = 124,
 		size_t _maxIndexCount = 64) const;
@@ -64,17 +70,20 @@ public:
 	// Compute meshlet bounds for culling
 	MeshletBounds ComputeMeshletBounds(
 		const std::vector<Vertex>& _vertex,
-		const MeshletData& _meshletData,
 		const Meshlet& _meshlet) const;
+	MeshletBounds ComputeMeshletBounds(
+		const std::vector<Vertex>& _vertex,
+		const Meshlet::DeviceData& _meshletData,
+		const Meshlet::DeviceDataRef& _meshlet) const;
 
 	// Compute boundary of cluster of mesh
 	MeshletBounds ComputeBounds(
 		const std::vector<Vertex>& _vertex,
 		const std::vector<uint32_t>& _index) const;
 
-	// Remove duplication of vertices based on _equal
+	// Remove duplicate vertices based on _equal
 	template<typename T>
-	void RemoveDuplication(
+	void RemoveDuplicateVertices(
 		std::vector<T>& _vertex, 
 		std::vector<uint32_t>& _index, 
 		std::function<bool(const T&, const T&)> _equal) const 
@@ -99,4 +108,27 @@ public:
 		_vertex = dstVerts;
 		_index = dstIndices;
 	};
+
+	// Map index to the first vertex
+	// whose first _equalByte bytes are equal to the 
+	// vertex that this index currently points to
+	// this function will not reorder triangles
+	// that _originalIndex represents
+	template<typename T>
+	void RemapIndex(
+		const std::vector<T>& _vertex,
+		const std::vector<uint32_t>& _originIndex,
+		std::vector<uint32_t>& _outIndex,
+		size_t _equalByte = sizeof(glm::vec3)) const
+	{
+		_outIndex.resize(_originIndex.size());
+		meshopt_generateShadowIndexBuffer(
+			_outIndex.data(), 
+			_originIndex.data(),
+			_originIndex.size(),
+			_vertex.data(), 
+			_vertex.size(), 
+			_equalByte,
+			sizeof(T));
+	}
 };

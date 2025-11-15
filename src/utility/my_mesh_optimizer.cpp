@@ -4,12 +4,12 @@
 void MeshOptimizer::BuildMeshlets(
 	const std::vector<Vertex>& _vertex, 
 	const std::vector<uint32_t>& _index, 
-	MeshletData& _outMeshletData, 
-	std::vector<Meshlet>& _outMeshlet,
+	Meshlet::DeviceData& _outMeshletData, 
+	std::vector<Meshlet::DeviceDataRef>& _outMeshlet,
 	size_t _maxPrimitiveCount, // must be divisible by 4
 	size_t _maxIndexCount) const
 {
-	std::vector<Meshlet> outMeshlets{};
+	std::vector<Meshlet::DeviceDataRef> outMeshlets{};
 	std::vector<uint32_t> outMeshletVertices{};
 	std::vector<uint8_t> outMeshletTriangles{};
 	std::vector<meshopt_Meshlet> meshoptMeshlets{};
@@ -43,10 +43,10 @@ void MeshOptimizer::BuildMeshlets(
 	// further optimize meshlets
 	for (const auto& m : meshoptMeshlets)
 	{
-		Meshlet outMeshlet{};
+		Meshlet::DeviceDataRef outMeshlet{};
 
 		outMeshlet.triangleCount = m.triangle_count;
-		outMeshlet.triangleOffset = m.triangle_offset + _outMeshletData.meshletIndices.size();
+		outMeshlet.indexOffset = m.triangle_offset + _outMeshletData.meshletIndices.size();
 		outMeshlet.vertexCount = m.vertex_count;
 		outMeshlet.vertexOffset = m.vertex_offset + _outMeshletData.meshletVertices.size();
 		meshopt_optimizeMeshlet(
@@ -60,6 +60,23 @@ void MeshOptimizer::BuildMeshlets(
 	_outMeshletData.meshletVertices.insert(_outMeshletData.meshletVertices.end(), outMeshletVertices.begin(), outMeshletVertices.end());
 	_outMeshletData.meshletIndices.insert(_outMeshletData.meshletIndices.end(), outMeshletTriangles.begin(), outMeshletTriangles.end());
 	_outMeshlet.insert(_outMeshlet.end(), outMeshlets.begin(), outMeshlets.end());
+}
+
+void MeshOptimizer::BuildMeshlets(
+	const std::vector<Vertex>& _vertex, 
+	const std::vector<uint32_t>& _index, 
+	std::vector<Meshlet>& _outMeshlet, 
+	size_t _maxPrimitiveCount, 
+	size_t _maxIndexCount) const
+{
+	Meshlet::DeviceData meshletData{};
+	std::vector<Meshlet::DeviceDataRef> meshletRefs;
+	BuildMeshlets(_vertex, _index, meshletData, meshletRefs, _maxPrimitiveCount, _maxIndexCount);
+
+	for (size_t i = 0; i < meshletRefs.size(); ++i)
+	{
+		_outMeshlet.push_back(Meshlet::GetFromDeviceData(meshletData, meshletRefs[i]));
+	}
 }
 
 float MeshOptimizer::SimplifyMesh(
@@ -290,17 +307,38 @@ void MeshOptimizer::OptimizeMesh(std::vector<Vertex>& _vertex, std::vector<uint3
 	_index = std::move(dstIndices);
 }
 
+MeshletBounds MeshOptimizer::ComputeMeshletBounds(const std::vector<Vertex>& _vertex, const Meshlet& _meshlet) const
+{
+	MeshletBounds retBounds{};
+	meshopt_Bounds bounds{};
+
+	bounds = meshopt_computeMeshletBounds(
+		_meshlet.vertices.data(),
+		_meshlet.index.data(),
+		_meshlet.index.size() / 3,
+		reinterpret_cast<const float*>(_vertex.data()),
+		_vertex.size(),
+		sizeof(Vertex));
+	retBounds.center = glm::vec3(bounds.center[0], bounds.center[1], bounds.center[2]);
+	retBounds.radius = bounds.radius;
+	retBounds.coneApex = glm::vec3(bounds.cone_apex[0], bounds.cone_apex[1], bounds.cone_apex[2]);
+	retBounds.coneAxis = glm::vec3(bounds.cone_axis[0], bounds.cone_axis[1], bounds.cone_axis[2]);
+	retBounds.coneCutoff = bounds.cone_cutoff;
+
+	return retBounds;
+}
+
 MeshletBounds MeshOptimizer::ComputeMeshletBounds(
 	const std::vector<Vertex>& _vertex,
-	const MeshletData& _meshletData, 
-	const Meshlet& _meshlet) const
+	const Meshlet::DeviceData& _meshletData, 
+	const Meshlet::DeviceDataRef& _meshlet) const
 {
 	MeshletBounds retBounds{};
 	meshopt_Bounds bounds{};
 
 	bounds = meshopt_computeMeshletBounds(
 		&_meshletData.meshletVertices[_meshlet.vertexOffset],
-		&_meshletData.meshletIndices[_meshlet.triangleOffset],
+		&_meshletData.meshletIndices[_meshlet.indexOffset],
 		_meshlet.triangleCount,
 		reinterpret_cast<const float*>(_vertex.data()),
 		_vertex.size(),

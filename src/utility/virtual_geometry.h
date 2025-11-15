@@ -73,13 +73,11 @@ public:
 	{
 		std::vector<Vertex> verts;
 		std::vector<Meshlet> meshlets;
-		MeshletData	meshletData;
 	};
 
 private:
 	const StaticMesh* m_pBaseMesh = nullptr;
-	std::vector<StaticMesh> m_lodMesh; // LOD0 meshlets are built from m_pBaseMesh, higher LOD meshlets are built from simplified triangles of lower LOD meshlets
-	std::vector<MeshletData> m_meshletTable;		// meshlet table for different LODs
+	std::vector<std::vector<Vertex>> m_lodVerts;	// LOD0 meshlets are built from m_pBaseMesh, higher LOD meshlets are built from simplified triangles of lower LOD meshlets
 	std::vector<std::vector<MyMeshlet>> m_meshlets;	// meshlets of different LODs
 	std::vector<uint32_t> m_realToVirtual;			// maps real index to virtual index based on vertex positions, virtual index points
 													// to a vertex in the static mesh that has the postion that differentiate this virtual index from others
@@ -90,7 +88,11 @@ private:
 	//const std::vector<Vertex>& _GetVertices(uint32_t _lod) { return m_pBaseMesh->verts; };
 	//const std::vector<uint32_t>& _GetIndices(uint32_t _lod) { return m_pBaseMesh->indices; };
 private:
-	const std::vector<Vertex>& _GetVertices(uint32_t _lod) const { return m_pBaseMesh->verts; };
+	// Get vertices when the current LOD of vertices are incomplete
+	std::vector<Vertex>& _GetIncompleteVertices(uint32_t _lod);
+
+	// Get vertices when the current LOD of vertices are complete
+	const std::vector<Vertex>& _GetCompleteVertices(uint32_t _lod) const;
 
 	// Add MyMeshlet objects, note it will also update parent MyMeshlet's child attribute
 	// _lod: LOD of new meshlets
@@ -131,11 +133,8 @@ private:
 	// return virtual index used to compare if the 2 vertices are same
 	uint32_t _GetVirtualIndex(uint32_t _realIndex) const;
 
-	// Find boundary of the meshlet, fill boundaries
-	void _FindMeshletBoundary(
-		const MeshletData& _meshletData,
-		const Meshlet& _meshlet, 
-		std::set<std::pair<uint32_t, uint32_t>>& _boundaries) const;
+	// Find borders of meshlets of a specific LOD
+	void _FindMeshletsBorder(uint32_t _lod);
 
 	// Find how many edges shared by meshlet pair, fill adjacentWeight
 	void _RecordMeshletConnections(uint32_t _lod);
@@ -150,12 +149,14 @@ private:
 		std::vector<std::vector<uint32_t>>& _meshletGroups) const;
 
 	// Simplify triangles in meshlet groups, return error compared to the original mesh
-	// _lod: lod of meshlets to group
+	// _srcLod: LOD of meshlets to simplify, which is one level lower than result LOD
 	// _meshletGroup: indices of meshlets in a group
+	// _outVerts: simplified vertices
 	// _outIndex: indices that build simplified triangles
 	float _SimplifyGroupTriangles(
-		uint32_t _lod,
+		uint32_t _srcLod,
 		const std::vector<uint32_t>& _meshletGroup,
+		std::vector<Vertex>& _outVerts,
 		std::vector<uint32_t>& _outIndex) const;
 
 	// Build new meshlets from simplified triangles in the group,
@@ -166,7 +167,6 @@ private:
 	void _BuildMeshletFromGroup(
 		const std::vector<Vertex>& _verts,
 		const std::vector<uint32_t>& _index,
-		MeshletData& _meshletData,
 		std::vector<Meshlet>& _meshlet) const;
 
 public:

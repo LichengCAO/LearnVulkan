@@ -1,24 +1,50 @@
 #include "geometry.h"
 
-void Meshlet::GetTriangle(uint32_t _index, const MeshletData& _meshletData, std::array<uint32_t, 3>& _outTriangle) const
+void Meshlet::GetTriangle(uint32_t _index, std::array<uint32_t, 3>& _outTriangle) const
 {
-	CHECK_TRUE(_index < triangleCount, "Triangle index out of range!");
-
-	for (int i = 0; i < 3; ++i)
+	for (size_t i = 0; i < 3; ++i)
 	{
-		uint8_t index = _meshletData.meshletIndices[triangleOffset + _index * 3 + i];
-		uint32_t vertexIndex = _meshletData.meshletVertices[vertexOffset + index];
-
-		_outTriangle[i] = vertexIndex;
+		uint8_t idx = this->index[i + _index * 3];
+		_outTriangle[i] = this->vertices[idx];
 	}
 }
 
-void Meshlet::GetIndices(const MeshletData& _meshletData, std::vector<uint32_t>& _outIndices) const
+void Meshlet::GetIndices(std::vector<uint32_t>& _outIndices) const
 {
-	for (uint32_t i = 0; i < triangleCount; ++i)
-	{
-		std::array<uint32_t, 3> triangle;
-		GetTriangle(i, _meshletData, triangle);
-		_outIndices.insert(_outIndices.end(), triangle.begin(), triangle.end());
-	}
+	_outIndices.insert(_outIndices.end(), this->vertices.begin(), this->vertices.end());
+}
+
+void Meshlet::CompressToDeviceData(const Meshlet& _meshlet, Meshlet::DeviceData& _outData, std::vector<Meshlet::DeviceDataRef>& _outRef)
+{
+	Meshlet::DeviceDataRef ref{};
+	ref.indexOffset = _outData.meshletIndices.size();
+	ref.vertexOffset = _outData.meshletVertices.size();
+	ref.triangleCount = _meshlet.index.size() / 3;
+	ref.vertexCount = _meshlet.vertices.size();
+
+	_outData.meshletIndices.insert(
+		_outData.meshletIndices.end(), 
+		_meshlet.index.begin(), 
+		_meshlet.index.end());
+	_outData.meshletVertices.insert(
+		_outData.meshletVertices.end(), 
+		_meshlet.vertices.begin(), 
+		_meshlet.vertices.end());
+	_outRef.push_back(ref);
+}
+
+Meshlet Meshlet::GetFromDeviceData(const Meshlet::DeviceData& _data, const Meshlet::DeviceDataRef& _ref)
+{
+	Meshlet meshlet{};
+	
+	meshlet.index.insert(
+		meshlet.index.end(), 
+		_data.meshletIndices.begin() + _ref.indexOffset, 
+		_data.meshletIndices.begin() + _ref.indexOffset + _ref.triangleCount * 3);
+	meshlet.vertices.insert(
+		meshlet.vertices.end(),
+		_data.meshletVertices.begin() + _ref.vertexOffset,
+		_data.meshletVertices.begin() + _ref.vertexOffset + _ref.vertexCount);
+
+	return meshlet;
 }

@@ -114,7 +114,7 @@ void MeshletApp::_InitModels()
 	for (size_t i = 0; i < meshs.size(); ++i)
 	{
 		Model model{};
-		MeshletData meshletData{};
+		Meshlet::DeviceData meshletData{};
 		VirtualGeometry virtualGeom{};
 		auto& staticMesh = meshs[i];
 
@@ -189,7 +189,7 @@ void MeshletApp::_InitBuffers()
 			{
 				MeshletSBO sbo{};
 				sbo.triangleCount = meshlet.triangleCount;
-				sbo.triangleOffset = meshlet.triangleOffset;
+				sbo.triangleOffset = meshlet.indexOffset;
 				sbo.vertexCount = meshlet.vertexCount;
 				sbo.vertexOffset = meshlet.vertexOffset;
 				sbos.push_back(sbo);

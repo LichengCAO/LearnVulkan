@@ -21,7 +21,7 @@ private:
 		StaticMesh mesh;
 		Transform transform;
 		glm::mat4 modelMatrix;
-		std::vector<Meshlet>       vecMeshlet;
+		std::vector<Meshlet::DeviceDataRef> vecMeshlet;
 		std::vector<uint32_t>      vecVertexRemap;
 		std::vector<uint8_t>       vecTriangleIndex;
 		std::vector<MeshletBounds> vecMeshletBounds;
