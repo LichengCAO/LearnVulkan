@@ -115,16 +115,20 @@ void MeshletApp::_InitModels()
 	{
 		Model model{};
 		Meshlet::DeviceData meshletData{};
-		VirtualGeometry virtualGeom{};
+		std::vector<Meshlet> meshlets;
 		auto& staticMesh = meshs[i];
 
 		optimizer.OptimizeMesh(staticMesh.verts, staticMesh.indices);
-		virtualGeom.PresetStaticMesh(staticMesh);
+		//virtualGeom.PresetStaticMesh(staticMesh);
 		//virtualGeom.Init();
 		
 		model.mesh = staticMesh;
 		model.modelMatrix = matrices[i];
-		optimizer.BuildMeshlets(staticMesh.verts, staticMesh.indices, meshletData, model.vecMeshlet);
+		optimizer.BuildMeshlets(staticMesh.verts, staticMesh.indices, meshlets);
+		for (const auto& meshlet : meshlets)
+		{
+			Meshlet::CompressToDeviceData(meshlet, meshletData, model.vecMeshlet);
+		}
 		model.vecVertexRemap = meshletData.meshletVertices;
 		model.vecTriangleIndex = meshletData.meshletIndices;
 		for (const auto& meshlet : model.vecMeshlet)

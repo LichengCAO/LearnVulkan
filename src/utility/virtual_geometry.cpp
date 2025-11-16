@@ -434,10 +434,14 @@ void VirtualGeometry::Init()
 		if (m_meshlets[i].size() <= 1) break;
 
 		// For each meshlet, find the set of all edges making up the triangles within the meshlet
+		std::cout << "Start find meshlets' border...";
 		_FindMeshletsBorder(i);
+		std::cout << "DONE" << std::endl;
 
 		// For each meshlet, find the set of connected meshlets(sharing an edge)
+		std::cout << "Start record connections...";
 		_RecordMeshletConnections(i);
+		std::cout << "DONE" << std::endl;
 
 		// Divide meshlets into groups of roughly 8
 		meshletGroups.clear();

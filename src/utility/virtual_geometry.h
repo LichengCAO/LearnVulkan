@@ -74,6 +74,13 @@ public:
 		std::vector<Vertex> verts;
 		std::vector<Meshlet> meshlets;
 	};
+	struct ClusterInfo
+	{
+		glm::vec4 bounding;
+		float error;
+		float mergeError; // error for case when this cluster merge with others
+		uint32_t groupID;
+	};
 
 private:
 	const StaticMesh* m_pBaseMesh = nullptr;
@@ -82,11 +89,6 @@ private:
 	std::vector<uint32_t> m_realToVirtual;			// maps real index to virtual index based on vertex positions, virtual index points
 													// to a vertex in the static mesh that has the postion that differentiate this virtual index from others
 
-	// Debug use
-	//std::vector<std::vector<Vertex>> m_verts;
-	//std::vector<std::vector<uint32_t>> m_indices;
-	//const std::vector<Vertex>& _GetVertices(uint32_t _lod) { return m_pBaseMesh->verts; };
-	//const std::vector<uint32_t>& _GetIndices(uint32_t _lod) { return m_pBaseMesh->indices; };
 private:
 	// Get vertices when the current LOD of vertices are incomplete
 	std::vector<Vertex>& _GetIncompleteVertices(uint32_t _lod);
@@ -150,7 +152,7 @@ private:
 
 	// Simplify triangles in meshlet groups, return error compared to the original mesh
 	// _srcLod: LOD of meshlets to simplify, which is one level lower than result LOD
-	// _meshletGroup: indices of meshlets in a group
+	// _meshletGroup: indices of meshlets in this lod that forms a group
 	// _outVerts: simplified vertices
 	// _outIndex: indices that build simplified triangles
 	float _SimplifyGroupTriangles(
