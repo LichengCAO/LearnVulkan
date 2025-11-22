@@ -90,7 +90,7 @@ private:
 
 	void _LoadScene(const tinygltf::Model& _root);
 
-	// recursively fetch primitives from this node and its child nodes that can build static meshes
+	// recursively fetch primitives from this node and its parent nodes that can build static meshes
 	// return the static meshes built by these primitives and their model matrices
 	void _FetchStaticMeshes(
 		const glTFLoader::Node* _pNode,

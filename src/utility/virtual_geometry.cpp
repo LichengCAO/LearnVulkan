@@ -23,15 +23,15 @@ void VirtualGeometry::_AddMyMeshlet(
 	uint32_t _lod, 
 	float _error, 
 	const std::vector<Meshlet>& _newMeshlets, 
-	const std::vector<uint32_t>& _parents, 
+	const std::vector<uint32_t>& _children, 
 	uint32_t* _pFirstIndex, 
 	uint32_t* _pNumAdded)
 {
 	auto& vectorToAdd = m_meshlets[_lod];
 	uint32_t firstIndex = vectorToAdd.size();
 	uint32_t numAdded = _newMeshlets.size();
-	float parentMaxClusterError = 0.0f; // maximum of all parents' cluster error
-	float clusterError = 0.0f; // all siblings have the same cluster error
+	float tinyClusterMaxError = 0.0f;	// maximum of all childrens' cluster error
+	float clusterError = 0.0f;			// all children have the same cluster error
 	MeshOptimizer optimizer{};
 	
 	if (_pFirstIndex != nullptr)
@@ -43,17 +43,17 @@ void VirtualGeometry::_AddMyMeshlet(
 		*_pNumAdded = numAdded;
 	}
 
-	// find maximum parent cluster error
+	// find maximum error of tiny clusters
 	if (_lod > 0)
 	{
-		uint32_t parentLod = _lod - 1;
-		for (size_t i = 0; i < _parents.size(); ++i)
+		uint32_t finerLOD = _lod - 1;
+		for (size_t i = 0; i < _children.size(); ++i)
 		{
-			const MyMeshlet& parentMeshlet = m_meshlets[parentLod][_parents[i]];
-			parentMaxClusterError = std::max(parentMaxClusterError, parentMeshlet.clusterError);
+			const MyMeshlet& parentMeshlet = m_meshlets[finerLOD][_children[i]];
+			tinyClusterMaxError = std::max(tinyClusterMaxError, parentMeshlet.clusterError);
 		}
 	}
-	clusterError = _error + parentMaxClusterError;
+	clusterError = _error + tinyClusterMaxError;
 
 	// fill in new myMeshlets
 	for (uint32_t i = 0; i < numAdded; ++i)
@@ -64,68 +64,29 @@ void VirtualGeometry::_AddMyMeshlet(
 		_newMeshlets[i].GetIndices(indices);
 		auto bounds = optimizer.ComputeBounds(_GetCompleteVertices(_lod), indices);
 		
-		myMeshlet.eldsetSibling = firstIndex;
-		myMeshlet.siblingCount = numAdded;
+		myMeshlet.firstLove = firstIndex;
+		myMeshlet.loverCount = numAdded;
 		myMeshlet.lod = _lod;
 		myMeshlet.meshlet = _newMeshlets[i];
-		myMeshlet.parents = _parents;
+		myMeshlet.children = _children;
 		myMeshlet.boundingSphere = glm::vec4(bounds.center, bounds.radius);
 		myMeshlet.clusterError = clusterError;
-		myMeshlet.groupError = 99.0f; // to be filled later by its children
+		myMeshlet.groupError = 99.0f; // to be filled later by its parent(Larger clusters)
 
 		vectorToAdd.push_back(myMeshlet);
 	}
 
-	// update parent
+	// update children(Tiny clusters)
 	if (_lod > 0)
 	{
-		uint32_t parentLod = _lod - 1;
-		for (size_t i = 0; i < _parents.size(); ++i)
+		uint32_t finerLOD = _lod - 1;
+		for (size_t i = 0; i < _children.size(); ++i)
 		{
-			MyMeshlet& parentMeshlet = m_meshlets[parentLod][_parents[i]];
-			parentMeshlet.child = firstIndex;
-			parentMeshlet.groupError = clusterError; // all parents have the same group error
+			MyMeshlet& childMeshlet = m_meshlets[finerLOD][_children[i]];
+			childMeshlet.parent = firstIndex;
+			childMeshlet.groupError = clusterError; // all children have the same group error
 		}
 	}
-}
-
-// TODO: improve this
-void VirtualGeometry::_BuildVirtualIndexMap()
-{
-	const StaticMesh& staticMesh = *m_pBaseMesh;
-	std::unordered_set<uint32_t> existVirtualIndex;
- 	size_t n = staticMesh.verts.size();
-	float percent = 0.2f;
-	
-	m_realToVirtual.clear();
-	m_realToVirtual.resize(n, 0);
-	std::cout << "Start build virtual index map...";
-	for (size_t i = 0; i < n; ++i)
-	{
-		const glm::vec3& curPosition = staticMesh.verts[i].position;
-		bool hasVirtualIndex = false;
-		for (auto virtualIndex : existVirtualIndex)
-		{
-			float dist = glm::distance(curPosition, staticMesh.verts[virtualIndex].position);
-			if (dist < 0.001f)
-			{
-				m_realToVirtual[i] = virtualIndex;
-				hasVirtualIndex = true;
-				break;
-			}
-		}
-		if (!hasVirtualIndex)
-		{
-			m_realToVirtual[i] = i;
-			existVirtualIndex.insert(i);
-		}
-		if ((float(i) / float(n)) > percent)
-		{
-			std::cout << percent * 100 << "%";
-			percent += 0.2;
-		}
-	}
-	std::cout << "DONE" << std::endl;
 }
 
 void VirtualGeometry::_PrepareMETIS(
@@ -358,12 +319,24 @@ void VirtualGeometry::_BuildMeshletFromGroup(
 	optimizer.BuildMeshlets(_vertex, _index, _meshlet);
 }
 
-void VirtualGeometry::PresetStaticMesh(const StaticMesh& _original)
+glm::vec4 VirtualGeometry::_MergeBounds(const glm::vec4& _sphere1, const glm::vec4& _sphere2) const
 {
-	m_pBaseMesh = &_original;
+	glm::vec4 result{};
+	
+	// center
+	result.x = (_sphere1.x + _sphere2.x) * 0.5f;
+	result.y = (_sphere1.y + _sphere2.y) * 0.5f;
+	result.z = (_sphere1.z + _sphere2.z) * 0.5f;
+
+	// radius
+	result.w = 
+		std::max(_sphere1.w, _sphere2.w) 
+		+ glm::distance(glm::vec3(result.x, result.y, result.z), glm::vec3(_sphere1.x, _sphere1.y, _sphere1.z));
+
+	return result;
 }
 
-void VirtualGeometry::Init()
+void VirtualGeometry::_SplitMeshLODs()
 {
 	int maxLOD = 15;
 	uint32_t lastGroupSize = ~0;
@@ -378,7 +351,7 @@ void VirtualGeometry::Init()
 	{
 		// Build meshlets for current LOD
 		if (i == 0)
-		{	
+		{
 			std::vector<Meshlet> meshlets{};
 			uint32_t firstIndx;
 			uint32_t numAdded;
@@ -407,7 +380,7 @@ void VirtualGeometry::Init()
 			{
 				std::vector<uint32_t> simplifiedIndex;
 				float error = 0.0f;
-				
+
 				// For each group of meshlets, build a new list of triangles approximating the original group
 				error = _SimplifyGroupTriangles(i - 1, group, _GetIncompleteVertices(i), simplifiedIndex);
 				numTrig += simplifiedIndex.size() / 3;
@@ -422,7 +395,7 @@ void VirtualGeometry::Init()
 				std::vector<Meshlet> meshlets{};
 				const auto& simplifiedIndices = groupIndices[j];
 				float error = simplifyError[j];
-				
+
 				_BuildMeshletFromGroup(_GetCompleteVertices(i), simplifiedIndices, meshlets);
 				_AddMyMeshlet(i, error, meshlets, meshletGroups[j], &firstIndx, &subNumAdded);
 				numAdded += subNumAdded;
@@ -461,4 +434,155 @@ void VirtualGeometry::Init()
 		lastGroupSize = meshletGroups.size();
 	}
 	std::cout << "===============================\r\n" << std::endl;
+}
+
+void VirtualGeometry::_BuildHierarchy()
+{
+	std::vector<HierarchyNode> treeNodes;
+	std::vector<std::vector<uint32_t>> LODClusterID; // leaf index of each LOD
+	std::vector<uint32_t> LODRoots;
+	size_t maxLOD = 0; // TODO
+
+	// build base node from cluster groups
+	LODClusterID.resize(maxLOD + 1);
+	for (size_t i = 0; i < LODClusterID.size(); ++i)
+	{
+		size_t clusterGroupsCount = 0; // TODO
+		LODClusterID[i].resize(clusterGroupsCount);
+		for (size_t j = 0; j < clusterGroupsCount; ++j)
+		{
+			HierarchyNode newNode{};
+			
+			LODClusterID[i][j] = treeNodes.size();
+			newNode.isClusterGroup = true;
+			newNode.parentError = 0;// TODO use group data to fill it
+			newNode.children[0] = 0;// TODO
+			newNode.bounding;
+
+			treeNodes.push_back(newNode);
+		}
+	}
+
+	// build hierarchy for each LOD
+	for (size_t i = 0; i < LODClusterID.size(); ++i)
+	{
+		if (LODClusterID[i].size() == 0) continue;
+		uint32_t lodRootId = _BuildHierarchyHelper(LODClusterID[i], treeNodes);
+		LODRoots.push_back(lodRootId);
+	}
+
+	// build top hierarchy with LOD trees
+	_BuildHierarchyHelper(LODRoots, treeNodes);
+}
+
+uint32_t VirtualGeometry::_BuildHierarchyHelper(std::vector<uint32_t>& _bottomNodeIndex, std::vector<HierarchyNode>& _fullTree) const
+{
+	CHECK_TRUE(_bottomNodeIndex.size() > 0, "Empty tree is not allowed!");
+
+	// if there is only one node
+	if (_bottomNodeIndex.size() == 1) return _bottomNodeIndex[0];
+
+	// if there is only one child layer
+	if (_bottomNodeIndex.size() <= VG_HIERARCHY_MAX_CHILD)
+	{
+		HierarchyNode newParentNode{};
+		uint32_t firstChildIndex = _bottomNodeIndex[0];
+		uint32_t newNodeIndex = _fullTree.size();
+
+		// use first bottom node as start
+		newParentNode = _fullTree[firstChildIndex];
+		newParentNode.children = {firstChildIndex , ~0u, ~0u, ~0u }; // to be filled
+		newParentNode.isClusterGroup = false;
+		
+		for (size_t i = 1; i < _bottomNodeIndex.size(); ++i)
+		{
+			uint32_t childIndex = _bottomNodeIndex[i];
+			const HierarchyNode& child = _fullTree[childIndex];
+
+			_MergeHierarchyNode(child, newParentNode);
+			newParentNode.children[i] = childIndex;
+		}
+
+		_fullTree.push_back(newParentNode);
+		return newNodeIndex;
+	}
+
+	// if there are more layers
+	{
+		uint32_t maxSubNodeCount = VG_HIERARCHY_MAX_CHILD;	// maximum possible leaf count of each subtree
+		uint32_t baseSubNodeCount;							// baseline leaf count of each subtree
+		uint32_t leftSubNodeCount; // if following subtree only hold baseSubNodeCount how many node will remain
+		uint32_t maxExtraHold;
+		HierarchyNode newNode{};
+		uint32_t result = 0;
+		size_t offset = 0; // offset of _bottomNodeIndex for subtree
+
+		while (maxSubNodeCount * VG_HIERARCHY_MAX_CHILD <= _bottomNodeIndex.size())
+		{
+			maxSubNodeCount *= VG_HIERARCHY_MAX_CHILD;
+		}
+		baseSubNodeCount = maxSubNodeCount / VG_HIERARCHY_MAX_CHILD;
+		leftSubNodeCount = _bottomNodeIndex.size() - baseSubNodeCount * VG_HIERARCHY_MAX_CHILD;
+		maxExtraHold = maxSubNodeCount - baseSubNodeCount;
+
+		std::array<uint32_t, VG_HIERARCHY_MAX_CHILD> subNodeCounts{}; // how many leaf nodes each child should handle
+		for (size_t i = 0; i < VG_HIERARCHY_MAX_CHILD; ++i)
+		{
+			if (leftSubNodeCount > maxExtraHold)
+			{
+				subNodeCounts[i] = maxSubNodeCount;
+				leftSubNodeCount -= (maxExtraHold - baseSubNodeCount);
+			}
+			else
+			{
+				subNodeCounts[i] = baseSubNodeCount + leftSubNodeCount;
+				leftSubNodeCount = 0;
+			}
+		}
+
+		// build each subtree
+		for (size_t i = 0; i < VG_HIERARCHY_MAX_CHILD; ++i)
+		{
+			std::vector<uint32_t> subBottomNodes(
+				_bottomNodeIndex.cbegin() + offset, 
+				_bottomNodeIndex.cbegin() + offset + subNodeCounts[i]);
+			const uint32_t childId = _BuildHierarchyHelper(subBottomNodes, _fullTree);
+			const HierarchyNode& child = _fullTree[childId];
+
+			if (i == 0)
+			{
+				newNode.bounding = child.bounding;
+				newNode.parentError = child.parentError;
+				newNode.isClusterGroup = false;
+			}
+			else
+			{
+				_MergeHierarchyNode(child, newNode);
+			}
+			newNode.children[i] = childId;
+			offset += subNodeCounts[i];
+		}
+		result = _fullTree.size();
+		_fullTree.push_back(newNode);
+
+		return result;
+	}
+
+	return 0;
+}
+
+void VirtualGeometry::_MergeHierarchyNode(const HierarchyNode& _node1, HierarchyNode& _merged) const
+{
+	_merged.bounding = _MergeBounds(_node1.bounding, _merged.bounding);
+	_merged.parentError = std::max(_node1.parentError, _merged.parentError);
+}
+
+void VirtualGeometry::PresetStaticMesh(const StaticMesh& _original)
+{
+	m_pBaseMesh = &_original;
+}
+
+void VirtualGeometry::Init()
+{
+	_SplitMeshLODs();
 }
