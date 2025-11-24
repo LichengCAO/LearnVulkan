@@ -7,6 +7,11 @@
 // Wrapper class for meshoptimizer lib
 class MeshOptimizer
 {
+private:
+	void _LockBoundary(
+		const std::vector<Vertex>& _vertex, 
+		const std::vector<uint32_t>& _index, 
+		std::vector<uint8_t>& _locks) const;
 public:
 	// Build meshlets from vertices and indices,
 	// _outMeshletData, _outMeshlet don't need 

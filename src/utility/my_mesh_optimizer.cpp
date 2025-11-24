@@ -1,6 +1,50 @@
 #include "my_mesh_optimizer.h"
 #include "utils.h"
 
+void MeshOptimizer::_LockBoundary(
+	const std::vector<Vertex>& _vertex, 
+	const std::vector<uint32_t>& _index, 
+	std::vector<uint8_t>& _locks) const
+{
+	std::vector<uint32_t> remap(_vertex.size());
+	std::set<std::pair<uint32_t, uint32_t>> halfEdges;
+	std::set<uint32_t> shouldLock;
+
+	meshopt_generatePositionRemap(remap.data(), reinterpret_cast<const float*>(_vertex.data()), _vertex.size(), sizeof(Vertex));
+	_locks.resize(_vertex.size(), 0u);
+	
+	CHECK_TRUE(_index.size() % 3 == 0, "Not a triangle based mesh!");
+	for (size_t offset = 0; offset < _index.size(); offset += 3)
+	{
+		uint32_t v0 = remap[_index[offset]];
+		uint32_t v1 = remap[_index[offset + 1]];
+		uint32_t v2 = remap[_index[offset + 2]];
+
+		halfEdges.insert({ v0, v1 });
+		halfEdges.insert({ v1, v2 });
+		halfEdges.insert({ v2, v0 });
+	}
+
+	for (const auto& item : halfEdges)
+	{
+		// single edge
+		if (halfEdges.find({ item.second, item.first }) == halfEdges.end())
+		{
+			shouldLock.insert(item.first);
+			shouldLock.insert(item.second);
+		}
+	}
+
+	for (size_t i = 0; i < _vertex.size(); ++i)
+	{
+		uint32_t mapped = remap[i];
+		if (shouldLock.find(mapped) != shouldLock.end())
+		{
+			_locks[i] |= meshopt_SimplifyVertex_Lock;
+		}
+	}
+}
+
 void MeshOptimizer::BuildMeshlets(
 	const std::vector<Vertex>& _vertex, 
 	const std::vector<uint32_t>& _index, 
@@ -100,7 +144,6 @@ float MeshOptimizer::SimplifyMesh(
 		_vertex.size(),
 		sizeof(glm::vec3),
 		sizeof(Vertex));
-
 	newIndexSize = meshopt_simplify(
 		dstIndex.data(),
 		srcIndex.data(),
@@ -110,28 +153,57 @@ float MeshOptimizer::SimplifyMesh(
 		sizeof(Vertex),
 		_targetIndexCount,
 		FLT_MAX,
-		meshopt_SimplifyLockBorder | meshopt_SimplifyPermissive,
+		meshopt_SimplifyLockBorder | meshopt_SimplifyPermissive | meshopt_SimplifyErrorAbsolute | meshopt_SimplifySparse,
 		&error);
 	dstIndex.resize(newIndexSize);
 	
 	// if normal simplification failed
-	if (newIndexSize == srcIndex.size())
+	if (newIndexSize > _targetIndexCount)
 	{
-		newIndexSize = meshopt_simplify(
-			srcIndex.data(),
-			dstIndex.data(),
-			dstIndex.size(),
-			reinterpret_cast<const float*>(_vertex.data()),
-			_vertex.size(),
-			sizeof(Vertex),
-			_targetIndexCount,
-			FLT_MAX,
-			meshopt_SimplifyLockBorder | meshopt_SimplifyPermissive | meshopt_SimplifyPrune,
-			&error);
-		if (newIndexSize > 0)
+		struct SloppyVertex
 		{
-			srcIndex.resize(newIndexSize);
-			std::swap(srcIndex, dstIndex);
+			glm::vec3 pos;
+			uint32_t id;
+		};
+		std::vector<uint8_t> lock;
+		std::vector<uint8_t> subLock;
+		std::vector<SloppyVertex> subVertex;
+		
+		dstIndex = srcIndex;
+		subVertex.resize(dstIndex.size());
+		subLock.resize(dstIndex.size());
+		_LockBoundary(_vertex, srcIndex, lock);
+
+		for (size_t i = 0; i < dstIndex.size(); ++i)
+		{
+			uint32_t vId = dstIndex[i];
+
+			subVertex[i].pos = _vertex[vId].position;
+			subVertex[i].id = vId;
+
+			dstIndex[i] = static_cast<uint32_t>(i);
+			subLock[i] = lock[vId];
+		}
+
+		newIndexSize = meshopt_simplifySloppy(
+			dstIndex.data(), 
+			dstIndex.data(), 
+			dstIndex.size(), 
+			reinterpret_cast<const float*>(subVertex.data()), 
+			subVertex.size(), 
+			sizeof(SloppyVertex), 
+			subLock.data(), 
+			_targetIndexCount, 
+			FLT_MAX, 
+			&error);
+
+		error *= meshopt_simplifyScale(reinterpret_cast<const float*>(subVertex.data()), subVertex.size(), sizeof(SloppyVertex));
+
+		dstIndex.resize(newIndexSize);
+
+		for (size_t i = 0; i < dstIndex.size(); ++i)
+		{
+			dstIndex[i] = subVertex[dstIndex[i]].id;
 		}
 	}
 
@@ -199,8 +271,9 @@ float MeshOptimizer::SimplifyMesh(
 		NULL,
 		_targetIndexCount,
 		FLT_MAX,
-		meshopt_SimplifyLockBorder | meshopt_SimplifyPermissive,
+		meshopt_SimplifyLockBorder | meshopt_SimplifyPermissive | meshopt_SimplifyErrorAbsolute,
 		&error);
+
 	if (indexCount > _targetIndexCount)
 	{
 		// try simplify more aggressively
@@ -219,7 +292,7 @@ float MeshOptimizer::SimplifyMesh(
 			NULL,
 			_targetIndexCount,
 			FLT_MAX,
-			meshopt_SimplifyLockBorder | meshopt_SimplifyPermissive | meshopt_SimplifyPrune,
+			meshopt_SimplifyLockBorder | meshopt_SimplifyPermissive | meshopt_SimplifyPrune | meshopt_SimplifyErrorAbsolute,
 			&error);
 	}
 	dstIndex.resize(indexCount);
