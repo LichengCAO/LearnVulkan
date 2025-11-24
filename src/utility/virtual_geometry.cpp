@@ -4,7 +4,44 @@
 #include <unordered_set>
 #include <functional>
 #include <numeric>
- 
+#include <algorithm>
+
+namespace
+{
+	glm::vec4 _MergeBounds(const glm::vec4& _sphere1, const glm::vec4& _sphere2)
+	{
+		glm::vec4 result{};
+
+		// center
+		result.x = (_sphere1.x + _sphere2.x) * 0.5f;
+		result.y = (_sphere1.y + _sphere2.y) * 0.5f;
+		result.z = (_sphere1.z + _sphere2.z) * 0.5f;
+
+		// radius
+		result.w =
+			std::max(_sphere1.w, _sphere2.w)
+			+ glm::distance(glm::vec3(result.x, result.y, result.z), glm::vec3(_sphere1.x, _sphere1.y, _sphere1.z));
+
+		return result;
+	}
+
+	float _HierarchyCost(
+		const std::vector<VirtualGeometry::HierarchyNode>& _fullTree,
+		const std::vector<uint32_t>& _nodeIndex,
+		uint32_t _begin,
+		uint32_t _end)
+	{
+		auto mergedSphere = _fullTree[_nodeIndex[_begin]].bounding;
+		
+		for (uint32_t i = _begin + 1; i < _end; ++i)
+		{
+			mergedSphere = _MergeBounds(mergedSphere, _fullTree[_nodeIndex[i]].bounding);
+		}
+
+		return mergedSphere.w * mergedSphere.w; // we want to calculate area
+	}
+}
+
 std::vector<Vertex>& VirtualGeometry::_GetIncompleteVertices(uint32_t _lod)
 {
 	while (_lod >= m_lodVerts.size())
@@ -114,12 +151,6 @@ void VirtualGeometry::_PrepareMETIS(
 		}
 		_xadj.push_back(static_cast<idx_t>(_adjncy.size()));
 	}
-}
-
-uint32_t VirtualGeometry::_GetVirtualIndex(uint32_t _realIndex) const
-{
-	return _realIndex;
-	//return m_realToVirtual[_realIndex];
 }
 
 void VirtualGeometry::_FindMeshletsBorder(uint32_t _lod)
@@ -319,27 +350,9 @@ void VirtualGeometry::_BuildMeshletFromGroup(
 	optimizer.BuildMeshlets(_vertex, _index, _meshlet);
 }
 
-glm::vec4 VirtualGeometry::_MergeBounds(const glm::vec4& _sphere1, const glm::vec4& _sphere2) const
-{
-	glm::vec4 result{};
-	
-	// center
-	result.x = (_sphere1.x + _sphere2.x) * 0.5f;
-	result.y = (_sphere1.y + _sphere2.y) * 0.5f;
-	result.z = (_sphere1.z + _sphere2.z) * 0.5f;
-
-	// radius
-	result.w = 
-		std::max(_sphere1.w, _sphere2.w) 
-		+ glm::distance(glm::vec3(result.x, result.y, result.z), glm::vec3(_sphere1.x, _sphere1.y, _sphere1.z));
-
-	return result;
-}
-
 void VirtualGeometry::_SplitMeshLODs()
 {
 	int maxLOD = 15;
-	uint32_t lastGroupSize = ~0;
 	MeshOptimizer optimizer{};
 	std::vector<std::vector<uint32_t>> meshletGroups;
 	m_meshlets.resize(maxLOD + 1);
@@ -376,6 +389,8 @@ void VirtualGeometry::_SplitMeshLODs()
 			std::vector<float> simplifyError;
 
 			std::cout << "Start build LOD " << i << " meshlets...";
+			
+			// simplify triangles in group
 			for (const auto& group : meshletGroups)
 			{
 				std::vector<uint32_t> simplifiedIndex;
@@ -387,9 +402,23 @@ void VirtualGeometry::_SplitMeshLODs()
 				groupIndices.push_back(simplifiedIndex);
 				simplifyError.push_back(error);
 			}
+
+			// remove redundant vertices
+			uint32_t maxVerticesIndex = 0;
+			std::cout << "vertex count before simplify: " << _GetIncompleteVertices(i).size() << std::endl;
+			for (auto& simplifiedIndex : groupIndices)
+			{
+				std::vector<uint32_t> newIndex(simplifiedIndex.size());
+				
+				optimizer.RemapIndex(_GetIncompleteVertices(i), simplifiedIndex, newIndex, sizeof(Vertex));
+				simplifiedIndex = newIndex;
+				maxVerticesIndex = std::max(maxVerticesIndex, *std::max_element(simplifiedIndex.begin(), simplifiedIndex.end()));
+			}
+			_GetIncompleteVertices(i).resize(maxVerticesIndex + 1);
 			std::cout << "triangle count: " << numTrig;
 			std::cout << ", vertex count: " << _GetCompleteVertices(i).size() << std::endl;
 
+			// build meshlets from simplified triangles
 			for (size_t j = 0; j < groupIndices.size(); ++j)
 			{
 				std::vector<Meshlet> meshlets{};
@@ -421,7 +450,8 @@ void VirtualGeometry::_SplitMeshLODs()
 		std::cout << "Start LOD " << i << " meshlets partition...";
 		uint32_t groupCount = m_meshlets[i].size() / 8;
 		groupCount = groupCount > 0 ? groupCount : 1;
-		auto divideSuccess = _DivideMeshletGroup(i, groupCount, meshletGroups);
+		m_groups.push_back({});
+		auto divideSuccess = _DivideMeshletGroup(i, groupCount, m_groups.back());
 
 		// Remove data we don't fill
 		if (!divideSuccess)
@@ -431,7 +461,6 @@ void VirtualGeometry::_SplitMeshLODs()
 			break;
 		}
 		std::cout << "DONE, divides meshlets into " << meshletGroups.size() << " groups.\r\n" << std::endl;
-		lastGroupSize = meshletGroups.size();
 	}
 	std::cout << "===============================\r\n" << std::endl;
 }
@@ -441,23 +470,30 @@ void VirtualGeometry::_BuildHierarchy()
 	std::vector<HierarchyNode> treeNodes;
 	std::vector<std::vector<uint32_t>> LODClusterID; // leaf index of each LOD
 	std::vector<uint32_t> LODRoots;
-	size_t maxLOD = 0; // TODO
+	uint32_t processedGroup = 0;
 
 	// build base node from cluster groups
-	LODClusterID.resize(maxLOD + 1);
+	LODClusterID.resize(m_groups.size());
 	for (size_t i = 0; i < LODClusterID.size(); ++i)
 	{
-		size_t clusterGroupsCount = 0; // TODO
+		size_t clusterGroupsCount = m_groups[i].size();
 		LODClusterID[i].resize(clusterGroupsCount);
 		for (size_t j = 0; j < clusterGroupsCount; ++j)
 		{
 			HierarchyNode newNode{};
+			const auto& currentGroup = m_groups[i][j];
 			
 			LODClusterID[i][j] = treeNodes.size();
 			newNode.isClusterGroup = true;
-			newNode.parentError = 0;// TODO use group data to fill it
-			newNode.children[0] = 0;// TODO
-			newNode.bounding;
+
+			newNode.bounding = m_meshlets[i][currentGroup[0]].boundingSphere;
+			for (auto clusterId : currentGroup)
+			{
+				const auto& currentCluster = m_meshlets[i][clusterId];
+				newNode.parentError = std::max(newNode.parentError, currentCluster.groupError);
+				newNode.bounding = _MergeBounds(newNode.bounding, currentCluster.boundingSphere);
+			}
+			newNode.children[0] = processedGroup++;
 
 			treeNodes.push_back(newNode);
 		}
@@ -539,6 +575,7 @@ uint32_t VirtualGeometry::_BuildHierarchyHelper(std::vector<uint32_t>& _bottomNo
 				leftSubNodeCount = 0;
 			}
 		}
+		_OptimizeHierarchyNodeGroups(_fullTree, subNodeCounts, _bottomNodeIndex);
 
 		// build each subtree
 		for (size_t i = 0; i < VG_HIERARCHY_MAX_CHILD; ++i)
@@ -569,6 +606,96 @@ uint32_t VirtualGeometry::_BuildHierarchyHelper(std::vector<uint32_t>& _bottomNo
 	}
 
 	return 0;
+}
+
+void VirtualGeometry::_OptimizeHierarchyNodeGroups(
+	const std::vector<HierarchyNode>& _fullTree, 
+	const std::array<uint32_t, VG_HIERARCHY_MAX_CHILD>& _groupSize,
+	std::vector<uint32_t>& _nodeIndices) const
+{
+	uint32_t levelCount = 1;
+	auto funcSortByAxis =
+		[&](uint32_t axis, uint32_t beginOffset, uint32_t endOffset)
+		{
+			std::function<bool(uint32_t, uint32_t)> funcCmp;
+			switch (axis)
+			{
+			case 0:
+				funcCmp = [&](uint32_t l, uint32_t r)->bool
+					{
+						return _fullTree[l].bounding.x < _fullTree[r].bounding.x;
+					};
+				break;
+			case 1:
+				funcCmp = [&](uint32_t l, uint32_t r)->bool
+					{
+						return _fullTree[l].bounding.y < _fullTree[r].bounding.y;
+					};
+				break;
+			case 2:
+				funcCmp = [&](uint32_t l, uint32_t r)->bool
+					{
+						return _fullTree[l].bounding.z < _fullTree[r].bounding.z;
+					};
+				break;
+			default:
+				CHECK_TRUE(false, "No such axis!");
+			}
+			std::sort(_nodeIndices.begin() + beginOffset, _nodeIndices.begin() + endOffset, funcCmp);
+		};
+	
+	while ((1 << levelCount) < VG_HIERARCHY_MAX_CHILD)
+	{
+		levelCount++;
+	}
+	CHECK_TRUE((1 << levelCount) == VG_HIERARCHY_MAX_CHILD, "");
+
+	for (uint32_t level = 0; level < levelCount; ++level)
+	{
+		const uint32_t bucketCount = 1 << level;
+		const uint32_t groupPerBucket = VG_HIERARCHY_MAX_CHILD >> level;
+
+		// sort each bucket
+		uint32_t bucketNodeOffset = 0;
+		for (uint32_t i = 0; i < bucketCount; ++i)
+		{
+			const uint32_t offset = groupPerBucket * i;
+			uint32_t sizes[2] = {};
+			uint32_t beginOffset; // begin of current bucket stride
+			uint32_t endOffset;	// end of current bucket stride
+			float minCost = std::numeric_limits<float>::max();
+			uint32_t bestAxis = 0;
+
+			for (uint32_t j = 0; j < (groupPerBucket / 2); ++j)
+			{
+				sizes[0] += _groupSize[offset + j];
+				sizes[1] += _groupSize[offset + j + (groupPerBucket / 2)];
+			}
+			
+			beginOffset = bucketNodeOffset;
+			endOffset = beginOffset + (sizes[0] + sizes[1]);
+			bucketNodeOffset = endOffset;
+
+			// try to sort axis by x, y, z to find which sort will give us the best division
+			// which produces minimal bounding spheres
+			for (uint32_t axis = 0; axis < 3; ++axis)
+			{
+				float cost;
+				
+				funcSortByAxis(axis, beginOffset, endOffset);
+				cost = _HierarchyCost(_fullTree, _nodeIndices, beginOffset, beginOffset + sizes[0])
+					+ _HierarchyCost(_fullTree, _nodeIndices, beginOffset + sizes[0], endOffset);
+
+				if (cost < minCost)
+				{
+					bestAxis = axis;
+					minCost = cost;
+				}
+			}
+
+			funcSortByAxis(bestAxis, beginOffset, endOffset);
+		}
+	}
 }
 
 void VirtualGeometry::_MergeHierarchyNode(const HierarchyNode& _node1, HierarchyNode& _merged) const

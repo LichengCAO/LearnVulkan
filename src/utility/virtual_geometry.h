@@ -62,8 +62,8 @@ private:
 		// Describes error of a meshlet(cluster)
 		// use for culling and decide LOD
 		glm::vec4 boundingSphere;	// xyz: position, w: radius
-		float clusterError;			// all siblings should have the same cluster error
-		float groupError;			// all classmates should have the same group error
+		float clusterError;			// all couples should have the same cluster error
+		float groupError;			// all siblings should have the same group error
 	};
 
 public:
@@ -77,13 +77,16 @@ public:
 	{
 		glm::vec4 bounding;
 		float error;
-		float parentError; // error for case when this cluster merge with others
 		uint32_t groupID;
+		uint32_t groupMeshletID;
 	};
 	struct HierarchyNode
 	{
 		glm::vec4 bounding; // xyz: center | w: radius
-		float parentError;	// consider this node only if threshold is smaller, otherwise, coarser parent nodes are already precise enough
+		
+		// consider this node only if threshold is smaller, 
+		// otherwise, coarser parent nodes are already precise enough
+		float parentError;
 		std::array<uint32_t, VG_HIERARCHY_MAX_CHILD> children = {~0u, ~0u, ~0u, ~0u};
 		bool isClusterGroup = false;
 	};
@@ -92,6 +95,7 @@ private:
 	const StaticMesh* m_pBaseMesh = nullptr;
 	std::vector<std::vector<Vertex>> m_lodVerts;	// LOD0 meshlets are built from m_pBaseMesh, higher LOD meshlets are built from simplified triangles of lower LOD meshlets
 	std::vector<std::vector<MyMeshlet>> m_meshlets;	// meshlets of different LODs
+	std::vector<std::vector<std::vector<uint32_t>>> m_groups; // m_groups[LOD][groupId][meshletId]
 
 private:
 	// Get vertices when the current LOD of vertices are incomplete
@@ -127,14 +131,6 @@ private:
 		std::vector<idx_t>& _xadj, 
 		std::vector<idx_t>& _adjncy, 
 		std::vector<idx_t>& _adjwgt) const;
-
-	// There may be some vertices that share same the position but store different information(normal, uv),
-	// but in this case we only want to differentiate them based on their positions,
-	// i.e. if 2 vertices are close enough, it should be treated as the same vertex,
-	// so i create this function,
-	// _realIndex: vertex index in Static Mesh
-	// return virtual index used to compare if the 2 vertices are same
-	uint32_t _GetVirtualIndex(uint32_t _realIndex) const;
 
 	// Find borders of meshlets of a specific LOD
 	void _FindMeshletsBorder(uint32_t _lod);
@@ -172,8 +168,6 @@ private:
 		const std::vector<uint32_t>& _index,
 		std::vector<Meshlet>& _meshlet) const;
 
-	glm::vec4 _MergeBounds(const glm::vec4& _sphere1, const glm::vec4& _sphere2) const;
-
 	// Split original mesh into meshlets of different LODs
 	void _SplitMeshLODs();
 
@@ -195,6 +189,12 @@ private:
 	uint32_t _BuildHierarchyHelper(
 		std::vector<uint32_t>& _bottomNodeIndex,
 		std::vector<HierarchyNode>& _fullTree) const;
+
+	// Optimize node grouping in hierarchy to minimize the bounding sphere size of each group
+	void _OptimizeHierarchyNodeGroups(
+		const std::vector<HierarchyNode>& _fullTree,
+		const std::array<uint32_t, VG_HIERARCHY_MAX_CHILD>& _groupSize,
+		std::vector<uint32_t>& _nodeIndices) const;
 
 	// Merge _node1 to _merged node
 	// which involves:
