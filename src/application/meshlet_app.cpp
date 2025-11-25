@@ -124,7 +124,7 @@ void MeshletApp::_InitModels()
 		model.modelMatrix = matrices[i];
 		if (i == 0)
 		{
-			vg.GetMeshletsAtLOD(4, meshlets);
+			vg.GetMeshletsAtLOD(3, meshlets);
 		}
 		else
 		{
