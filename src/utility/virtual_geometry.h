@@ -34,7 +34,6 @@ private:
 		uint32_t lod = 0;
 		
 		// index pointing to error information of the meshlet
-		uint32_t errorId = ~0;
 		Meshlet meshlet;
 		
 		// edges on the boundary, built with virtual indices of 2 ends
@@ -64,42 +63,32 @@ private:
 		glm::vec4 boundingSphere;	// xyz: position, w: radius
 		float clusterError;			// all couples should have the same cluster error
 		float groupError;			// all siblings should have the same group error
+		uint32_t groupIndex;		// group index that shared by siblings
 	};
 
 public:
-	// Use for upload page data
-	struct GroupData
-	{
-		std::vector<Vertex> verts;
-		std::vector<Meshlet> meshlets;
-	};
-	struct ClusterInfo
-	{
-		glm::vec4 bounding;
-		float error;
-		uint32_t groupID;
-		uint32_t groupMeshletID;
-	};
 	struct HierarchyNode
 	{
 		glm::vec4 bounding; // xyz: center | w: radius
 		
 		// consider this node only if threshold is smaller, 
 		// otherwise, coarser parent nodes are already precise enough
-		float parentError;
+		float error;
 		std::array<uint32_t, VG_HIERARCHY_MAX_CHILD> children = {~0u, ~0u, ~0u, ~0u};
 		bool isClusterGroup = false;
+		uint32_t groupId = ~0;
 	};
 
 private:
 	const StaticMesh* m_pBaseMesh = nullptr;
-	std::vector<std::vector<Vertex>> m_lodVerts;	// LOD0 meshlets are built from m_pBaseMesh, higher LOD meshlets are built from simplified triangles of lower LOD meshlets
+	// std::vector<std::vector<Vertex>> m_lodVerts; seems won't work LOD0 meshlets are built from m_pBaseMesh, higher LOD meshlets are built from simplified triangles of lower LOD meshlets
 	std::vector<std::vector<MyMeshlet>> m_meshlets;	// meshlets of different LODs
 	std::vector<std::vector<std::vector<uint32_t>>> m_groups; // m_groups[LOD][groupId][meshletId]
+	std::vector<HierarchyNode> m_hierarchy;
 
 private:
 	// Get vertices when the current LOD of vertices are incomplete
-	std::vector<Vertex>& _GetIncompleteVertices(uint32_t _lod);
+	//std::vector<Vertex>& _GetIncompleteVertices(uint32_t _lod);
 
 	// Get vertices when the current LOD of vertices are complete
 	const std::vector<Vertex>& _GetCompleteVertices(uint32_t _lod) const;
@@ -150,12 +139,10 @@ private:
 	// Simplify triangles in meshlet groups, return error compared to the original mesh
 	// _srcLod: LOD of meshlets to simplify, which is one level lower than result LOD
 	// _meshletGroup: indices of meshlets in this lod that forms a group
-	// _outVerts: simplified vertices
 	// _outIndex: indices that build simplified triangles
 	float _SimplifyGroupTriangles(
 		uint32_t _srcLod,
 		const std::vector<uint32_t>& _meshletGroup,
-		std::vector<Vertex>& _outVerts,
 		std::vector<uint32_t>& _outIndex) const;
 
 	// Build new meshlets from simplified triangles in the group,
@@ -206,4 +193,6 @@ public:
 	void PresetStaticMesh(const StaticMesh& _original);
 	
 	void Init();
+
+	void GetMeshletsAtLOD(uint32_t _lod, std::vector<Meshlet>& _meshlet) const;
 };

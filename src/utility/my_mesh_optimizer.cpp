@@ -451,3 +451,9 @@ MeshletBounds MeshOptimizer::ComputeBounds(const std::vector<Vertex>& _vertex, c
 
 	return retBounds;
 }
+
+void MeshOptimizer::GeneratePositionRemap(const std::vector<Vertex>& _vertex, std::vector<uint32_t>& _outPositionRemap) const
+{
+	_outPositionRemap.resize(_vertex.size());
+	meshopt_generatePositionRemap(_outPositionRemap.data(), reinterpret_cast<const float*>(_vertex.data()), _vertex.size(), sizeof(Vertex));
+}

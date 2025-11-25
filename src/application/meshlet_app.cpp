@@ -104,12 +104,13 @@ void MeshletApp::_InitModels()
 	glTFLoader gltfScene{};
 	//gltfScene.Load("E:/GitStorage/LearnVulkan/res/models/cornell_box/scene.gltf");
 	//gltfScene.GetSceneSimpleMeshes(meshs, matrices);
-	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/girl.OBJ", meshs);
-	trans.SetScale(0.01, 0.01, 0.01);
+	MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/bunny/bunny.obj", meshs);
+	//MeshUtility::Load("E:/GitStorage/LearnVulkan/res/models/20.obj", meshs);
+	//trans.SetScale(0.01, 0.01, 0.01);
 	matrices.push_back(trans.GetModelMatrix());
 	VirtualGeometry vg{};
-	//vg.PresetStaticMesh(objMeshs[0]);
-	//vg.Init();
+	vg.PresetStaticMesh(meshs[0]);
+	vg.Init();
 
 	for (size_t i = 0; i < meshs.size(); ++i)
 	{
@@ -118,13 +119,18 @@ void MeshletApp::_InitModels()
 		std::vector<Meshlet> meshlets;
 		auto& staticMesh = meshs[i];
 
-		optimizer.OptimizeMesh(staticMesh.verts, staticMesh.indices);
-		//virtualGeom.PresetStaticMesh(staticMesh);
-		//virtualGeom.Init();
-		
+		//optimizer.OptimizeMesh(staticMesh.verts, staticMesh.indices);		
 		model.mesh = staticMesh;
 		model.modelMatrix = matrices[i];
-		optimizer.BuildMeshlets(staticMesh.verts, staticMesh.indices, meshlets);
+		if (i == 0)
+		{
+			vg.GetMeshletsAtLOD(4, meshlets);
+		}
+		else
+		{
+			optimizer.BuildMeshlets(staticMesh.verts, staticMesh.indices, meshlets);
+		}
+		
 		for (const auto& meshlet : meshlets)
 		{
 			Meshlet::CompressToDeviceData(meshlet, meshletData, model.vecMeshlet);

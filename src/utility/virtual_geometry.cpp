@@ -42,18 +42,9 @@ namespace
 	}
 }
 
-std::vector<Vertex>& VirtualGeometry::_GetIncompleteVertices(uint32_t _lod)
-{
-	while (_lod >= m_lodVerts.size())
-	{
-		m_lodVerts.push_back({});
-	}
-	return m_lodVerts[_lod];
-}
-
 const std::vector<Vertex>& VirtualGeometry::_GetCompleteVertices(uint32_t _lod) const
 {
-	return m_lodVerts[_lod];
+	return m_pBaseMesh->verts;
 }
 
 void VirtualGeometry::_AddMyMeshlet(
@@ -108,7 +99,7 @@ void VirtualGeometry::_AddMyMeshlet(
 		myMeshlet.children = _children;
 		myMeshlet.boundingSphere = glm::vec4(bounds.center, bounds.radius);
 		myMeshlet.clusterError = clusterError;
-		myMeshlet.groupError = 99.0f; // to be filled later by its parent(Larger clusters)
+		myMeshlet.groupError = FLT_MAX; // to be filled later by its parent(Larger clusters)
 
 		vectorToAdd.push_back(myMeshlet);
 	}
@@ -156,11 +147,9 @@ void VirtualGeometry::_PrepareMETIS(
 void VirtualGeometry::_FindMeshletsBorder(uint32_t _lod)
 {
 	MeshOptimizer optimizer{};
-	std::vector<uint32_t> originIndex(_GetCompleteVertices(_lod).size());
 	std::vector<uint32_t> remapIndex(_GetCompleteVertices(_lod).size()); // remap the index based on position
 	
-	std::iota(originIndex.begin(), originIndex.end(), 0);
-	optimizer.RemapIndex(_GetCompleteVertices(_lod), originIndex, remapIndex);
+	optimizer.GeneratePositionRemap(_GetCompleteVertices(_lod), remapIndex);
 
 	// for each meshlet of this LOD find its border
 	for (size_t i = 0; i < m_meshlets[_lod].size(); ++i)
@@ -317,11 +306,9 @@ bool VirtualGeometry::_DivideMeshletGroup(
 float VirtualGeometry::_SimplifyGroupTriangles(
 	uint32_t _srcLod, 
 	const std::vector<uint32_t>& _meshletGroup,
-	std::vector<Vertex>& _outVerts,
 	std::vector<uint32_t>& _outIndex) const
 {
 	std::vector<uint32_t> meshletIndex;
-	std::vector<Vertex> updatedVerts;
 	MeshOptimizer optimizer{};
 	float error = 0.0f;
 
@@ -333,9 +320,8 @@ float VirtualGeometry::_SimplifyGroupTriangles(
 
 	error = optimizer.SimplifyMesh(
 		_GetCompleteVertices(_srcLod),
-		meshletIndex, 
-		meshletIndex.size() / 2, 
-		_outVerts,
+		meshletIndex,
+		meshletIndex.size() / 2,
 		_outIndex);
 
 	return error;
@@ -352,9 +338,9 @@ void VirtualGeometry::_BuildMeshletFromGroup(
 
 void VirtualGeometry::_SplitMeshLODs()
 {
-	int maxLOD = 15;
+	int maxLOD = 31;
 	MeshOptimizer optimizer{};
-	std::vector<std::vector<uint32_t>> meshletGroups;
+	//std::vector<std::vector<uint32_t>> meshletGroups;
 	m_meshlets.resize(maxLOD + 1);
 
 	std::cout << "Start build virtual geometry..." << std::endl;
@@ -371,7 +357,6 @@ void VirtualGeometry::_SplitMeshLODs()
 
 			std::cout << "Start build LOD " << i << " meshlets...";
 			optimizer.BuildMeshlets(m_pBaseMesh->verts, m_pBaseMesh->indices, meshlets);
-			_GetIncompleteVertices(i) = m_pBaseMesh->verts;
 			_AddMyMeshlet(i, 0.0f, meshlets, {}, &firstIndx, &numAdded);
 			std::cout << "triangle count: " << m_pBaseMesh->indices.size() / 3;
 			std::cout << ", vertex count: " << _GetCompleteVertices(i).size() << std::endl;
@@ -391,32 +376,31 @@ void VirtualGeometry::_SplitMeshLODs()
 			std::cout << "Start build LOD " << i << " meshlets...";
 			
 			// simplify triangles in group
-			for (const auto& group : meshletGroups)
+			for (const auto& group : m_groups.back())
 			{
 				std::vector<uint32_t> simplifiedIndex;
 				float error = 0.0f;
 
 				// For each group of meshlets, build a new list of triangles approximating the original group
-				error = _SimplifyGroupTriangles(i - 1, group, _GetIncompleteVertices(i), simplifiedIndex);
+				error = _SimplifyGroupTriangles(i - 1, group, simplifiedIndex);
 				numTrig += simplifiedIndex.size() / 3;
 				groupIndices.push_back(simplifiedIndex);
 				simplifyError.push_back(error);
 			}
 
 			// remove redundant vertices
-			uint32_t maxVerticesIndex = 0;
-			std::cout << "vertex count before simplify: " << _GetIncompleteVertices(i).size() << std::endl;
-			for (auto& simplifiedIndex : groupIndices)
-			{
-				std::vector<uint32_t> newIndex(simplifiedIndex.size());
-				
-				optimizer.RemapIndex(_GetIncompleteVertices(i), simplifiedIndex, newIndex, sizeof(Vertex));
-				simplifiedIndex = newIndex;
-				maxVerticesIndex = std::max(maxVerticesIndex, *std::max_element(simplifiedIndex.begin(), simplifiedIndex.end()));
-			}
-			_GetIncompleteVertices(i).resize(maxVerticesIndex + 1);
-			std::cout << "triangle count: " << numTrig;
-			std::cout << ", vertex count: " << _GetCompleteVertices(i).size() << std::endl;
+			//uint32_t maxVerticesIndex = 0;
+			////std::cout << "vertex count before simplify: " << _GetIncompleteVertices(i).size() << std::endl;
+			//for (auto& simplifiedIndex : groupIndices)
+			//{
+			//	std::vector<uint32_t> newIndex(simplifiedIndex.size());
+			//	
+			//	optimizer.RemapIndex(_GetIncompleteVertices(i), simplifiedIndex, newIndex, sizeof(Vertex));
+			//	simplifiedIndex = newIndex;
+			//	maxVerticesIndex = std::max(maxVerticesIndex, *std::max_element(simplifiedIndex.begin(), simplifiedIndex.end()));
+			//}
+			//_GetIncompleteVertices(i).resize(maxVerticesIndex + 1);
+			std::cout << "triangle count: " << numTrig << std::endl;
 
 			// build meshlets from simplified triangles
 			for (size_t j = 0; j < groupIndices.size(); ++j)
@@ -426,14 +410,19 @@ void VirtualGeometry::_SplitMeshLODs()
 				float error = simplifyError[j];
 
 				_BuildMeshletFromGroup(_GetCompleteVertices(i), simplifiedIndices, meshlets);
-				_AddMyMeshlet(i, error, meshlets, meshletGroups[j], &firstIndx, &subNumAdded);
+				_AddMyMeshlet(i, error, meshlets, m_groups.back()[j], &firstIndx, &subNumAdded);
 				numAdded += subNumAdded;
 			}
 			std::cout << "DONE, meshlets added: " << numAdded << std::endl;
 		}
 
 		// if LOD reaches max we don't need to group meshlet any more, break;
-		if (m_meshlets[i].size() <= 1) break;
+		if (m_meshlets[i].size() == 1)
+		{
+			m_groups.push_back({ { 0 } });
+			m_meshlets[i][0].groupIndex = 0;
+			break;
+		}
 
 		// For each meshlet, find the set of all edges making up the triangles within the meshlet
 		std::cout << "Start find meshlets' border...";
@@ -446,12 +435,21 @@ void VirtualGeometry::_SplitMeshLODs()
 		std::cout << "DONE" << std::endl;
 
 		// Divide meshlets into groups of roughly 8
-		meshletGroups.clear();
+		//meshletGroups.clear();
 		std::cout << "Start LOD " << i << " meshlets partition...";
 		uint32_t groupCount = m_meshlets[i].size() / 8;
 		groupCount = groupCount > 0 ? groupCount : 1;
 		m_groups.push_back({});
 		auto divideSuccess = _DivideMeshletGroup(i, groupCount, m_groups.back());
+
+		// update mymeshlet group id attribute
+		for (size_t groupId = 0; groupId < m_groups.back().size(); ++groupId)
+		{
+			for (auto meshletId : m_groups.back()[groupId])
+			{
+				m_meshlets[i][meshletId].groupIndex = groupId;
+			}
+		}
 
 		// Remove data we don't fill
 		if (!divideSuccess)
@@ -460,14 +458,14 @@ void VirtualGeometry::_SplitMeshLODs()
 			std::cout << "ERROR: Cannot divide meshlet groups, break!" << std::endl;
 			break;
 		}
-		std::cout << "DONE, divides meshlets into " << meshletGroups.size() << " groups.\r\n" << std::endl;
+		std::cout << "DONE, divides meshlets into " << m_groups.back().size() << " groups.\r\n" << std::endl;
 	}
 	std::cout << "===============================\r\n" << std::endl;
 }
 
 void VirtualGeometry::_BuildHierarchy()
 {
-	std::vector<HierarchyNode> treeNodes;
+	std::vector<HierarchyNode>& treeNodes = m_hierarchy;
 	std::vector<std::vector<uint32_t>> LODClusterID; // leaf index of each LOD
 	std::vector<uint32_t> LODRoots;
 	uint32_t processedGroup = 0;
@@ -490,7 +488,7 @@ void VirtualGeometry::_BuildHierarchy()
 			for (auto clusterId : currentGroup)
 			{
 				const auto& currentCluster = m_meshlets[i][clusterId];
-				newNode.parentError = std::max(newNode.parentError, currentCluster.groupError);
+				newNode.error = std::max(newNode.error, currentCluster.groupError);
 				newNode.bounding = _MergeBounds(newNode.bounding, currentCluster.boundingSphere);
 			}
 			newNode.children[0] = processedGroup++;
@@ -589,7 +587,7 @@ uint32_t VirtualGeometry::_BuildHierarchyHelper(std::vector<uint32_t>& _bottomNo
 			if (i == 0)
 			{
 				newNode.bounding = child.bounding;
-				newNode.parentError = child.parentError;
+				newNode.error = child.error;
 				newNode.isClusterGroup = false;
 			}
 			else
@@ -701,7 +699,7 @@ void VirtualGeometry::_OptimizeHierarchyNodeGroups(
 void VirtualGeometry::_MergeHierarchyNode(const HierarchyNode& _node1, HierarchyNode& _merged) const
 {
 	_merged.bounding = _MergeBounds(_node1.bounding, _merged.bounding);
-	_merged.parentError = std::max(_node1.parentError, _merged.parentError);
+	_merged.error = std::max(_node1.error, _merged.error);
 }
 
 void VirtualGeometry::PresetStaticMesh(const StaticMesh& _original)
@@ -712,4 +710,14 @@ void VirtualGeometry::PresetStaticMesh(const StaticMesh& _original)
 void VirtualGeometry::Init()
 {
 	_SplitMeshLODs();
+}
+
+void VirtualGeometry::GetMeshletsAtLOD(uint32_t _lod, std::vector<Meshlet>& _meshlet) const
+{
+	CHECK_TRUE(_lod < m_meshlets.size(), "Don't have this LOD");
+	_meshlet.reserve(m_meshlets[_lod].size());
+	for (const auto& myMeshlet : m_meshlets[_lod])
+	{
+		_meshlet.push_back(myMeshlet.meshlet);
+	}
 }

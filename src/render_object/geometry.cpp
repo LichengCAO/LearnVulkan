@@ -11,7 +11,11 @@ void Meshlet::GetTriangle(uint32_t _index, std::array<uint32_t, 3>& _outTriangle
 
 void Meshlet::GetIndices(std::vector<uint32_t>& _outIndices) const
 {
-	_outIndices.insert(_outIndices.end(), this->vertices.begin(), this->vertices.end());
+	for (auto idx : this->index)
+	{
+		_outIndices.push_back(this->vertices[idx]);
+	}
+	//_outIndices.insert(_outIndices.end(), this->vertices.begin(), this->vertices.end());
 }
 
 void Meshlet::CompressToDeviceData(const Meshlet& _meshlet, Meshlet::DeviceData& _outData, std::vector<Meshlet::DeviceDataRef>& _outRef)

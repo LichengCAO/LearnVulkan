@@ -127,13 +127,22 @@ public:
 		size_t _equalByte = sizeof(glm::vec3)) const
 	{
 		_outIndex.resize(_originIndex.size());
-		meshopt_generateShadowIndexBuffer(
-			_outIndex.data(), 
+		meshopt_generateVertexRemapCustom(
+			_outIndex.data(),
 			_originIndex.data(),
 			_originIndex.size(),
-			_vertex.data(), 
-			_vertex.size(), 
-			_equalByte,
-			sizeof(T));
+			reinterpret_cast<const float*>(_vertex.data()),
+			_vertex.size(),
+			sizeof(T),
+			[&](unsigned int l, unsigned int r) {
+				return std::memcmp(
+					reinterpret_cast<const uint8_t*>(&_vertex[l]), 
+					reinterpret_cast<const uint8_t*>(&_vertex[r]), 
+					_equalByte) == 0;
+			});
 	}
+
+	void GeneratePositionRemap(
+		const std::vector<Vertex>& _vertex,
+		std::vector<uint32_t>& _outPositionRemap) const;
 };
