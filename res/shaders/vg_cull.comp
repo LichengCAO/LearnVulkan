@@ -25,135 +25,145 @@ bool _LoadNode(uint nodeIndex)
     return false;
 }
 
+uint _GetBatchClusterCount(uint _offset)
+{
+    return 0; // TODO
+}
+
 #define BARRIER memoryBarrierShared(); barrier();
 #define MAX_NODES_PER_WORKGROUP 16
 #define NODES_COUNT_IN_TREE 1024 // TODO
 #define CLUSTERS_COUNT_IN_TREE 256 // TODO
 #define CLUSTERS_COUNT_PER_WORKGROUP 64
-shared uint g_workgroupNodeOffset = 0; // offset of the first node task for this workgroup
-shared uint g_nodeReadyMask = 0;
-shared uint g_workgroupClusterOffset = 0xFFFFFFFFu; // offset of the first cluster task for this workgroup
+#define NODE_TO_PROCESS_COUNT 0 // TODO
+
+shared uint g_workgroupPassedNodeCount;    // count of nodes passed cull in this workgroup
+shared uint g_workgroupNodeOffset;         // offset of the first node task for this workgroup
+shared uint g_workgroupNodeReadyMask;      // bitmask of loaded nodes in current batch -> workgroup size should be <= 32
+shared uint g_workgroupClusterBatchOffset; // offset of the first cluster task for this workgroup
 shared uint g_nodesRemaining; // nodes remaining to process in the whole mesh
-shared uint g_clusterLoadedSize;
+shared uint g_workgroupBatchClusterCount;
 
 void HierarchyTraversal()
 {
-    uint threadID = gl_GlobalInvocationID.x;
-    bool processNode = true;
-    uint doneNodeCount = MAX_NODES_PER_WORKGROUP; // 
-    uint workgroupNodeOffset = 0; // offset of the first node task for this workgroup
-    uint workgroupClusterOffset = 0xFFFFFFFFu; // offset of the first cluster task for this workgroup
+    const uint threadID = gl_GlobalInvocationID.x;
+    
+    // same for all threads in workgroup
+    bool workgroupProcessNode = true;
+    uint workgroupDoneNodeCount = MAX_NODES_PER_WORKGROUP; 
+    
+    // local clone of workgroup shared variables, same for all threads in workgroup
+    uint workgroupNodeOffset = 0;
+    uint workgroupClusterBatchOffset = 0xFFFFFFFFu;
+    uint workgroupNodeReadyMask = 0;
+    uint workgroupBatchClusterCount = 0;
 
     while(true)
     {
         BARRIER;
         if (threadID == 0)
         {
-            // Reset task counters
-            // TODO
-            g_nodeReadyMask = 0;
+            g_workgroupPassedNodeCount = 0;
+            g_workgroupNodeReadyMask = 0;
         }
         BARRIER;
 
-        if (processNode)
+        if (workgroupProcessNode)
         {
-            if (doneNodeCount == MAX_NODES_PER_WORKGROUP)
+            if (workgroupDoneNodeCount == MAX_NODES_PER_WORKGROUP)
             {
-                // fill workgroup node tasks
+                workgroupDoneNodeCount = 0;
+
+                // fetch workgroup node tasks from hierarchy
                 if (threadID == 0)
                 {
                     g_workgroupNodeOffset = atomicAdd(nextNodeTask, MAX_NODES_PER_WORKGROUP);
                 }
-                BARRIER;
 
-                doneNodeCount = 0;
-                workgroupNodeOffset = g_workgroupNodeOffset; // why? For optimize maybe?
+                BARRIER;
+                workgroupNodeOffset = g_workgroupNodeOffset;
 
                 if (workgroupNodeOffset >= NODES_COUNT_IN_TREE)
                 {
-                    // No more node tasks, try to do cluster tasks
-                    processNode = false;
-                    continue;
+                    workgroupProcessNode = false; // No more node tasks, try to do cluster tasks
+                    continue; // All threads within this workgroup will take the same branch
                 }
             }
 
-            const uint nodeToProcess = workgroupNodeOffset + doneNodeCount + threadID;
-            bool nodeReady = (threadID + doneNodeCount) < MAX_NODES_PER_WORKGROUP && nodeToProcess < NODES_COUNT_IN_TREE;
-            uint nodeReadyMask = 0;
+            const uint nodeToProcess = workgroupNodeOffset + workgroupDoneNodeCount + threadID;
+            bool nodeReady = (threadID + workgroupDoneNodeCount) < MAX_NODES_PER_WORKGROUP && nodeToProcess < NODES_COUNT_IN_TREE;
             
             // check if node loaded
             if (nodeReady)
             {
-                // Load node data
+                // TODO: load node data, fill data to process data array
                 nodeReady = _LoadNode(nodeToProcess);
-
-                // TODO Fill data to process data array
-            }
-
-            // mark loaded nodes
-            if (nodeReady)
-            {
-                atomicOr(g_nodeReadyMask, 1 << threadID);
+                
+                if (nodeReady)
+                {
+                    // mark loaded nodes
+                    atomicOr(g_workgroupNodeReadyMask, 1 << threadID);
+                }
             }
             BARRIER;
-            nodeReadyMask = g_nodeReadyMask;
+            workgroupNodeReadyMask = g_workgroupNodeReadyMask;
 
             // Process loaded nodes
-            if (nodeReady & 1u) // we only process first continously loaded nodes
+            if (workgroupNodeReadyMask & 1u) // we only process first contiguously loaded nodes
             {
-                uint frontReadyNodeCount = findLSB(~nodeReadyMask);
+                uint frontReadyNodeCount = findLSB(~workgroupNodeReadyMask);
 
                 // TODO process node cull
                 // CullNode(frontReadyNodeCount, threadID);
 
-                doneNodeCount += frontReadyNodeCount;
+                workgroupDoneNodeCount += frontReadyNodeCount;
 
                 // TODO erase processed data in process data array, -> neccessary?
-                continue;
+                continue; // all threads within this workgroup will take the same branch
             }
         }
 
-        if (workgroupClusterOffset == 0xFFFFFFFFu)
+        // We reach here when:
+        // Some nodes don't loaded yet -> workgroupProcessNode == true
+        // or all node tasks done, which means all valid cluster tasks should be written into buffer now -> workgroupProcessNode == false
+
+        // fetch workgroup cluster batch task if we first reach here or last batch was finished
+        if (workgroupClusterBatchOffset == 0xFFFFFFFFu)
         {
             // fill workgroup cluster tasks
             if (threadID == 0)
             {
-                g_workgroupClusterOffset = atomicAdd(nextClusterTask, 1);
+                g_workgroupClusterBatchOffset = atomicAdd(nextClusterTask, 1);
             }
             BARRIER;
-            workgroupClusterOffset = g_workgroupClusterOffset;
+            workgroupClusterBatchOffset = g_workgroupClusterBatchOffset;
         }
 
-        if (!processNode && workgroupClusterOffset >= CLUSTERS_COUNT_IN_TREE)
-        {
-            // No more cluster tasks, finish
-            break;
-        }
+        // All cluster tasks done, finish
+        if (!workgroupProcessNode && workgroupClusterBatchOffset >= CLUSTERS_COUNT_IN_TREE) break;
 
         if (threadID == 0)
         {
-            // TODO process cluster cull
-            // CullCluster(workgroupClusterOffset);
-            g_nodesRemaining = 0;// TODO set remaining nodes count
-            g_clusterLoadedSize = 0; // TODO reset for next cluster task
+            g_nodesRemaining = NODE_TO_PROCESS_COUNT;
+            g_workgroupBatchClusterCount = _GetBatchClusterCount(workgroupClusterBatchOffset);
         }
+        
         BARRIER;
+        workgroupBatchClusterCount = g_workgroupBatchClusterCount;
+        workgroupProcessNode = (g_nodesRemaining == 0) ? false : workgroupProcessNode;
 
-        uint clusterLoadedSize = g_clusterLoadedSize;
+        if (!workgroupProcessNode && workgroupBatchClusterCount == 0) break;
 
-        if (!processNode && clusterLoadedSize == 0) break;
-
-        if (
-            (processNode && g_clusterLoadedSize == CLUSTERS_COUNT_PER_WORKGROUP) // hungry?
-            || (!processNode && clusterLoadedSize > 0))
+        // process cluster batch cull
+        if (// hungry? -> process full batch, else, hang task when nodes cull finished
+            (workgroupProcessNode && workgroupBatchClusterCount == CLUSTERS_COUNT_PER_WORKGROUP)
+            || (!workgroupProcessNode && workgroupBatchClusterCount > 0))
         {
-            // TODO process cluster
-            workgroupClusterOffset = 0xFFFFFFFFu;
-        }
+            // TODO process cluster batch cull
+            // CullCluster(workgroupClusterBatchOffset);
 
-        if (g_nodesRemaining == 0)
-        {
-            processNode = false;
+            // mark batch as done -> fetch new batch next iteration
+            workgroupClusterBatchOffset = 0xFFFFFFFFu;
         }
     }
 }
