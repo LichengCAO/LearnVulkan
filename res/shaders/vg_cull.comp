@@ -9,11 +9,6 @@ layout(binding = 0, set = 0) buffer TaskBuffer
     uint totalClusterTasks;
 };
 
-void CullNode()
-{
-
-}
-
 void CullCluster()
 {
 
@@ -43,6 +38,14 @@ shared uint g_workgroupNodeReadyMask;      // bitmask of loaded nodes in current
 shared uint g_workgroupClusterBatchOffset; // offset of the first cluster task for this workgroup
 shared uint g_nodesRemaining; // nodes remaining to process in the whole mesh
 shared uint g_workgroupBatchClusterCount;
+
+void CullNode(uint _availableNodeCount, uint _threadID)
+{
+    if (_threadID >= _availableNodeCount) return;
+
+    Node nodeToProcess; // TODO load from process data array
+    float errorScale = 1.0; // TODO compute error scale based on distance to camera
+}
 
 void HierarchyTraversal()
 {
