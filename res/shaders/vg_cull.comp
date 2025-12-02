@@ -9,11 +9,6 @@ layout(binding = 0, set = 0) buffer TaskBuffer
     uint totalClusterTasks;
 };
 
-void CullCluster()
-{
-
-}
-
 bool _LoadNode(uint nodeIndex)
 {
     // TODO load node data from taskNodes[nodeIndex]
@@ -31,6 +26,7 @@ uint _GetBatchClusterCount(uint _offset)
 #define CLUSTERS_COUNT_IN_TREE 256 // TODO
 #define CLUSTERS_COUNT_PER_WORKGROUP 64
 #define NODE_TO_PROCESS_COUNT 0 // TODO
+#define WORKGROUP_SIZE 64
 
 shared uint g_workgroupPassedNodeCount;    // count of nodes passed cull in this workgroup
 shared uint g_workgroupNodeOffset;         // offset of the first node task for this workgroup
@@ -45,6 +41,54 @@ void CullNode(uint _availableNodeCount, uint _threadID)
 
     Node nodeToProcess; // TODO load from process data array
     float errorScale = 1.0; // TODO compute error scale based on distance to camera
+}
+
+// Cull children of a node that passed the cull test, each thread process one child node
+// if child node passes, there will be 2 cases:
+// 1. child node is a leaf node -> add its clusters to cluster task buffer
+// 2. child node is not a leaf node -> add it to node task buffer
+void CullNodeChildren(uint _nodeIndex, uint _threadID)
+{
+    NodeInfo childNode = _LoadNodeInfo(_nodeIndex); // TODO load node info from hierarchy
+    float maxParentError = childNode.maxError; // TODO get max error from node info
+    bool isLeafNode = childNode.isLeaf; // TODO get leaf flag from node info
+    bool coarseEnough = (maxParentError * errorScale) > ERROR_THRESHOLD; // TODO define ERROR_THRESHOLD
+    bool frustumCulled = false; // TODO perform frustum cull test
+    if (frustumCulled) return;
+    if (!coarseEnough) return;
+    if (isLeafNode)
+    {
+        bool groupLoaded = true; // TODO check if cluster group is loaded
+        if (!groupLoaded)
+        {
+            // require loading of cluster group
+            return;
+        }
+        else
+        {
+            // Output cluster group in cluster queue for further processing
+            // OR clusters in the queue? not sure which one is better
+            return;
+        }
+    }
+    else
+    {
+        // add current child node to process queue
+    }
+}
+
+// Cull clusters each thread process one cluster in the batch
+void CullClustersInGroup(uint _groupIndex, uint _threadID)
+{
+    bool culled = false; // TODO perform cull test
+    if (culled) return;
+    float error = 0.0; // TODO compute cluster error
+    if (error > ERROR_THRESHOLD)
+    {
+        bool finerLodAvailable = false; // TODO check if finer LOD is available
+        if (finerLodAvailable) return;
+    }
+    // TODO Output cluster for rendering
 }
 
 void HierarchyTraversal()
