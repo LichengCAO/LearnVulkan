@@ -5,6 +5,9 @@
 #include "common.h"
 #include "geometry.h"
 #define VG_HIERARCHY_MAX_CHILD 4
+#define VG_MAX_CLUSTER_GROUP_SIZE 16
+#define VG_MAX_CLUSTER_INDEX 64
+#define 
 
 class VirtualGeometry
 {
@@ -66,17 +69,41 @@ private:
 		uint32_t groupIndex;		// group index that shared by siblings
 	};
 
-public:
 	struct HierarchyNode
 	{
 		glm::vec4 bounding; // xyz: center | w: radius
-		
-		// consider this node only if threshold is smaller, 
-		// otherwise, coarser parent nodes are already precise enough
+		std::array<uint32_t, VG_HIERARCHY_MAX_CHILD> children = { ~0u, ~0u, ~0u, ~0u };
 		float error;
-		std::array<uint32_t, VG_HIERARCHY_MAX_CHILD> children = {~0u, ~0u, ~0u, ~0u};
-		bool isClusterGroup = false;
-		uint32_t groupId = ~0;
+	};
+public:
+	class IntermediateNode
+	{
+	private:
+		std::array<uint32_t, 12> m_data; // data align as 16 bytes on device side
+
+	public:
+		bool IsLeaf() const;
+		void GetBoundingSphere(glm::vec3& _center, float& _radius) const;
+		void GetChildren(std::array<uint32_t, VG_HIERARCHY_MAX_CHILD>& _children) const;
+		float GetError() const;
+		uint64_t GetClusterGroupOffset() const;
+		bool ShouldTraverse(float _errorThreshold) const;
+	};
+
+	class ClusterGroupData
+	{
+	private:
+		std::vector<uint32_t> m_data;
+
+	public:
+		uint32_t GetClusterCount() const;
+		void GetClusterBoundingSphere(uint32_t _clusterId, glm::vec3& _center, float& _radius) const;
+		float GetClusterError(uint32_t _clusterId) const;
+		uint32_t GetClusterVertexCount(uint32_t _clusterId) const;
+		uint32_t GetClusterTriangleCount(uint32_t _clusterId) const;
+		uint32_t GetClusterMeshVertex(uint32_t _clusterId, uint32_t _localIndex) const;
+		void GetClusterTriangleIndices(uint32_t _clusterId, uint8_t& _x, uint8_t& _y, uint8_t& _z) const;
+		bool FinerGroupExists(uint32_t _clusterId) const;
 	};
 
 private:
