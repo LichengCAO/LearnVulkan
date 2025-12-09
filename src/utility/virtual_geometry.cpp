@@ -8,41 +8,25 @@
 
 namespace
 {
-	glm::vec4 _MergeBounds(const glm::vec4& _sphere1, const glm::vec4& _sphere2)
+	glm::vec4 _MergeBounds(const glm::vec4& inSphere1, const glm::vec4& inSphere2)
 	{
 		glm::vec4 result{};
 
 		// center
-		result.x = (_sphere1.x + _sphere2.x) * 0.5f;
-		result.y = (_sphere1.y + _sphere2.y) * 0.5f;
-		result.z = (_sphere1.z + _sphere2.z) * 0.5f;
+		result.x = (inSphere1.x + inSphere2.x) * 0.5f;
+		result.y = (inSphere1.y + inSphere2.y) * 0.5f;
+		result.z = (inSphere1.z + inSphere2.z) * 0.5f;
 
 		// radius
 		result.w =
-			std::max(_sphere1.w, _sphere2.w)
-			+ glm::distance(glm::vec3(result.x, result.y, result.z), glm::vec3(_sphere1.x, _sphere1.y, _sphere1.z));
+			std::max(inSphere1.w, inSphere2.w)
+			+ glm::distance(glm::vec3(result.x, result.y, result.z), glm::vec3(inSphere1.x, inSphere1.y, inSphere1.z));
 
 		return result;
 	}
-
-	float _HierarchyCost(
-		const std::vector<VirtualGeometry::HierarchyNode>& _fullTree,
-		const std::vector<uint32_t>& _nodeIndex,
-		uint32_t _begin,
-		uint32_t _end)
-	{
-		auto mergedSphere = _fullTree[_nodeIndex[_begin]].bounding;
-		
-		for (uint32_t i = _begin + 1; i < _end; ++i)
-		{
-			mergedSphere = _MergeBounds(mergedSphere, _fullTree[_nodeIndex[i]].bounding);
-		}
-
-		return mergedSphere.w * mergedSphere.w; // we want to calculate area
-	}
 }
 
-const std::vector<Vertex>& VirtualGeometry::_GetCompleteVertices(uint32_t _lod) const
+const std::vector<Vertex>& VirtualGeometry::_GetCompleteVertices(uint32_t inLod) const
 {
 	return m_pBaseMesh->verts;
 }
@@ -642,6 +626,22 @@ void VirtualGeometry::_OptimizeHierarchyNodeGroups(
 			std::sort(_nodeIndices.begin() + beginOffset, _nodeIndices.begin() + endOffset, funcCmp);
 		};
 	
+	auto funcCalculateCost = [](
+		const std::vector<VirtualGeometry::HierarchyNode>& inFullTree,
+		const std::vector<uint32_t>& inNodeIndices,
+		uint32_t inBegin,
+		uint32_t inEnd)
+		{
+			auto mergedSphere = inFullTree[inNodeIndices[inBegin]].bounding;
+
+			for (uint32_t i = inBegin + 1; i < inEnd; ++i)
+			{
+				mergedSphere = _MergeBounds(mergedSphere, inFullTree[inNodeIndices[i]].bounding);
+			}
+
+			return mergedSphere.w * mergedSphere.w; // we want to calculate area
+		};
+
 	while ((1 << levelCount) < VG_HIERARCHY_MAX_CHILD)
 	{
 		levelCount++;
@@ -681,8 +681,8 @@ void VirtualGeometry::_OptimizeHierarchyNodeGroups(
 				float cost;
 				
 				funcSortByAxis(axis, beginOffset, endOffset);
-				cost = _HierarchyCost(_fullTree, _nodeIndices, beginOffset, beginOffset + sizes[0])
-					+ _HierarchyCost(_fullTree, _nodeIndices, beginOffset + sizes[0], endOffset);
+				cost = funcCalculateCost(_fullTree, _nodeIndices, beginOffset, beginOffset + sizes[0])
+					+ funcCalculateCost(_fullTree, _nodeIndices, beginOffset + sizes[0], endOffset);
 
 				if (cost < minCost)
 				{
@@ -721,3 +721,78 @@ void VirtualGeometry::GetMeshletsAtLOD(uint32_t _lod, std::vector<Meshlet>& _mes
 		_meshlet.push_back(myMeshlet.meshlet);
 	}
 }
+
+float VirtualGeometry::IntermediateNode::GetError() const
+{
+	float result;
+	memcpy(&result, (m_data.data() + 8), sizeof(float));
+	return result;
+}
+
+void VirtualGeometry::IntermediateNode::GetBoundingSphere(glm::vec3& outCenter, float& outRadius) const
+{
+	std::array<float, 3> xyz;
+
+	memcpy(xyz.data(), (m_data.data() + 4), sizeof(xyz));
+	outCenter = glm::vec3(xyz[0], xyz[1], xyz[2]);
+	memcpy(&outRadius, (m_data.data() + 7), sizeof(float));
+}
+
+void VirtualGeometry::IntermediateNode::GetChildren(std::array<uint32_t, VG_HIERARCHY_MAX_CHILD>& outChildren) const
+{
+	memcpy(outChildren.data(), m_data.data(), sizeof(uint32_t) * VG_HIERARCHY_MAX_CHILD);
+}
+
+bool VirtualGeometry::IntermediateNode::IsLeaf() const
+{
+	return m_data[0] == ~0;
+}
+
+bool VirtualGeometry::IntermediateNode::ShouldTraverse(float inErrorThreshold) const
+{
+	return GetError() > inErrorThreshold;
+}
+
+uint32_t VirtualGeometry::IntermediateNode::GetClusterGroupDataIndex() const
+{
+	CHECK_TRUE(IsLeaf(), "Only leaf node has cluster group data index!");
+	return m_data[1];
+}
+
+void VirtualGeometry::IntermediateNode::GetDataToCopyToDevice(const void*& outSrcPtr, size_t& outSize)
+{
+	outSrcPtr = static_cast<const void*>(m_data.data());
+	outSize = m_data.size() * sizeof(uint32_t);
+}
+
+uint32_t VirtualGeometry::ClusterGroupData::_GetClusterDataOffset(uint32_t inClusterId) const
+{
+	CHECK_TRUE(inClusterId < GetClusterCount(), "Cluster ID out of range!");
+
+	return 1 + inClusterId * 9;
+}
+
+uint32_t VirtualGeometry::ClusterGroupData::GetClusterCount() const
+{
+	uint32_t result = m_data[0] >> 24;
+	return result;
+}
+
+uint32_t VirtualGeometry::ClusterGroupData::GetClusterVertexCount(uint32_t inClusterId) const
+{
+	uint32_t offset = _GetClusterDataOffset(inClusterId) + 2;
+	return m_data[offset];
+}
+
+uint32_t VirtualGeometry::ClusterGroupData::GetClusterTriangleCount(uint32_t inClusterId) const
+{
+	uint32_t offset = _GetClusterDataOffset(inClusterId) + 3;
+	return m_data[offset];
+}
+
+uint32_t VirtualGeometry::ClusterGroupData::GetClusterMeshVertex(uint32_t inClusterId, uint8_t inLocalIndex) const
+{
+	return 0;
+}
+
+

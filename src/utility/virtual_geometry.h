@@ -7,7 +7,6 @@
 #define VG_HIERARCHY_MAX_CHILD 4
 #define VG_MAX_CLUSTER_GROUP_SIZE 16
 #define VG_MAX_CLUSTER_INDEX 64
-#define 
 
 class VirtualGeometry
 {
@@ -74,36 +73,70 @@ private:
 		glm::vec4 bounding; // xyz: center | w: radius
 		std::array<uint32_t, VG_HIERARCHY_MAX_CHILD> children = { ~0u, ~0u, ~0u, ~0u };
 		float error;
+		bool isClusterGroup = false;
+		uint32_t groupLod = ~0u;
+		uint32_t groupIndex = ~0u;
 	};
+
 public:
 	class IntermediateNode
 	{
 	private:
-		std::array<uint32_t, 12> m_data; // data align as 16 bytes on device side
+		// layout
+		// child0: 4 bytes   | child1 or clusterGroupIdx: 4 bytes | child2: 4 bytes | child3: 4 bytes -> [0-3]
+		// center.x: 4 bytes | center.y: 4 bytes | center.z: 4 bytes | radius: 4 bytes -> [4-7]
+		// error: 4 bytes    | padding: 12 bytes -> [8-11]
+		std::array<uint32_t, 12> m_data; // data to copy to device
 
 	public:
-		bool IsLeaf() const;
-		void GetBoundingSphere(glm::vec3& _center, float& _radius) const;
-		void GetChildren(std::array<uint32_t, VG_HIERARCHY_MAX_CHILD>& _children) const;
+		// device side functions
 		float GetError() const;
-		uint64_t GetClusterGroupOffset() const;
-		bool ShouldTraverse(float _errorThreshold) const;
+		void GetBoundingSphere(glm::vec3& outCenter, float& outRadius) const;
+		void GetChildren(std::array<uint32_t, VG_HIERARCHY_MAX_CHILD>& outChildren) const;
+		bool IsLeaf() const;
+		bool ShouldTraverse(float inErrorThreshold) const;
+		uint32_t GetClusterGroupDataIndex() const;
+
+		// host side functions
+		void GetDataToCopyToDevice(const void*& outSrcPtr, size_t& outSize);
 	};
 
 	class ClusterGroupData
 	{
 	private:
-		std::vector<uint32_t> m_data;
+		// layout
+		// clusterCount + vertexCount: 1 bytes + 3 bytes-> [0]
+		// clusterData is 36 bytes each -> vertex offset 4 bytes | triangle offset 4 bytes | vertex count 4 bytes | triangle count 4 bytes | bounding 16 bytes | error 4 byptes
+		// clusterData: 32 * 36 bytes -> [1 - 288]
+		// vertex data: arbitrary size -> [289 - ... 289 + vertexCount];
+		// triangle data: arbitrary size -> [... - end]
+		std::vector<uint32_t> m_data;					// data to copy to device
+		std::vector<uint32_t> m_childrenGroupDataIndex; // index of children ClusterGroupData in the array of ClusterGroupData
+
+	private:
+		uint32_t _GetClusterDataOffset(uint32_t inClusterId) const;
 
 	public:
+		// device side functions
 		uint32_t GetClusterCount() const;
-		void GetClusterBoundingSphere(uint32_t _clusterId, glm::vec3& _center, float& _radius) const;
-		float GetClusterError(uint32_t _clusterId) const;
-		uint32_t GetClusterVertexCount(uint32_t _clusterId) const;
-		uint32_t GetClusterTriangleCount(uint32_t _clusterId) const;
-		uint32_t GetClusterMeshVertex(uint32_t _clusterId, uint32_t _localIndex) const;
-		void GetClusterTriangleIndices(uint32_t _clusterId, uint8_t& _x, uint8_t& _y, uint8_t& _z) const;
-		bool FinerGroupExists(uint32_t _clusterId) const;
+		uint32_t GetClusterVertexCount(uint32_t inClusterId) const;
+		uint32_t GetClusterTriangleCount(uint32_t inClusterId) const;
+		uint32_t GetClusterMeshVertex(uint32_t inClusterId, uint8_t inLocalIndex) const;
+		void GetClusterTriangleIndices(
+			uint32_t inClusterId, 
+			uint32_t inTriangleIndex,
+			uint8_t& outX,
+			uint8_t& outY,
+			uint8_t& outZ) const;
+		void GetClusterBoundingSphere(
+			uint32_t inClusterId,
+			glm::vec3& outCenter,
+			float& outRadius) const;
+		float GetClusterError(uint32_t inClusterId) const;
+		
+		// host side functions
+		void GetDataToCopyToDevice(const void*& outSrcPtr, size_t& outSize);
+		uint32_t GetClusterChildGroupDataIndex(uint32_t inClusterId) const;
 	};
 
 private:
@@ -124,7 +157,7 @@ private:
 	// _lod: LOD of new meshlets
 	// _error: error when simplifiy triangles to serve as the input to build new meshlets
 	// _newMeshlets: meshlets built from simplified triangles
-	// _children: index of meshlets from the group before triangle simplification
+	// outChildren: index of meshlets from the group before triangle simplification
 	// _pFirstIndex: output, if not nullptr, fill first index of newly added MyMeshlet objects
 	// _pNumAdded: output, if not nullptr, fill number of MyMeshlet objects added
 	void _AddMyMeshlet(
