@@ -18,7 +18,7 @@ public:
 	// to be empty as long as the vertices that they built from are the same as the current call.
 	// Which means that we can insert only part of the whole index buffer to build meshlets that for partial of the mesh 
 	// and come back later to build the other part
-	// _vertex: vertices of the whole mesh, start with vec3 position
+	// inVertices: vertices of the whole mesh, start with vec3 position
 	// _index: index of the part of the mesh we want to build meshlet for
 	// _outMeshletData: data used by meshlet to get indices of the original mesh
 	// _outMeshlet: each element is an interval of _outMeshletVertex, _outMeshletLocalIndex that presents a meshlet
@@ -42,10 +42,10 @@ public:
 	// use original vertices to draw simplified mesh
 	// return relative error from the original mesh
 	// previous elements in _outIndex will remain intact
-	// _vertex: vertices of the original mesh
+	// inVertices: vertices of the original mesh
 	// _index: indices of the orignal mesh
 	// _targetIndexCount: target index number returned may not reach this
-	// _outIndex: output simplified index, can draw new mesh with the original _vertex
+	// _outIndex: output simplified index, can draw new mesh with the original inVertices
 	float SimplifyMesh(
 		const std::vector<Vertex>& _vertex,
 		const std::vector<uint32_t>& _index,
@@ -56,7 +56,7 @@ public:
 	// generate a new set of vertices used to draw simplified mesh
 	// return relative error from the original mesh,
 	// previous elements in _outVertex and _outIndex will remain intact
-	// _vertex: vertices of the original mesh
+	// inVertices: vertices of the original mesh
 	// _index: indices of the orignal mesh
 	// _targetIndexCount: target index number returned may not reach this
 	// _outVertex: output simplified vertices 
@@ -86,63 +86,63 @@ public:
 		const std::vector<Vertex>& _vertex,
 		const std::vector<uint32_t>& _index) const;
 
-	// Remove duplicate vertices based on _equal
+	// Remove duplicate vertices based on inFuncEqual
 	template<typename T>
 	void RemoveDuplicateVertices(
-		std::vector<T>& _vertex, 
-		std::vector<uint32_t>& _index, 
-		std::function<bool(const T&, const T&)> _equal) const 
+		std::vector<T>& inoutVertices, 
+		std::vector<uint32_t>& inoutIndices, 
+		std::function<bool(const T&, const T&)> inFuncEqual) const 
 	{
-		std::vector<uint32_t> remap(std::max(_vertex.size(), _index.size()));
-		std::vector<uint32_t> dstIndices(_index.size());
-		std::vector<T> dstVerts(_vertex.size());
-		size_t indexCount = _index.size();
+		std::vector<uint32_t> remap(std::max(inoutVertices.size(), inoutIndices.size()));
+		std::vector<uint32_t> dstIndices(inoutIndices.size());
+		std::vector<T> dstVerts(inoutVertices.size());
+		size_t indexCount = inoutIndices.size();
 		size_t vertexCount = meshopt_generateVertexRemapCustom(
 			remap.data(),
-			_index.data(),
-			_index.size(),
-			reinterpret_cast<const float*>(_vertex.data()),
-			_vertex.size(),
+			inoutIndices.data(),
+			inoutIndices.size(),
+			reinterpret_cast<const float*>(inoutVertices.data()),
+			inoutVertices.size(),
 			sizeof(T),
-			[&](unsigned int l, unsigned int r) { return _equal(_vertex[l], _vertex[r]); }
+			[&](unsigned int l, unsigned int r) { return inFuncEqual(inoutVertices[l], inoutVertices[r]); }
 		);
 		dstIndices.resize(indexCount);
 		dstVerts.resize(vertexCount);
-		meshopt_remapVertexBuffer(dstVerts.data(), _vertex.data(), _vertex.size(), sizeof(T), remap.data());
-		meshopt_remapIndexBuffer(dstIndices.data(), _index.data(), indexCount, remap.data());
-		_vertex = dstVerts;
-		_index = dstIndices;
+		meshopt_remapVertexBuffer(dstVerts.data(), inoutVertices.data(), inoutVertices.size(), sizeof(T), remap.data());
+		meshopt_remapIndexBuffer(dstIndices.data(), inoutIndices.data(), indexCount, remap.data());
+		inoutVertices = dstVerts;
+		inoutIndices = dstIndices;
 	};
 
 	// Map index to the first vertex
-	// whose first _equalByte bytes are equal to the 
+	// whose first inEqualBytes bytes are equal to the 
 	// vertex that this index currently points to
 	// this function will not reorder triangles
-	// that _originalIndex represents
+	// that inOriginIndices represents
 	template<typename T>
 	void RemapIndex(
-		const std::vector<T>& _vertex,
-		const std::vector<uint32_t>& _originIndex,
-		std::vector<uint32_t>& _outIndex,
-		size_t _equalByte = sizeof(glm::vec3)) const
+		const std::vector<T>& inVertices,
+		const std::vector<uint32_t>& inOriginIndices,
+		std::vector<uint32_t>& outIndices,
+		size_t inEqualBytes = sizeof(glm::vec3)) const
 	{
-		_outIndex.resize(_originIndex.size());
+		outIndices.resize(inOriginIndices.size());
 		meshopt_generateVertexRemapCustom(
-			_outIndex.data(),
-			_originIndex.data(),
-			_originIndex.size(),
-			reinterpret_cast<const float*>(_vertex.data()),
-			_vertex.size(),
+			outIndices.data(),
+			inOriginIndices.data(),
+			inOriginIndices.size(),
+			reinterpret_cast<const float*>(inVertices.data()),
+			inVertices.size(),
 			sizeof(T),
 			[&](unsigned int l, unsigned int r) {
 				return std::memcmp(
-					reinterpret_cast<const uint8_t*>(&_vertex[l]), 
-					reinterpret_cast<const uint8_t*>(&_vertex[r]), 
-					_equalByte) == 0;
+					reinterpret_cast<const uint8_t*>(&inVertices[l]), 
+					reinterpret_cast<const uint8_t*>(&inVertices[r]), 
+					inEqualBytes) == 0;
 			});
 	}
 
 	void GeneratePositionRemap(
-		const std::vector<Vertex>& _vertex,
-		std::vector<uint32_t>& _outPositionRemap) const;
+		const std::vector<Vertex>& inVertices,
+		std::vector<uint32_t>& outPositionRemap) const;
 };
