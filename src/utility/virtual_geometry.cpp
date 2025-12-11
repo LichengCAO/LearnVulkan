@@ -778,6 +778,12 @@ uint32_t VirtualGeometry::ClusterGroupData::GetClusterCount() const
 	return result;
 }
 
+uint32_t VirtualGeometry::ClusterGroupData::GetVertexCount() const
+{
+	const uint32_t VERTEX_COUNT_MASK = 0x00FFFFFF;
+	return m_data[0] & VERTEX_COUNT_MASK;
+}
+
 uint32_t VirtualGeometry::ClusterGroupData::GetClusterVertexCount(uint32_t inClusterId) const
 {
 	uint32_t offset = _GetClusterDataOffset(inClusterId) + 2;
@@ -792,7 +798,33 @@ uint32_t VirtualGeometry::ClusterGroupData::GetClusterTriangleCount(uint32_t inC
 
 uint32_t VirtualGeometry::ClusterGroupData::GetClusterMeshVertex(uint32_t inClusterId, uint8_t inLocalIndex) const
 {
-	return 0;
+	uint32_t vertexCount = GetVertexCount();
+	uint32_t offset = _GetClusterDataOffset(inClusterId);
+	uint32_t clusterVertexOffset = m_data[offset];
+	uint32_t vertexIndex = m_data[clusterVertexOffset + static_cast<uint32_t>(inLocalIndex) + 289];
+	return vertexIndex;
+}
+
+void VirtualGeometry::ClusterGroupData::GetClusterTriangleIndices(
+	uint32_t inClusterId, 
+	uint32_t inTriangleIndex, 
+	uint8_t& outX, 
+	uint8_t& outY, 
+	uint8_t& outZ) const
+{
+	uint32_t triangleStrideInBytes = 3; // each triangle use 3 uint8_t
+	uint32_t clusterTriangleOffset = m_data[_GetClusterDataOffset(inClusterId) + 1];
+	uint32_t triangleDataStart = 289 + GetVertexCount(); // each vertex use 1 uint32_t, plus 289 uint32_t header
+	uint32_t byteOffset = triangleStrideInBytes * (clusterTriangleOffset + inTriangleIndex);
+	const std::array<uint32_t, 4> byteMasks = { 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000 };
+	std::array<uint8_t*, 3> triangleIndices = { &outX, &outY, &outZ };
+	for (int i = 0; i < 3; ++i)
+	{
+		uint32_t dataIndex = (byteOffset + i) / 4;
+		uint32_t byteIndex = (byteOffset + i) % 4;
+
+		*triangleIndices[i] = static_cast<uint8_t>((m_data[triangleDataStart + dataIndex] & byteMasks[byteIndex]) >> (byteIndex * 8));
+	}
 }
 
 

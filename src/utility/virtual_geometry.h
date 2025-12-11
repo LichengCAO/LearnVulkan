@@ -108,7 +108,7 @@ public:
 		// clusterCount + vertexCount: 1 bytes + 3 bytes-> [0]
 		// clusterData is 36 bytes each -> vertex offset 4 bytes | triangle offset 4 bytes | vertex count 4 bytes | triangle count 4 bytes | bounding 16 bytes | error 4 byptes
 		// clusterData: 32 * 36 bytes -> [1 - 288]
-		// vertex data: arbitrary size -> [289 - ... 289 + vertexCount];
+		// vertex data: arbitrary size -> [289 - ... 289 + vertexCount - 1];
 		// triangle data: arbitrary size -> [... - end]
 		std::vector<uint32_t> m_data;					// data to copy to device
 		std::vector<uint32_t> m_childrenGroupDataIndex; // index of children ClusterGroupData in the array of ClusterGroupData
@@ -119,6 +119,7 @@ public:
 	public:
 		// device side functions
 		uint32_t GetClusterCount() const;
+		uint32_t GetVertexCount() const;
 		uint32_t GetClusterVertexCount(uint32_t inClusterId) const;
 		uint32_t GetClusterTriangleCount(uint32_t inClusterId) const;
 		uint32_t GetClusterMeshVertex(uint32_t inClusterId, uint8_t inLocalIndex) const;
