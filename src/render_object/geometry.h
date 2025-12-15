@@ -61,7 +61,7 @@ public:
 	static void CompressToDeviceData(
 		const Meshlet& _meshlet,
 		Meshlet::DeviceData& _outData,
-		std::vector<Meshlet::DeviceDataRef>& _outRef);
+		Meshlet::DeviceDataRef& _outRef);
 
 	// Get meshlet from device data
 	static Meshlet GetFromDeviceData(

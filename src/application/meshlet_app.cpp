@@ -133,7 +133,8 @@ void MeshletApp::_InitModels()
 		
 		for (const auto& meshlet : meshlets)
 		{
-			Meshlet::CompressToDeviceData(meshlet, meshletData, model.vecMeshlet);
+			model.vecMeshlet.push_back({});
+			Meshlet::CompressToDeviceData(meshlet, meshletData, model.vecMeshlet.back());
 		}
 		model.vecVertexRemap = meshletData.meshletVertices;
 		model.vecTriangleIndex = meshletData.meshletIndices;

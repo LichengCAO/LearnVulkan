@@ -124,41 +124,41 @@ void MeshOptimizer::BuildMeshlets(
 }
 
 float MeshOptimizer::SimplifyMesh(
-	const std::vector<Vertex>& _vertex, 
-	const std::vector<uint32_t>& _index, 
-	size_t _targetIndexCount, 
-	std::vector<uint32_t>& _outIndex) const
+	const std::vector<Vertex>& inVertices, 
+	const std::vector<uint32_t>& inIndices, 
+	size_t inTargetIndexCount, 
+	std::vector<uint32_t>& inoutIndices) const
 {
 	float error = 0.0f;
 	size_t newIndexSize = 0;
 	std::vector<uint32_t> dstIndex;
 	std::vector<uint32_t> srcIndex;
 	
-	srcIndex.resize(_index.size());
-	dstIndex.resize(_index.size());
+	srcIndex.resize(inIndices.size());
+	dstIndex.resize(inIndices.size());
 	meshopt_generateShadowIndexBuffer(
 		srcIndex.data(),
-		_index.data(),
-		_index.size(),
-		_vertex.data(),
-		_vertex.size(),
+		inIndices.data(),
+		inIndices.size(),
+		inVertices.data(),
+		inVertices.size(),
 		sizeof(glm::vec3),
 		sizeof(Vertex));
 	newIndexSize = meshopt_simplify(
 		dstIndex.data(),
 		srcIndex.data(),
 		srcIndex.size(),
-		reinterpret_cast<const float*>(_vertex.data()),
-		_vertex.size(),
+		reinterpret_cast<const float*>(inVertices.data()),
+		inVertices.size(),
 		sizeof(Vertex),
-		_targetIndexCount,
+		inTargetIndexCount,
 		FLT_MAX,
 		meshopt_SimplifyLockBorder | meshopt_SimplifyPermissive | meshopt_SimplifyErrorAbsolute | meshopt_SimplifySparse,
 		&error);
 	dstIndex.resize(newIndexSize);
 	
 	// if normal simplification failed
-	if (newIndexSize > _targetIndexCount)
+	if (newIndexSize > inTargetIndexCount)
 	{
 		struct SloppyVertex
 		{
@@ -172,13 +172,13 @@ float MeshOptimizer::SimplifyMesh(
 		dstIndex = srcIndex;
 		subVertex.resize(dstIndex.size());
 		subLock.resize(dstIndex.size());
-		_LockBoundary(_vertex, srcIndex, lock);
+		_LockBoundary(inVertices, srcIndex, lock);
 
 		for (size_t i = 0; i < dstIndex.size(); ++i)
 		{
 			uint32_t vId = dstIndex[i];
 
-			subVertex[i].pos = _vertex[vId].position;
+			subVertex[i].pos = inVertices[vId].position;
 			subVertex[i].id = vId;
 
 			dstIndex[i] = static_cast<uint32_t>(i);
@@ -193,7 +193,7 @@ float MeshOptimizer::SimplifyMesh(
 			subVertex.size(), 
 			sizeof(SloppyVertex), 
 			subLock.data(), 
-			_targetIndexCount, 
+			inTargetIndexCount, 
 			FLT_MAX, 
 			&error);
 
@@ -207,7 +207,7 @@ float MeshOptimizer::SimplifyMesh(
 		}
 	}
 
-	_outIndex.insert(_outIndex.end(), dstIndex.begin(), dstIndex.end());
+	inoutIndices.insert(inoutIndices.end(), dstIndex.begin(), dstIndex.end());
 	
 	return error;
 }
@@ -234,7 +234,7 @@ float MeshOptimizer::SimplifyMesh(
 	size_t indexCount = 0;
 	uint32_t indexOffset = _outVertex.size();
 	
-	// fill _vertex into flat format
+	// fill inVertices into flat format
 	srcVerts.resize(_vertex.size());
 	for (size_t i = 0; i < _vertex.size(); ++i)
 	{

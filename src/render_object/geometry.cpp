@@ -18,13 +18,12 @@ void Meshlet::GetIndices(std::vector<uint32_t>& _outIndices) const
 	//_outIndices.insert(_outIndices.end(), this->vertices.begin(), this->vertices.end());
 }
 
-void Meshlet::CompressToDeviceData(const Meshlet& _meshlet, Meshlet::DeviceData& _outData, std::vector<Meshlet::DeviceDataRef>& _outRef)
+void Meshlet::CompressToDeviceData(const Meshlet& _meshlet, Meshlet::DeviceData& _outData, Meshlet::DeviceDataRef& _outRef)
 {
-	Meshlet::DeviceDataRef ref{};
-	ref.indexOffset = _outData.meshletIndices.size();
-	ref.vertexOffset = _outData.meshletVertices.size();
-	ref.triangleCount = _meshlet.index.size() / 3;
-	ref.vertexCount = _meshlet.vertices.size();
+	_outRef.indexOffset = _outData.meshletIndices.size();
+	_outRef.vertexOffset = _outData.meshletVertices.size();
+	_outRef.triangleCount = _meshlet.index.size() / 3;
+	_outRef.vertexCount = _meshlet.vertices.size();
 
 	_outData.meshletIndices.insert(
 		_outData.meshletIndices.end(), 
@@ -34,7 +33,6 @@ void Meshlet::CompressToDeviceData(const Meshlet& _meshlet, Meshlet::DeviceData&
 		_outData.meshletVertices.end(), 
 		_meshlet.vertices.begin(), 
 		_meshlet.vertices.end());
-	_outRef.push_back(ref);
 }
 
 Meshlet Meshlet::GetFromDeviceData(const Meshlet::DeviceData& _data, const Meshlet::DeviceDataRef& _ref)

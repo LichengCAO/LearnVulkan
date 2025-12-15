@@ -19,9 +19,9 @@ public:
 	// Which means that we can insert only part of the whole index buffer to build meshlets that for partial of the mesh 
 	// and come back later to build the other part
 	// inVertices: vertices of the whole mesh, start with vec3 position
-	// _index: index of the part of the mesh we want to build meshlet for
-	// _outMeshletData: data used by meshlet to get indices of the original mesh
-	// _outMeshlet: each element is an interval of _outMeshletVertex, _outMeshletLocalIndex that presents a meshlet
+	// inIndices: index of the part of the mesh we want to build meshlet for
+	// _outMeshletData: data used by meshlet to get indices of the original mesh, data already stored remains intact
+	// _outMeshlet: each element is an interval of Meshlet::DeviceData that presents a meshlet
 	// _maxPrimitiveCount: max primitive/triangle count of each meshlet
 	// _maxIndexCount: max index count of each meshlet
 	void BuildMeshlets(
@@ -41,50 +41,52 @@ public:
 	// Simplify mesh/meshlet while leaving border intact,
 	// use original vertices to draw simplified mesh
 	// return relative error from the original mesh
-	// previous elements in _outIndex will remain intact
+	// previous elements in outIndices will remain intact
 	// inVertices: vertices of the original mesh
-	// _index: indices of the orignal mesh
-	// _targetIndexCount: target index number returned may not reach this
-	// _outIndex: output simplified index, can draw new mesh with the original inVertices
+	// inIndices: indices of the orignal mesh
+	// inTargetIndexCount: target index number returned may not reach this
+	// outIndices: output simplified index, can draw new mesh with the original inVertices
 	float SimplifyMesh(
-		const std::vector<Vertex>& _vertex,
-		const std::vector<uint32_t>& _index,
-		size_t _targetIndexCount,
-		std::vector<uint32_t>& _outIndex) const;
+		const std::vector<Vertex>& inVertices,
+		const std::vector<uint32_t>& inIndices,
+		size_t inTargetIndexCount,
+		std::vector<uint32_t>& outIndices) const;
 
 	// Simplify mesh/meshlet while leaving border intact, 
 	// generate a new set of vertices used to draw simplified mesh
 	// return relative error from the original mesh,
-	// previous elements in _outVertex and _outIndex will remain intact
+	// previous elements in outVertices and outIndices will remain intact
 	// inVertices: vertices of the original mesh
-	// _index: indices of the orignal mesh
-	// _targetIndexCount: target index number returned may not reach this
-	// _outVertex: output simplified vertices 
-	// _outIndex: output simplified index, can draw new mesh with _outVertex
+	// inIndices: indices of the orignal mesh
+	// inTargetIndexCount: target index number returned may not reach this
+	// outVertices: output simplified vertices 
+	// outIndices: output simplified index, can draw new mesh with outVertices
 	float SimplifyMesh(
-		const std::vector<Vertex>& _vertex,
-		const std::vector<uint32_t>& _index,
-		size_t _targetIndexCount,
-		std::vector<Vertex>& _outVertex,
-		std::vector<uint32_t>& _outIndex) const;
+		const std::vector<Vertex>& inVertices,
+		const std::vector<uint32_t>& inIndices,
+		size_t inTargetIndexCount,
+		std::vector<Vertex>& outVertices,
+		std::vector<uint32_t>& outIndices) const;
 
 	// Optimize mesh by reordering vertex and index to GPU friendly layout
 	// removes duplicated vertices
-	void OptimizeMesh(std::vector<Vertex>& _vertex, std::vector<uint32_t>& _index) const;
+	void OptimizeMesh(
+		std::vector<Vertex>& inoutVertices, 
+		std::vector<uint32_t>& inoutIndices) const;
 
 	// Compute meshlet bounds for culling
 	MeshletBounds ComputeMeshletBounds(
-		const std::vector<Vertex>& _vertex,
-		const Meshlet& _meshlet) const;
+		const std::vector<Vertex>& inVertices,
+		const Meshlet& inMeshlet) const;
 	MeshletBounds ComputeMeshletBounds(
-		const std::vector<Vertex>& _vertex,
-		const Meshlet::DeviceData& _meshletData,
-		const Meshlet::DeviceDataRef& _meshlet) const;
+		const std::vector<Vertex>& inVertices,
+		const Meshlet::DeviceData& inMeshletData,
+		const Meshlet::DeviceDataRef& inMeshletDataRef) const;
 
 	// Compute boundary of cluster of mesh
 	MeshletBounds ComputeBounds(
-		const std::vector<Vertex>& _vertex,
-		const std::vector<uint32_t>& _index) const;
+		const std::vector<Vertex>& inVertices,
+		const std::vector<uint32_t>& inIndices) const;
 
 	// Remove duplicate vertices based on inFuncEqual
 	template<typename T>

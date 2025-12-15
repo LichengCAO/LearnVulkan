@@ -4,6 +4,7 @@
 #include <metis/include/metis.h>
 #include "common.h"
 #include "geometry.h"
+#include <variant>
 #define VG_HIERARCHY_MAX_CHILD 4
 #define VG_MAX_CLUSTER_GROUP_SIZE 16
 #define VG_MAX_CLUSTER_INDEX 64
@@ -79,6 +80,8 @@ private:
 	};
 
 public:
+	// Non-cluster group node in hierarchical traversal,
+	// use GetDataToCopyToDevice() to copy neccessary data to push to device
 	class IntermediateNode
 	{
 	private:
@@ -87,6 +90,11 @@ public:
 		// center.x: 4 bytes | center.y: 4 bytes | center.z: 4 bytes | radius: 4 bytes -> [4-7]
 		// error: 4 bytes    | padding: 12 bytes -> [8-11]
 		std::array<uint32_t, 12> m_data; // data to copy to device
+
+	private:
+		void _SetError(float inError);
+		void _SetBoundingSphere(const glm::vec3& inCenter, float inRadius);
+		void _SetChildrenNodesOrClusterGroup(const std::variant<std::array<uint32_t, VG_HIERARCHY_MAX_CHILD>, uint32_t>& inChildren);
 
 	public:
 		// device side functions
@@ -98,9 +106,13 @@ public:
 		uint32_t GetClusterGroupDataIndex() const;
 
 		// host side functions
-		void GetDataToCopyToDevice(const void*& outSrcPtr, size_t& outSize);
+		void GetDataToCopyToDevice(const void*& outSrcPtr, size_t& outSize) const;
+
+		friend class VirtualGeometry;
 	};
 
+	// Cluster group that can be replaced by larger clusters with higher LOD,
+	// use GetDataToCopyToDevice() to copy neccessary data to push to device
 	class ClusterGroupData
 	{
 	private:
@@ -111,10 +123,23 @@ public:
 		// vertex data: arbitrary size -> [289 - ... 289 + vertexCount - 1];
 		// triangle data: arbitrary size -> [... - end]
 		std::vector<uint32_t> m_data;					// data to copy to device
-		std::vector<uint32_t> m_childrenGroupDataIndex; // index of children ClusterGroupData in the array of ClusterGroupData
+		std::vector<uint32_t> m_childrenGroupDataIndex;	// index of children ClusterGroupData in the array of ClusterGroupData
 
 	private:
 		uint32_t _GetClusterDataOffset(uint32_t inClusterId) const;
+		void _SetClusterCount(uint32_t inClusterCount);
+		void _SetClusterData(
+			uint32_t inIndex,
+			uint32_t inVertexOffset,
+			uint32_t inVertexCount,
+			uint32_t inTriangleOffset,
+			uint32_t inTriangleCount,
+			const glm::vec3& inBoundingCenter,
+			float inRadius,
+			float inGroupError);
+		void _SetMeshletCompactData(
+			const std::vector<uint32_t>& inVertexRemap,
+			const std::vector<uint8_t>& inLocalIndices);
 
 	public:
 		// device side functions
@@ -136,8 +161,10 @@ public:
 		float GetClusterError(uint32_t inClusterId) const;
 		
 		// host side functions
-		void GetDataToCopyToDevice(const void*& outSrcPtr, size_t& outSize);
+		void GetDataToCopyToDevice(const void*& outSrcPtr, size_t& outSize) const;
 		uint32_t GetClusterChildGroupDataIndex(uint32_t inClusterId) const;
+
+		friend class VirtualGeometry;
 	};
 
 private:
@@ -145,7 +172,10 @@ private:
 	// std::vector<std::vector<Vertex>> m_lodVerts; seems won't work LOD0 meshlets are built from m_pBaseMesh, higher LOD meshlets are built from simplified triangles of lower LOD meshlets
 	std::vector<std::vector<MyMeshlet>> m_meshlets;	// meshlets of different LODs
 	std::vector<std::vector<std::vector<uint32_t>>> m_groups; // m_groups[LOD][groupId][meshletId]
+	uint32_t m_rootIndex;
 	std::vector<HierarchyNode> m_hierarchy;
+	std::vector<IntermediateNode> m_deviceNodes;
+	std::vector<ClusterGroupData> m_deviceGroups;
 
 private:
 	// Get vertices when the current LOD of vertices are incomplete
@@ -256,4 +286,9 @@ public:
 	void Init();
 
 	void GetMeshletsAtLOD(uint32_t _lod, std::vector<Meshlet>& _meshlet) const;
+
+	void GetVirtualGeometryDeviceData(
+		uint32_t& outRootNodeIndex,
+		std::vector<VirtualGeometry::IntermediateNode>& outHierarchyNodes,
+		std::vector<VirtualGeometry::ClusterGroupData>& outClusterGroupData) const;
 };

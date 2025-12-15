@@ -32,40 +32,40 @@ const std::vector<Vertex>& VirtualGeometry::_GetCompleteVertices(uint32_t inLod)
 }
 
 void VirtualGeometry::_AddMyMeshlet(
-	uint32_t _lod, 
-	float _error, 
-	const std::vector<Meshlet>& _newMeshlets, 
-	const std::vector<uint32_t>& _children, 
-	uint32_t* _pFirstIndex, 
-	uint32_t* _pNumAdded)
+	uint32_t inLod, 
+	float inError, 
+	const std::vector<Meshlet>& inNewMeshlets, 
+	const std::vector<uint32_t>& inChildren, 
+	uint32_t* outFirstIndexPtr, 
+	uint32_t* outNumAddedPtr)
 {
-	auto& vectorToAdd = m_meshlets[_lod];
+	auto& vectorToAdd = m_meshlets[inLod];
 	uint32_t firstIndex = vectorToAdd.size();
-	uint32_t numAdded = _newMeshlets.size();
+	uint32_t numAdded = inNewMeshlets.size();
 	float tinyClusterMaxError = 0.0f;	// maximum of all childrens' cluster error
 	float clusterError = 0.0f;			// all children have the same cluster error
 	MeshOptimizer optimizer{};
 	
-	if (_pFirstIndex != nullptr)
+	if (outFirstIndexPtr != nullptr)
 	{
-		*_pFirstIndex = firstIndex;
+		*outFirstIndexPtr = firstIndex;
 	}
-	if (_pNumAdded != nullptr)
+	if (outNumAddedPtr != nullptr)
 	{
-		*_pNumAdded = numAdded;
+		*outNumAddedPtr = numAdded;
 	}
 
 	// find maximum error of tiny clusters
-	if (_lod > 0)
+	if (inLod > 0)
 	{
-		uint32_t finerLOD = _lod - 1;
-		for (size_t i = 0; i < _children.size(); ++i)
+		uint32_t finerLOD = inLod - 1;
+		for (size_t i = 0; i < inChildren.size(); ++i)
 		{
-			const MyMeshlet& parentMeshlet = m_meshlets[finerLOD][_children[i]];
+			const MyMeshlet& parentMeshlet = m_meshlets[finerLOD][inChildren[i]];
 			tinyClusterMaxError = std::max(tinyClusterMaxError, parentMeshlet.clusterError);
 		}
 	}
-	clusterError = _error + tinyClusterMaxError;
+	clusterError = inError + tinyClusterMaxError;
 
 	// fill in new myMeshlets
 	for (uint32_t i = 0; i < numAdded; ++i)
@@ -73,14 +73,14 @@ void VirtualGeometry::_AddMyMeshlet(
 		MyMeshlet myMeshlet{};
 		std::vector<uint32_t> indices;
 
-		_newMeshlets[i].GetIndices(indices);
-		auto bounds = optimizer.ComputeBounds(_GetCompleteVertices(_lod), indices);
+		inNewMeshlets[i].GetIndices(indices);
+		auto bounds = optimizer.ComputeBounds(_GetCompleteVertices(inLod), indices);
 		
 		myMeshlet.firstLove = firstIndex;
 		myMeshlet.loverCount = numAdded;
-		myMeshlet.lod = _lod;
-		myMeshlet.meshlet = _newMeshlets[i];
-		myMeshlet.children = _children;
+		myMeshlet.lod = inLod;
+		myMeshlet.meshlet = inNewMeshlets[i];
+		myMeshlet.children = inChildren;
 		myMeshlet.boundingSphere = glm::vec4(bounds.center, bounds.radius);
 		myMeshlet.clusterError = clusterError;
 		myMeshlet.groupError = FLT_MAX; // to be filled later by its parent(Larger clusters)
@@ -89,12 +89,12 @@ void VirtualGeometry::_AddMyMeshlet(
 	}
 
 	// update children(Tiny clusters)
-	if (_lod > 0)
+	if (inLod > 0)
 	{
-		uint32_t finerLOD = _lod - 1;
-		for (size_t i = 0; i < _children.size(); ++i)
+		uint32_t finerLOD = inLod - 1;
+		for (size_t i = 0; i < inChildren.size(); ++i)
 		{
-			MyMeshlet& childMeshlet = m_meshlets[finerLOD][_children[i]];
+			MyMeshlet& childMeshlet = m_meshlets[finerLOD][inChildren[i]];
 			childMeshlet.parent = firstIndex;
 			childMeshlet.groupError = clusterError; // all children have the same group error
 		}
@@ -102,44 +102,44 @@ void VirtualGeometry::_AddMyMeshlet(
 }
 
 void VirtualGeometry::_PrepareMETIS(
-	uint32_t _lod, 
-	std::vector<idx_t>& _xadj, 
-	std::vector<idx_t>& _adjncy, 
-	std::vector<idx_t>& _adjwgt) const
+	uint32_t inLod, 
+	std::vector<idx_t>& outXadj, 
+	std::vector<idx_t>& outAdjncy, 
+	std::vector<idx_t>& outAdjwgt) const
 {
-	const uint32_t n = m_meshlets[_lod].size();
-	_xadj.clear();
-	_adjncy.clear();
-	_adjwgt.clear();
-	_xadj.resize(n + 1);
-	_adjncy.reserve(8 * n);
-	_adjwgt.reserve(8 * n);
+	const uint32_t n = m_meshlets[inLod].size();
+	outXadj.clear();
+	outAdjncy.clear();
+	outAdjwgt.clear();
+	outXadj.resize(n + 1);
+	outAdjncy.reserve(8 * n);
+	outAdjwgt.reserve(8 * n);
 
-	_xadj.push_back(static_cast<idx_t>(_adjncy.size()));
+	outXadj.push_back(static_cast<idx_t>(outAdjncy.size()));
 	for (uint32_t i = 0; i < n; ++i)
 	{
-		const auto& curMeshlet = m_meshlets[_lod][i];
+		const auto& curMeshlet = m_meshlets[inLod][i];
 		for (const auto& p : curMeshlet.adjacentWeight)
 		{
-			_adjncy.push_back(static_cast<idx_t>(p.first));		// index of the adjacent meshlet
-			_adjwgt.push_back(static_cast<idx_t>(p.second));	// number of shared edges
+			outAdjncy.push_back(static_cast<idx_t>(p.first));		// index of the adjacent meshlet
+			outAdjwgt.push_back(static_cast<idx_t>(p.second));	// number of shared edges
 		}
-		_xadj.push_back(static_cast<idx_t>(_adjncy.size()));
+		outXadj.push_back(static_cast<idx_t>(outAdjncy.size()));
 	}
 }
 
-void VirtualGeometry::_FindMeshletsBorder(uint32_t _lod)
+void VirtualGeometry::_FindMeshletsBorder(uint32_t inLod)
 {
 	MeshOptimizer optimizer{};
-	std::vector<uint32_t> remapIndex(_GetCompleteVertices(_lod).size()); // remap the index based on position
+	std::vector<uint32_t> remapIndex(_GetCompleteVertices(inLod).size()); // remap the index based on position
 	
-	optimizer.GeneratePositionRemap(_GetCompleteVertices(_lod), remapIndex);
+	optimizer.GeneratePositionRemap(_GetCompleteVertices(inLod), remapIndex);
 
 	// for each meshlet of this LOD find its border
-	for (size_t i = 0; i < m_meshlets[_lod].size(); ++i)
+	for (size_t i = 0; i < m_meshlets[inLod].size(); ++i)
 	{
 		std::unordered_map<std::pair<uint32_t, uint32_t>, uint32_t, common_utils::PairHash> edgeSeen;
-		MyMeshlet& myMeshlet = m_meshlets[_lod][i];
+		MyMeshlet& myMeshlet = m_meshlets[inLod][i];
 		const Meshlet& meshlet = myMeshlet.meshlet;
 		 
 		// iterate all triangle of current meshlet
@@ -182,7 +182,7 @@ void VirtualGeometry::_FindMeshletsBorder(uint32_t _lod)
 	}
 }
 
-void VirtualGeometry::_RecordMeshletConnections(uint32_t _lod)
+void VirtualGeometry::_RecordMeshletConnections(uint32_t inLod)
 {
 	std::unordered_map<
 		std::pair<uint32_t, uint32_t>, 
@@ -190,9 +190,9 @@ void VirtualGeometry::_RecordMeshletConnections(uint32_t _lod)
 		common_utils::PairHash> edgeMeshlet; // edge to meshlets that have the edge
 
 	// fill edge meshlet map
-	for (uint32_t i = 0; i < m_meshlets[_lod].size(); ++i)
+	for (uint32_t i = 0; i < m_meshlets[inLod].size(); ++i)
 	{
-		const auto& currentMeshlet = m_meshlets[_lod][i];
+		const auto& currentMeshlet = m_meshlets[inLod][i];
 		for (const auto& edge : currentMeshlet.boundaries)
 		{
 			if (edgeMeshlet.find(edge) == edgeMeshlet.end())
@@ -212,7 +212,7 @@ void VirtualGeometry::_RecordMeshletConnections(uint32_t _lod)
 		for (uint32_t i = 0; i < p.second.size(); ++i)
 		{
 			uint32_t meshletId = p.second[i];
-			auto& meshlet = m_meshlets[_lod][meshletId];
+			auto& meshlet = m_meshlets[inLod][meshletId];
 			for (uint32_t j = 0; j < p.second.size(); ++j)
 			{
 				if (j == i) continue;
@@ -231,17 +231,17 @@ void VirtualGeometry::_RecordMeshletConnections(uint32_t _lod)
 }
 
 bool VirtualGeometry::_DivideMeshletGroup(
-	uint32_t _lod, 
-	uint32_t _groupCount, 
-	std::vector<std::vector<uint32_t>>& _meshletGroups) const
+	uint32_t inLod, 
+	uint32_t inGroupCount, 
+	std::vector<std::vector<uint32_t>>& outClusterGroups) const
 {
 	std::vector<idx_t> xadj;
 	std::vector<idx_t> adjncy;
 	std::vector<idx_t> adjwgt;
 	std::vector<idx_t> part;
-	idx_t nvtxs = m_meshlets[_lod].size();
-	//idx_t nparts = std::max(static_cast<idx_t>(m_meshlets[_lod].size() / 4), 1);
-	idx_t nparts = static_cast<idx_t>(_groupCount);
+	idx_t nvtxs = m_meshlets[inLod].size();
+	//idx_t nparts = std::max(static_cast<idx_t>(m_meshlets[inLod].size() / 4), 1);
+	idx_t nparts = static_cast<idx_t>(inGroupCount);
 	idx_t edgecut = 0;
 	idx_t options[METIS_NOPTIONS];
 	idx_t ncon = 1;
@@ -250,7 +250,7 @@ bool VirtualGeometry::_DivideMeshletGroup(
 
 	METIS_SetDefaultOptions(options);  // Initialize default options
 	part.resize(nvtxs);
-	_PrepareMETIS(_lod, xadj, adjncy, adjwgt);
+	_PrepareMETIS(inLod, xadj, adjncy, adjwgt);
 	if (nparts > 8)
 	{
 		metisFunc = METIS_PartGraphKway;
@@ -276,11 +276,11 @@ bool VirtualGeometry::_DivideMeshletGroup(
 
 	if (result == METIS_OK)
 	{
-		_meshletGroups.resize(nparts, {});
+		outClusterGroups.resize(nparts, {});
 		for (uint32_t i = 0; i < nvtxs; ++i)
 		{
 			idx_t groupId = part[i];
-			_meshletGroups[groupId].push_back(i);
+			outClusterGroups[groupId].push_back(i);
 		}
 	}
 
@@ -288,25 +288,25 @@ bool VirtualGeometry::_DivideMeshletGroup(
 }
 
 float VirtualGeometry::_SimplifyGroupTriangles(
-	uint32_t _srcLod, 
-	const std::vector<uint32_t>& _meshletGroup,
-	std::vector<uint32_t>& _outIndex) const
+	uint32_t inSrcLod, 
+	const std::vector<uint32_t>& inClusterGroup,
+	std::vector<uint32_t>& inoutIndex) const
 {
 	std::vector<uint32_t> meshletIndex;
 	MeshOptimizer optimizer{};
 	float error = 0.0f;
 
-	for (size_t i = 0; i < _meshletGroup.size(); ++i)
+	for (size_t i = 0; i < inClusterGroup.size(); ++i)
 	{
-		const auto& meshlet = m_meshlets[_srcLod][_meshletGroup[i]].meshlet;
+		const auto& meshlet = m_meshlets[inSrcLod][inClusterGroup[i]].meshlet;
 		meshlet.GetIndices(meshletIndex);
 	}
 
 	error = optimizer.SimplifyMesh(
-		_GetCompleteVertices(_srcLod),
+		_GetCompleteVertices(inSrcLod),
 		meshletIndex,
 		meshletIndex.size() / 2,
-		_outIndex);
+		inoutIndex);
 
 	return error;
 }
@@ -450,9 +450,15 @@ void VirtualGeometry::_SplitMeshLODs()
 void VirtualGeometry::_BuildHierarchy()
 {
 	std::vector<HierarchyNode>& treeNodes = m_hierarchy;
+	std::vector<ClusterGroupData>& deviceGroups = m_deviceGroups;
+	std::vector<IntermediateNode>& deviceNodes = m_deviceNodes;
 	std::vector<std::vector<uint32_t>> LODClusterID; // leaf index of each LOD
 	std::vector<uint32_t> LODRoots;
 	uint32_t processedGroup = 0;
+
+	treeNodes.clear();
+	deviceGroups.clear();
+	deviceNodes.clear();
 
 	// build base node from cluster groups
 	LODClusterID.resize(m_groups.size());
@@ -462,21 +468,32 @@ void VirtualGeometry::_BuildHierarchy()
 		LODClusterID[i].resize(clusterGroupsCount);
 		for (size_t j = 0; j < clusterGroupsCount; ++j)
 		{
-			HierarchyNode newNode{};
 			const auto& currentGroup = m_groups[i][j];
-			
+			HierarchyNode newNode{};
+			ClusterGroupData deviceGroup{}; // TODO
+			Meshlet::DeviceData clusterCompactData{};
+			uint32_t clusterCount = 0;
+
 			LODClusterID[i][j] = treeNodes.size();
 			newNode.isClusterGroup = true;
-
 			newNode.bounding = m_meshlets[i][currentGroup[0]].boundingSphere;
 			for (auto clusterId : currentGroup)
 			{
 				const auto& currentCluster = m_meshlets[i][clusterId];
+				Meshlet::DeviceDataRef clusterCompactRef{};
+
 				newNode.error = std::max(newNode.error, currentCluster.groupError);
 				newNode.bounding = _MergeBounds(newNode.bounding, currentCluster.boundingSphere);
+				Meshlet::CompressToDeviceData(currentCluster.meshlet, clusterCompactData, clusterCompactRef);
+				//deviceGroup._SetClusterData(clusterCount, clusterCompactRef.vertexOffset, clusterCompactRef.vertexCount, clusterCompactRef);
+				++clusterCount;
 			}
-			newNode.children[0] = processedGroup++;
+			newNode.children[0] = processedGroup;
+			newNode.groupLod = i;
+			newNode.groupIndex = j;
+			deviceGroup._SetClusterCount(clusterCount);
 
+			++processedGroup;
 			treeNodes.push_back(newNode);
 		}
 	}
@@ -490,7 +507,9 @@ void VirtualGeometry::_BuildHierarchy()
 	}
 
 	// build top hierarchy with LOD trees
-	_BuildHierarchyHelper(LODRoots, treeNodes);
+	m_rootIndex = _BuildHierarchyHelper(LODRoots, treeNodes);
+
+
 }
 
 uint32_t VirtualGeometry::_BuildHierarchyHelper(std::vector<uint32_t>& _bottomNodeIndex, std::vector<HierarchyNode>& _fullTree) const
@@ -722,6 +741,46 @@ void VirtualGeometry::GetMeshletsAtLOD(uint32_t _lod, std::vector<Meshlet>& _mes
 	}
 }
 
+void VirtualGeometry::GetVirtualGeometryDeviceData(
+	uint32_t& outRootNodeIndex, 
+	std::vector<VirtualGeometry::IntermediateNode>& outHierarchyNodes, 
+	std::vector<VirtualGeometry::ClusterGroupData>& outClusterGroupData) const
+{
+	outRootNodeIndex = m_rootIndex;
+	outHierarchyNodes = m_deviceNodes;
+	outClusterGroupData = m_deviceGroups;
+}
+
+void VirtualGeometry::IntermediateNode::_SetError(float inError)
+{
+	m_data[8] = inError;
+}
+
+void VirtualGeometry::IntermediateNode::_SetBoundingSphere(const glm::vec3& inCenter, float inRadius)
+{
+	m_data[4] = inCenter.x;
+	m_data[5] = inCenter.y;
+	m_data[6] = inCenter.z;
+	m_data[7] = inRadius;
+}
+
+void VirtualGeometry::IntermediateNode::_SetChildrenNodesOrClusterGroup(
+	const std::variant<std::array<uint32_t, VG_HIERARCHY_MAX_CHILD>, uint32_t>& inChildren)
+{
+	bool setChildrenNodes = std::holds_alternative<std::array<uint32_t, VG_HIERARCHY_MAX_CHILD>>(inChildren);
+
+	if (setChildrenNodes)
+	{
+		const auto& srcData = std::get<std::array<uint32_t, VG_HIERARCHY_MAX_CHILD>>(inChildren);
+		memcpy(m_data.data(), srcData.data(), sizeof(std::array<uint32_t, VG_HIERARCHY_MAX_CHILD>));
+	}
+	else
+	{
+		m_data[0] = ~0;
+		m_data[1] = std::get<uint32_t>(inChildren);
+	}
+}
+
 float VirtualGeometry::IntermediateNode::GetError() const
 {
 	float result;
@@ -759,10 +818,21 @@ uint32_t VirtualGeometry::IntermediateNode::GetClusterGroupDataIndex() const
 	return m_data[1];
 }
 
-void VirtualGeometry::IntermediateNode::GetDataToCopyToDevice(const void*& outSrcPtr, size_t& outSize)
+void VirtualGeometry::IntermediateNode::GetDataToCopyToDevice(const void*& outSrcPtr, size_t& outSize) const
 {
 	outSrcPtr = static_cast<const void*>(m_data.data());
 	outSize = m_data.size() * sizeof(uint32_t);
+}
+
+void VirtualGeometry::ClusterGroupData::GetDataToCopyToDevice(const void*& outSrcPtr, size_t& outSize) const
+{
+	outSrcPtr = static_cast<const void*>(m_data.data());
+	outSize = m_data.size() * sizeof(uint32_t);
+}
+
+uint32_t VirtualGeometry::ClusterGroupData::GetClusterChildGroupDataIndex(uint32_t inClusterId) const
+{
+	return m_childrenGroupDataIndex.at(inClusterId);
 }
 
 uint32_t VirtualGeometry::ClusterGroupData::_GetClusterDataOffset(uint32_t inClusterId) const
@@ -770,6 +840,56 @@ uint32_t VirtualGeometry::ClusterGroupData::_GetClusterDataOffset(uint32_t inClu
 	CHECK_TRUE(inClusterId < GetClusterCount(), "Cluster ID out of range!");
 
 	return 1 + inClusterId * 9;
+}
+
+void VirtualGeometry::ClusterGroupData::_SetClusterCount(uint32_t inClusterCount)
+{
+	inClusterCount = inClusterCount & 0x000000FF;
+	m_data[0] = (m_data[0] & 0x00FFFFFF) | (inClusterCount << 24);
+}
+
+void VirtualGeometry::ClusterGroupData::_SetClusterData(
+	uint32_t inIndex, 
+	uint32_t inVertexOffset, 
+	uint32_t inVertexCount, 
+	uint32_t inTriangleOffset, 
+	uint32_t inTriangleCount, 
+	const glm::vec3& inBoundingCenter, 
+	float inRadius, 
+	float inGroupError)
+{
+	uint32_t offset = _GetClusterDataOffset(inIndex);
+
+	m_data[offset + 0] = inVertexOffset;
+	m_data[offset + 2] = inVertexCount;
+	m_data[offset + 1] = inTriangleOffset;
+	m_data[offset + 3] = inTriangleCount;
+	m_data[offset + 4] = inBoundingCenter.x;
+	m_data[offset + 5] = inBoundingCenter.y;
+	m_data[offset + 6] = inBoundingCenter.z;
+	m_data[offset + 7] = inRadius;
+	m_data[offset + 8] = inGroupError;
+}
+
+void VirtualGeometry::ClusterGroupData::_SetMeshletCompactData(
+	const std::vector<uint32_t>& inVertexRemap, 
+	const std::vector<uint8_t>& inLocalIndices)
+{
+	uint32_t vertexCount = (0x00FFFFFF & (inVertexRemap.size()));
+	uint32_t index4Count = (inLocalIndices.size() + 3) / 4;
+	const std::array<uint32_t, 4> byteMasks = { 0x000000FF, 0x0000FF00, 0x00FF0000, 0xFF000000 };
+	
+	m_data.resize(289 + vertexCount + index4Count, 0);
+	m_data[0] = (m_data[0] & 0xFF000000) | vertexCount;
+	std::copy(inVertexRemap.cbegin(), inVertexRemap.cend(), m_data.begin() + 289);
+	for (size_t i = 0; i < inLocalIndices.size(); ++i)
+	{
+		uint32_t currentIndex = inLocalIndices[i];
+		uint32_t dataIndex = i / 4 + 289 + vertexCount;
+		uint32_t byteIndex = i % 4;
+
+		m_data[dataIndex] = (m_data[dataIndex] & ~(byteMasks[byteIndex])) | (currentIndex << (byteIndex * 8));
+	}
 }
 
 uint32_t VirtualGeometry::ClusterGroupData::GetClusterCount() const
@@ -825,6 +945,21 @@ void VirtualGeometry::ClusterGroupData::GetClusterTriangleIndices(
 
 		*triangleIndices[i] = static_cast<uint8_t>((m_data[triangleDataStart + dataIndex] & byteMasks[byteIndex]) >> (byteIndex * 8));
 	}
+}
+
+void VirtualGeometry::ClusterGroupData::GetClusterBoundingSphere(uint32_t inClusterId, glm::vec3& outCenter, float& outRadius) const
+{
+	uint32_t offset = _GetClusterDataOffset(inClusterId) + 4;
+	std::array<float, 3> xyz;
+	memcpy(xyz.data(), (m_data.data() + offset), sizeof(xyz));
+	outCenter = glm::vec3(xyz[0], xyz[1], xyz[2]);
+	memcpy(&outRadius, (m_data.data() + offset + 3), sizeof(float));
+}
+
+float VirtualGeometry::ClusterGroupData::GetClusterError(uint32_t inClusterId) const
+{
+	uint32_t offset = _GetClusterDataOffset(inClusterId) + 8;
+	return m_data[offset];
 }
 
 
