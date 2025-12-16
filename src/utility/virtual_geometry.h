@@ -136,7 +136,7 @@ public:
 			uint32_t inTriangleCount,
 			const glm::vec3& inBoundingCenter,
 			float inRadius,
-			float inGroupError);
+			float inClusterError);
 		void _SetMeshletCompactData(
 			const std::vector<uint32_t>& inVertexRemap,
 			const std::vector<uint8_t>& inLocalIndices);

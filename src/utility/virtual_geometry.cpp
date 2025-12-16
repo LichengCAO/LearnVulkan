@@ -465,12 +465,13 @@ void VirtualGeometry::_BuildHierarchy()
 	for (size_t i = 0; i < LODClusterID.size(); ++i)
 	{
 		size_t clusterGroupsCount = m_groups[i].size();
+		
 		LODClusterID[i].resize(clusterGroupsCount);
 		for (size_t j = 0; j < clusterGroupsCount; ++j)
 		{
 			const auto& currentGroup = m_groups[i][j];
 			HierarchyNode newNode{};
-			ClusterGroupData deviceGroup{}; // TODO
+			ClusterGroupData deviceGroup{};
 			Meshlet::DeviceData clusterCompactData{};
 			uint32_t clusterCount = 0;
 
@@ -485,16 +486,26 @@ void VirtualGeometry::_BuildHierarchy()
 				newNode.error = std::max(newNode.error, currentCluster.groupError);
 				newNode.bounding = _MergeBounds(newNode.bounding, currentCluster.boundingSphere);
 				Meshlet::CompressToDeviceData(currentCluster.meshlet, clusterCompactData, clusterCompactRef);
-				//deviceGroup._SetClusterData(clusterCount, clusterCompactRef.vertexOffset, clusterCompactRef.vertexCount, clusterCompactRef);
+				deviceGroup._SetClusterData(
+					clusterCount, 
+					clusterCompactRef.vertexOffset, 
+					clusterCompactRef.vertexCount, 
+					clusterCompactRef.indexOffset / 3,
+					clusterCompactRef.triangleCount,
+					glm::vec3(currentCluster.boundingSphere),
+					currentCluster.boundingSphere.w,
+					currentCluster.clusterError);
 				++clusterCount;
 			}
 			newNode.children[0] = processedGroup;
 			newNode.groupLod = i;
 			newNode.groupIndex = j;
 			deviceGroup._SetClusterCount(clusterCount);
+			deviceGroup._SetMeshletCompactData(clusterCompactData.meshletVertices, clusterCompactData.meshletIndices);
 
 			++processedGroup;
 			treeNodes.push_back(newNode);
+			deviceGroups.push_back(deviceGroup);
 		}
 	}
 
@@ -509,7 +520,24 @@ void VirtualGeometry::_BuildHierarchy()
 	// build top hierarchy with LOD trees
 	m_rootIndex = _BuildHierarchyHelper(LODRoots, treeNodes);
 
+	// convert to device nodes
+	for (size_t i = 0; i < treeNodes.size(); ++i)
+	{
+		auto& treeNode = treeNodes[i];
+		IntermediateNode deviceNode{};
 
+		deviceNode._SetError(treeNode.error);
+		deviceNode._SetBoundingSphere(glm::vec3(treeNode.bounding.x, treeNode.bounding.y, treeNode.bounding.z), treeNode.bounding.w);
+		if (treeNode.isClusterGroup)
+		{
+			deviceNode._SetChildrenNodesOrClusterGroup(treeNode.children[0]);
+		}
+		else
+		{
+			deviceNode._SetChildrenNodesOrClusterGroup(treeNode.children);
+		}
+		deviceNodes.push_back(deviceNode);
+	}
 }
 
 uint32_t VirtualGeometry::_BuildHierarchyHelper(std::vector<uint32_t>& _bottomNodeIndex, std::vector<HierarchyNode>& _fullTree) const
@@ -729,6 +757,7 @@ void VirtualGeometry::PresetStaticMesh(const StaticMesh& _original)
 void VirtualGeometry::Init()
 {
 	_SplitMeshLODs();
+	_BuildHierarchy();
 }
 
 void VirtualGeometry::GetMeshletsAtLOD(uint32_t _lod, std::vector<Meshlet>& _meshlet) const
@@ -856,7 +885,7 @@ void VirtualGeometry::ClusterGroupData::_SetClusterData(
 	uint32_t inTriangleCount, 
 	const glm::vec3& inBoundingCenter, 
 	float inRadius, 
-	float inGroupError)
+	float inClusterError)
 {
 	uint32_t offset = _GetClusterDataOffset(inIndex);
 
@@ -868,7 +897,7 @@ void VirtualGeometry::ClusterGroupData::_SetClusterData(
 	m_data[offset + 5] = inBoundingCenter.y;
 	m_data[offset + 6] = inBoundingCenter.z;
 	m_data[offset + 7] = inRadius;
-	m_data[offset + 8] = inGroupError;
+	m_data[offset + 8] = inClusterError;
 }
 
 void VirtualGeometry::ClusterGroupData::_SetMeshletCompactData(
