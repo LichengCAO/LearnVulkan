@@ -194,7 +194,7 @@ class CommandBuffer
 private:
 	VkCommandBuffer		 m_vkCommandBuffer = VK_NULL_HANDLE;
 	VkCommandPool		 m_vkCommandPool = VK_NULL_HANDLE;
-	VkCommandBufferLevel m_vkCommandBufferLevel = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	VkCommandBufferLevel m_vkCommandBufferLevel = VK_COMMAND_BUFFER_LEVEL_MAX_ENUM;
 	uint32_t			 m_queueFamily = ~0;
 
 public:
@@ -208,11 +208,16 @@ public:
 	void Init();
 
 	// Initiate based on Vulkan settings
-	void Init(const VkCommandBufferAllocateInfo& inAllocateInfo);
+	void Init(
+		VkCommandPool inCommandPool,
+		VkCommandBufferLevel inBufferLevel = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+		const void* inNextPtr = nullptr);
 
-	// Destroy command buffer to invalid state
+	// Destroy command buffer to invalid state.
+	// According to spec, the allocated command buffer will not be freed until
+	// the command pool is reset, even with this function invoked.
 	void Uninit();
 
 	// Reset commands in command buffer
-	void Reset();
+	void Reset(VkCommandBufferResetFlags inFlags = 0);
 };

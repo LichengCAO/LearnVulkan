@@ -457,7 +457,56 @@ VkImageBlit ImageBlitBuilder::NewBlit(VkOffset2D srcOffsetLR, uint32_t srcMipLev
 	return NewBlit({ 0, 0, 0 }, { srcOffsetLR.x, srcOffsetLR.y, 1 }, srcMipLevel, { 0, 0, 0 }, { dstOffsetLR.x, dstOffsetLR.y, 1 }, dstMipLevel);
 }
 
+uint32_t CommandBuffer::GetQueueFamliyIndex() const
+{
+	return m_queueFamily;
+}
+
 VkCommandBuffer CommandBuffer::GetVkCommandBuffer() const
 {
 	return m_vkCommandBuffer;
+}
+
+VkCommandBufferLevel CommandBuffer::GetCommandBufferLevel() const
+{
+	return m_vkCommandBufferLevel;
+}
+
+void CommandBuffer::Init()
+{
+	MyDevice::CommandPoolRequireInfo reqInfo{};
+	const auto& myDevice = MyDevice::GetInstance();
+	uint32_t queueFamilyIndex = myDevice.GetQueueFamilyIndex(QueueFamilyType::GRAPHICS);
+	
+	reqInfo.queueFamilyIndex = queueFamilyIndex;
+	Init(myDevice.GetCommandPool(reqInfo), VK_COMMAND_BUFFER_LEVEL_PRIMARY, nullptr);
+}
+
+void CommandBuffer::Init(
+	VkCommandPool inCommandPool, 
+	VkCommandBufferLevel inBufferLevel, 
+	const void* inNextPtr)
+{
+	auto& myDevice = MyDevice::GetInstance();
+
+	m_vkCommandBuffer = myDevice.AllocateCommandBuffer(inCommandPool, inBufferLevel, inNextPtr);
+	m_vkCommandBufferLevel = inBufferLevel;
+	m_vkCommandPool = inCommandPool;
+	m_queueFamily = myDevice.GetQueueFamilyIndex(m_vkCommandPool);
+}
+
+void CommandBuffer::Uninit()
+{
+	auto& myDevice = MyDevice::GetInstance();
+
+	myDevice.FreeCommandBuffer(m_vkCommandPool, m_vkCommandBuffer);
+	m_vkCommandBuffer = VK_NULL_HANDLE;
+	m_vkCommandBufferLevel = VK_COMMAND_BUFFER_LEVEL_MAX_ENUM;
+	m_vkCommandPool = VK_NULL_HANDLE;
+	m_queueFamily = ~0;
+}
+
+void CommandBuffer::Reset(VkCommandBufferResetFlags inFlags)
+{
+	VK_CHECK(vkResetCommandBuffer(m_vkCommandBuffer, inFlags), "Failed to reset command buffer!");
 }

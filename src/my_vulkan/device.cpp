@@ -796,13 +796,24 @@ VkCommandPool MyDevice::GetCommandPool(const CommandPoolRequireInfo& inRequireIn
 	return VK_NULL_HANDLE;
 }
 
-VkCommandBuffer MyDevice::AllocateCommandBuffer(const VkCommandBufferAllocateInfo& inAllocateInfo)
+VkCommandBuffer MyDevice::AllocateCommandBuffer(VkCommandPool inCommandPool, VkCommandBufferLevel inBufferLevel, const void* inNextPtr)
 {
+	VkCommandBufferAllocateInfo allocateInfo{};
 	VkCommandBuffer result = VK_NULL_HANDLE;
 
-	VK_CHECK(vkAllocateCommandBuffers(vkDevice, &inAllocateInfo, &result), "Failed to allocate command buffer!");
+	allocateInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+	allocateInfo.pNext = inNextPtr;
+	allocateInfo.commandBufferCount = 1;
+	allocateInfo.commandPool = inCommandPool;
+	allocateInfo.level = inBufferLevel;
 
+	VK_CHECK(vkAllocateCommandBuffers(vkDevice, &allocateInfo, &result), "Failed to allocate command buffer!");
 	return result;
+}
+
+void MyDevice::FreeCommandBuffer(VkCommandPool inCommandPool, VkCommandBuffer inCommandBuffer)
+{
+	vkFreeCommandBuffers(vkDevice, inCommandPool, 1, &inCommandBuffer);
 }
 
 MyDevice& MyDevice::GetInstance()

@@ -141,7 +141,12 @@ public:
 	VkCommandPool GetCommandPool(const CommandPoolRequireInfo& inRequireInfo) const;
 
 	// Allocate VkCommandBuffer
-	VkCommandBuffer AllocateCommandBuffer(const VkCommandBufferAllocateInfo& inAllocateInfo);
+	VkCommandBuffer AllocateCommandBuffer(
+		VkCommandPool inCommandPool, 
+		VkCommandBufferLevel inBufferLevel = VK_COMMAND_BUFFER_LEVEL_PRIMARY,
+		const void* inNextPtr = nullptr);
+
+	void FreeCommandBuffer(VkCommandPool inCommandPool, VkCommandBuffer inCommandBuffer);
 public:
 	static MyDevice& GetInstance();
 	static void OnFramebufferResized(GLFWwindow* _pWindow, int width, int height);
