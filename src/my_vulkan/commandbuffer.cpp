@@ -347,35 +347,52 @@ ImageBarrierBuilder::ImageBarrierBuilder()
 {
 	Reset();
 }
-void ImageBarrierBuilder::Reset()
+ImageBarrierBuilder& ImageBarrierBuilder::Reset()
 {
 	m_subresourceRange.aspectMask = VkImageAspectFlagBits::VK_IMAGE_ASPECT_COLOR_BIT;
 	m_subresourceRange.baseArrayLayer = 0;
 	m_subresourceRange.baseMipLevel = 0;
 	m_subresourceRange.layerCount = 1;
 	m_subresourceRange.levelCount = 1;
+	m_dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	m_srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	return *this;
 }
-void ImageBarrierBuilder::SetMipLevelRange(uint32_t baseMipLevel, uint32_t levelCount)
+ImageBarrierBuilder& ImageBarrierBuilder::SetMipLevelRange(uint32_t baseMipLevel, uint32_t levelCount)
 {
 	m_subresourceRange.baseMipLevel = baseMipLevel;
 	m_subresourceRange.levelCount = levelCount;
+	return *this;
 }
-void ImageBarrierBuilder::SetArrayLayerRange(uint32_t baseArrayLayer, uint32_t layerCount)
+ImageBarrierBuilder& ImageBarrierBuilder::SetArrayLayerRange(uint32_t baseArrayLayer, uint32_t layerCount)
 {
 	m_subresourceRange.baseArrayLayer = baseArrayLayer;
 	m_subresourceRange.layerCount = layerCount;
+	return *this;
 }
-void ImageBarrierBuilder::SetAspect(VkImageAspectFlags aspectMask)
+ImageBarrierBuilder& ImageBarrierBuilder::SetAspect(VkImageAspectFlags aspectMask)
 {
 	m_subresourceRange.aspectMask = aspectMask;
+	return *this;
 }
-VkImageMemoryBarrier ImageBarrierBuilder::NewBarrier(VkImage _image, VkImageLayout _oldLayout, VkImageLayout _newLayout, VkAccessFlags _srcAccessMask, VkAccessFlags _dstAccessMask) const
+ImageBarrierBuilder& ImageBarrierBuilder::SetQueueFamilyTransfer(uint32_t inQueueFamilyTransferFrom, uint32_t inQueueFamilyTransferTo)
+{
+	m_dstQueueFamilyIndex = inQueueFamilyTransferTo;
+	m_srcQueueFamilyIndex = inQueueFamilyTransferFrom;
+	return *this;
+}
+VkImageMemoryBarrier ImageBarrierBuilder::NewBarrier(
+	VkImage _image, 
+	VkImageLayout _oldLayout, 
+	VkImageLayout _newLayout, 
+	VkAccessFlags _srcAccessMask, 
+	VkAccessFlags _dstAccessMask) const
 {
 	VkImageMemoryBarrier barrier{ VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER };
 	barrier.oldLayout = _oldLayout;
 	barrier.newLayout = _newLayout;
-	barrier.srcQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
-	barrier.dstQueueFamilyIndex = VK_QUEUE_FAMILY_IGNORED;
+	barrier.srcQueueFamilyIndex = m_srcQueueFamilyIndex;
+	barrier.dstQueueFamilyIndex = m_dstQueueFamilyIndex;
 	barrier.image = _image;
 	barrier.subresourceRange = m_subresourceRange;
 	barrier.srcAccessMask = _srcAccessMask;
@@ -438,4 +455,9 @@ VkImageBlit ImageBlitBuilder::NewBlit(VkOffset3D srcOffsetUL, VkOffset3D srcOffs
 VkImageBlit ImageBlitBuilder::NewBlit(VkOffset2D srcOffsetLR, uint32_t srcMipLevel, VkOffset2D dstOffsetLR, uint32_t dstMipLevel) const
 {
 	return NewBlit({ 0, 0, 0 }, { srcOffsetLR.x, srcOffsetLR.y, 1 }, srcMipLevel, { 0, 0, 0 }, { dstOffsetLR.x, dstOffsetLR.y, 1 }, dstMipLevel);
+}
+
+VkCommandBuffer CommandBuffer::GetVkCommandBuffer() const
+{
+	return m_vkCommandBuffer;
 }

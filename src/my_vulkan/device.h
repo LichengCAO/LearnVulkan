@@ -116,13 +116,32 @@ public:
 
 	// Create a VkFence, _pCreateInfo is optional, if it's not nullptr, VkFence will be created based on it
 	VkFence CreateVkFence(const VkFenceCreateInfo* _pCreateInfo = nullptr);
+	
 	// Destroy _fence on device, set it to VK_NULL_HANDLE
 	void DestroyVkFence(VkFence& _fence);
+	
 	// Create a VkSemaphore, _pCreateInfo is optional, if it's not nullptr, VkSemaphore will be created based on it
 	VkSemaphore CreateVkSemaphore(const VkSemaphoreCreateInfo* _pCreateInfo = nullptr);
+	
 	// Destroy _semaphore on device, set it to VK_NULL_HANDLE
 	void DestroyVkSemaphore(VkSemaphore& _semaphore);
 
+	// Get queue family index by the function
+	uint32_t GetQueueFamilyIndex(QueueFamilyType inType) const;
+
+	// Get queue family index by VkCommandPool handle
+	uint32_t GetQueueFamilyIndex(VkCommandPool inVkCommandPool) const;
+
+	struct CommandPoolRequireInfo
+	{
+		uint32_t queueFamilyIndex;
+		// thread id maybe?
+	};
+	// Get VkCommandPool by several info
+	VkCommandPool GetCommandPool(const CommandPoolRequireInfo& inRequireInfo) const;
+
+	// Allocate VkCommandBuffer
+	VkCommandBuffer AllocateCommandBuffer(const VkCommandBufferAllocateInfo& inAllocateInfo);
 public:
 	static MyDevice& GetInstance();
 	static void OnFramebufferResized(GLFWwindow* _pWindow, int width, int height);

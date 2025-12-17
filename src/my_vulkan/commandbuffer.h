@@ -2,6 +2,7 @@
 #include "common.h"
 #include "pipeline_io.h";
 #include <queue>
+#include "vk_struct.h"
 // https://stackoverflow.com/questions/44105058/implementing-component-system-from-unity-in-c
 
 class GraphicsPipeline;
@@ -17,10 +18,20 @@ private:
 
 public:
 	ImageBarrierBuilder();
-	void Reset();
-	void SetMipLevelRange(uint32_t baseMipLevel, uint32_t levelCount = 1);
-	void SetArrayLayerRange(uint32_t baseArrayLayer, uint32_t layerCount = 1);
-	void SetAspect(VkImageAspectFlags aspectMask);
+	ImageBarrierBuilder& Reset();
+
+	// optional, set mip level range of the barrier
+	ImageBarrierBuilder& SetMipLevelRange(uint32_t baseMipLevel, uint32_t levelCount = 1);
+
+	// optional, set array layer range of the barrier
+	ImageBarrierBuilder& SetArrayLayerRange(uint32_t baseArrayLayer, uint32_t layerCount = 1);
+
+	// optional, set aspect of the image barrier
+	ImageBarrierBuilder& SetAspect(VkImageAspectFlags aspectMask);
+
+	// optional, useful when trying to upload image in a command buffer from queue family other than the graphics queue family
+	ImageBarrierBuilder& SetQueueFamilyTransfer(uint32_t inQueueFamilyTransferFrom, uint32_t inQueueFamilyTransferTo);
+	
 	// _srcAccessMask: when the data is updated (available)
 	// _dstAccessMask: when the data is visible
 	// see: https://themaister.net/blog/2019/08/14/yet-another-blog-explaining-vulkan-synchronization/
@@ -176,4 +187,32 @@ public:
 	friend class RenderPass;
 	friend class GraphicsPipeline;
 	friend class RayTracingAccelerationStructure;
+};
+
+class CommandBuffer
+{
+private:
+	VkCommandBuffer		 m_vkCommandBuffer = VK_NULL_HANDLE;
+	VkCommandPool		 m_vkCommandPool = VK_NULL_HANDLE;
+	VkCommandBufferLevel m_vkCommandBufferLevel = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+	uint32_t			 m_queueFamily = ~0;
+
+public:
+	uint32_t GetQueueFamliyIndex() const;
+	
+	VkCommandBuffer GetVkCommandBuffer() const;
+
+	VkCommandBufferLevel GetCommandBufferLevel() const;
+
+	// Initiate based on default settings
+	void Init();
+
+	// Initiate based on Vulkan settings
+	void Init(const VkCommandBufferAllocateInfo& inAllocateInfo);
+
+	// Destroy command buffer to invalid state
+	void Uninit();
+
+	// Reset commands in command buffer
+	void Reset();
 };

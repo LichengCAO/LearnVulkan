@@ -42,4 +42,12 @@ failedMessage);\
 }\
 }while(0)
 
+#define CHECK_TRUE(condition) \
+do{\
+if(!(condition)){\
+   throw std::runtime_error(\
+"Check failed!");\
+}\
+}while(0)
+
 #define COMPARE_BITS(a, bits) (((a) & (bits)) == (bits)) 

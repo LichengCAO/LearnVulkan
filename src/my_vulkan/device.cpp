@@ -738,6 +738,73 @@ void MyDevice::DestroyVkSemaphore(VkSemaphore& _semaphore)
 	_semaphore = VK_NULL_HANDLE;
 }
 
+uint32_t MyDevice::GetQueueFamilyIndex(QueueFamilyType inType) const
+{
+	uint32_t result = ~0;
+
+	switch (inType)
+	{
+	case QueueFamilyType::COMPUTE:
+	{
+		result = queueFamilyIndices.graphicsAndComputeFamily.value_or(~0);
+	}
+	break;
+	case QueueFamilyType::GRAPHICS:
+	{
+		result = queueFamilyIndices.graphicsFamily.value_or(~0);
+	}
+	break;
+	case QueueFamilyType::PRESENT:
+	{
+		result = queueFamilyIndices.presentFamily.value_or(~0);
+	}
+	break;
+	case QueueFamilyType::TRANSFER:
+	{
+		result = queueFamilyIndices.transferFamily.value_or(~0);
+	}
+	break;
+	}
+	CHECK_TRUE(result != ~0);
+
+	return result;
+}
+
+uint32_t MyDevice::GetQueueFamilyIndex(VkCommandPool inVkCommandPool) const
+{
+	uint32_t result = ~0;
+	
+	for (const auto& p : vkCommandPools)
+	{
+		if (p.second == inVkCommandPool)
+		{
+			result = p.first;
+			break;
+		}
+	}
+	CHECK_TRUE(result != ~0, "Failed to identify this command pool!");
+	
+	return result;
+}
+
+VkCommandPool MyDevice::GetCommandPool(const CommandPoolRequireInfo& inRequireInfo) const
+{
+	if (vkCommandPools.find(inRequireInfo.queueFamilyIndex) != vkCommandPools.end())
+	{
+		return vkCommandPools.at(inRequireInfo.queueFamilyIndex);
+	}
+	return VK_NULL_HANDLE;
+}
+
+VkCommandBuffer MyDevice::AllocateCommandBuffer(const VkCommandBufferAllocateInfo& inAllocateInfo)
+{
+	VkCommandBuffer result = VK_NULL_HANDLE;
+
+	VK_CHECK(vkAllocateCommandBuffers(vkDevice, &inAllocateInfo, &result), "Failed to allocate command buffer!");
+
+	return result;
+}
+
 MyDevice& MyDevice::GetInstance()
 {
 	if (s_uptrInstance.get() == nullptr)

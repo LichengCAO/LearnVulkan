@@ -23,3 +23,10 @@ struct SwapChainSupportDetails
 	std::vector<VkSurfaceFormatKHR> formats;
 	std::vector<VkPresentModeKHR> presentModes;
 };
+
+enum class QueueFamilyType
+{
+	COMPUTE,
+	GRAPHICS,
+	TRANSFER
+};
