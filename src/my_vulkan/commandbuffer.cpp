@@ -457,6 +457,13 @@ VkImageBlit ImageBlitBuilder::NewBlit(VkOffset2D srcOffsetLR, uint32_t srcMipLev
 	return NewBlit({ 0, 0, 0 }, { srcOffsetLR.x, srcOffsetLR.y, 1 }, srcMipLevel, { 0, 0, 0 }, { dstOffsetLR.x, dstOffsetLR.y, 1 }, dstMipLevel);
 }
 
+void CommandBuffer::_ProcessInScope(const std::function<void()>& inFunction)
+{
+	// common things to do before processing
+	inFunction();
+	// common things to do after processing
+}
+
 uint32_t CommandBuffer::GetQueueFamliyIndex() const
 {
 	return m_queueFamily;
@@ -508,5 +515,304 @@ void CommandBuffer::Uninit()
 
 void CommandBuffer::Reset(VkCommandBufferResetFlags inFlags)
 {
-	VK_CHECK(vkResetCommandBuffer(m_vkCommandBuffer, inFlags), "Failed to reset command buffer!");
+	VK_CHECK(vkResetCommandBuffer(m_vkCommandBuffer, inFlags));
+}
+
+CommandBuffer& CommandBuffer::BeginCommands(VkCommandBufferUsageFlags inFlags, const std::optional<VkCommandBufferInheritanceInfo>& inInheritanceInfo, const void* inNextPtr)
+{
+	VkCommandBufferBeginInfo beginInfo;
+	
+	beginInfo.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+	beginInfo.pNext = inNextPtr;
+	beginInfo.flags = inFlags;
+	beginInfo.pInheritanceInfo = inInheritanceInfo.has_value() ? &inInheritanceInfo.value() : nullptr;
+
+	_ProcessInScope(
+		[this, &beginInfo]() 
+		{
+			VK_CHECK(vkBeginCommandBuffer(this->m_vkCommandBuffer, &beginInfo));
+		});
+
+	return *this;
+}
+
+CommandBuffer& CommandBuffer::EndCommands()
+{
+	_ProcessInScope(
+		[this]() 
+		{
+			VK_CHECK(vkEndCommandBuffer(this->m_vkCommandBuffer));
+		});
+
+	return *this;
+}
+
+CommandBuffer& CommandBuffer::CmdBeginRenderPass(const VkRenderPassBeginInfo& inRenderPassBeginInfo, VkSubpassContents inContents)
+{
+	// TODO: 在此处插入 return 语句
+	_ProcessInScope(
+		[this, &inRenderPassBeginInfo, inContents]()
+		{
+			vkCmdBeginRenderPass(this->m_vkCommandBuffer, &inRenderPassBeginInfo, inContents);
+		});
+
+	return *this;
+}
+
+CommandBuffer& CommandBuffer::CmdBeginRenderPass(
+	VkRenderPass inRenderPass, 
+	VkFramebuffer inFramebuffer, 
+	int32_t offsetX,
+	int32_t offsetY, 
+	uint32_t width, 
+	uint32_t height, 
+	const std::vector<VkClearValue>& inClearValues, 
+	VkSubpassContents inContents, 
+	const void* inNextPtr)
+{
+	VkRenderPassBeginInfo renderPassBeginInfo{ VK_STRUCTURE_TYPE_RENDER_PASS_BEGIN_INFO };
+
+	renderPassBeginInfo.clearValueCount = static_cast<uint32_t>(inClearValues.size());
+	renderPassBeginInfo.pClearValues = inClearValues.data();
+	renderPassBeginInfo.framebuffer = inFramebuffer;
+	renderPassBeginInfo.renderPass = inRenderPass;
+	renderPassBeginInfo.renderArea.offset = { offsetX, offsetY };
+	renderPassBeginInfo.renderArea.extent = { width, height };
+	renderPassBeginInfo.pNext = inNextPtr;
+
+	return CmdBeginRenderPass(renderPassBeginInfo, inContents);
+}
+
+CommandBuffer& CommandBuffer::CmdEndRenderPass()
+{
+	_ProcessInScope(
+		[this]()
+		{
+			vkCmdEndRenderPass(this->m_vkCommandBuffer);
+		});
+
+	return *this;
+}
+
+CommandBuffer& CommandBuffer::CmdPipelineBarrier(
+	VkPipelineStageFlags inSrcStageMask,
+	VkPipelineStageFlags inDstStageMask,
+	const std::vector<VkMemoryBarrier>& inMemoryBarriers,
+	VkDependencyFlags inFlags)
+{
+	return CmdPipelineBarrier(
+		inSrcStageMask,
+		inDstStageMask,
+		inMemoryBarriers,
+		{},
+		{},
+		inFlags);
+}
+
+CommandBuffer& CommandBuffer::CmdPipelineBarrier(
+	VkPipelineStageFlags inSrcStageMask,
+	VkPipelineStageFlags inDstStageMask,
+	const std::vector<VkBufferMemoryBarrier>& inBufferBarriers,
+	VkDependencyFlags inFlags)
+{
+	return CmdPipelineBarrier(
+		inSrcStageMask,
+		inDstStageMask,
+		{},
+		inBufferBarriers,
+		{},
+		inFlags);
+}
+
+CommandBuffer& CommandBuffer::CmdPipelineBarrier(
+	VkPipelineStageFlags inSrcStageMask,
+	VkPipelineStageFlags inDstStageMask,
+	const std::vector<VkImageMemoryBarrier>& inImageBarriers,
+	VkDependencyFlags inFlags)
+{
+	return CmdPipelineBarrier(
+		inSrcStageMask,
+		inDstStageMask,
+		{},
+		{},
+		inImageBarriers,
+		inFlags);
+}
+
+CommandBuffer& CommandBuffer::CmdPipelineBarrier(
+	VkPipelineStageFlags inSrcStageMask, 
+	VkPipelineStageFlags inDstStageMask, 
+	const std::vector<VkMemoryBarrier>& inMemoryBarriers, 
+	const std::vector<VkBufferMemoryBarrier>& inBufferBarriers, 
+	const std::vector<VkImageMemoryBarrier>& inImageBarriers, 
+	VkDependencyFlags inFlags)
+{
+	_ProcessInScope(
+		[&]()
+		{
+			vkCmdPipelineBarrier(
+				m_vkCommandBuffer,
+				inSrcStageMask,
+				inDstStageMask,
+				inFlags,
+				static_cast<uint32_t>(inMemoryBarriers.size()),
+				inMemoryBarriers.data(),
+				static_cast<uint32_t>(inBufferBarriers.size()),
+				inBufferBarriers.data(),
+				static_cast<uint32_t>(inImageBarriers.size()),
+				inImageBarriers.data());
+		});
+
+	return *this;
+}
+
+CommandBuffer& CommandBuffer::CmdClearColorImage(
+	VkImage inImage, 
+	VkImageLayout inImageLayout, 
+	const VkClearColorValue& inClearColor, 
+	const std::vector<VkImageSubresourceRange>& inRanges)
+{
+	_ProcessInScope(
+		[&]()
+		{
+			vkCmdClearColorImage(
+				m_vkCommandBuffer,
+				inImage,
+				inImageLayout,
+				&inClearColor,
+				static_cast<uint32_t>(inRanges.size()),
+				inRanges.data());
+		});
+	
+	return *this;
+}
+
+CommandBuffer& CommandBuffer::CmdFillBuffer(VkBuffer inBuffer, VkDeviceSize inOffset, VkDeviceSize inSize, uint32_t inValue)
+{
+	// TODO: 在此处插入 return 语句
+	_ProcessInScope(
+		[this, inBuffer, inOffset, inSize, inValue]()
+		{
+			vkCmdFillBuffer(this->m_vkCommandBuffer, inBuffer, inOffset, inSize, inValue);
+		});
+	return *this;
+}
+
+CommandBuffer& CommandBuffer::CmdBlitImage(
+	VkImage inSrcImage, 
+	VkImageLayout inSrcLayout, 
+	VkImage inDstImage, 
+	VkImageLayout inDstLayout, 
+	const std::vector<VkImageBlit>& inRegions, 
+	VkFilter inFilter)
+{
+	_ProcessInScope(
+		[&]()
+		{
+			vkCmdBlitImage(
+				m_vkCommandBuffer,
+				inSrcImage,
+				inSrcLayout,
+				inDstImage,
+				inDstLayout,
+				static_cast<uint32_t>(inRegions.size()),
+				inRegions.data(),
+				inFilter);
+		});
+
+	return *this;
+}
+
+CommandBuffer& CommandBuffer::CmdCopyBufferToImage(
+	VkBuffer inSrcBuffer,
+	VkImage inDstImage,
+	VkImageLayout inDstLayout,
+	const std::vector<VkBufferImageCopy>& inRegions)
+{
+	_ProcessInScope(
+		[&]()
+		{
+			vkCmdCopyBufferToImage(
+				m_vkCommandBuffer,
+				inSrcBuffer,
+				inDstImage,
+				inDstLayout,
+				static_cast<uint32_t>(inRegions.size()),
+				inRegions.data());
+		});
+
+	return *this;
+}
+
+CommandBuffer& CommandBuffer::CmdBuildAccelerationStructuresKHR(
+	const std::vector<VkAccelerationStructureBuildGeometryInfoKHR>& inBuildInfos,
+	const std::vector<VkAccelerationStructureBuildRangeInfoKHR*>& inBuildRanges)
+{
+	_ProcessInScope(
+		[&]()
+		{
+			vkCmdBuildAccelerationStructuresKHR(
+				m_vkCommandBuffer,
+				static_cast<uint32_t>(inBuildInfos.size()),
+				inBuildInfos.data(),
+				inBuildRanges.data());
+		});
+
+	return *this;
+}
+
+CommandBuffer& CommandBuffer::CmdWriteAccelerationStructuresPropertiesKHR(
+	const std::vector<VkAccelerationStructureKHR>& inAccelerationStructures,
+	VkQueryType inQueryType,
+	VkQueryPool inQueryPool,
+	uint32_t inFirstQuery)
+{
+	_ProcessInScope(
+		[&]()
+		{
+			vkCmdWriteAccelerationStructuresPropertiesKHR(
+				m_vkCommandBuffer,
+				static_cast<uint32_t>(inAccelerationStructures.size()),
+				inAccelerationStructures.data(),
+				inQueryType,
+				inQueryPool,
+				inFirstQuery);
+		});
+
+	return *this;
+}
+
+CommandBuffer& CommandBuffer::CmdCopyAccelerationStructureKHR(
+	const VkCopyAccelerationStructureInfoKHR& inCopyInfo)
+{
+	_ProcessInScope(
+		[&]()
+		{
+			vkCmdCopyAccelerationStructureKHR(
+				m_vkCommandBuffer,
+				&inCopyInfo);
+		});
+
+	return *this;
+}
+
+CommandBuffer& CommandBuffer::CmdCopyAccelerationStructureKHR(VkAccelerationStructureKHR inSrcAS, VkAccelerationStructureKHR inDstAS, VkCopyAccelerationStructureModeKHR inMode, const void* inNextPtr)
+{
+	VkCopyAccelerationStructureInfoKHR copyInfo{ VK_STRUCTURE_TYPE_COPY_ACCELERATION_STRUCTURE_INFO_KHR };
+	copyInfo.src = inSrcAS;
+	copyInfo.dst = inDstAS;
+	copyInfo.mode = inMode;
+	copyInfo.pNext = inNextPtr;
+	return CmdCopyAccelerationStructureKHR(copyInfo);
+}
+
+CommandBuffer& CommandBuffer::CmdExecuteCommands(const std::vector<VkCommandBuffer>& inCommandBuffers)
+{
+	_ProcessInScope(
+		[this, &inCommandBuffers]()
+		{
+			vkCmdExecuteCommands(this->m_vkCommandBuffer, static_cast<uint32_t>(inCommandBuffers.size()), inCommandBuffers.data());
+		});
+
+	return *this;
 }

@@ -197,6 +197,9 @@ private:
 	VkCommandBufferLevel m_vkCommandBufferLevel = VK_COMMAND_BUFFER_LEVEL_MAX_ENUM;
 	uint32_t			 m_queueFamily = ~0;
 
+private:
+	void _ProcessInScope(const std::function<void()>& inFunction);
+
 public:
 	uint32_t GetQueueFamliyIndex() const;
 	
@@ -220,4 +223,97 @@ public:
 
 	// Reset commands in command buffer
 	void Reset(VkCommandBufferResetFlags inFlags = 0);
+
+	// Begin recording commands
+	CommandBuffer& BeginCommands(
+		VkCommandBufferUsageFlags inFlags = 0, 
+		const std::optional<VkCommandBufferInheritanceInfo>& inInheritanceInfo = {},
+		const void* inNextPtr = nullptr);
+
+	// End recording commands
+	CommandBuffer& EndCommands();
+
+	CommandBuffer& CmdBeginRenderPass(
+		const VkRenderPassBeginInfo& inRenderPassBeginInfo,
+		VkSubpassContents inContents = VK_SUBPASS_CONTENTS_INLINE);
+	CommandBuffer& CmdBeginRenderPass(
+		VkRenderPass inRenderPass,
+		VkFramebuffer inFramebuffer,
+		int32_t offsetX, 
+		int32_t offsetY,
+		uint32_t width, 
+		uint32_t height,
+		const std::vector<VkClearValue>& inClearValues,
+		VkSubpassContents inContents = VK_SUBPASS_CONTENTS_INLINE,
+		const void* inNextPtr = nullptr);
+
+	CommandBuffer& CmdEndRenderPass();
+
+	CommandBuffer& CmdPipelineBarrier(
+		VkPipelineStageFlags inSrcStageMask,
+		VkPipelineStageFlags inDstStageMask,
+		const std::vector<VkMemoryBarrier>& inMemoryBarriers,
+		VkDependencyFlags inFlags = 0);
+	CommandBuffer& CmdPipelineBarrier(
+		VkPipelineStageFlags inSrcStageMask,
+		VkPipelineStageFlags inDstStageMask,
+		const std::vector<VkBufferMemoryBarrier>& inBufferBarriers,
+		VkDependencyFlags inFlags = 0);
+	CommandBuffer& CmdPipelineBarrier(
+		VkPipelineStageFlags inSrcStageMask,
+		VkPipelineStageFlags inDstStageMask,
+		const std::vector<VkImageMemoryBarrier>& inImageBarriers,
+		VkDependencyFlags inFlags = 0);
+	CommandBuffer& CmdPipelineBarrier(
+		VkPipelineStageFlags inSrcStageMask,
+		VkPipelineStageFlags inDstStageMask,
+		const std::vector<VkMemoryBarrier>& inMemoryBarriers,
+		const std::vector<VkBufferMemoryBarrier>& inBufferBarriers,
+		const std::vector<VkImageMemoryBarrier>& inImageBarriers,
+		VkDependencyFlags inFlags = 0);
+
+	CommandBuffer& CmdClearColorImage(
+		VkImage inImage,
+		VkImageLayout inImageLayout,
+		const VkClearColorValue& inClearColor,
+		const std::vector<VkImageSubresourceRange>& inRanges);
+
+	CommandBuffer& CmdFillBuffer(
+		VkBuffer inBuffer, 
+		VkDeviceSize inOffset, 
+		VkDeviceSize inSize, 
+		uint32_t inValue);
+
+	CommandBuffer& CmdBlitImage(
+		VkImage inSrcImage, VkImageLayout inSrcLayout,
+		VkImage inDstImage, VkImageLayout inDstLayout,
+		const std::vector<VkImageBlit>& inRegions,
+		VkFilter inFilter = VK_FILTER_LINEAR);
+
+	CommandBuffer& CmdCopyBufferToImage(
+		VkBuffer inSrcBuffer,
+		VkImage inDstImage,
+		VkImageLayout inDstLayout,
+		const std::vector<VkBufferImageCopy>& inRegions);
+
+	CommandBuffer& CmdBuildAccelerationStructuresKHR(
+		const std::vector<VkAccelerationStructureBuildGeometryInfoKHR>& inBuildInfos,
+		const std::vector<VkAccelerationStructureBuildRangeInfoKHR*>& inBuildRanges);
+
+	CommandBuffer& CmdWriteAccelerationStructuresPropertiesKHR(
+		const std::vector<VkAccelerationStructureKHR>& inAccelerationStructures,
+		VkQueryType inQueryType,
+		VkQueryPool inQueryPool,
+		uint32_t inFirstQuery);
+
+	CommandBuffer& CmdCopyAccelerationStructureKHR(
+		const VkCopyAccelerationStructureInfoKHR& inCopyInfo);
+	CommandBuffer& CmdCopyAccelerationStructureKHR(
+		VkAccelerationStructureKHR inSrcAS,
+		VkAccelerationStructureKHR inDstAS,
+		VkCopyAccelerationStructureModeKHR inMode,
+		const void* inNextPtr = nullptr);
+
+	CommandBuffer& CmdExecuteCommands(
+		const std::vector<VkCommandBuffer>& inCommandBuffers);
 };

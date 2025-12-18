@@ -26,27 +26,26 @@
 #include <functional>
 #include <format>
 
-#define VK_CHECK(vkcommand, failedMessage) \
-do{\
-if((vkcommand)!=VK_SUCCESS){\
-   throw std::runtime_error(\
-failedMessage);\
-}\
-}while(0)
+#define VK_CHECK(X, ...) \
+	VK_CHECK_IMPL(X, __VA_ARGS__, "Vulkan check failed!")
 
-#define CHECK_TRUE(condition, failedMessage) \
+#define VK_CHECK_IMPL(vkcommand, failedMessage, ...) \
+		do\
+		{\
+			if((vkcommand)!=VK_SUCCESS)\
+			{\
+				throw std::runtime_error(failedMessage);\
+			}\
+		}while(0)
+
+#define CHECK_TRUE(X, ...) \
+	CHECK_TRUE_IMPL(X, __VA_ARGS__, "Check failed!")
+
+#define CHECK_TRUE_IMPL(condition, failedMessage, ...) \
 do{\
 if(!(condition)){\
    throw std::runtime_error(\
 failedMessage);\
-}\
-}while(0)
-
-#define CHECK_TRUE(condition) \
-do{\
-if(!(condition)){\
-   throw std::runtime_error(\
-"Check failed!");\
 }\
 }while(0)
 
