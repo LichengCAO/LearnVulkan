@@ -196,9 +196,12 @@ private:
 	VkCommandPool		 m_vkCommandPool = VK_NULL_HANDLE;
 	VkCommandBufferLevel m_vkCommandBufferLevel = VK_COMMAND_BUFFER_LEVEL_MAX_ENUM;
 	uint32_t			 m_queueFamily = ~0;
+	bool				 m_isRecording = false;
+	bool				 m_isInRenderPass = false;
+	bool				 m_isFullyRecorded = false;
 
 private:
-	void _ProcessInScope(const std::function<void()>& inFunction);
+	void _ProcessInCmdScope(const std::function<void()>& inFunction);
 
 public:
 	uint32_t GetQueueFamliyIndex() const;
@@ -233,37 +236,50 @@ public:
 	// End recording commands
 	CommandBuffer& EndCommands();
 
+	// Starts a render pass, providing detailed settings for the render pass context.
 	CommandBuffer& CmdBeginRenderPass(
 		const VkRenderPassBeginInfo& inRenderPassBeginInfo,
 		VkSubpassContents inContents = VK_SUBPASS_CONTENTS_INLINE);
+
+	// Overloaded version of CmdBeginRenderPass: Simplifies setup by directly passing
+	// the render pass, framebuffer, dimensions, clear values, and optional next pointer for extensibility.
 	CommandBuffer& CmdBeginRenderPass(
 		VkRenderPass inRenderPass,
 		VkFramebuffer inFramebuffer,
-		int32_t offsetX, 
+		int32_t offsetX,
 		int32_t offsetY,
-		uint32_t width, 
+		uint32_t width,
 		uint32_t height,
 		const std::vector<VkClearValue>& inClearValues,
 		VkSubpassContents inContents = VK_SUBPASS_CONTENTS_INLINE,
 		const void* inNextPtr = nullptr);
 
+	// Ends the current render pass. Should be called after all subpasses and commands within the render pass are complete.
 	CommandBuffer& CmdEndRenderPass();
 
+	// Inserts a pipeline barrier between two sets of pipeline stages to synchronize operations.
+	// This overload handles memory barriers specifically.
 	CommandBuffer& CmdPipelineBarrier(
 		VkPipelineStageFlags inSrcStageMask,
 		VkPipelineStageFlags inDstStageMask,
 		const std::vector<VkMemoryBarrier>& inMemoryBarriers,
 		VkDependencyFlags inFlags = 0);
+
+	// Inserts a pipeline barrier for buffer-specific synchronization.
 	CommandBuffer& CmdPipelineBarrier(
 		VkPipelineStageFlags inSrcStageMask,
 		VkPipelineStageFlags inDstStageMask,
 		const std::vector<VkBufferMemoryBarrier>& inBufferBarriers,
 		VkDependencyFlags inFlags = 0);
+
+	// Inserts a pipeline barrier for image-specific synchronization.
 	CommandBuffer& CmdPipelineBarrier(
 		VkPipelineStageFlags inSrcStageMask,
 		VkPipelineStageFlags inDstStageMask,
 		const std::vector<VkImageMemoryBarrier>& inImageBarriers,
 		VkDependencyFlags inFlags = 0);
+
+	// A generalized pipeline barrier that can handle multiple types of barriers (memory, buffer, image) simultaneously.
 	CommandBuffer& CmdPipelineBarrier(
 		VkPipelineStageFlags inSrcStageMask,
 		VkPipelineStageFlags inDstStageMask,
@@ -272,48 +288,59 @@ public:
 		const std::vector<VkImageMemoryBarrier>& inImageBarriers,
 		VkDependencyFlags inFlags = 0);
 
+	// Clears a color image using specific clear values for the given subresource ranges.
 	CommandBuffer& CmdClearColorImage(
 		VkImage inImage,
 		VkImageLayout inImageLayout,
 		const VkClearColorValue& inClearColor,
 		const std::vector<VkImageSubresourceRange>& inRanges);
 
+	// Fills a buffer with a specified value, starting at a given offset and spanning the specified size.
 	CommandBuffer& CmdFillBuffer(
-		VkBuffer inBuffer, 
-		VkDeviceSize inOffset, 
-		VkDeviceSize inSize, 
+		VkBuffer inBuffer,
+		VkDeviceSize inOffset,
+		VkDeviceSize inSize,
 		uint32_t inValue);
 
+	// Performs an image blit operation, copying data from one image to another with optional filtering.
 	CommandBuffer& CmdBlitImage(
 		VkImage inSrcImage, VkImageLayout inSrcLayout,
 		VkImage inDstImage, VkImageLayout inDstLayout,
 		const std::vector<VkImageBlit>& inRegions,
 		VkFilter inFilter = VK_FILTER_LINEAR);
 
+	// Copies data from a buffer to an image, using the provided regions to specify the layout of the copy operation.
 	CommandBuffer& CmdCopyBufferToImage(
 		VkBuffer inSrcBuffer,
 		VkImage inDstImage,
 		VkImageLayout inDstLayout,
 		const std::vector<VkBufferImageCopy>& inRegions);
 
+	// Builds acceleration structures for ray tracing pipelines using provided geometry and range information.
 	CommandBuffer& CmdBuildAccelerationStructuresKHR(
 		const std::vector<VkAccelerationStructureBuildGeometryInfoKHR>& inBuildInfos,
 		const std::vector<VkAccelerationStructureBuildRangeInfoKHR*>& inBuildRanges);
 
+	// Writes properties of specified acceleration structures into a query pool.
 	CommandBuffer& CmdWriteAccelerationStructuresPropertiesKHR(
 		const std::vector<VkAccelerationStructureKHR>& inAccelerationStructures,
 		VkQueryType inQueryType,
 		VkQueryPool inQueryPool,
 		uint32_t inFirstQuery);
 
+	// Copies an acceleration structure using detailed copy information.
 	CommandBuffer& CmdCopyAccelerationStructureKHR(
 		const VkCopyAccelerationStructureInfoKHR& inCopyInfo);
+
+	// Overloaded version of CmdCopyAccelerationStructureKHR: Allows copying from source to destination
+	// acceleration structures with the specified mode and optional extensibility via inNextPtr.
 	CommandBuffer& CmdCopyAccelerationStructureKHR(
 		VkAccelerationStructureKHR inSrcAS,
 		VkAccelerationStructureKHR inDstAS,
 		VkCopyAccelerationStructureModeKHR inMode,
 		const void* inNextPtr = nullptr);
 
+	// Executes secondary command buffers within the current primary command buffer.
 	CommandBuffer& CmdExecuteCommands(
 		const std::vector<VkCommandBuffer>& inCommandBuffers);
 };

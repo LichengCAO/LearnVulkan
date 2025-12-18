@@ -457,9 +457,11 @@ VkImageBlit ImageBlitBuilder::NewBlit(VkOffset2D srcOffsetLR, uint32_t srcMipLev
 	return NewBlit({ 0, 0, 0 }, { srcOffsetLR.x, srcOffsetLR.y, 1 }, srcMipLevel, { 0, 0, 0 }, { dstOffsetLR.x, dstOffsetLR.y, 1 }, dstMipLevel);
 }
 
-void CommandBuffer::_ProcessInScope(const std::function<void()>& inFunction)
+void CommandBuffer::_ProcessInCmdScope(const std::function<void()>& inFunction)
 {
 	// common things to do before processing
+	CHECK_TRUE(m_isRecording, "Command buffer is not in recording state!");
+
 	inFunction();
 	// common things to do after processing
 }
@@ -511,10 +513,16 @@ void CommandBuffer::Uninit()
 	m_vkCommandBufferLevel = VK_COMMAND_BUFFER_LEVEL_MAX_ENUM;
 	m_vkCommandPool = VK_NULL_HANDLE;
 	m_queueFamily = ~0;
+	m_isFullyRecorded = false;
+	m_isInRenderPass = false;
+	m_isRecording = false;
 }
 
 void CommandBuffer::Reset(VkCommandBufferResetFlags inFlags)
 {
+	m_isFullyRecorded = false;
+	m_isInRenderPass = false;
+	m_isRecording = false;
 	VK_CHECK(vkResetCommandBuffer(m_vkCommandBuffer, inFlags));
 }
 
@@ -527,30 +535,31 @@ CommandBuffer& CommandBuffer::BeginCommands(VkCommandBufferUsageFlags inFlags, c
 	beginInfo.flags = inFlags;
 	beginInfo.pInheritanceInfo = inInheritanceInfo.has_value() ? &inInheritanceInfo.value() : nullptr;
 
-	_ProcessInScope(
-		[this, &beginInfo]() 
-		{
-			VK_CHECK(vkBeginCommandBuffer(this->m_vkCommandBuffer, &beginInfo));
-		});
+	CHECK_TRUE(!m_isRecording);
+	CHECK_TRUE(!m_isInRenderPass);
+	CHECK_TRUE(!m_isFullyRecorded);
+	VK_CHECK(vkBeginCommandBuffer(this->m_vkCommandBuffer, &beginInfo));
+	m_isRecording = true;
 
 	return *this;
 }
 
 CommandBuffer& CommandBuffer::EndCommands()
 {
-	_ProcessInScope(
-		[this]() 
-		{
-			VK_CHECK(vkEndCommandBuffer(this->m_vkCommandBuffer));
-		});
+	CHECK_TRUE(m_isRecording, "Command buffer is not in recording state!");
+	CHECK_TRUE(!m_isInRenderPass);
+	CHECK_TRUE(!m_isFullyRecorded);
+	VK_CHECK(vkEndCommandBuffer(this->m_vkCommandBuffer));
+	m_isRecording = false;
+	m_isFullyRecorded = true;
 
 	return *this;
 }
 
 CommandBuffer& CommandBuffer::CmdBeginRenderPass(const VkRenderPassBeginInfo& inRenderPassBeginInfo, VkSubpassContents inContents)
 {
-	// TODO: 在此处插入 return 语句
-	_ProcessInScope(
+	m_isInRenderPass = true;
+	_ProcessInCmdScope(
 		[this, &inRenderPassBeginInfo, inContents]()
 		{
 			vkCmdBeginRenderPass(this->m_vkCommandBuffer, &inRenderPassBeginInfo, inContents);
@@ -585,11 +594,12 @@ CommandBuffer& CommandBuffer::CmdBeginRenderPass(
 
 CommandBuffer& CommandBuffer::CmdEndRenderPass()
 {
-	_ProcessInScope(
+	_ProcessInCmdScope(
 		[this]()
 		{
 			vkCmdEndRenderPass(this->m_vkCommandBuffer);
 		});
+	m_isInRenderPass = false;
 
 	return *this;
 }
@@ -647,7 +657,7 @@ CommandBuffer& CommandBuffer::CmdPipelineBarrier(
 	const std::vector<VkImageMemoryBarrier>& inImageBarriers, 
 	VkDependencyFlags inFlags)
 {
-	_ProcessInScope(
+	_ProcessInCmdScope(
 		[&]()
 		{
 			vkCmdPipelineBarrier(
@@ -672,7 +682,7 @@ CommandBuffer& CommandBuffer::CmdClearColorImage(
 	const VkClearColorValue& inClearColor, 
 	const std::vector<VkImageSubresourceRange>& inRanges)
 {
-	_ProcessInScope(
+	_ProcessInCmdScope(
 		[&]()
 		{
 			vkCmdClearColorImage(
@@ -689,8 +699,7 @@ CommandBuffer& CommandBuffer::CmdClearColorImage(
 
 CommandBuffer& CommandBuffer::CmdFillBuffer(VkBuffer inBuffer, VkDeviceSize inOffset, VkDeviceSize inSize, uint32_t inValue)
 {
-	// TODO: 在此处插入 return 语句
-	_ProcessInScope(
+	_ProcessInCmdScope(
 		[this, inBuffer, inOffset, inSize, inValue]()
 		{
 			vkCmdFillBuffer(this->m_vkCommandBuffer, inBuffer, inOffset, inSize, inValue);
@@ -706,7 +715,7 @@ CommandBuffer& CommandBuffer::CmdBlitImage(
 	const std::vector<VkImageBlit>& inRegions, 
 	VkFilter inFilter)
 {
-	_ProcessInScope(
+	_ProcessInCmdScope(
 		[&]()
 		{
 			vkCmdBlitImage(
@@ -729,7 +738,7 @@ CommandBuffer& CommandBuffer::CmdCopyBufferToImage(
 	VkImageLayout inDstLayout,
 	const std::vector<VkBufferImageCopy>& inRegions)
 {
-	_ProcessInScope(
+	_ProcessInCmdScope(
 		[&]()
 		{
 			vkCmdCopyBufferToImage(
@@ -748,7 +757,7 @@ CommandBuffer& CommandBuffer::CmdBuildAccelerationStructuresKHR(
 	const std::vector<VkAccelerationStructureBuildGeometryInfoKHR>& inBuildInfos,
 	const std::vector<VkAccelerationStructureBuildRangeInfoKHR*>& inBuildRanges)
 {
-	_ProcessInScope(
+	_ProcessInCmdScope(
 		[&]()
 		{
 			vkCmdBuildAccelerationStructuresKHR(
@@ -767,7 +776,7 @@ CommandBuffer& CommandBuffer::CmdWriteAccelerationStructuresPropertiesKHR(
 	VkQueryPool inQueryPool,
 	uint32_t inFirstQuery)
 {
-	_ProcessInScope(
+	_ProcessInCmdScope(
 		[&]()
 		{
 			vkCmdWriteAccelerationStructuresPropertiesKHR(
@@ -785,7 +794,7 @@ CommandBuffer& CommandBuffer::CmdWriteAccelerationStructuresPropertiesKHR(
 CommandBuffer& CommandBuffer::CmdCopyAccelerationStructureKHR(
 	const VkCopyAccelerationStructureInfoKHR& inCopyInfo)
 {
-	_ProcessInScope(
+	_ProcessInCmdScope(
 		[&]()
 		{
 			vkCmdCopyAccelerationStructureKHR(
@@ -808,7 +817,8 @@ CommandBuffer& CommandBuffer::CmdCopyAccelerationStructureKHR(VkAccelerationStru
 
 CommandBuffer& CommandBuffer::CmdExecuteCommands(const std::vector<VkCommandBuffer>& inCommandBuffers)
 {
-	_ProcessInScope(
+	CHECK_TRUE(m_vkCommandBufferLevel == VK_COMMAND_BUFFER_LEVEL_PRIMARY);
+	_ProcessInCmdScope(
 		[this, &inCommandBuffers]()
 		{
 			vkCmdExecuteCommands(this->m_vkCommandBuffer, static_cast<uint32_t>(inCommandBuffers.size()), inCommandBuffers.data());

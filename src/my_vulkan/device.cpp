@@ -200,6 +200,7 @@ void MyDevice::_SelectPhysicalDevice()
 	_AddMeshShaderExtensionsAndFeatures(physicalDeviceSelector);
 	_AddRayTracingExtensionsAndFeatures(physicalDeviceSelector);
 	_AddRayQueryExtensionsAndFeatures(physicalDeviceSelector);
+	_AddBindlessExtensionsAndFeatures(physicalDeviceSelector);
 
 	// select device based on setting
 	{
@@ -517,6 +518,17 @@ void MyDevice::_AddRayQueryExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _s
 	_selector.add_required_extension_features(rayQueryFeatures);
 }
 
+void MyDevice::_AddBindlessExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selector) const
+{
+	// Bindless
+	VkPhysicalDeviceVulkan12Features vulkan12Featrues{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES };
+
+	vulkan12Featrues.runtimeDescriptorArray = VK_TRUE;
+	vulkan12Featrues.descriptorBindingPartiallyBound = VK_TRUE;
+
+	_selector.add_required_extension_features(vulkan12Featrues);
+}
+
 void MyDevice::_GetVkSwapchainImages(std::vector<VkImage>& _vkImages) const
 {
 	uint32_t uImageCount = 0;
@@ -693,6 +705,11 @@ MemoryAllocator* MyDevice::GetMemoryAllocator()
 	return m_uptrMemoryAllocator.get();
 }
 
+DescriptorSetAllocator* MyDevice::GetDescriptorSetAllocator()
+{
+	return &descriptorAllocator;
+}
+
 VkFence MyDevice::CreateVkFence(const VkFenceCreateInfo* _pCreateInfo)
 {
 	VkFence vkFence = VK_NULL_HANDLE;
@@ -754,11 +771,6 @@ uint32_t MyDevice::GetQueueFamilyIndex(QueueFamilyType inType) const
 		result = queueFamilyIndices.graphicsFamily.value_or(~0);
 	}
 	break;
-	case QueueFamilyType::PRESENT:
-	{
-		result = queueFamilyIndices.presentFamily.value_or(~0);
-	}
-	break;
 	case QueueFamilyType::TRANSFER:
 	{
 		result = queueFamilyIndices.transferFamily.value_or(~0);
@@ -814,6 +826,66 @@ VkCommandBuffer MyDevice::AllocateCommandBuffer(VkCommandPool inCommandPool, VkC
 void MyDevice::FreeCommandBuffer(VkCommandPool inCommandPool, VkCommandBuffer inCommandBuffer)
 {
 	vkFreeCommandBuffers(vkDevice, inCommandPool, 1, &inCommandBuffer);
+}
+
+VkDescriptorSetLayout MyDevice::CreateDescriptorSetLayout(const VkDescriptorSetLayoutCreateInfo& inCreateInfo, const VkAllocationCallbacks* inCallbacks)
+{
+	VkDescriptorSetLayout result = VK_NULL_HANDLE;
+
+	VK_CHECK(vkCreateDescriptorSetLayout(vkDevice, &inCreateInfo, inCallbacks, &result), "Failed to create descriptor set layout!");
+
+	return result;
+}
+
+void MyDevice::DestroyDescriptorSetLayout(VkDescriptorSetLayout inDescriptorSetLayout, const VkAllocationCallbacks* inCallbacks)
+{
+	vkDestroyDescriptorSetLayout(vkDevice, inDescriptorSetLayout, inCallbacks);
+}
+
+VkDescriptorPool MyDevice::CreateDescriptorPool(
+	const VkDescriptorPoolCreateInfo& inCreateInfo,
+	VkResult* outResultPtr,
+	const VkAllocationCallbacks* inCallbacks)
+{
+	VkDescriptorPool result = VK_NULL_HANDLE;
+	auto processResult = vkCreateDescriptorPool(vkDevice, &inCreateInfo, inCallbacks, &result);
+
+	if (outResultPtr != nullptr)
+	{
+		*outResultPtr = processResult;
+	}
+
+	return result;
+}
+
+void MyDevice::DestroyDescriptorPool(VkDescriptorPool inPoolToDestroy, const VkAllocationCallbacks* pCallbacks)
+{
+	vkDestroyDescriptorPool(vkDevice, inPoolToDestroy, pCallbacks);
+}
+
+VkDescriptorSet MyDevice::AllocateDescriptorSet(VkDescriptorSetLayout inLayout, VkDescriptorPool inPool, const void* inNextPtr, VkResult* outResultPtr)
+{
+	VkDescriptorSet result = VK_NULL_HANDLE;
+	VkDescriptorSetAllocateInfo allocInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+	VkResult processResult;
+
+	allocInfo.descriptorPool = inPool;
+	allocInfo.descriptorSetCount = 1;
+	allocInfo.pNext = inNextPtr;
+	allocInfo.pSetLayouts = &inLayout;
+
+	processResult = vkAllocateDescriptorSets(vkDevice, &allocInfo, &result);
+	if (outResultPtr != nullptr)
+	{
+		*outResultPtr = processResult;
+	}
+
+	return result;
+}
+
+VkResult MyDevice::ResetDescriptorPool(VkDescriptorPool inDescriptorPool, VkDescriptorPoolResetFlags inFlags)
+{
+	return vkResetDescriptorPool(vkDevice, inDescriptorPool, inFlags);
 }
 
 MyDevice& MyDevice::GetInstance()

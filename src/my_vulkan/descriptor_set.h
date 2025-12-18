@@ -1,36 +1,61 @@
 #pragma once
 #include "common.h"
-
+#include <map>
 class DescriptorSet;
 // Pipeline can have multiple DescriptorSetLayout, 
 // when execute the pipeline we need to provide DescriptorSets for each of the DescriptorSetLayout in order
 class DescriptorSetLayout
 {
+private:
+	bool m_allowBindless = false;	// whether to add following descriptor bindings as bindless one
+	std::vector<VkDescriptorBindingFlags> m_bindingFlags; // only used when using bindless descriptors
+
 public:
 	VkDescriptorSetLayout vkDescriptorSetLayout = VK_NULL_HANDLE;
 	std::vector<VkDescriptorSetLayoutBinding> bindings;
+
+private:
 
 public:
 	~DescriptorSetLayout();
 
 public:
-	uint32_t PreAddBinding(
+	// Optional, indicating whether the later descriptor bindings added are bindless or not
+	// the descriptor set is NOT bindless by default
+	DescriptorSetLayout& SetFollowingBindless(bool inBindless);
+
+	DescriptorSetLayout& PreAddBinding(
 		uint32_t descriptorCount,
 		VkDescriptorType descriptorType,
 		VkShaderStageFlags stageFlags,
-		const VkSampler* pImmutableSamplers = nullptr);
+		const VkSampler* pImmutableSamplers = nullptr,
+		uint32_t* outBindingPtr = nullptr);
 
-	uint32_t PreAddBinding(
+	// Add binding for the current layout.
+	// For bindless binding, you may want to set descriptorCount large!
+	DescriptorSetLayout& PreAddBinding(
 		uint32_t binding,
 		uint32_t descriptorCount,
 		VkDescriptorType descriptorType,
 		VkShaderStageFlags stageFlags,
 		const VkSampler* pImmutableSamplers = nullptr);
 
+	// Optional, set up binding flags for a specific binding
+	// now only used for bindless descriptors
+	DescriptorSetLayout& PreSetBindingFlags(
+		uint32_t binding,
+		VkDescriptorBindingFlags flags);
+
 	void Init();
 
 	DescriptorSet NewDescriptorSet() const;
 	DescriptorSet* NewDescriptorSetPointer() const;
+
+	// Set up the descriptor set, the result descriptor set is not Init() yet
+	bool NewDescriptorSet(DescriptorSet& outDescriptorSet) const;
+
+	// Create a pointer to the descriptor set, the result descriptor set is not Init() yet
+	bool NewDescriptorSet(DescriptorSet*& outDescriptorSetPtr) const;
 
 	void Uninit();
 };
@@ -42,7 +67,7 @@ private:
 	struct DescriptorSetUpdate
 	{
 		uint32_t        binding = 0;
-		uint32_t        startElement = 0;
+		uint32_t        arrayElementIndex = 0;
 		DescriptorType  descriptorType = DescriptorType::BUFFER;
 		std::vector<VkDescriptorBufferInfo> bufferInfos;
 		std::vector<VkDescriptorImageInfo>  imageInfos;
@@ -53,6 +78,7 @@ private:
 private:
 	std::vector<DescriptorSetUpdate> m_updates;
 	const DescriptorSetLayout* m_pLayout = nullptr;
+	VkDescriptorPoolCreateFlags m_requiredPoolFlags = 0;
 
 public:
 	VkDescriptorSet vkDescriptorSet = VK_NULL_HANDLE;
@@ -62,14 +88,35 @@ public:
 
 public:
 	void PresetLayout(const DescriptorSetLayout* _layout);
+	
+	VkDescriptorPoolCreateFlags GetRequiredPoolFlags() const;
+
+	void PreSetRequiredPoolFlags(VkDescriptorPoolCreateFlags inFlags);
 
 	void Init();
-
+	
 	void StartUpdate();
-	void UpdateBinding(uint32_t bindingId, const std::vector<VkDescriptorImageInfo>& dImageInfo);
-	void UpdateBinding(uint32_t bindingId, const std::vector<VkBufferView>& bufferViews);
-	void UpdateBinding(uint32_t bindingId, const std::vector<VkDescriptorBufferInfo>& bufferInfos);
-	void UpdateBinding(uint32_t bindingId, const std::vector<VkAccelerationStructureKHR>& _accelStructs);
+	
+	void UpdateBinding(
+		uint32_t bindingId, 
+		const std::vector<VkDescriptorImageInfo>& dImageInfo,
+		uint32_t inArrayIndexOffset = 0);
+	
+	void UpdateBinding(
+		uint32_t bindingId, 
+		const std::vector<VkBufferView>& bufferViews,
+		uint32_t inArrayIndexOffset = 0);
+	
+	void UpdateBinding(
+		uint32_t bindingId, 
+		const std::vector<VkDescriptorBufferInfo>& bufferInfos,
+		uint32_t inArrayIndexOffset = 0);
+	
+	void UpdateBinding(
+		uint32_t bindingId, 
+		const std::vector<VkAccelerationStructureKHR>& _accelStructs,
+		uint32_t inArrayIndexOffset = 0);
+	
 	void FinishUpdate();
 };
 
@@ -95,18 +142,25 @@ public:
 	};
 
 private:
-	VkDescriptorPool _CreatePool();
-	VkDescriptorPool _GrabPool();
-	VkDescriptorPool m_currentPool = VK_NULL_HANDLE;
 	PoolSizes m_poolSizes{};
-	std::vector<VkDescriptorPool> m_usedPools;
-	std::vector<VkDescriptorPool> m_freePools;
+	std::map<VkDescriptorPoolCreateFlags, VkDescriptorPool> m_candidatePool;
+	std::map<VkDescriptorPoolCreateFlags, std::vector<VkDescriptorPool>> m_usedPools;
+	std::map<VkDescriptorPoolCreateFlags, std::vector<VkDescriptorPool>> m_freePools;
+
+private:
+	VkDescriptorPool _CreatePool(VkDescriptorPoolCreateFlags inPoolFlags);
+	VkDescriptorPool _GrabPool(VkDescriptorPoolCreateFlags inPoolFlags);
 
 public:
 	void ResetPools();
 
-	bool Allocate(VkDescriptorSet* _vkSet, VkDescriptorSetLayout layout);
+	bool Allocate(
+		VkDescriptorSetLayout inLayout, 
+		VkDescriptorSet& outDescriptorSet, 
+		VkDescriptorPoolCreateFlags inPoolFlags = 0,
+		const void* inNextPtr = nullptr);
 
 	void Init();
+
 	void Uninit();
 };

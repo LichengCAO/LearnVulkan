@@ -69,6 +69,7 @@ private:
 	void _AddRayTracingExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selector) const;
 	void _AddMeshShaderExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selector) const;
 	void _AddRayQueryExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selector) const;
+	void _AddBindlessExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selector) const;
 
 	// get VkImages in current swapchain
 	void _GetVkSwapchainImages(std::vector<VkImage>& _vkImages) const;
@@ -114,6 +115,8 @@ public:
 
 	MemoryAllocator* GetMemoryAllocator();
 
+	DescriptorSetAllocator* GetDescriptorSetAllocator();
+
 	// Create a VkFence, _pCreateInfo is optional, if it's not nullptr, VkFence will be created based on it
 	VkFence CreateVkFence(const VkFenceCreateInfo* _pCreateInfo = nullptr);
 	
@@ -147,6 +150,31 @@ public:
 		const void* inNextPtr = nullptr);
 
 	void FreeCommandBuffer(VkCommandPool inCommandPool, VkCommandBuffer inCommandBuffer);
+
+	VkDescriptorSetLayout CreateDescriptorSetLayout(
+		const VkDescriptorSetLayoutCreateInfo& inCreateInfo, 
+		const VkAllocationCallbacks* inCallbacks = nullptr);
+
+	void DestroyDescriptorSetLayout(
+		VkDescriptorSetLayout inDescriptorSetLayout,
+		const VkAllocationCallbacks* inCallbacks = nullptr);
+
+	VkDescriptorPool CreateDescriptorPool(
+		const VkDescriptorPoolCreateInfo& inCreateInfo,
+		VkResult* outResultPtr = nullptr,
+		const VkAllocationCallbacks* inCallbacks = nullptr);
+
+	void DestroyDescriptorPool(
+		VkDescriptorPool inPoolToDestroy, 
+		const VkAllocationCallbacks* pCallbacks = nullptr);
+
+	VkDescriptorSet AllocateDescriptorSet(
+		VkDescriptorSetLayout inLayout,
+		VkDescriptorPool inPool,
+		const void* inNextPtr = nullptr,
+		VkResult* outResultPtr = nullptr);
+
+	VkResult ResetDescriptorPool(VkDescriptorPool inDescriptorPool, VkDescriptorPoolResetFlags inFlags = 0);
 public:
 	static MyDevice& GetInstance();
 	static void OnFramebufferResized(GLFWwindow* _pWindow, int width, int height);

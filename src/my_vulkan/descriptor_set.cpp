@@ -7,14 +7,23 @@ void DescriptorSet::PresetLayout(const DescriptorSetLayout* _layout)
 	m_pLayout = _layout;
 }
 
+VkDescriptorPoolCreateFlags DescriptorSet::GetRequiredPoolFlags() const
+{
+	return m_requiredPoolFlags;
+}
+
+void DescriptorSet::PreSetRequiredPoolFlags(VkDescriptorPoolCreateFlags inFlags)
+{
+	m_requiredPoolFlags = inFlags;
+}
+
 void DescriptorSet::Init()
 {
-	if (m_pLayout == nullptr)
-	{
-		throw std::runtime_error("No descriptor layout set!");
-	}
+	CHECK_TRUE(m_pLayout != nullptr, "No descriptor layout set!");
 	CHECK_TRUE(vkDescriptorSet == VK_NULL_HANDLE, "VkDescriptorSet is already created!");
-	MyDevice::GetInstance().descriptorAllocator.Allocate(&vkDescriptorSet, m_pLayout->vkDescriptorSetLayout);
+
+	auto pAllocator = MyDevice::GetInstance().GetDescriptorSetAllocator();
+	pAllocator->Allocate(m_pLayout->vkDescriptorSetLayout, vkDescriptorSet);
 }
 
 void DescriptorSet::StartUpdate()
@@ -30,39 +39,55 @@ void DescriptorSet::StartUpdate()
 	m_updates.clear();
 }
 
-void DescriptorSet::UpdateBinding(uint32_t bindingId, const std::vector<VkDescriptorImageInfo>& dImageInfo)
+void DescriptorSet::UpdateBinding(
+	uint32_t bindingId, 
+	const std::vector<VkDescriptorImageInfo>& dImageInfo,
+	uint32_t inArrayIndexOffset)
 {
 	DescriptorSetUpdate newUpdate{};
 	newUpdate.binding = bindingId;
 	newUpdate.imageInfos = dImageInfo;
+	newUpdate.arrayElementIndex = inArrayIndexOffset;
 	newUpdate.descriptorType = DescriptorType::IMAGE;
 	m_updates.push_back(newUpdate);
 }
 
-void DescriptorSet::UpdateBinding(uint32_t bindingId, const std::vector<VkBufferView>& bufferViews)
+void DescriptorSet::UpdateBinding(
+	uint32_t bindingId, 
+	const std::vector<VkBufferView>& bufferViews,
+	uint32_t inArrayIndexOffset)
 {
 	DescriptorSetUpdate newUpdate{};
 
 	newUpdate.binding = bindingId;
 	newUpdate.bufferViews = bufferViews;
+	newUpdate.arrayElementIndex = inArrayIndexOffset;
 	newUpdate.descriptorType = DescriptorType::TEXEL_BUFFER;
 	m_updates.push_back(newUpdate);
 }
 
-void DescriptorSet::UpdateBinding(uint32_t bindingId, const std::vector<VkDescriptorBufferInfo>& bufferInfos)
+void DescriptorSet::UpdateBinding(
+	uint32_t bindingId, 
+	const std::vector<VkDescriptorBufferInfo>& bufferInfos,
+	uint32_t inArrayIndexOffset)
 {
 	DescriptorSetUpdate newUpdate{};
 	newUpdate.binding = bindingId;
 	newUpdate.bufferInfos = bufferInfos;
+	newUpdate.arrayElementIndex = inArrayIndexOffset;
 	newUpdate.descriptorType = DescriptorType::BUFFER;
 	m_updates.push_back(newUpdate);
 }
 
-void DescriptorSet::UpdateBinding(uint32_t bindingId, const std::vector<VkAccelerationStructureKHR>& _accelStructs)
+void DescriptorSet::UpdateBinding(
+	uint32_t bindingId, 
+	const std::vector<VkAccelerationStructureKHR>& _accelStructs,
+	uint32_t inArrayIndexOffset)
 {
 	DescriptorSetUpdate newUpdate{};
 	newUpdate.binding = bindingId;
 	newUpdate.accelerationStructures = _accelStructs;
+	newUpdate.arrayElementIndex = inArrayIndexOffset;
 	newUpdate.descriptorType = DescriptorType::ACCELERATION_STRUCTURE;
 	m_updates.push_back(newUpdate);
 }
@@ -78,7 +103,7 @@ void DescriptorSet::FinishUpdate()
 		bool bindingFound = false;
 		wds.dstSet = vkDescriptorSet;
 		wds.dstBinding = eUpdate.binding;
-		wds.dstArrayElement = eUpdate.startElement;
+		wds.dstArrayElement = eUpdate.arrayElementIndex;
 		for (const auto& binding : m_pLayout->bindings)
 		{
 			if (binding.binding == eUpdate.binding)
@@ -141,18 +166,33 @@ DescriptorSetLayout::~DescriptorSetLayout()
 	assert(vkDescriptorSetLayout == VK_NULL_HANDLE);
 }
 
-uint32_t DescriptorSetLayout::PreAddBinding(
+DescriptorSetLayout& DescriptorSetLayout::SetFollowingBindless(bool inBindless)
+{
+	m_allowBindless = inBindless;
+	if (m_allowBindless)
+	{
+		m_hasBindless = true;
+	}
+	return *this;
+}
+
+DescriptorSetLayout& DescriptorSetLayout::PreAddBinding(
 	uint32_t descriptorCount,
 	VkDescriptorType descriptorType,
 	VkShaderStageFlags stageFlags,
-	const VkSampler* pImmutableSamplers)
+	const VkSampler* pImmutableSamplers,
+	uint32_t* outBindingPtr)
 {
 	uint32_t binding = static_cast<uint32_t>(bindings.size());
+	if (outBindingPtr != nullptr)
+	{
+		*outBindingPtr = binding;
+	}
 
 	return PreAddBinding(binding, descriptorCount, descriptorType, stageFlags, pImmutableSamplers);
 }
 
-uint32_t DescriptorSetLayout::PreAddBinding(
+DescriptorSetLayout& DescriptorSetLayout::PreAddBinding(
 	uint32_t binding,
 	uint32_t descriptorCount,
 	VkDescriptorType descriptorType,
@@ -168,22 +208,53 @@ uint32_t DescriptorSetLayout::PreAddBinding(
 	layoutBinding.stageFlags = stageFlags;
 
 	bindings.push_back(layoutBinding);
+	if (m_allowBindless)
+	{
+		PreSetBindingFlags(binding, 
+			VK_DESCRIPTOR_BINDING_PARTIALLY_BOUND_BIT_EXT
+			| VK_DESCRIPTOR_BINDING_UPDATE_AFTER_BIND_BIT_EXT);
+	}
 
-	return binding;
+	return *this;
+}
+
+DescriptorSetLayout& DescriptorSetLayout::PreSetBindingFlags(
+	uint32_t binding,
+	VkDescriptorBindingFlags flags)
+{
+	m_bindingFlags.resize(binding + 1, 0);
+	m_bindingFlags[binding] = flags;
+
+	return *this;
 }
 
 void DescriptorSetLayout::Init()
 {
 	CHECK_TRUE(bindings.size() != 0, "No bindings set!");
-	CHECK_TRUE(vkDescriptorSetLayout == VK_NULL_HANDLE, "Layout is already initialized!");
+	CHECK_TRUE(vkDescriptorSetLayout == VK_NULL_HANDLE, "VkDescriptorSetLayout is already created!");
 
 	VkDescriptorSetLayoutCreateInfo createInfo{};
+	VkDescriptorSetLayoutBindingFlagsCreateInfo bindingFlagsCreateInfo{};
+	void const** ppNextChain = &(createInfo.pNext);
+
 	createInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_CREATE_INFO;
 	createInfo.bindingCount = static_cast<uint32_t>(bindings.size());
 	createInfo.pBindings = bindings.data();
 
-	CHECK_TRUE(vkDescriptorSetLayout == VK_NULL_HANDLE, "VkDescriptorSetLayout is already created!");
-	VK_CHECK(vkCreateDescriptorSetLayout(MyDevice::GetInstance().vkDevice, &createInfo, nullptr, &vkDescriptorSetLayout), "Failed to create descriptor set layout!");
+	// Which indicates that the descriptor set layout will use the extended binding flags
+	if (m_bindingFlags.size() > 0)
+	{
+		m_bindingFlags.resize(bindings.size(), 0);
+		bindingFlagsCreateInfo.sType = VK_STRUCTURE_TYPE_DESCRIPTOR_SET_LAYOUT_BINDING_FLAGS_CREATE_INFO_EXT;
+		bindingFlagsCreateInfo.pNext = nullptr;
+		bindingFlagsCreateInfo.bindingCount = static_cast<uint32_t>(m_bindingFlags.size());
+		bindingFlagsCreateInfo.pBindingFlags = m_bindingFlags.data();
+
+		(*ppNextChain) = &bindingFlagsCreateInfo;
+		ppNextChain = &(bindingFlagsCreateInfo.pNext);
+	}
+
+	vkDescriptorSetLayout = MyDevice::GetInstance().CreateDescriptorSetLayout(createInfo);
 }
 
 DescriptorSet DescriptorSetLayout::NewDescriptorSet() const
@@ -200,92 +271,144 @@ DescriptorSet* DescriptorSetLayout::NewDescriptorSetPointer() const
 	return pDescriptor;
 }
 
+bool DescriptorSetLayout::NewDescriptorSet(DescriptorSet& outDescriptorSet) const
+{
+	bool supportBindless = m_bindingFlags.size() > 0;
+	outDescriptorSet.PresetLayout(this);
+	if (supportBindless)
+	{
+		// For bindless descriptor sets, 
+		// change which buffer descriptor is pointing to after bound, 
+		// before command buffer submission
+		outDescriptorSet.PreSetRequiredPoolFlags(
+			outDescriptorSet.GetRequiredPoolFlags()
+			| VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT_EXT
+		);
+	}
+	return true;
+}
+
+bool DescriptorSetLayout::NewDescriptorSet(DescriptorSet*& outDescriptorSetPtr) const
+{
+	outDescriptorSetPtr = new DescriptorSet();
+	return NewDescriptorSet(*outDescriptorSetPtr);
+}
+
 void DescriptorSetLayout::Uninit()
 {
 	if (vkDescriptorSetLayout != VK_NULL_HANDLE)
 	{
-		vkDestroyDescriptorSetLayout(MyDevice::GetInstance().vkDevice, vkDescriptorSetLayout, nullptr);
+		MyDevice::GetInstance().DestroyDescriptorSetLayout(vkDescriptorSetLayout);
 		vkDescriptorSetLayout = VK_NULL_HANDLE;
 	}
 	bindings.clear();
 }
 
-VkDescriptorPool DescriptorSetAllocator::_CreatePool()
+VkDescriptorPool DescriptorSetAllocator::_CreatePool(VkDescriptorPoolCreateFlags inPoolFlags)
 {
-	VkDevice device = MyDevice::GetInstance().vkDevice;
-	std::vector<VkDescriptorPoolSize> sizes;
-	VkDescriptorPoolCreateInfo pool_info = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
+	std::vector<VkDescriptorPoolSize> poolSizes;
+	VkDescriptorPoolCreateInfo createInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_POOL_CREATE_INFO };
 	VkDescriptorPool descriptorPool = VK_NULL_HANDLE;
 
-	sizes.reserve(m_poolSizes.sizes.size());
+	poolSizes.reserve(m_poolSizes.sizes.size());
 	for (auto sz : m_poolSizes.sizes)
 	{
-		sizes.push_back({ sz.first, sz.second });
+		poolSizes.push_back({ sz.first, sz.second });
 	}
 	
-	pool_info.flags = 0;
-	pool_info.maxSets = 1000;
-	pool_info.poolSizeCount = static_cast<uint32_t>(sizes.size());
-	pool_info.pPoolSizes = sizes.data();
+	createInfo.flags = inPoolFlags;
+	createInfo.maxSets = 1000;
+	createInfo.poolSizeCount = static_cast<uint32_t>(poolSizes.size());
+	createInfo.pPoolSizes = poolSizes.data();
+	createInfo.pNext = nullptr;
 
-	vkCreateDescriptorPool(device, &pool_info, nullptr, &descriptorPool);
+	descriptorPool = MyDevice::GetInstance().CreateDescriptorPool(createInfo);
 
 	return descriptorPool;
 }
 
-VkDescriptorPool DescriptorSetAllocator::_GrabPool()
+VkDescriptorPool DescriptorSetAllocator::_GrabPool(VkDescriptorPoolCreateFlags inPoolFlags)
 {
+	bool hasThisTypeFreePool = 
+		m_freePools.find(inPoolFlags) != m_freePools.end() 
+		&& m_freePools[inPoolFlags].size() > 0;
+	
 	//there are reusable pools available
-	if (m_freePools.size() > 0)
+	if (hasThisTypeFreePool)
 	{
 		//grab pool from the back of the vector and remove it from there.
-		VkDescriptorPool pool = m_freePools.back();
-		m_freePools.pop_back();
+		auto& freePools = m_freePools[inPoolFlags];
+		VkDescriptorPool pool = freePools.back();
+		freePools.pop_back();
 		return pool;
 	}
 	else
 	{
 		//no pools available, so create a new one
-		return _CreatePool();
+		return _CreatePool(inPoolFlags);
 	}
 }
 
 void DescriptorSetAllocator::ResetPools()
 {
-	VkDevice device = MyDevice::GetInstance().vkDevice;
+	auto& device = MyDevice::GetInstance();
+	
 	//reset all used pools and add them to the free pools
-	for (auto p : m_usedPools)
+	for (auto& p : m_usedPools)
 	{
-		vkResetDescriptorPool(device, p, 0);
-		m_freePools.push_back(p);
-	}
+		auto& freePools = m_freePools.at(p.first);
+		auto& toFreePools = p.second;
+		
+		for (VkDescriptorPool poolToFree : toFreePools)
+		{
+			device.ResetDescriptorPool(poolToFree);
+			freePools.push_back(poolToFree);
+		}
 
-	//clear the used pools, since we've put them all in the free pools
-	m_usedPools.clear();
+		//clear the used pools, since we've put them all in the free pools
+		toFreePools.clear();
+	}
 
 	//reset the current pool handle back to null
-	m_currentPool = VK_NULL_HANDLE;
+	m_candidatePool.clear();
 }
 
-bool DescriptorSetAllocator::Allocate(VkDescriptorSet* _vkSet, VkDescriptorSetLayout layout)
+bool DescriptorSetAllocator::Allocate(
+	VkDescriptorSetLayout inLayout, 
+	VkDescriptorSet& outDescriptorSet, 
+	VkDescriptorPoolCreateFlags inPoolFlags, 
+	const void* inNextPtr)
 {
-	VkDevice device = MyDevice::GetInstance().vkDevice;
-	//initialize the currentPool handle if it's null
-	if (m_currentPool == VK_NULL_HANDLE)
+	auto& device = MyDevice::GetInstance();
+	VkDescriptorSetAllocateInfo allocInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
+	VkDescriptorPool candidatePool = VK_NULL_HANDLE;
+	VkResult allocResult;
+	bool needReallocate = false;
+
+	//initialize the candidate pool handle if it's null
+	if (m_candidatePool.find(inPoolFlags) == m_candidatePool.end()
+		|| m_candidatePool[inPoolFlags] == VK_NULL_HANDLE)
 	{
-		m_currentPool = _GrabPool();
-		m_usedPools.push_back(m_currentPool);
+		candidatePool = _GrabPool(inPoolFlags);
+		m_candidatePool[inPoolFlags] = candidatePool;
+		m_usedPools[inPoolFlags].push_back(candidatePool);
+	}
+	else
+	{
+		candidatePool = m_candidatePool[inPoolFlags];
 	}
 
-	VkDescriptorSetAllocateInfo allocInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
 	allocInfo.pNext = nullptr;
-	allocInfo.pSetLayouts = &layout;
-	allocInfo.descriptorPool = m_currentPool;
+	allocInfo.pSetLayouts = &inLayout;
+	allocInfo.descriptorPool = candidatePool;
 	allocInfo.descriptorSetCount = 1;
 
 	//try to allocate the descriptor set
-	VkResult allocResult = vkAllocateDescriptorSets(device, &allocInfo, _vkSet);
-	bool needReallocate = false;
+	outDescriptorSet = device.AllocateDescriptorSet(
+		inLayout, 
+		candidatePool, 
+		nullptr, 
+		&allocResult);
 
 	switch (allocResult)
 	{
@@ -305,10 +428,15 @@ bool DescriptorSetAllocator::Allocate(VkDescriptorSet* _vkSet, VkDescriptorSetLa
 	if (needReallocate)
 	{
 		//allocate a new pool and retry
-		m_currentPool = _GrabPool();
-		m_usedPools.push_back(m_currentPool);
+		candidatePool = _GrabPool(inPoolFlags);
+		m_candidatePool[inPoolFlags] = candidatePool;
+		m_usedPools[inPoolFlags].push_back(candidatePool);
 
-		allocResult = vkAllocateDescriptorSets(device, &allocInfo, _vkSet);
+		outDescriptorSet = device.AllocateDescriptorSet(
+			inLayout,
+			candidatePool,
+			nullptr,
+			&allocResult);
 
 		//if it still fails then we have big issues
 		if (allocResult == VK_SUCCESS)
@@ -326,14 +454,24 @@ void DescriptorSetAllocator::Init()
 
 void DescriptorSetAllocator::Uninit()
 {
-	VkDevice device = MyDevice::GetInstance().vkDevice;
+	auto& device = MyDevice::GetInstance();
 	//delete every pool held
-	for (auto p : m_freePools)
+	for (auto& p : m_freePools)
 	{
-		vkDestroyDescriptorPool(device, p, nullptr);
+		auto& poolsToDestroy = p.second;
+		for (VkDescriptorPool pool : poolsToDestroy)
+		{
+			device.DestroyDescriptorPool(pool);
+		}
 	}
-	for (auto p : m_usedPools)
+	m_freePools.clear();
+	for (auto& p : m_usedPools)
 	{
-		vkDestroyDescriptorPool(device, p, nullptr);
+		auto& poolsToDestroy = p.second;
+		for (VkDescriptorPool pool : poolsToDestroy)
+		{
+			device.DestroyDescriptorPool(pool);
+		}
 	}
+	m_usedPools.clear();
 }
