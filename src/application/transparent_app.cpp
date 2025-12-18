@@ -974,7 +974,7 @@ void TransparentApp::_InitDescriptorSets()
 			inUseImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;			  // Commonly used layout for storage images
 
 			m_oitDSets.push_back(DescriptorSet{});
-			m_oitDSets[i].PresetLayout(&m_oitSampleDSetLayout);
+			m_oitSampleDSetLayout.ApplyToDescriptorSet(m_oitDSets[i]);
 			m_oitDSets[i].Init();
 			m_oitDSets[i].StartUpdate();
 			m_oitDSets[i].UpdateBinding(0, { m_oitSampleTexelBufferViews[i].vkBufferView });
@@ -993,7 +993,7 @@ void TransparentApp::_InitDescriptorSets()
 			outputImageInfo.imageLayout = VK_IMAGE_LAYOUT_GENERAL;			  // Commonly used layout for storage images
 
 			m_oitColorDSets.push_back(DescriptorSet{});
-			m_oitColorDSets[i].PresetLayout(&m_oitColorDSetLayout);
+			m_oitColorDSetLayout.ApplyToDescriptorSet(m_oitColorDSets[i]);
 			m_oitColorDSets[i].Init();
 			m_oitColorDSets[i].StartUpdate();
 			m_oitColorDSets[i].UpdateBinding(0, { outputImageInfo });
@@ -1007,7 +1007,7 @@ void TransparentApp::_InitDescriptorSets()
 		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 		{
 			m_distortDSets.push_back(DescriptorSet{});
-			m_distortDSets[i].PresetLayout(&m_distortDSetLayout);
+			m_distortDSetLayout.ApplyToDescriptorSet(m_distortDSets[i]);
 			m_distortDSets[i].Init();
 			m_distortDSets[i].StartUpdate();
 			m_distortDSets[i].UpdateBinding(0, { (&m_distortBuffers[i])->GetDescriptorInfo() });
@@ -1026,7 +1026,7 @@ void TransparentApp::_InitDescriptorSets()
 			for (int j = 0; j < n; ++j)
 			{
 				m_vecModelDSets[i].push_back(DescriptorSet{});
-				m_vecModelDSets[i][j].PresetLayout(&m_modelDSetLayout);
+				m_modelDSetLayout.ApplyToDescriptorSet(m_vecModelDSets[i][j]);
 				m_vecModelDSets[i][j].Init();
 				m_vecModelDSets[i][j].StartUpdate();
 				m_vecModelDSets[i][j].UpdateBinding(0, { m_vecModelBuffers[i][j].GetDescriptorInfo() });
@@ -1044,7 +1044,7 @@ void TransparentApp::_InitDescriptorSets()
 			for (int j = 0; j < n; ++j)
 			{
 				m_vecTransModelDSets[i].push_back(DescriptorSet{});
-				m_vecTransModelDSets[i][j].PresetLayout(&m_modelDSetLayout);
+				m_modelDSetLayout.ApplyToDescriptorSet(m_vecTransModelDSets[i][j]);
 				m_vecTransModelDSets[i][j].Init();
 				m_vecTransModelDSets[i][j].StartUpdate();
 				m_vecTransModelDSets[i][j].UpdateBinding(0, { m_vecTransModelBuffers[i][j].GetDescriptorInfo() });
@@ -1064,7 +1064,7 @@ void TransparentApp::_InitDescriptorSets()
 			for (int j = 0; j < n; ++j)
 			{
 				m_vecMaterialDSets[i].push_back(DescriptorSet{});
-				m_vecMaterialDSets[i][j].PresetLayout(&m_materialDSetLayout);
+				m_materialDSetLayout.ApplyToDescriptorSet(m_vecMaterialDSets[i][j]);
 				m_vecMaterialDSets[i][j].Init();
 				m_vecMaterialDSets[i][j].StartUpdate();
 				m_vecMaterialDSets[i][j].UpdateBinding(0, { m_vecMaterialBuffers[i][j].GetDescriptorInfo() });
@@ -1079,7 +1079,7 @@ void TransparentApp::_InitDescriptorSets()
 		for (int i = 0; i < MAX_FRAME_COUNT; ++i)
 		{
 			m_cameraDSets.push_back(DescriptorSet{});
-			m_cameraDSets.back().PresetLayout(&m_cameraDSetLayout);
+			m_cameraDSetLayout.ApplyToDescriptorSet(m_cameraDSets.back());
 			m_cameraDSets.back().Init();
 			m_cameraDSets.back().StartUpdate();
 			m_cameraDSets.back().UpdateBinding(0, { m_cameraBuffers[i].GetDescriptorInfo() });
@@ -1118,7 +1118,7 @@ void TransparentApp::_InitDescriptorSets()
 			//imageInfo4.sampler = m_vkSampler;
 
 			m_gbufferDSets.push_back(DescriptorSet{});
-			m_gbufferDSets.back().PresetLayout(&m_gbufferDSetLayout);
+			m_gbufferDSetLayout.ApplyToDescriptorSet(m_gbufferDSets.back());
 			m_gbufferDSets.back().Init();
 			m_gbufferDSets.back().StartUpdate();
 			m_gbufferDSets.back().UpdateBinding(0, { imageInfo0 });
@@ -1145,7 +1145,7 @@ void TransparentApp::_InitDescriptorSets()
 			distortOutputImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 
 			m_transOutputDSets.push_back(DescriptorSet{});
-			m_transOutputDSets[i].PresetLayout(&m_transOutputDSetLayout);
+			m_transOutputDSetLayout.ApplyToDescriptorSet(m_transOutputDSets[i]);
 			m_transOutputDSets[i].Init();
 			m_transOutputDSets[i].StartUpdate();
 			m_transOutputDSets[i].UpdateBinding(0, { oitOutputImageInfo });
@@ -1190,7 +1190,7 @@ void TransparentApp::_InitDescriptorSets()
 				blurOutputImageInfoX.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
 				m_blurLayeredDSetsX[i].push_back(DescriptorSet{});
-				m_blurLayeredDSetsX[i][j].PresetLayout(&m_blurDSetLayout);
+				m_blurDSetLayout.ApplyToDescriptorSet(m_blurLayeredDSetsX[i][j]);
 				m_blurLayeredDSetsX[i][j].Init();
 				m_blurLayeredDSetsX[i][j].StartUpdate();
 				m_blurLayeredDSetsX[i][j].UpdateBinding(0, { blurInputImageInfoX });
@@ -1211,7 +1211,7 @@ void TransparentApp::_InitDescriptorSets()
 				blurOutputImageInfoY.imageLayout = VK_IMAGE_LAYOUT_GENERAL;
 
 				m_blurLayeredDSetsY[i].push_back(DescriptorSet{});
-				m_blurLayeredDSetsY[i][j].PresetLayout(&m_blurDSetLayout);
+				m_blurDSetLayout.ApplyToDescriptorSet(m_blurLayeredDSetsY[i][j]);
 				m_blurLayeredDSetsY[i][j].Init();
 				m_blurLayeredDSetsY[i][j].StartUpdate();
 				m_blurLayeredDSetsY[i][j].UpdateBinding(0, { blurInputImageInfoY });
@@ -1235,7 +1235,7 @@ void TransparentApp::_InitDescriptorSets()
 			blurOutputImageInfo.imageLayout = VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL;
 			blurOutputImageInfo.imageView = m_lightImageBlurViews[i].vkImageView;
 			m_blurOutputDSets.push_back(DescriptorSet{});
-			m_blurOutputDSets[i].PresetLayout(&m_blurOutputDSetLayout);
+			m_blurOutputDSetLayout.ApplyToDescriptorSet(m_blurOutputDSets[i]);
 			m_blurOutputDSets[i].Init();
 			m_blurOutputDSets[i].StartUpdate();
 			m_blurOutputDSets[i].UpdateBinding(0, { blurOutputImageInfo });

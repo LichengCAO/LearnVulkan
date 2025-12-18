@@ -9,12 +9,11 @@ class DescriptorSetLayout
 private:
 	bool m_allowBindless = false;	// whether to add following descriptor bindings as bindless one
 	std::vector<VkDescriptorBindingFlags> m_bindingFlags; // only used when using bindless descriptors
+	std::map<uint32_t, size_t> m_bindingToIndex;
 
 public:
 	VkDescriptorSetLayout vkDescriptorSetLayout = VK_NULL_HANDLE;
 	std::vector<VkDescriptorSetLayoutBinding> bindings;
-
-private:
 
 public:
 	~DescriptorSetLayout();
@@ -49,13 +48,11 @@ public:
 	void Init();
 
 	DescriptorSet NewDescriptorSet() const;
-	DescriptorSet* NewDescriptorSetPointer() const;
+	
+	DescriptorSet* NewDescriptorSetPtr() const;
 
-	// Set up the descriptor set, the result descriptor set is not Init() yet
-	bool NewDescriptorSet(DescriptorSet& outDescriptorSet) const;
-
-	// Create a pointer to the descriptor set, the result descriptor set is not Init() yet
-	bool NewDescriptorSet(DescriptorSet*& outDescriptorSetPtr) const;
+	// Set up the descriptor set with this layout, the result descriptor set is not Init() yet
+	void ApplyToDescriptorSet(DescriptorSet& outDescriptorSet) const;
 
 	void Uninit();
 };
@@ -85,12 +82,18 @@ public:
 
 public:
 	// ~DescriptorSet(); No worry, allocator will handle this
+private:
+	// Set up layout for the descriptor set, I make it private so that a valid descriptor set
+	// can only be get by a descriptor set layout
+	void _PreSetLayout(const DescriptorSetLayout* _layout);
 
 public:
-	void PresetLayout(const DescriptorSetLayout* _layout);
-	
+	// Get descriptor pool flags this descriptor set needs,
+	// it should be constant once the descriptor set is created by Init()
 	VkDescriptorPoolCreateFlags GetRequiredPoolFlags() const;
 
+	// Optional, normally set by descriptor set layout.
+	// Will do nothing after descriptor set initialized.
 	void PreSetRequiredPoolFlags(VkDescriptorPoolCreateFlags inFlags);
 
 	void Init();
@@ -118,6 +121,8 @@ public:
 		uint32_t inArrayIndexOffset = 0);
 	
 	void FinishUpdate();
+
+	friend class DescriptorSetLayout;
 };
 
 class DescriptorSetAllocator

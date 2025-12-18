@@ -3,6 +3,7 @@
 #include "buffer.h"
 #include "pipeline_io.h"
 #include "utils.h"
+#include <fstream>
 
 PushConstantManager::PushConstantManager()
 {
@@ -794,4 +795,96 @@ void RayTracingPipeline::ShaderBindingTable::Init(const RayTracingPipeline* pRay
 void RayTracingPipeline::ShaderBindingTable::Uninit()
 {
 	m_uptrBuffer->Uninit();
+}
+
+void PipelineCache::_LoadBinary(std::vector<uint8_t>& outData) const
+{
+	// code from https://mysvac.github.io/vulkan-hpp-tutorial/md/04/11_pipelinecache/
+	outData.clear();
+	if (std::ifstream in("pipeline_cache.data", std::ios::binary | std::ios::ate); in) 
+	{
+		const std::size_t size = in.tellg();
+		in.seekg(0);
+		outData.resize(size);
+		in.read(reinterpret_cast<char*>(outData.data()), size);
+	}
+}
+
+PipelineCache::~PipelineCache()
+{
+	CHECK_TRUE(m_vkPipelineCache == VK_NULL_HANDLE);
+}
+
+PipelineCache& PipelineCache::PreSetSourceFilePath(const std::string& inFilePath)
+{
+	m_filePath = inFilePath;
+
+	return *this;
+}
+
+PipelineCache& PipelineCache::PreSetCreateFlags(VkPipelineCacheCreateFlags inFlags)
+{
+	m_createFlags = inFlags;
+
+	return *this;
+}
+
+void PipelineCache::Init()
+{
+	auto& device = MyDevice::GetInstance();
+	VkPipelineCacheCreateInfo createInfo{};
+	std::vector<uint8_t> binaryData{};
+	VkPipelineCacheHeaderVersionOne* pCacheHeader;
+
+	createInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_CACHE_CREATE_INFO;
+	createInfo.pNext = nullptr;
+	createInfo.flags = m_createFlags;
+	
+	// now, load data from file
+	_LoadBinary(binaryData);
+	pCacheHeader = reinterpret_cast<VkPipelineCacheHeaderVersionOne*>(binaryData.data());
+	if (device.IsPipelineCacheValid(pCacheHeader))
+	{
+		createInfo.initialDataSize = binaryData.size();
+		createInfo.pInitialData = binaryData.data();
+		m_fileCacheValid = true;
+	}
+	// we no longer need source file path
+	m_filePath = {};
+
+	m_vkPipelineCache = device.CreatePipelineCache(createInfo);
+}
+
+VkPipelineCache PipelineCache::GetVkPipelineCache() const
+{
+	return m_vkPipelineCache;
+}
+
+bool PipelineCache::IsEmptyCache() const
+{
+	return (!m_fileCacheValid) && m_vkPipelineCache != VK_NULL_HANDLE;
+}
+
+void PipelineCache::Uninit()
+{
+	auto& device = MyDevice::GetInstance();
+
+	device.DestroyPipelineCache(m_vkPipelineCache);
+
+	m_vkPipelineCache = VK_NULL_HANDLE;
+	m_createFlags = 0;
+	m_filePath = {};
+	m_fileCacheValid = false;
+}
+
+void PipelineCache::SaveCacheToFile(VkPipelineCache inCacheToStore, const std::string& inDstFilePath)
+{
+	// code from https://mysvac.github.io/vulkan-hpp-tutorial/md/04/11_pipelinecache/
+	auto& device = MyDevice::GetInstance();
+	std::vector<uint8_t> cacheData;
+	std::ofstream out(inDstFilePath, std::ios::binary);
+
+	VK_CHECK(device.GetPipelineCacheData(inCacheToStore, cacheData));
+	
+	out.write(reinterpret_cast<const char*>(cacheData.data()), cacheData.size());
 }

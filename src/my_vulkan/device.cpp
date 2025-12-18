@@ -432,7 +432,6 @@ void MyDevice::_AddBaseExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selec
 	VkPhysicalDeviceDescriptorIndexingFeaturesEXT physicalDeviceDescriptorIndexingFeatures{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_DESCRIPTOR_INDEXING_FEATURES_EXT };
 	VkPhysicalDeviceSynchronization2FeaturesKHR sync2Feature{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_SYNCHRONIZATION_2_FEATURES_KHR };
 	
-	
 	requiredFeatures.geometryShader = VK_TRUE;
 	requiredFeatures.samplerAnisotropy = VK_TRUE;
 	requiredFeatures.sampleRateShading = VK_TRUE;
@@ -444,7 +443,6 @@ void MyDevice::_AddBaseExtensionsAndFeatures(vkb::PhysicalDeviceSelector& _selec
 	physicalDeviceDescriptorIndexingFeatures.descriptorBindingVariableDescriptorCount = VK_TRUE;
 	sync2Feature.synchronization2 = VK_TRUE;
 	
-
 	_selector.add_required_extensions(
 		{ 
 			VK_KHR_SWAPCHAIN_EXTENSION_NAME,
@@ -808,6 +806,17 @@ VkCommandPool MyDevice::GetCommandPool(const CommandPoolRequireInfo& inRequireIn
 	return VK_NULL_HANDLE;
 }
 
+bool MyDevice::IsPipelineCacheValid(const VkPipelineCacheHeaderVersionOne* inCacheHeaderPtr) const
+{
+	bool result = false;
+
+	result = (m_physicalDevice.properties.deviceID == inCacheHeaderPtr->deviceID)
+		&& (m_physicalDevice.properties.vendorID == inCacheHeaderPtr->vendorID)
+		&& (memcmp(inCacheHeaderPtr->pipelineCacheUUID, m_physicalDevice.properties.pipelineCacheUUID, VK_UUID_SIZE) == 0);
+
+	return result;
+}
+
 VkCommandBuffer MyDevice::AllocateCommandBuffer(VkCommandPool inCommandPool, VkCommandBufferLevel inBufferLevel, const void* inNextPtr)
 {
 	VkCommandBufferAllocateInfo allocateInfo{};
@@ -844,16 +853,25 @@ void MyDevice::DestroyDescriptorSetLayout(VkDescriptorSetLayout inDescriptorSetL
 
 VkDescriptorPool MyDevice::CreateDescriptorPool(
 	const VkDescriptorPoolCreateInfo& inCreateInfo,
-	VkResult* outResultPtr,
+	const VkAllocationCallbacks* inCallbacks)
+{
+	VkDescriptorPool result;
+	VkResult processResult;
+
+	CreateDescriptorPool(inCreateInfo, processResult, inCallbacks);
+	VK_CHECK(processResult);
+
+	return result;
+}
+
+VkDescriptorPool MyDevice::CreateDescriptorPool(
+	const VkDescriptorPoolCreateInfo& inCreateInfo, 
+	VkResult& outResult, 
 	const VkAllocationCallbacks* inCallbacks)
 {
 	VkDescriptorPool result = VK_NULL_HANDLE;
-	auto processResult = vkCreateDescriptorPool(vkDevice, &inCreateInfo, inCallbacks, &result);
 
-	if (outResultPtr != nullptr)
-	{
-		*outResultPtr = processResult;
-	}
+	outResult = vkCreateDescriptorPool(vkDevice, &inCreateInfo, inCallbacks, &result);
 
 	return result;
 }
@@ -863,22 +881,28 @@ void MyDevice::DestroyDescriptorPool(VkDescriptorPool inPoolToDestroy, const VkA
 	vkDestroyDescriptorPool(vkDevice, inPoolToDestroy, pCallbacks);
 }
 
-VkDescriptorSet MyDevice::AllocateDescriptorSet(VkDescriptorSetLayout inLayout, VkDescriptorPool inPool, const void* inNextPtr, VkResult* outResultPtr)
+VkDescriptorSet MyDevice::AllocateDescriptorSet(VkDescriptorSetLayout inLayout, VkDescriptorPool inPool, const void* inNextPtr)
+{
+	VkDescriptorSet result;
+	VkResult processResult;
+
+	result = AllocateDescriptorSet(inLayout, inPool, processResult, inNextPtr);
+	VK_CHECK(processResult);
+
+	return result;
+}
+
+VkDescriptorSet MyDevice::AllocateDescriptorSet(VkDescriptorSetLayout inLayout, VkDescriptorPool inPool, VkResult& outResult, const void* inNextPtr)
 {
 	VkDescriptorSet result = VK_NULL_HANDLE;
 	VkDescriptorSetAllocateInfo allocInfo = { VK_STRUCTURE_TYPE_DESCRIPTOR_SET_ALLOCATE_INFO };
-	VkResult processResult;
 
 	allocInfo.descriptorPool = inPool;
 	allocInfo.descriptorSetCount = 1;
 	allocInfo.pNext = inNextPtr;
 	allocInfo.pSetLayouts = &inLayout;
 
-	processResult = vkAllocateDescriptorSets(vkDevice, &allocInfo, &result);
-	if (outResultPtr != nullptr)
-	{
-		*outResultPtr = processResult;
-	}
+	outResult = vkAllocateDescriptorSets(vkDevice, &allocInfo, &result);
 
 	return result;
 }
@@ -886,6 +910,68 @@ VkDescriptorSet MyDevice::AllocateDescriptorSet(VkDescriptorSetLayout inLayout, 
 VkResult MyDevice::ResetDescriptorPool(VkDescriptorPool inDescriptorPool, VkDescriptorPoolResetFlags inFlags)
 {
 	return vkResetDescriptorPool(vkDevice, inDescriptorPool, inFlags);
+}
+
+void MyDevice::UpdateDescriptorSets(const std::vector<VkWriteDescriptorSet>& inWriteUpdates, const std::vector<VkCopyDescriptorSet>& inCopyUpdates)
+{
+	vkUpdateDescriptorSets(
+		vkDevice, 
+		static_cast<uint32_t>(inWriteUpdates.size()), 
+		inWriteUpdates.data(), 
+		static_cast<uint32_t>(inCopyUpdates.size()), 
+		inCopyUpdates.data());
+}
+
+void MyDevice::UpdateDescriptorSets(const std::vector<VkWriteDescriptorSet>& inWriteUpdates)
+{
+	UpdateDescriptorSets(inWriteUpdates, {});
+}
+
+void MyDevice::UpdateDescriptorSets(const std::vector<VkCopyDescriptorSet>& inCopyUpdates)
+{
+	UpdateDescriptorSets({}, inCopyUpdates);
+}
+
+VkPipelineCache MyDevice::CreatePipelineCache(const VkPipelineCacheCreateInfo& inCreateInfo, const VkAllocationCallbacks* pCallbacks)
+{
+	VkResult processResult;
+	VkPipelineCache result;
+
+	result = CreatePipelineCache(inCreateInfo, processResult, pCallbacks);
+
+	VK_CHECK(processResult);
+
+	return result;
+}
+
+VkPipelineCache MyDevice::CreatePipelineCache(const VkPipelineCacheCreateInfo& inCreateInfo, VkResult& outResult, const VkAllocationCallbacks* pCallbacks)
+{
+	VkPipelineCache result = VK_NULL_HANDLE;
+	
+	outResult = vkCreatePipelineCache(vkDevice, &inCreateInfo, pCallbacks, &result);
+	
+	return result;
+}
+
+void MyDevice::DestroyPipelineCache(VkPipelineCache inPipelineCache, const VkAllocationCallbacks* pCallback)
+{
+	vkDestroyPipelineCache(vkDevice, inPipelineCache, pCallback);
+}
+
+VkResult MyDevice::GetPipelineCacheData(VkPipelineCache inPipelineCache, std::vector<uint8_t>& outCacheData)
+{
+	VkResult result;
+	size_t dataSize;
+
+	result = vkGetPipelineCacheData(vkDevice, inPipelineCache, &dataSize, nullptr);
+	if (result == VK_SUCCESS)
+	{
+		outCacheData.clear();
+		outCacheData.resize(dataSize);
+		result = vkGetPipelineCacheData(vkDevice, inPipelineCache, &dataSize, outCacheData.data());
+	}
+
+	return result;
 }
 
 MyDevice& MyDevice::GetInstance()

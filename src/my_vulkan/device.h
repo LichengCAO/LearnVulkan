@@ -117,18 +117,6 @@ public:
 
 	DescriptorSetAllocator* GetDescriptorSetAllocator();
 
-	// Create a VkFence, _pCreateInfo is optional, if it's not nullptr, VkFence will be created based on it
-	VkFence CreateVkFence(const VkFenceCreateInfo* _pCreateInfo = nullptr);
-	
-	// Destroy _fence on device, set it to VK_NULL_HANDLE
-	void DestroyVkFence(VkFence& _fence);
-	
-	// Create a VkSemaphore, _pCreateInfo is optional, if it's not nullptr, VkSemaphore will be created based on it
-	VkSemaphore CreateVkSemaphore(const VkSemaphoreCreateInfo* _pCreateInfo = nullptr);
-	
-	// Destroy _semaphore on device, set it to VK_NULL_HANDLE
-	void DestroyVkSemaphore(VkSemaphore& _semaphore);
-
 	// Get queue family index by the function
 	uint32_t GetQueueFamilyIndex(QueueFamilyType inType) const;
 
@@ -142,6 +130,22 @@ public:
 	};
 	// Get VkCommandPool by several info
 	VkCommandPool GetCommandPool(const CommandPoolRequireInfo& inRequireInfo) const;
+
+	bool IsPipelineCacheValid(const VkPipelineCacheHeaderVersionOne* inCacheHeaderPtr) const;
+
+	// Thin wraps for device vkFunctions
+	//---------------------------------------------
+	// Create a VkFence, _pCreateInfo is optional, if it's not nullptr, VkFence will be created based on it
+	VkFence CreateVkFence(const VkFenceCreateInfo* _pCreateInfo = nullptr);
+
+	// Destroy _fence on device, set it to VK_NULL_HANDLE
+	void DestroyVkFence(VkFence& _fence);
+
+	// Create a VkSemaphore, _pCreateInfo is optional, if it's not nullptr, VkSemaphore will be created based on it
+	VkSemaphore CreateVkSemaphore(const VkSemaphoreCreateInfo* _pCreateInfo = nullptr);
+
+	// Destroy _semaphore on device, set it to VK_NULL_HANDLE
+	void DestroyVkSemaphore(VkSemaphore& _semaphore);
 
 	// Allocate VkCommandBuffer
 	VkCommandBuffer AllocateCommandBuffer(
@@ -161,7 +165,10 @@ public:
 
 	VkDescriptorPool CreateDescriptorPool(
 		const VkDescriptorPoolCreateInfo& inCreateInfo,
-		VkResult* outResultPtr = nullptr,
+		const VkAllocationCallbacks* inCallbacks = nullptr);
+	VkDescriptorPool CreateDescriptorPool(
+		const VkDescriptorPoolCreateInfo& inCreateInfo,
+		VkResult& outResult,
 		const VkAllocationCallbacks* inCallbacks = nullptr);
 
 	void DestroyDescriptorPool(
@@ -171,10 +178,37 @@ public:
 	VkDescriptorSet AllocateDescriptorSet(
 		VkDescriptorSetLayout inLayout,
 		VkDescriptorPool inPool,
-		const void* inNextPtr = nullptr,
-		VkResult* outResultPtr = nullptr);
+		const void* inNextPtr = nullptr);
+	VkDescriptorSet AllocateDescriptorSet(
+		VkDescriptorSetLayout inLayout,
+		VkDescriptorPool inPool,
+		VkResult& outResult,
+		const void* inNextPtr = nullptr);
 
 	VkResult ResetDescriptorPool(VkDescriptorPool inDescriptorPool, VkDescriptorPoolResetFlags inFlags = 0);
+
+	// https://docs.vulkan.org/refpages/latest/refpages/source/vkUpdateDescriptorSets.html
+	void UpdateDescriptorSets(
+		const std::vector<VkWriteDescriptorSet>& inWriteUpdates, 
+		const std::vector<VkCopyDescriptorSet>& inCopyUpdates);
+	void UpdateDescriptorSets(
+		const std::vector<VkWriteDescriptorSet>& inWriteUpdates);
+	void UpdateDescriptorSets(
+		const std::vector<VkCopyDescriptorSet>& inCopyUpdates);
+
+	// https://docs.vulkan.org/refpages/latest/refpages/source/vkCreatePipelineCache.html
+	VkPipelineCache CreatePipelineCache(
+		const VkPipelineCacheCreateInfo& inCreateInfo,
+		const VkAllocationCallbacks* pCallbacks = nullptr);
+	VkPipelineCache CreatePipelineCache(
+		const VkPipelineCacheCreateInfo& inCreateInfo,
+		VkResult& outResult,
+		const VkAllocationCallbacks* pCallbacks = nullptr);
+
+	void DestroyPipelineCache(VkPipelineCache inPipelineCache, const VkAllocationCallbacks* pCallback = nullptr);
+
+	VkResult GetPipelineCacheData(VkPipelineCache inPipelineCache, std::vector<uint8_t>& outCacheData);
+	//---------------------------------------------
 public:
 	static MyDevice& GetInstance();
 	static void OnFramebufferResized(GLFWwindow* _pWindow, int width, int height);

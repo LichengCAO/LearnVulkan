@@ -277,3 +277,39 @@ public:
 
 	void Do(VkCommandBuffer commandBuffer, const PipelineInput& input);
 };
+
+class PipelineCache
+{
+private:
+	std::string m_filePath;
+	VkPipelineCache m_vkPipelineCache = VK_NULL_HANDLE;
+	VkPipelineCacheCreateFlags m_createFlags = 0;
+	bool m_fileCacheValid = false;
+
+private:
+	void _LoadBinary(std::vector<uint8_t>& outData) const;
+
+public:
+	~PipelineCache();
+
+	// Optional, use it when we try to load previously stored cache from file
+	PipelineCache& PreSetSourceFilePath(const std::string& inFilePath);
+
+	// Optional, do not know what's for for now
+	PipelineCache& PreSetCreateFlags(VkPipelineCacheCreateFlags inFlags);
+
+	// Init device object
+	void Init();
+
+	// Return device handle
+	VkPipelineCache GetVkPipelineCache() const;
+
+	// Return whether the current cache is empty and will be written by pipeline creation.
+	// Return false if we set source file before intialization, and we successfully load a valid pipeline cache from it
+	bool IsEmptyCache() const;
+
+	// Destroy device object
+	void Uninit();
+
+	static void SaveCacheToFile(VkPipelineCache inCacheToStore, const std::string& inDstFilePath);
+};

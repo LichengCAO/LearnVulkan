@@ -161,7 +161,7 @@ void DescriptorSetManager::_ProcessPlan()
 			while (j <= i )
 			{
 				std::unique_ptr<DescriptorSetData> setData = std::make_unique<DescriptorSetData>();
-				auto pDescriptorSet = m_vecUptrDescriptorSetLayout[j]->NewDescriptorSetPointer();
+				auto pDescriptorSet = m_vecUptrDescriptorSetLayout[j]->NewDescriptorSetPtr();
 				pDescriptorSet->Init();
 				setData->uptrDescriptorSet.reset(pDescriptorSet);
 				m_uptrDescriptorSetSetting0.push_back(std::move(setData));
@@ -178,7 +178,7 @@ void DescriptorSetManager::_ProcessPlan()
 			while (j <= i)
 			{
 				std::unique_ptr<DescriptorSetData> setData = std::make_unique<DescriptorSetData>();
-				auto pDescriptorSet = m_vecUptrDescriptorSetLayout[j]->NewDescriptorSetPointer();
+				auto pDescriptorSet = m_vecUptrDescriptorSetLayout[j]->NewDescriptorSetPtr();
 				pDescriptorSet->Init();
 				setData->uptrDescriptorSet.reset(pDescriptorSet);
 				m_uptrDescriptorSetSetting1[m_uCurrentFrame].push_back(std::move(setData));
@@ -251,7 +251,7 @@ void DescriptorSetManager::_ProcessPlan()
 			if (needToCreateDescriptorSet)
 			{
 				std::unique_ptr<DescriptorSetData> setData = std::make_unique<DescriptorSetData>();
-				DescriptorSet* pDescriptorSet = m_vecUptrDescriptorSetLayout[i]->NewDescriptorSetPointer();
+				DescriptorSet* pDescriptorSet = m_vecUptrDescriptorSetLayout[i]->NewDescriptorSetPtr();
 				pDescriptorSet->Init();
 				setData->uptrDescriptorSet.reset(pDescriptorSet);
 				pDescriptorSetData = setData.get();
@@ -325,7 +325,7 @@ void DescriptorSetManager::_ProcessPlan()
 			if (needToCreateDescriptorSet)
 			{
 				std::unique_ptr<DescriptorSetData> setData = std::make_unique<DescriptorSetData>();
-				DescriptorSet* pDescriptorSet = m_vecUptrDescriptorSetLayout[i]->NewDescriptorSetPointer();
+				DescriptorSet* pDescriptorSet = m_vecUptrDescriptorSetLayout[i]->NewDescriptorSetPtr();
 				pDescriptorSet->Init();
 				setData->uptrDescriptorSet.reset(pDescriptorSet);
 				pDescriptorSetData = setData.get();

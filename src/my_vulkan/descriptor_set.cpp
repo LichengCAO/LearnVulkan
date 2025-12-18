@@ -2,7 +2,7 @@
 #include "device.h"
 #include "buffer.h"
 
-void DescriptorSet::PresetLayout(const DescriptorSetLayout* _layout)
+void DescriptorSet::_PreSetLayout(const DescriptorSetLayout* _layout)
 {
 	m_pLayout = _layout;
 }
@@ -14,12 +14,13 @@ VkDescriptorPoolCreateFlags DescriptorSet::GetRequiredPoolFlags() const
 
 void DescriptorSet::PreSetRequiredPoolFlags(VkDescriptorPoolCreateFlags inFlags)
 {
+	if (vkDescriptorSet != VK_NULL_HANDLE) return;
 	m_requiredPoolFlags = inFlags;
 }
 
 void DescriptorSet::Init()
 {
-	CHECK_TRUE(m_pLayout != nullptr, "No descriptor layout set!");
+	CHECK_TRUE(m_pLayout != nullptr, "No descriptor layout set! Apply a layout before initialization!");
 	CHECK_TRUE(vkDescriptorSet == VK_NULL_HANDLE, "VkDescriptorSet is already created!");
 
 	auto pAllocator = MyDevice::GetInstance().GetDescriptorSetAllocator();
@@ -157,7 +158,7 @@ void DescriptorSet::FinishUpdate()
 		}
 		writes.push_back(wds);
 	}
-	vkUpdateDescriptorSets(MyDevice::GetInstance().vkDevice, static_cast<uint32_t>(writes.size()), writes.data(), 0, nullptr);
+	MyDevice::GetInstance().UpdateDescriptorSets(writes);
 	m_updates.clear();
 }
 
@@ -169,10 +170,6 @@ DescriptorSetLayout::~DescriptorSetLayout()
 DescriptorSetLayout& DescriptorSetLayout::SetFollowingBindless(bool inBindless)
 {
 	m_allowBindless = inBindless;
-	if (m_allowBindless)
-	{
-		m_hasBindless = true;
-	}
 	return *this;
 }
 
@@ -206,7 +203,7 @@ DescriptorSetLayout& DescriptorSetLayout::PreAddBinding(
 	layoutBinding.descriptorType = descriptorType;
 	layoutBinding.pImmutableSamplers = pImmutableSamplers;
 	layoutBinding.stageFlags = stageFlags;
-
+	m_bindingToIndex[binding] = bindings.size();
 	bindings.push_back(layoutBinding);
 	if (m_allowBindless)
 	{
@@ -222,8 +219,12 @@ DescriptorSetLayout& DescriptorSetLayout::PreSetBindingFlags(
 	uint32_t binding,
 	VkDescriptorBindingFlags flags)
 {
-	m_bindingFlags.resize(binding + 1, 0);
-	m_bindingFlags[binding] = flags;
+	if (m_bindingToIndex.find(binding) == m_bindingToIndex.end()) return *this;
+	
+	size_t index = m_bindingToIndex.at(binding);
+	
+	m_bindingFlags.resize(index + 1, 0);
+	m_bindingFlags[index] = flags;
 
 	return *this;
 }
@@ -260,21 +261,25 @@ void DescriptorSetLayout::Init()
 DescriptorSet DescriptorSetLayout::NewDescriptorSet() const
 {
 	DescriptorSet result{};
-	result.PresetLayout(this);
+
+	ApplyToDescriptorSet(result);
+
 	return result;
 }
 
-DescriptorSet* DescriptorSetLayout::NewDescriptorSetPointer() const
+DescriptorSet* DescriptorSetLayout::NewDescriptorSetPtr() const
 {
 	DescriptorSet* pDescriptor = new DescriptorSet();
-	pDescriptor->PresetLayout(this);
+
+	ApplyToDescriptorSet(*pDescriptor);
+
 	return pDescriptor;
 }
 
-bool DescriptorSetLayout::NewDescriptorSet(DescriptorSet& outDescriptorSet) const
+void DescriptorSetLayout::ApplyToDescriptorSet(DescriptorSet& outDescriptorSet) const
 {
 	bool supportBindless = m_bindingFlags.size() > 0;
-	outDescriptorSet.PresetLayout(this);
+	outDescriptorSet._PreSetLayout(this);
 	if (supportBindless)
 	{
 		// For bindless descriptor sets, 
@@ -285,13 +290,6 @@ bool DescriptorSetLayout::NewDescriptorSet(DescriptorSet& outDescriptorSet) cons
 			| VK_DESCRIPTOR_POOL_CREATE_UPDATE_AFTER_BIND_BIT_EXT
 		);
 	}
-	return true;
-}
-
-bool DescriptorSetLayout::NewDescriptorSet(DescriptorSet*& outDescriptorSetPtr) const
-{
-	outDescriptorSetPtr = new DescriptorSet();
-	return NewDescriptorSet(*outDescriptorSetPtr);
 }
 
 void DescriptorSetLayout::Uninit()
@@ -302,6 +300,9 @@ void DescriptorSetLayout::Uninit()
 		vkDescriptorSetLayout = VK_NULL_HANDLE;
 	}
 	bindings.clear();
+	m_bindingFlags.clear();
+	m_bindingToIndex.clear();
+	m_allowBindless = false;
 }
 
 VkDescriptorPool DescriptorSetAllocator::_CreatePool(VkDescriptorPoolCreateFlags inPoolFlags)
@@ -406,9 +407,8 @@ bool DescriptorSetAllocator::Allocate(
 	//try to allocate the descriptor set
 	outDescriptorSet = device.AllocateDescriptorSet(
 		inLayout, 
-		candidatePool, 
-		nullptr, 
-		&allocResult);
+		candidatePool,
+		allocResult);
 
 	switch (allocResult)
 	{
@@ -435,8 +435,7 @@ bool DescriptorSetAllocator::Allocate(
 		outDescriptorSet = device.AllocateDescriptorSet(
 			inLayout,
 			candidatePool,
-			nullptr,
-			&allocResult);
+			allocResult);
 
 		//if it still fails then we have big issues
 		if (allocResult == VK_SUCCESS)
