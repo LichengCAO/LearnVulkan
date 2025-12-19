@@ -133,7 +133,9 @@ public:
 
 	bool IsPipelineCacheValid(const VkPipelineCacheHeaderVersionOne* inCacheHeaderPtr) const;
 
-	// Thin wraps for device vkFunctions
+	void GetPhysicalDeviceRayTracingProperties(VkPhysicalDeviceRayTracingPipelinePropertiesKHR& outProperties) const;
+
+	// Thin wraps for device Vulkan functions
 	//---------------------------------------------
 	// Create a VkFence, _pCreateInfo is optional, if it's not nullptr, VkFence will be created based on it
 	VkFence CreateVkFence(const VkFenceCreateInfo* _pCreateInfo = nullptr);
@@ -166,6 +168,7 @@ public:
 	VkDescriptorPool CreateDescriptorPool(
 		const VkDescriptorPoolCreateInfo& inCreateInfo,
 		const VkAllocationCallbacks* inCallbacks = nullptr);
+	
 	VkDescriptorPool CreateDescriptorPool(
 		const VkDescriptorPoolCreateInfo& inCreateInfo,
 		VkResult& outResult,
@@ -208,6 +211,46 @@ public:
 	void DestroyPipelineCache(VkPipelineCache inPipelineCache, const VkAllocationCallbacks* pCallback = nullptr);
 
 	VkResult GetPipelineCacheData(VkPipelineCache inPipelineCache, std::vector<uint8_t>& outCacheData);
+
+	VkPipeline CreateGraphicsPipeline(
+		const VkGraphicsPipelineCreateInfo& inCreateInfo,
+		VkPipelineCache inCache = VK_NULL_HANDLE,
+		const VkAllocationCallbacks* pAllocator = nullptr);
+
+	VkPipeline CreateComputePipeline(
+		const VkComputePipelineCreateInfo& inCreateInfo,
+		VkPipelineCache inCache = VK_NULL_HANDLE,
+		const VkAllocationCallbacks* pAllocator = nullptr);
+
+	VkPipeline CreateRayTracingPipeline(
+		const VkRayTracingPipelineCreateInfoKHR& inCreateInfo,
+		VkPipelineCache inCache = VK_NULL_HANDLE,
+		VkDeferredOperationKHR inDeferredOperation = VK_NULL_HANDLE,
+		const VkAllocationCallbacks* pAllocator = nullptr);
+
+	void DestroyPipeline(
+		VkPipeline inPipeline,
+		const VkAllocationCallbacks* pAllocator = nullptr);
+
+	VkPipelineLayout CreatePipelineLayout(
+		const VkPipelineLayoutCreateInfo& inCreateInfo,
+		const VkAllocationCallbacks* pAllocator = nullptr);
+
+	VkPipelineLayout CreatePipelineLayout(
+		const VkPipelineLayoutCreateInfo& inCreateInfo,
+		VkResult& outProcessResult,
+		const VkAllocationCallbacks* pAllocator = nullptr);
+
+	void DestroyPipelineLayout(
+		VkPipelineLayout inLayout,
+		const VkAllocationCallbacks* pAllocator = nullptr);
+
+	VkResult GetRayTracingShaderGroupHandles(
+		VkPipeline inPipeline,
+		uint32_t inFirstGroup,
+		uint32_t inGroupCount,
+		size_t inDataSize,
+		void* outDataPtr);
 	//---------------------------------------------
 public:
 	static MyDevice& GetInstance();

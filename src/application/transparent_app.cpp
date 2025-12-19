@@ -2114,8 +2114,8 @@ void TransparentApp::_DrawFrame()
 		ImageBlitBuilder blitBuilder{};
 		ImageBarrierBuilder barrierBuilder{};
 
-		int32_t mipWidth = m_gbufferAlbedoImages[m_currentFrame].GetImageInformation().width;
-		int32_t mipHeight = m_gbufferAlbedoImages[m_currentFrame].GetImageInformation().height;
+		uint32_t mipWidth = m_gbufferAlbedoImages[m_currentFrame].GetImageInformation().width;
+		uint32_t mipHeight = m_gbufferAlbedoImages[m_currentFrame].GetImageInformation().height;
 		for (uint32_t i = 1; i < m_mipLevel; i++) {
 			barrierBuilder.Reset();
 			barrierBuilder.SetMipLevelRange(i - 1);
@@ -2134,9 +2134,10 @@ void TransparentApp::_DrawFrame()
 			);
 
 			VkImageBlit blit = blitBuilder.NewBlit(
-				{ mipWidth, mipHeight }, static_cast<uint32_t>(i - 1),
-				{ mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1 }, static_cast<uint32_t>(i)
-			);
+				{ mipWidth, mipHeight }, 
+				static_cast<uint32_t>(i - 1),
+				{ mipWidth > 1 ? mipWidth / 2 : 1, mipHeight > 1 ? mipHeight / 2 : 1 }
+				, static_cast<uint32_t>(i));
 
 			cmd.BlitImage(
 				m_gbufferAlbedoImages[m_currentFrame].vkImage, VK_IMAGE_LAYOUT_TRANSFER_SRC_OPTIMAL,

@@ -97,6 +97,7 @@ private:
 	const RenderPass* m_pRenderPass = nullptr;
 	uint32_t m_subpass = 0;
 	PushConstantManager m_pushConstant;
+	VkPipelineCache m_vkPipelineCache = VK_NULL_HANDLE;
 
 public:
 	VkPipelineLayout vkPipelineLayout = VK_NULL_HANDLE;
@@ -128,6 +129,11 @@ public:
 	void BindToSubpass(const RenderPass* pRenderPass, uint32_t subpass);
 	void SetColorAttachmentAsAdd(int idx);
 	void AddPushConstant(VkShaderStageFlags _stages, uint32_t _offset, uint32_t _size);
+
+	// Optional, if cache is not empty, this will facilitate pipeline creation,
+	// if not, cache will be filled with pipeline information for next creation
+	void PreSetPipelineCache(VkPipelineCache inCache);
+
 	void Init();
 	void Uninit();
 
@@ -154,6 +160,7 @@ private:
 	VkPipelineShaderStageCreateInfo m_shaderStageInfo{};
 	std::vector<VkDescriptorSetLayout> m_descriptorSetLayouts;
 	PushConstantManager m_pushConstant;
+	VkPipelineCache m_vkPipelineCache = VK_NULL_HANDLE;
 
 public:
 	VkPipelineLayout vkPipelineLayout = VK_NULL_HANDLE;
@@ -168,6 +175,10 @@ public:
 	void AddDescriptorSetLayout(const DescriptorSetLayout* pSetLayout);
 	void AddDescriptorSetLayout(VkDescriptorSetLayout _vkLayout);
 	void AddPushConstant(VkShaderStageFlags _stages, uint32_t _offset, uint32_t _size);
+
+	// Optional, if cache is not empty, this will facilitate pipeline creation,
+	// if not, cache will be filled with pipeline information for next creation
+	void PreSetPipelineCache(VkPipelineCache inCache);
 
 	void Init();
 	void Uninit();
@@ -199,7 +210,6 @@ private:
 		void AddMissRecord(uint32_t index);
 		void AddHitRecord(uint32_t index);
 		void AddCallableRecord(uint32_t index);
-		
 		void Init(const RayTracingPipeline* pRayTracingPipeline);
 		void Uninit();
 
@@ -229,6 +239,7 @@ private:
 	ShaderBindingTable m_SBT{};
 	uint32_t m_maxRayRecursionDepth = 1u;
 	PushConstantManager m_pushConstant;
+	VkPipelineCache m_vkPipelineCache = VK_NULL_HANDLE;
 
 public:
 	VkPipelineLayout vkPipelineLayout = VK_NULL_HANDLE;
@@ -270,6 +281,10 @@ public:
 	uint32_t AddCallableShaderRecord(uint32_t _callable);
 
 	void SetMaxRecursion(uint32_t maxRecur);
+
+	// Optional, if cache is not empty, this will facilitate pipeline creation,
+	// if not, cache will be filled with pipeline information for next creation
+	void PreSetPipelineCache(VkPipelineCache inCache);
 
 	void Init();
 

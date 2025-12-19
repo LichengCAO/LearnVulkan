@@ -273,8 +273,15 @@ void GraphicsPipeline::SetColorAttachmentAsAdd(int idx)
 	m_colorBlendAttachmentStates[idx].srcColorBlendFactor = VkBlendFactor::VK_BLEND_FACTOR_ONE;
 }
 
+void GraphicsPipeline::PreSetPipelineCache(VkPipelineCache inCache)
+{
+	m_vkPipelineCache = inCache;
+}
+
 void GraphicsPipeline::Init()
 {
+	auto& device = MyDevice::GetInstance();
+
 	VkPipelineVertexInputStateCreateInfo vertexInputInfo{ VK_STRUCTURE_TYPE_PIPELINE_VERTEX_INPUT_STATE_CREATE_INFO };
 	vertexInputInfo.vertexBindingDescriptionCount = static_cast<uint32_t>(m_vertBindingDescriptions.size());
 	vertexInputInfo.pVertexBindingDescriptions = m_vertBindingDescriptions.data();
@@ -300,7 +307,8 @@ void GraphicsPipeline::Init()
 	pipelineLayoutInfo.pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size());
 	pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges.data();
 	CHECK_TRUE(vkPipelineLayout == VK_NULL_HANDLE, "VkPipelineLayout is already created!");
-	VK_CHECK(vkCreatePipelineLayout(MyDevice::GetInstance().vkDevice, &pipelineLayoutInfo, nullptr, &vkPipelineLayout), "Failed to create pipeline layout!");
+	
+	device.CreatePipelineLayout(pipelineLayoutInfo);
 
 	VkGraphicsPipelineCreateInfo pipelineInfo{ VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
 	pipelineInfo.stageCount = static_cast<uint32_t>(m_shaderStageInfos.size());
@@ -319,19 +327,20 @@ void GraphicsPipeline::Init()
 	pipelineInfo.basePipelineIndex = -1;
 	pipelineInfo.pDepthStencilState = &m_depthStencilInfo;
 	CHECK_TRUE(vkPipeline == VK_NULL_HANDLE, "VkPipeline is already created!");
-	VK_CHECK(vkCreateGraphicsPipelines(MyDevice::GetInstance().vkDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &vkPipeline), "Failed to create graphics pipeline!");
+	vkPipeline = device.CreateGraphicsPipeline(pipelineInfo, m_vkPipelineCache);
 }
 
 void GraphicsPipeline::Uninit()
 {
+	auto& device = MyDevice::GetInstance();
 	if (vkPipeline != VK_NULL_HANDLE)
 	{
-		vkDestroyPipeline(MyDevice::GetInstance().vkDevice, vkPipeline, nullptr);
+		device.DestroyPipeline(vkPipeline);
 		vkPipeline = VK_NULL_HANDLE;
 	}
 	if (vkPipelineLayout != VK_NULL_HANDLE)
 	{
-		vkDestroyPipelineLayout(MyDevice::GetInstance().vkDevice, vkPipelineLayout, nullptr);
+		device.DestroyPipelineLayout(vkPipelineLayout);
 		vkPipelineLayout = VK_NULL_HANDLE;
 	}
 	m_pRenderPass = nullptr;
@@ -424,8 +433,14 @@ void ComputePipeline::AddDescriptorSetLayout(VkDescriptorSetLayout _vkLayout)
 	m_descriptorSetLayouts.push_back(_vkLayout);
 }
 
+void ComputePipeline::PreSetPipelineCache(VkPipelineCache inCache)
+{
+	m_vkPipelineCache = inCache;
+}
+
 void ComputePipeline::Init()
 {
+	auto& device = MyDevice::GetInstance();
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
 	std::vector<VkPushConstantRange> pushConstantRanges{};
 	m_pushConstant.GetVkPushConstantRanges(pushConstantRanges);
@@ -434,25 +449,28 @@ void ComputePipeline::Init()
 	pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges.data();
 	pipelineLayoutInfo.pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size());
 	CHECK_TRUE(vkPipelineLayout == VK_NULL_HANDLE, "VkPipelineLayout is already created!");
-	VK_CHECK(vkCreatePipelineLayout(MyDevice::GetInstance().vkDevice, &pipelineLayoutInfo, nullptr, &vkPipelineLayout), "Failed to create pipeline layout!");
+
+	device.CreatePipelineLayout(pipelineLayoutInfo);
 
 	VkComputePipelineCreateInfo pipelineInfo{ VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
 	pipelineInfo.stage = m_shaderStageInfo;
 	pipelineInfo.layout = vkPipelineLayout;
 	CHECK_TRUE(vkPipeline == VK_NULL_HANDLE, "VkPipeline is already created!");
-	VK_CHECK(vkCreateComputePipelines(MyDevice::GetInstance().vkDevice, VK_NULL_HANDLE, 1, &pipelineInfo, nullptr, &vkPipeline), "Failed to create compute pipeline!");
+
+	vkPipeline = device.CreateComputePipeline(pipelineInfo, m_vkPipelineCache);
 }
 
 void ComputePipeline::Uninit()
 {
+	auto& device = MyDevice::GetInstance();
 	if (vkPipeline != VK_NULL_HANDLE)
 	{
-		vkDestroyPipeline(MyDevice::GetInstance().vkDevice, vkPipeline, nullptr);
+		device.DestroyPipeline(vkPipeline);
 		vkPipeline = VK_NULL_HANDLE;
 	}
 	if (vkPipelineLayout != VK_NULL_HANDLE)
 	{
-		vkDestroyPipelineLayout(MyDevice::GetInstance().vkDevice, vkPipelineLayout, nullptr);
+		device.DestroyPipelineLayout(vkPipelineLayout);
 		vkPipelineLayout = VK_NULL_HANDLE;
 	}
 }
@@ -602,8 +620,14 @@ void RayTracingPipeline::SetMaxRecursion(uint32_t maxRecur)
 	m_maxRayRecursionDepth = maxRecur;
 }
 
+void RayTracingPipeline::PreSetPipelineCache(VkPipelineCache inCache)
+{
+	m_vkPipelineCache = inCache;
+}
+
 void RayTracingPipeline::Init()
 {
+	auto& device = MyDevice::GetInstance();
 	VkPipelineLayoutCreateInfo pipelineLayoutInfo{ VK_STRUCTURE_TYPE_PIPELINE_LAYOUT_CREATE_INFO };
 	std::vector<VkPushConstantRange> pushConstantRanges{};
 	m_pushConstant.GetVkPushConstantRanges(pushConstantRanges);
@@ -612,7 +636,8 @@ void RayTracingPipeline::Init()
 	pipelineLayoutInfo.pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size());
 	pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges.data();
 	CHECK_TRUE(vkPipelineLayout == VK_NULL_HANDLE, "VkPipelineLayout is already created!");
-	VK_CHECK(vkCreatePipelineLayout(MyDevice::GetInstance().vkDevice, &pipelineLayoutInfo, nullptr, &vkPipelineLayout), "Failed to create pipeline layout!");
+
+	device.CreatePipelineLayout(pipelineLayoutInfo);
 
 	VkRayTracingPipelineCreateInfoKHR pipelineInfo{VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR};
 	pipelineInfo.pNext = nullptr;
@@ -630,22 +655,24 @@ void RayTracingPipeline::Init()
 	pipelineInfo.basePipelineIndex = -1;
 
 	CHECK_TRUE(vkPipeline == VK_NULL_HANDLE, "VkPipeline is already created!");
-	VK_CHECK(vkCreateRayTracingPipelinesKHR(MyDevice::GetInstance().vkDevice, {}, {}, 1, &pipelineInfo, nullptr, &vkPipeline), "Failed to create ray tracing pipeline!");
+	
+	vkPipeline = device.CreateRayTracingPipeline(pipelineInfo);
 
 	m_SBT.Init(this);
 }
 
 void RayTracingPipeline::Uninit()
 {
+	auto& device = MyDevice::GetInstance();
 	m_SBT.Uninit();
 	if (vkPipeline != VK_NULL_HANDLE)
 	{
-		vkDestroyPipeline(MyDevice::GetInstance().vkDevice, vkPipeline, nullptr);
+		device.DestroyPipeline(vkPipeline);
 		vkPipeline = VK_NULL_HANDLE;
 	}
 	if (vkPipelineLayout != VK_NULL_HANDLE)
 	{
-		vkDestroyPipelineLayout(MyDevice::GetInstance().vkDevice, vkPipelineLayout, nullptr);
+		device.DestroyPipelineLayout(vkPipelineLayout);
 		vkPipelineLayout = VK_NULL_HANDLE;
 	}
 }
@@ -707,20 +734,19 @@ void RayTracingPipeline::ShaderBindingTable::AddCallableRecord(uint32_t index)
 
 void RayTracingPipeline::ShaderBindingTable::Init(const RayTracingPipeline* pRayTracingPipeline)
 {
-	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rayTracingProperties{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR };
-	VkPhysicalDeviceProperties2 prop2{VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2};
+	VkPhysicalDeviceRayTracingPipelinePropertiesKHR rayTracingProperties{};
 	uint32_t uRecordCount = static_cast<uint32_t>(pRayTracingPipeline->m_shaderRecords.size()); // This is because the inner (nested) class A is considered part of B and has access to all private, protected, and public members of B
 	uint32_t uHandleSizeHost = 0u;
 	uint32_t uHandleSizeDevice = 0u;
 	size_t uGroupDataSize = 0u;
 	std::vector<uint8_t> groupData;
+	auto& device = MyDevice::GetInstance();
 	static auto funcAlignUp = [](uint32_t uToAlign, uint32_t uAlignRef)
 	{
 		return (uToAlign + uAlignRef - 1) & ~(uAlignRef - 1);
 	};
 	
-	prop2.pNext = &rayTracingProperties;
-	vkGetPhysicalDeviceProperties2(MyDevice::GetInstance().vkPhysicalDevice, &prop2);
+	device.GetPhysicalDeviceRayTracingProperties(rayTracingProperties);
 	
 	uHandleSizeHost = rayTracingProperties.shaderGroupHandleSize;
 	uHandleSizeDevice = funcAlignUp(uHandleSizeHost, rayTracingProperties.shaderGroupHandleAlignment);
@@ -737,8 +763,15 @@ void RayTracingPipeline::ShaderBindingTable::Init(const RayTracingPipeline* pRay
 
 	uGroupDataSize = static_cast<size_t>(uRecordCount * uHandleSizeHost);
 	groupData.resize(uGroupDataSize);
-	VK_CHECK(vkGetRayTracingShaderGroupHandlesKHR(MyDevice::GetInstance().vkDevice, pRayTracingPipeline->vkPipeline, 0, uRecordCount, uGroupDataSize, groupData.data())
-		, "Failed to get group handle data!");
+
+	VK_CHECK(
+		device.GetRayTracingShaderGroupHandles(
+			pRayTracingPipeline->vkPipeline, 
+			0, 
+			uRecordCount, 
+			uGroupDataSize, 
+			groupData.data()), 
+		"Failed to get group handle data!");
 
 	// bind shader group(shader record) handle to table on device
 	{

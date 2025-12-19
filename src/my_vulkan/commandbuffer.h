@@ -56,8 +56,25 @@ public:
 	void SetDstAspect(VkImageAspectFlags aspectMask);
 	void SetSrcArrayLayerRange(uint32_t baseArrayLayer, uint32_t layerCount = 1);
 	void SetDstArrayLayerRange(uint32_t baseArrayLayer, uint32_t layerCount = 1);
-	VkImageBlit NewBlit(VkOffset3D srcOffsetUL, VkOffset3D srcOffsetLR, uint32_t srcMipLevel, VkOffset3D dstOffsetUL, VkOffset3D dstOffsetLR, uint32_t dstMipLevel) const;
-	VkImageBlit NewBlit(VkOffset2D srcOffsetLR, uint32_t srcMipLevel, VkOffset2D dstOffsetLR, uint32_t dstMipLevel) const;
+	VkImageBlit NewBlit(
+		const VkOffset3D& srcOffsetUL, 
+		const VkOffset3D& srcOffsetLR, 
+		uint32_t srcMipLevel, 
+		const VkOffset3D& dstOffsetUL,
+		const VkOffset3D& dstOffsetLR,
+		uint32_t dstMipLevel) const;
+	VkImageBlit NewBlit(
+		const VkExtent2D& inSrcImageSize,
+		uint32_t srcMipLevel, 
+		const VkExtent2D& inDstImageSize,
+		uint32_t dstMipLevel) const;
+	VkImageBlit NewBlit(
+		const VkOffset2D& inSrcOffsetUpperLeftXY,
+		const VkOffset2D& inSrcOffsetLowerRightXY,
+		uint32_t inSrcMipLevel,
+		const VkOffset2D& inDstOffsetUpperLeftXY,
+		const VkOffset2D& inDstOffsetLowerRightXY,
+		uint32_t inDstMipLevel) const;
 };
 
 // class handles commandbuffer and queue submission, synchronization
@@ -227,6 +244,9 @@ public:
 	// Reset commands in command buffer
 	void Reset(VkCommandBufferResetFlags inFlags = 0);
 
+	// Commands to record
+	// ------------------------------------------------------
+
 	// Begin recording commands
 	CommandBuffer& BeginCommands(
 		VkCommandBufferUsageFlags inFlags = 0, 
@@ -343,4 +363,7 @@ public:
 	// Executes secondary command buffers within the current primary command buffer.
 	CommandBuffer& CmdExecuteCommands(
 		const std::vector<VkCommandBuffer>& inCommandBuffers);
+
+	// end of commands
+	// ------------------------------------------------------
 };

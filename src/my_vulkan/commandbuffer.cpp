@@ -438,7 +438,13 @@ void ImageBlitBuilder::SetDstArrayLayerRange(uint32_t baseArrayLayer, uint32_t l
 	m_dstSubresourceLayers.layerCount = layerCount;
 }
 
-VkImageBlit ImageBlitBuilder::NewBlit(VkOffset3D srcOffsetUL, VkOffset3D srcOffsetLR, uint32_t srcMipLevel, VkOffset3D dstOffsetUL, VkOffset3D dstOffsetLR, uint32_t dstMipLevel) const
+VkImageBlit ImageBlitBuilder::NewBlit(
+	const VkOffset3D& srcOffsetUL, 
+	const VkOffset3D& srcOffsetLR, 
+	uint32_t srcMipLevel, 
+	const VkOffset3D& dstOffsetUL, 
+	const VkOffset3D& dstOffsetLR, 
+	uint32_t dstMipLevel) const
 {
 	VkImageBlit blit{};
 	blit.srcOffsets[0] = srcOffsetUL;
@@ -452,9 +458,47 @@ VkImageBlit ImageBlitBuilder::NewBlit(VkOffset3D srcOffsetUL, VkOffset3D srcOffs
 	return blit;
 }
 
-VkImageBlit ImageBlitBuilder::NewBlit(VkOffset2D srcOffsetLR, uint32_t srcMipLevel, VkOffset2D dstOffsetLR, uint32_t dstMipLevel) const
+VkImageBlit ImageBlitBuilder::NewBlit(
+	const VkExtent2D& srcImageSize, 
+	uint32_t srcMipLevel, 
+	const VkExtent2D& dstImageSize, 
+	uint32_t dstMipLevel) const
 {
-	return NewBlit({ 0, 0, 0 }, { srcOffsetLR.x, srcOffsetLR.y, 1 }, srcMipLevel, { 0, 0, 0 }, { dstOffsetLR.x, dstOffsetLR.y, 1 }, dstMipLevel);
+	VkOffset3D srcOffset;
+	VkOffset3D dstOffset;
+
+	srcOffset.z = 1;
+	dstOffset.z = 1;
+
+	srcOffset.x = static_cast<int32_t>(srcImageSize.width);
+	srcOffset.y = static_cast<int32_t>(srcImageSize.height);
+	dstOffset.x = static_cast<int32_t>(dstImageSize.width);
+	dstOffset.y = static_cast<int32_t>(dstImageSize.height);
+
+	return NewBlit(
+		{ 0, 0, 0 }, 
+		srcOffset, 
+		srcMipLevel, 
+		{ 0, 0, 0 }, 
+		dstOffset, 
+		dstMipLevel);
+}
+
+VkImageBlit ImageBlitBuilder::NewBlit(
+	const VkOffset2D& inSrcOffsetUpperLeftXY, 
+	const VkOffset2D& inSrcOffsetLowerRightXY, 
+	uint32_t inSrcMipLevel, 
+	const VkOffset2D& inDstOffsetUpperLeftXY,
+	const VkOffset2D& inDstOffsetLowerRightXY,
+	uint32_t inDstMipLevel) const
+{
+	return NewBlit(
+		{ inSrcOffsetUpperLeftXY.x, inSrcOffsetUpperLeftXY.y, 0 },
+		{ inSrcOffsetLowerRightXY.x, inSrcOffsetLowerRightXY.y, 1},
+		inSrcMipLevel,
+		{ inDstOffsetUpperLeftXY.x, inDstOffsetUpperLeftXY.y, 0},
+		{ inDstOffsetLowerRightXY.x, inDstOffsetLowerRightXY.y, 1},
+		inDstMipLevel);
 }
 
 void CommandBuffer::_ProcessInCmdScope(const std::function<void()>& inFunction)

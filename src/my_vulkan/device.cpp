@@ -817,6 +817,15 @@ bool MyDevice::IsPipelineCacheValid(const VkPipelineCacheHeaderVersionOne* inCac
 	return result;
 }
 
+void MyDevice::GetPhysicalDeviceRayTracingProperties(VkPhysicalDeviceRayTracingPipelinePropertiesKHR& outProperties) const
+{
+	VkPhysicalDeviceProperties2 prop2{ VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2 };
+	outProperties.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_RAY_TRACING_PIPELINE_PROPERTIES_KHR;
+
+	prop2.pNext = &outProperties;
+	vkGetPhysicalDeviceProperties2(vkPhysicalDevice, &prop2);
+}
+
 VkCommandBuffer MyDevice::AllocateCommandBuffer(VkCommandPool inCommandPool, VkCommandBufferLevel inBufferLevel, const void* inNextPtr)
 {
 	VkCommandBufferAllocateInfo allocateInfo{};
@@ -972,6 +981,75 @@ VkResult MyDevice::GetPipelineCacheData(VkPipelineCache inPipelineCache, std::ve
 	}
 
 	return result;
+}
+
+VkPipeline MyDevice::CreateGraphicsPipeline(const VkGraphicsPipelineCreateInfo& inCreateInfo, VkPipelineCache inCache, const VkAllocationCallbacks* pAllocator)
+{
+	VkPipeline result = VK_NULL_HANDLE;
+
+	VK_CHECK(vkCreateGraphicsPipelines(vkDevice, inCache, 1, &inCreateInfo, pAllocator, &result), "Failed to create graphics pipeline!");
+
+    return result;
+}
+
+VkPipeline MyDevice::CreateComputePipeline(const VkComputePipelineCreateInfo& inCreateInfo, VkPipelineCache inCache, const VkAllocationCallbacks* pAllocator)
+{
+	VkPipeline result = VK_NULL_HANDLE;
+
+	VK_CHECK(vkCreateComputePipelines(vkDevice, inCache, 1, &inCreateInfo, pAllocator, &result), "Failed to create compute pipeline!");
+
+	return result;
+}
+
+VkPipeline MyDevice::CreateRayTracingPipeline(const VkRayTracingPipelineCreateInfoKHR& inCreateInfo, VkPipelineCache inCache, VkDeferredOperationKHR inDeferredOperation, const VkAllocationCallbacks* pAllocator)
+{
+	VkPipeline result = VK_NULL_HANDLE;
+
+	VK_CHECK(
+		vkCreateRayTracingPipelinesKHR(vkDevice, inDeferredOperation, inCache, 1, &inCreateInfo, pAllocator, &result), 
+		"Failed to create ray tracing pipeline!");
+
+	return result;
+}
+
+void MyDevice::DestroyPipeline(VkPipeline inPipeline, const VkAllocationCallbacks* pAllocator)
+{
+	vkDestroyPipeline(vkDevice, inPipeline, pAllocator);
+}
+
+VkPipelineLayout MyDevice::CreatePipelineLayout(
+	const VkPipelineLayoutCreateInfo& inCreateInfo, 
+	const VkAllocationCallbacks* pAllocator)
+{
+	VkResult processResult;
+	VkPipelineLayout result;
+
+	result = CreatePipelineLayout(inCreateInfo, processResult, pAllocator);
+	VK_CHECK(processResult, "Failed to create pipeline layout!");
+
+	return result;
+}
+
+VkPipelineLayout MyDevice::CreatePipelineLayout(
+	const VkPipelineLayoutCreateInfo& inCreateInfo, 
+	VkResult& outProcessResult, 
+	const VkAllocationCallbacks* pAllocator)
+{
+	VkPipelineLayout result = VK_NULL_HANDLE;
+
+	outProcessResult = vkCreatePipelineLayout(vkDevice, &inCreateInfo, pAllocator, &result);
+
+	return result;
+}
+
+void MyDevice::DestroyPipelineLayout(VkPipelineLayout inLayout, const VkAllocationCallbacks* pAllocator)
+{
+	vkDestroyPipelineLayout(vkDevice, inLayout, pAllocator);
+}
+
+VkResult MyDevice::GetRayTracingShaderGroupHandles(VkPipeline inPipeline, uint32_t inFirstGroup, uint32_t inGroupCount, size_t inDataSize, void* outDataPtr)
+{
+	return vkGetRayTracingShaderGroupHandlesKHR(vkDevice, inPipeline, inFirstGroup, inGroupCount, inDataSize, outDataPtr);
 }
 
 MyDevice& MyDevice::GetInstance()
