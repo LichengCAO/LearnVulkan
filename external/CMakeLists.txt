@@ -40,6 +40,7 @@ set(EXT_LIBS
     spirv-reflect-static
     imgui
     nanovdb
+    enkiTS
 )
 
 #===================================
@@ -132,6 +133,7 @@ add_subdirectory(vma)
 add_subdirectory(tinygltf)
 add_subdirectory(spirv_reflect)
 add_subdirectory(openvdb)
+add_subdirectory(enkiTS)
 target_link_libraries(ExternalLibs INTERFACE ${EXT_LIBS} metis)
 target_include_directories(ExternalLibs INTERFACE ${INCLUDE_DIRS}) 
 

@@ -26,8 +26,10 @@
 #include <functional>
 #include <format>
 
+//see https://stackoverflow.com/questions/77700691/getting-va-opt-to-be-recognized-by-visual-studio
+
 #define VK_CHECK(X, ...) \
-	VK_CHECK_IMPL(X, __VA_ARGS__, "Vulkan check failed!")
+	VK_CHECK_IMPL(X __VA_OPT__(, ) __VA_ARGS__, "Vulkan check failed!")
 
 #define VK_CHECK_IMPL(vkcommand, failedMessage, ...) \
 		do\
@@ -39,7 +41,7 @@
 		}while(0)
 
 #define CHECK_TRUE(X, ...) \
-	CHECK_TRUE_IMPL(X, __VA_ARGS__, "Check failed!")
+	CHECK_TRUE_IMPL(X __VA_OPT__(, ) __VA_ARGS__, "Check failed!")
 
 #define CHECK_TRUE_IMPL(condition, failedMessage, ...) \
 do{\

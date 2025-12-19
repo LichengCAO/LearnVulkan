@@ -5,8 +5,8 @@ project(learn_vulkan)
 
 #find_package(Vulkan REQUIRED)
 
-set(CMAKE_CXX_STANDARD 17)
-
+set(CMAKE_CXX_STANDARD 20)
+set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_RUNTIME_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/bin")
 set(CMAKE_LIBRARY_OUTPUT_DIRECTORY "${PROJECT_SOURCE_DIR}/bin")
 
@@ -17,6 +17,14 @@ foreach(OUTPUTCONFIG ${CMAKE_CONFIGURATION_TYPES})
     set( CMAKE_LIBRARY_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CMAKE_LIBRARY_OUTPUT_DIRECTORY} )
     set( CMAKE_ARCHIVE_OUTPUT_DIRECTORY_${OUTPUTCONFIG} ${CMAKE_ARCHIVE_OUTPUT_DIRECTORY} )
 endforeach()
+
+# Source - https://stackoverflow.com/q
+# Posted by Jepessen
+# Retrieved 2025-12-19, License - CC BY-SA 4.0
+# set up visual studio
+if(MSVC)
+    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /Zc:__cplusplus /Zc:preprocessor")
+endif()
 
 #show folder in IDE
 set_property(GLOBAL PROPERTY USE_FOLDERS ON)
