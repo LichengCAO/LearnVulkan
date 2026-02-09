@@ -308,7 +308,7 @@ void GraphicsPipeline::Init()
 	pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges.data();
 	CHECK_TRUE(vkPipelineLayout == VK_NULL_HANDLE, "VkPipelineLayout is already created!");
 	
-	device.CreatePipelineLayout(pipelineLayoutInfo);
+	vkPipelineLayout = device.CreatePipelineLayout(pipelineLayoutInfo);
 
 	VkGraphicsPipelineCreateInfo pipelineInfo{ VK_STRUCTURE_TYPE_GRAPHICS_PIPELINE_CREATE_INFO };
 	pipelineInfo.stageCount = static_cast<uint32_t>(m_shaderStageInfos.size());
@@ -450,7 +450,7 @@ void ComputePipeline::Init()
 	pipelineLayoutInfo.pushConstantRangeCount = static_cast<uint32_t>(pushConstantRanges.size());
 	CHECK_TRUE(vkPipelineLayout == VK_NULL_HANDLE, "VkPipelineLayout is already created!");
 
-	device.CreatePipelineLayout(pipelineLayoutInfo);
+	vkPipelineLayout = device.CreatePipelineLayout(pipelineLayoutInfo);
 
 	VkComputePipelineCreateInfo pipelineInfo{ VK_STRUCTURE_TYPE_COMPUTE_PIPELINE_CREATE_INFO };
 	pipelineInfo.stage = m_shaderStageInfo;
@@ -637,7 +637,7 @@ void RayTracingPipeline::Init()
 	pipelineLayoutInfo.pPushConstantRanges = pushConstantRanges.data();
 	CHECK_TRUE(vkPipelineLayout == VK_NULL_HANDLE, "VkPipelineLayout is already created!");
 
-	device.CreatePipelineLayout(pipelineLayoutInfo);
+	vkPipelineLayout = device.CreatePipelineLayout(pipelineLayoutInfo);
 
 	VkRayTracingPipelineCreateInfoKHR pipelineInfo{VK_STRUCTURE_TYPE_RAY_TRACING_PIPELINE_CREATE_INFO_KHR};
 	pipelineInfo.pNext = nullptr;

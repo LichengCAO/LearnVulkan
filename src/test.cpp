@@ -6,12 +6,12 @@
 
 int main() {
 	//RayQueryApp app;
-	//RayTracingApp app;
+	RayTracingApp app;
 	//RayTracingThousandsApp app;
 	//RayTracingReflectApp app;
 	//TransparentApp app;
 	//RayTracingNanoVDBApp app;
-	MeshletApp app;
+	//MeshletApp app;
 	app.Run(); // easier to debug this way
 	//try {
 	//	app.Run();
